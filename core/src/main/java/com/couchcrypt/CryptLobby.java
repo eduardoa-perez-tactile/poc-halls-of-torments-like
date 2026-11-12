@@ -316,7 +316,7 @@ public final class CryptLobby extends ApplicationAdapter {
                 world.activatePlayer(i);
                 previouslyAlive[i] = world.players[i].alive;
                 if (joining && world.elapsed > 0) {
-                    hudState.notify("A SOUL ANSWERS", i == 0 ? "Player I has joined the descent." : "Player II has joined the descent.",
+                    hudState.notify(i == 0 ? "PLAYER I JOINED" : "PLAYER II JOINED", i == 0 ? "Player I has joined the descent." : "Player II has joined the descent.",
                         ArenaHudState.Tone.SUCCESS, 4f);
                     arena.resetCameras();
                 }
@@ -538,19 +538,19 @@ public final class CryptLobby extends ApplicationAdapter {
                 hudState.notify(i == 0 ? "PLAYER I HAS FALLEN" : "PLAYER II HAS FALLEN",
                     "Stand near your companion to revive them.", ArenaHudState.Tone.WARNING, 4f);
             else if (!previouslyAlive[i] && player.alive)
-                hudState.notify("A SOUL REKINDLED", i == 0 ? "Player I returns to the fight." : "Player II returns to the fight.",
+                hudState.notify(i == 0 ? "PLAYER I REVIVED" : "PLAYER II REVIVED", i == 0 ? "Player I returns to the fight." : "Player II returns to the fight.",
                     ArenaHudState.Tone.SUCCESS, 3.5f);
             previouslyAlive[i] = player.alive;
             if (player.alive && player.health <= player.maxHealth * .25f && !lowHealthNotified[i]) {
                 lowHealthNotified[i] = true;
-                hudState.notify(i == 0 ? "PLAYER I IN PERIL" : "PLAYER II IN PERIL",
+                hudState.notify(i == 0 ? "PLAYER I LOW HEALTH" : "PLAYER II LOW HEALTH",
                     "Dodge to safety. Seek a healing ember.", ArenaHudState.Tone.WARNING, 3.5f);
             }
             if (player.health > player.maxHealth * .4f) lowHealthNotified[i] = false;
         }
         if (!finalWarning && world.timeRemaining() <= 30 && world.outcome == ArenaWorld.Outcome.RUNNING) {
             finalWarning = true;
-            hudState.notify("HOLD THE LINE", "Thirty seconds remain in this descent.", ArenaHudState.Tone.WARNING, 4f);
+            hudState.notify("30 SECONDS REMAIN", "Thirty seconds remain in this descent.", ArenaHudState.Tone.WARNING, 4f);
         }
     }
 

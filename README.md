@@ -64,7 +64,7 @@ The gameplay artwork is temporary pending a separate isometric art pass; the cur
 - Survive for two minutes against ghouls. Collect shared souls and occasional healing drops.
 - One connected player gets a full-screen view. Two get independent vertical split-screen cameras in the same world.
 - Invite a second phone from Pause; it enters beside its companion when resumed.
-- The TV displays ornate player vitals, timer/rewards, and queued combat notifications. A hidden boss status lane is ready for future encounters.
+- The TV uses compact, unboxed player vitals and timer/rewards, with one-line combat notifications. A slim boss status lane appears only when needed for future encounters.
 - Phones show only player identity, movement, and Dodge during play; health stays on the TV.
 - Use the joystick to move and Dodge to escape. Both starter characters currently fire the same automatic magic bolt; differentiated weapons and progression are future work.
 - A living ally can revive a fallen companion by staying nearby for two seconds. If everyone falls, the run ends.
