@@ -43,15 +43,20 @@ public final class JoinServer extends NanoWSD {
     }
 
     public String room() { return room; }
-    public String url(String host) { return "http://" + host + ":" + getListeningPort() + "/?room=" + room; }
+    public String url(String host) { return "http://" + host + ":" + getListeningPort() + "/"; }
 
     @Override protected Response serveHttp(IHTTPSession session) {
         if (session.getMethod() != Method.GET && session.getMethod() != Method.HEAD)
             return newFixedLengthResponse(Response.Status.METHOD_NOT_ALLOWED, MIME_PLAINTEXT, "GET only");
-        Asset asset = assets.get(session.getUri());
-        if (asset == null) return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not found");
-        Response response = newFixedLengthResponse(Response.Status.OK, asset.type(),
-            new java.io.ByteArrayInputStream(asset.data()), asset.data().length);
+        Response response;
+        if ("/session".equals(session.getUri())) {
+            response = newFixedLengthResponse(Response.Status.OK, "application/json", "{\"room\":\"" + room + "\"}");
+        } else {
+            Asset asset = assets.get(session.getUri());
+            if (asset == null) return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not found");
+            response = newFixedLengthResponse(Response.Status.OK, asset.type(),
+                new java.io.ByteArrayInputStream(asset.data()), asset.data().length);
+        }
         response.addHeader("Cache-Control", "no-store");
         response.addHeader("X-Content-Type-Options", "nosniff");
         response.addHeader("Content-Security-Policy", "default-src 'self'; connect-src 'self' ws:; img-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'");
@@ -63,7 +68,8 @@ public final class JoinServer extends NanoWSD {
     private String status() {
         LobbyState.Snapshot snapshot = state.snapshot(System.currentTimeMillis());
         return "{\"type\":\"status\",\"connected\":" + snapshot.connected()
-            + ",\"hostActive\":" + snapshot.hostActive() + ",\"phase\":\"lobby\"}";
+            + ",\"hostActive\":" + snapshot.hostActive() + ",\"phase\":\""
+            + snapshot.phase().name().toLowerCase(java.util.Locale.ROOT) + "\"}";
     }
 
     private void tick() {

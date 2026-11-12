@@ -47,6 +47,8 @@ class JoinServerTest {
             String base = server.url("127.0.0.1");
             var response = http.send(HttpRequest.newBuilder(URI.create(base)).build(), HttpResponse.BodyHandlers.ofString());
             assertEquals(200, response.statusCode()); assertEquals("controller", response.body());
+            var session = http.send(HttpRequest.newBuilder(URI.create(base + "session")).build(), HttpResponse.BodyHandlers.ofString());
+            assertEquals(server.room(), new JsonReader().parse(session.body()).getString("room"));
             String url = "ws://127.0.0.1:" + server.getListeningPort() + "/socket?room=" + server.room();
             Client one = new Client(), two = new Client(), three = new Client();
             WebSocket first = http.newWebSocketBuilder().buildAsync(URI.create(url), one).get(3, TimeUnit.SECONDS);

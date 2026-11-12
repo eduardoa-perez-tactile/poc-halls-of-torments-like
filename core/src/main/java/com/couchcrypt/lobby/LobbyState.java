@@ -5,8 +5,9 @@ import java.util.UUID;
 /** The only owner of player slots. Network callbacks and the render thread use snapshots. */
 public final class LobbyState {
     public static final long RECONNECT_MILLIS = 45_000;
+    public enum Phase { LOBBY, SESSION, PAUSED, INVITE }
     public record Player(int index, boolean connected, boolean reserved, int secondsLeft) {}
-    public record Snapshot(Player first, Player second, int connected, boolean hostActive, long revision) {}
+    public record Snapshot(Player first, Player second, int connected, boolean hostActive, Phase phase, long revision) {}
     public record Join(int slot, String token, String error) {
         static Join rejected(String reason) { return new Join(-1, null, reason); }
     }
@@ -18,6 +19,7 @@ public final class LobbyState {
     }
     private final Slot[] slots = {new Slot(), new Slot()};
     private boolean hostActive = true;
+    private Phase phase = Phase.LOBBY;
     private long revision;
 
     public synchronized Join join(String token, String connection, long now) {
@@ -37,6 +39,7 @@ public final class LobbyState {
         for (int i = 0; i < slots.length; i++) {
             Slot slot = slots[i];
             if (slot.token == null) {
+                if (phase != Phase.LOBBY && phase != Phase.INVITE) return Join.rejected("invite_required");
                 slot.token = UUID.randomUUID().toString();
                 slot.connection = connection;
                 revision++;
@@ -73,11 +76,15 @@ public final class LobbyState {
         if (hostActive != active) { hostActive = active; revision++; }
     }
 
+    public synchronized void setPhase(Phase next) {
+        if (phase != next) { phase = next; revision++; }
+    }
+
     public synchronized Snapshot snapshot(long now) {
         expire(now);
         int count = 0;
         for (Slot slot : slots) if (slot.connection != null) count++;
-        return new Snapshot(player(0, now), player(1, now), count, hostActive, revision);
+        return new Snapshot(player(0, now), player(1, now), count, hostActive, phase, revision);
     }
 
     private Player player(int index, long now) {

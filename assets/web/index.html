@@ -16,9 +16,7 @@
       <h1 id="title">Join your party</h1>
       <p id="message" role="status" aria-live="polite">Keep your phone on the same Wi-Fi as the TV.</p>
       <form id="join-form">
-        <label for="room">Room code on the TV</label>
-        <input id="room" name="room" maxlength="6" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABC123" required pattern="[A-Za-z0-9]{6}">
-        <button id="join" type="submit">Join party</button>
+        <button id="join" type="submit" disabled>Connecting…</button>
       </form>
       <div id="connected" hidden><div class="connection-mark" aria-hidden="true">✓</div><p id="party">Waiting for your companion</p><p class="hint">The TV remote controls the lobby.<br>Your phone controls your character when the adventure begins.</p></div>
     </section>
