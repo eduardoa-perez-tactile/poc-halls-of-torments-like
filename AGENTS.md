@@ -6,10 +6,11 @@
 - Support two players in one shared world with independent split-screen cameras.
 - Players join the TV lobby by scanning a QR code on phones connected to the same local network. Phones open a controller webpage; no companion app is required.
 - The TV remote is the master controller for all shared UI: navigation, character selection, starting, pause, upgrades, restart, and returning to the lobby. Phones provide gameplay controls and connection status, not shared menu navigation or Ready buttons.
-- Target the medieval/isometric dark-fantasy direction of PVGames' Other Worlds: Core Tiles: https://pvgames.itch.io/other-worlds-core-tiles. Use supplied licensed assets when available; identify placeholders clearly.
+- Target the medieval/isometric dark-fantasy direction of PVGames' Other Worlds: Core Tiles: https://pvgames.itch.io/other-worlds-core-tiles. The reference is inspiration. The user authorized original generated lobby artwork from the first build; keep its prompts and provenance in docs/art-direction.md.
 - The reviewed UI proposal is Home -> Lobby -> Objective/countdown -> Split-screen game -> Results. The lobby contains the QR code, two connection slots, character selection, and remote-controlled Start enabled when both phones are connected.
 - Fixed vertical split, shared experience, sequential remote-selected upgrades for both players, revival, and automatic pause on disconnect are proposed design choices; confirm them through design review before treating them as final requirements.
-- Current authorization is environment repair and this working agreement only. Do not scaffold or implement the game until the user explicitly starts implementation. Setup work is not authorization to expand scope.
+- Current authorized milestone: implement the LibGDX foundation and lobby, TV remote navigation, and QR joining for two phones, with original art. Leave gameplay, movement controls, split-screen rendering, and combat for the next step.
+- Treat 60 FPS (16.7 ms per frame) and low memory consumption as requirements. Keep texture dimensions bounded, reuse resources, avoid per-frame allocations and layout rebuilds, and keep network I/O off the render thread. Measure briefly and report limitations honestly; emulator results do not guarantee performance on physical TVs.
 
 ## Working process
 
@@ -53,4 +54,4 @@
 - Android SDK on this machine: /Users/eduardoleale/Library/Android/sdk.
 - Primary TV AVD: Television_1080p (1920x1080, ARM64). Inspect its current configuration rather than assuming an Android image version.
 - Keep local SDK configuration, SDK downloads, emulator images, logs, screenshots, credentials, generated caches, and build outputs out of Git.
-- No game modules, build scripts, or playable prototype are authorized by the setup task.
+- Gameplay is outside the current foundation/lobby milestone.

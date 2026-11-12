@@ -1,0 +1,5 @@
+plugins {
+    id 'com.android.application' version '8.13.2' apply false
+}
+ext.gdxVersion = '1.14.2'
+allprojects { version = '0.1.0'; group = 'com.couchcrypt' }
