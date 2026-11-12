@@ -15,6 +15,7 @@ import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
@@ -49,6 +50,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private Label firstStatus, secondStatus, partyStatus, startLabel, connectionLabel, diagnostics;
     private RemoteButton start;
     private Image qrImage;
+    private Label qrStatus;
     private Texture qr;
     private float refreshClock, profileClock;
     private long lastRevision = -1;
@@ -101,7 +103,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private void reset(boolean isLobby) {
         lobby = isLobby; content.clearChildren(); buttons.clear(); focus = 0;
         firstStatus = secondStatus = partyStatus = connectionLabel = startLabel = null;
-        start = null; qrImage = null; lastRevision = -1;
+        start = null; qrImage = null; qrStatus = null; lastRevision = -1;
         content.pad(90, 100, 64, 100);
     }
 
@@ -166,8 +168,12 @@ public final class CryptLobby extends ApplicationAdapter {
         Table join = new Table();
         join.add(art.label("SCAN TO JOIN", art.section, UiArt.IVORY)).padBottom(16).row();
         qrImage = new Image();
+        qrStatus = art.label("", art.body, UiArt.IVORY);
+        qrStatus.setAlignment(Align.center); qrStatus.setWrap(true);
+        Table statusOverlay = new Table();
+        statusOverlay.add(qrStatus).width(230);
         refreshQr();
-        join.add(qrImage).size(280).padBottom(16).row();
+        join.add(new Stack(qrImage, statusOverlay)).size(280).padBottom(16).row();
         join.add(art.label("Same Wi-Fi. No app required.", art.small, UiArt.IVORY)).padBottom(12).row();
         connectionLabel = art.label(connectionText(), art.small, UiArt.MUTED);
         connectionLabel.setAlignment(Align.center); connectionLabel.setWrap(true);
@@ -185,7 +191,13 @@ public final class CryptLobby extends ApplicationAdapter {
     private void refreshQr() {
         if (qr != null) { qr.dispose(); qr = null; }
         if (qrImage == null) return;
-        if (server == null || host == null) { qrImage.setDrawable(art.panel); return; }
+        qrStatus.setVisible(false);
+        if (server == null || host == null) {
+            qrImage.setDrawable(art.panel);
+            qrStatus.setText(server == null ? "HOST OFFLINE\n\nOpen Network\nto retry" : "NO NETWORK\n\nConnect the TV\nto Wi-Fi");
+            qrStatus.setVisible(true);
+            return;
+        }
         try {
             var bits = new QRCodeWriter().encode(server.url(host), BarcodeFormat.QR_CODE, 360, 360,
                 Map.of(EncodeHintType.MARGIN, 4));
@@ -195,7 +207,12 @@ public final class CryptLobby extends ApplicationAdapter {
             qr = new Texture(pixmap); pixmap.dispose();
             qr.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
             qrImage.setDrawable(new TextureRegionDrawable(qr));
-        } catch (Exception failure) { Gdx.app.error("QR", "Cannot encode local join URL", failure); }
+        } catch (Exception failure) {
+            qrImage.setDrawable(art.panel);
+            qrStatus.setText("CODE UNAVAILABLE\n\nUse the address below");
+            qrStatus.setVisible(true);
+            Gdx.app.error("QR", "Cannot encode local join URL", failure);
+        }
     }
 
     private void managePlayer(int index) {
