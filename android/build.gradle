@@ -1,0 +1,44 @@
+plugins { id 'com.android.application' }
+configurations { natives }
+android {
+    namespace 'com.couchcrypt.android'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.couchcrypt.tv'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName project.version
+    }
+    sourceSets.main {
+        assets.srcDirs = ['../assets']
+        jniLibs.srcDirs = ['build/generated/natives']
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
+    }
+    buildTypes { release { minifyEnabled false } }
+    packaging { resources.excludes += ['META-INF/INDEX.LIST', 'META-INF/*.kotlin_module'] }
+}
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+    implementation project(':core')
+    implementation "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
+    ['arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'].each { abi ->
+        natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-$abi"
+        natives "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-$abi"
+    }
+}
+tasks.register('extractNatives') {
+    inputs.files configurations.natives
+    outputs.dir layout.buildDirectory.dir('generated/natives')
+    doLast {
+        configurations.natives.files.each { archive ->
+            def abi = ['arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86'].find { archive.name.endsWith("natives-${it}.jar") }
+            copy { from zipTree(archive); into layout.buildDirectory.dir("generated/natives/$abi"); include '*.so' }
+        }
+    }
+}
+tasks.named('preBuild').configure { dependsOn 'extractNatives' }
