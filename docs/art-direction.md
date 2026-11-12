@@ -25,7 +25,7 @@ Warm ivory text, muted gold borders and obvious remote focus contrast against co
 
 Both illustrations stay below a 2048-pixel edge. No mipmaps, post-processing, framebuffer effects, animation strips, remote font loads, or duplicate per-screen artwork. Fonts share a small atlas; UI resources are reused and disposed at shutdown. Keep total resident lobby art/font textures below 32 MiB; retain only the small CPU atlas needed for Android context restoration. Profile the actual target hardware before claiming sustained 60 FPS.
 
-## Interface art pass
+## Initial interface art pass
 
 The original backdrop and characters are now complemented by original painted stone/brass panels and iron button plates. These sources were created with the built-in image generation tool on 2026-11-12:
 
@@ -33,6 +33,8 @@ The original backdrop and characters are now complemented by original painted st
 - `assets/art/ui-button.png`: 2172 x 724 source painting, including transparent margins. The native UI reads the plate at (8,132) with size 2156 x 457 once and bakes a 1024 x 224 managed texture. Its nine-slice keeps rivets/corners intact as buttons resize.
 
 The runtime textures add only 1.875 MiB, with the same amount of small CPU pixmap storage for Android context recovery. Full-resolution source pixmaps are disposed immediately after baking. Original source paintings remain unchanged on disk. No textures are rebuilt in the frame loop. Remote focus adds a crisp gold rim, and disabled controls use a muted plate tint. The phone page uses the same local source art through CSS border-image/background cropping.
+
+These initial blue/iron skins and background have been superseded at runtime by the approved shared Home theme described in [home-menu-art.md](home-menu-art.md). The original files and prompts below are retained as source-art provenance; current screens use the matching warm panel and separate normal/focused stone plates.
 
 ### Panel prompt
 
