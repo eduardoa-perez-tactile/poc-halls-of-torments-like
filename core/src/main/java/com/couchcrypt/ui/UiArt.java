@@ -31,7 +31,7 @@ public final class UiArt implements Disposable {
     public final BitmapFont title, heading, section, body, small;
     public final Drawable pixel;
     public final Drawable panel, focusPanel, disabledPanel, scrim, goldLine;
-    public final Button.ButtonStyle normal, focused;
+    public final Button.ButtonStyle normal, focused, cardNormal, cardFocused;
     private final Array<Texture> generated = new Array<>();
     private final Array<Pixmap> generatedPixmaps = new Array<>();
     private final PixmapPacker fontPacker;
@@ -55,13 +55,21 @@ public final class UiArt implements Disposable {
         pixel = fill(Color.WHITE);
         scrim = fill(new Color(0.015f, 0.02f, 0.025f, 0.82f));
         goldLine = fill(new Color(GOLD.r, GOLD.g, GOLD.b, 0.42f));
-        panel = bordered(Color.valueOf("151a1de8"), Color.valueOf("77716377"));
-        focusPanel = bordered(Color.valueOf("252923f5"), GOLD);
-        disabledPanel = bordered(Color.valueOf("151a1dbb"), Color.valueOf("5e605d66"));
-        normal = new Button.ButtonStyle(panel, focusPanel, panel);
+        // Downsample the large source paintings once, before any frame is rendered.
+        // Source masters stay untouched; only small managed runtime textures are retained.
+        panel = skin("art/ui-panel.png", null, 512, 512, 72, 72, 36);
+        NinePatchDrawable plate = skin("art/ui-button.png", new int[]{8, 132, 2156, 457},
+            1024, 224, 72, 48, 14);
+        Drawable focusRim = bordered(Color.CLEAR, GOLD);
+        focusPanel = new FocusDrawable(panel, focusRim);
+        Drawable focusPlate = new FocusDrawable(plate, focusRim);
+        disabledPanel = plate.tint(new Color(0.58f, 0.62f, 0.64f, 0.78f));
+        normal = new Button.ButtonStyle(plate, focusPlate, plate);
         normal.disabled = disabledPanel;
-        focused = new Button.ButtonStyle(focusPanel, focusPanel, focusPanel);
+        focused = new Button.ButtonStyle(focusPlate, focusPlate, focusPlate);
         focused.disabled = disabledPanel;
+        cardNormal = new Button.ButtonStyle(panel, focusPanel, panel);
+        cardFocused = new Button.ButtonStyle(focusPanel, focusPanel, focusPanel);
         long bytes = (long) backdrop.getWidth() * backdrop.getHeight() * 4 + (long) heroes.getWidth() * heroes.getHeight() * 4;
         for (Texture texture : generated) bytes += (long) texture.getWidth() * texture.getHeight() * 4;
         textureBytes = bytes;
@@ -91,11 +99,32 @@ public final class UiArt implements Disposable {
     }
     private Drawable bordered(Color fill, Color edge) {
         Pixmap pixmap = new Pixmap(12, 12, Pixmap.Format.RGBA8888);
+        pixmap.setBlending(Pixmap.Blending.None);
         pixmap.setColor(edge); pixmap.fill();
         pixmap.setColor(fill); pixmap.fillRectangle(2, 2, 8, 8);
         Texture texture = new Texture(new PixmapTextureData(pixmap, null, false, false, true));
         generatedPixmaps.add(pixmap); generated.add(texture);
         return new NinePatchDrawable(new NinePatch(texture, 4, 4, 4, 4));
+    }
+    private NinePatchDrawable skin(String path, int[] crop, int width, int height,
+                                  int splitX, int splitY, float corner) {
+        Pixmap source = new Pixmap(Gdx.files.internal(path));
+        Pixmap small = new Pixmap(width, height, Pixmap.Format.RGBA8888);
+        small.setBlending(Pixmap.Blending.None);
+        small.setFilter(Pixmap.Filter.BiLinear);
+        int x = crop == null ? 0 : crop[0], y = crop == null ? 0 : crop[1];
+        int w = crop == null ? source.getWidth() : crop[2];
+        int h = crop == null ? source.getHeight() : crop[3];
+        small.drawPixmap(source, x, y, w, h, 0, 0, width, height);
+        source.dispose();
+        Texture texture = new Texture(new PixmapTextureData(small, null, false, false, true));
+        texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        generated.add(texture); generatedPixmaps.add(small);
+        NinePatch patch = new NinePatch(texture, splitX, splitX, splitY, splitY);
+        patch.scale(corner / splitX, corner / splitY);
+        NinePatchDrawable drawable = new NinePatchDrawable(patch);
+        drawable.setMinWidth(0); drawable.setMinHeight(0);
+        return drawable;
     }
     public Label label(String text, BitmapFont font, Color color) { return new Label(text, new Label.LabelStyle(font, color)); }
     @Override public void dispose() {

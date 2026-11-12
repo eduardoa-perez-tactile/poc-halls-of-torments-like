@@ -22,4 +22,6 @@ These are observations from a short foundation check. They do not establish an a
 
 ## Recheck only when relevant
 
+The subsequent UI art pass adds two baked textures (512 x 512 and 1024 x 224), totaling 1.875 MiB of GPU data and 1.875 MiB of retained CPU pixmaps. Large painted UI source pixmaps are freed after the one-time startup bake. The estimated art/font texture total is approximately 17.88 MiB plus QR, within the 32 MiB budget. A static gold focus rim adds one small draw layer, with no animation or post-processing.
+
 Run `python3 scripts/tv-dev.py --profile`, inspect a few LobbyPerf log lines and one dumpsys meminfo snapshot. F3 displays the same frame/resource summary on desktop. No prolonged automated playtesting is required for the static lobby.

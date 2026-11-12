@@ -22,7 +22,7 @@
 - Keep changes focused. Avoid unrelated refactors, speculative systems, unnecessary frameworks, and generated clutter.
 - When authorized and useful, maintain short current design documents under docs/ for game scope, UI flow, and architecture. Do not create documentation as a substitute for requested implementation.
 - At handoff, explain what changed, what was actually checked, known limitations, and a short list of things for the user to try. Distinguish verified behavior from untested behavior.
-- Do not delegate to additional agents unless the user explicitly requests delegation.
+- The user explicitly requests subagents for independent chunks of substantial work. Assign disjoint file ownership and integrate their results in the existing checkout. The primary agent owns branch switching, commits, merges, cleanup, and pushing; subagents must not create worktrees or switch branches.
 
 ## Testing rules
 
@@ -45,7 +45,7 @@
 - Use merge commits for completed feature, release, and hotfix branches so the branch purpose remains visible in history.
 - Delete local and remote branches created for this work once merged; only delete remote branches if they were actually pushed. Never delete user-owned or unmerged branches.
 - Do not force-push, rewrite shared history, create worktrees, or leave abandoned task branches behind.
-- Commit completed coherent work. Push when the user requests publishing or the active task explicitly includes pushing; creating a file alone does not require a remote push.
+- Commit and push completed coherent milestones automatically. The user expects finished work to be visible on GitHub, not only in local commits. After merging a completed feature, push develop; publish main and version tags through the release/hotfix flow when a stable release is prepared.
 - Branch merges do not automatically trigger full regression tests or gameplay playthroughs.
 
 ## Local environment

@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Original crypt portal and two co-op embers, entirely within the 72 x 72 safe area. -->
+    <path android:fillColor="#b99a63" android:fillType="evenOdd"
+        android:pathData="M25,85L25,49C25,31 38,22 54,22C70,22 83,31 83,49L83,85Z M35,81L73,81L73,50C73,38 65,32 54,32C43,32 35,38 35,50Z" />
+    <path android:fillColor="#e1be7b" android:pathData="M50,22L58,22L57,33L51,33Z" />
+    <path android:fillColor="#7e8077" android:pathData="M25,54L35,54L35,58L25,58Z M73,54L83,54L83,58L73,58Z" />
+    <path android:fillColor="#e1be7b" android:pathData="M45,77C35,75 35,67 41,60C44,56 45,52 44,48C51,54 55,63 52,70C51,75 48,77 45,77Z" />
+    <path android:fillColor="#9bc3bb" android:pathData="M63,77C54,75 54,68 59,62C63,57 64,53 63,49C70,56 73,65 70,71C69,75 66,77 63,77Z" />
+    <path android:fillColor="#eee7d8" android:pathData="M45,72C42,70 43,66 46,63C49,67 49,71 45,72Z M63,72C60,70 61,67 64,64C67,68 67,71 63,72Z" />
+    <path android:fillColor="#b99a63" android:pathData="M22,83L86,83L86,88L22,88Z" />
+</vector>
