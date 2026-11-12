@@ -1,6 +1,6 @@
 # Couch Crypt
 
-A LibGDX Android TV couch co-op foundation, using Couch Crypt as its working title. This milestone includes original dark-fantasy lobby art, TV remote navigation, and local QR joining for two phone browsers. Gameplay is the next milestone.
+A LibGDX Android TV couch co-op arena survivor, using Couch Crypt as its working title. The first playable slice includes original dark-fantasy art, TV remote menus, QR phone controllers, and solo or two-player combat.
 
 ## Run on desktop
 
@@ -51,11 +51,22 @@ Select **Play** using the remote. A phone scans the QR and gets a slot automatic
 - A disconnected slot is held for 45 seconds; the same browser can reclaim it using its stored token. The remote can free a slot immediately.
 - Tokens are scoped to this host and app session. A duplicate tab cannot take over an active controller. A new app process creates a fresh session; scan again after restarting the app.
 - The TV remote owns menus and player removal. Phones cannot start the game or send shared UI actions.
-- **Start Solo** unlocks at one connection; **Start Co-op** appears at two. They open the session-ready handoff; gameplay is the next milestone.
-- Press Back in the session to open **Pause**: Resume, Invite Player 2, or Return to Lobby. Invite shows the QR without leaving the session; Back returns to Pause. Returning to the lobby requires confirmation and keeps the party connected. Resume is disabled if no phones are connected.
+- **Start Solo** unlocks at one connection; **Start Co-op** appears at two. They start a two-minute survival round. Phones control movement and dodge; attacks automatically target nearby enemies.
+- Press Back in the session to open **Pause**: Resume, Invite Player 2, Restart Run, or Return to Lobby. Invite shows the QR without leaving the session; Back returns to Pause. Returning to the lobby requires confirmation and keeps the party connected. A disconnected player pauses the world. Reconnect that phone or remove its slot under Invite Player 2 before resuming.
 - Player 2 can join in the lobby or later from **Pause -> Invite Player 2**. The normal join area shows only the QR and a Same Wi-Fi reminder; address/port troubleshooting is under Network.
 - Home/Back preserves connections in the lobby. Android backgrounding informs connected phones that the host is away.
 - Network shows available LAN addresses and can retry a failed controller server.
+
+The gameplay artwork is temporary pending a separate isometric art pass; the current focus is functionality.
+
+## First playable slice
+
+- Survive for two minutes against ghouls. Collect shared souls and occasional healing drops.
+- One connected player gets a full-screen view. Two get independent vertical split-screen cameras in the same world.
+- Invite a second phone from Pause; it enters beside its companion when resumed.
+- Use the joystick to move and Dodge to escape. Both starter characters currently fire the same automatic magic bolt; differentiated weapons and progression are future work.
+- A living ally can revive a fallen companion by staying nearby for two seconds. If everyone falls, the run ends.
+- Victory/defeat offers Restart Run or Return to Lobby using the TV remote.
 
 ## Focused verification
 
@@ -66,7 +77,7 @@ node --check assets/web/controller.js
 
 The small test suite covers slot allocation, reconnect reservations/expiry, duplicate tabs, host removal, room validation, and the real HTTP/WebSocket handshake. No whole-game playthroughs or broad regression runs are part of this milestone.
 
-Checks passed: nine core tests, desktop compilation, Android APK build/launch, D-pad/OK/Back navigation, and automatic browser joining through the emulator LAN relay. The solo-ready -> Pause -> Invite Player 2 -> Resume flow was checked with a browser plus a separate WebSocket client. Slot-limit and reconnect checks remain covered by the focused suite. Two physical phones and camera scanning still need the user's review.
+The focused tests cover simulation invariants and input/protocol safety. User playtesting covers combat feel, difficulty, two physical phones, and camera scanning. No automated full-round playthrough is required.
 
 F3 toggles desktop diagnostics. `--profile` (or the Android `profile` intent extra) logs FPS, live Java heap, resident art texture bytes, and draw calls every five seconds. These are brief diagnostics, not a guarantee of performance on every TV. See [performance notes](docs/performance.md).
 
@@ -80,7 +91,7 @@ F3 toggles desktop diagnostics. `--profile` (or the Android `profile` intent ext
 
 Home, lobby, pause, dialogs, and the phone page share the same carved stone, aged brass, and ruby-gem theme. Buttons have separate normal and bright gold focused/pressed artwork with aligned crops. Native UI textures are baked once and shared by all controls.
 
-The approved centered Home uses a crypt backdrop, forged-gold logo, and pale carved-stone controls for Play, How to Join, Settings, and Exit. These are live remote controls over separate artwork, not a flattened menu screenshot. Reusing that backdrop throughout the app keeps the shared texture footprint at about 20.07 MiB plus QR, within the 32 MiB budget. Settings contains the functional Network submenu; Exit asks for confirmation. Phones receive small, already baked versions of the same art rather than full-size source paintings.
+The approved centered Home uses a crypt backdrop, forged-gold logo, and pale carved-stone controls for Play, How to Join, Settings, and Exit. These are live remote controls over separate artwork, not a flattened menu screenshot. Reusing that backdrop throughout the app keeps the shared texture footprint at about 23.07 MiB plus QR, including the 3 MiB gameplay atlas and floor, within the 32 MiB budget. Settings contains the functional Network submenu; Exit asks for confirmation. Phones receive small, already baked versions of the same art rather than full-size source paintings.
 
 The Android launcher has a safe-zone adaptive icon, legacy icon densities, and 16:9 title banners. Its actual banner has been checked in the TV emulator's Installed Games row. Reproduce these code-native assets with `java -Djava.awt.headless=true scripts/GenerateLauncherArt.java` using JDK 21.
 

@@ -1,6 +1,6 @@
 # Foundation and lobby
 
-The TV/desktop host owns a two-slot LobbyState. Its synchronized methods are short; network sockets and asset I/O do not run in the render loop. The LibGDX UI reads snapshots twice per second and changes labels only when state or reconnect countdown changes.
+The TV/desktop host owns a two-slot LobbyState. Its synchronized methods are short; network sockets and asset I/O do not run in the render loop. The LibGDX UI reads snapshots five times per second and changes labels only when state or reconnect countdown changes.
 
 NanoWSD serves an allowlisted set of local assets over HTTP and accepts WebSockets on the same TCP port, 8787. ZXing generates the join QR from the TV's plain local address. There is one party per TV. The controller page discovers an opaque internal session identifier from GET /session, then automatically connects; players never enter or see a room number. The page has no runtime third-party dependencies.
 
@@ -20,6 +20,12 @@ Home, lobby, and dialogs now share the approved crypt backdrop and matching ston
 
 AndroidLauncher uses singleTask launch mode so reopening from the TV launcher reuses the existing activity, room, and controller server. A second activity would otherwise fail to bind the same local port and show an offline lobby. The QR area now displays an explicit network/host error instead of a blank artwork panel if hosting or QR generation is unavailable.
 
-Gameplay systems, movement input, split-screen cameras, class selection, combat, and progression are deliberately outside this milestone.
+ArenaWorld is a rendering-independent, fixed 60 Hz simulation with preallocated pools (64 enemies, 96 bolts, 96 pickups). Frame delta is bounded to 100 ms. It owns movement, dodge, targeting, health, shared pickups, revival, and the 120-second round outcome. There are no tick-time allocations.
+
+Phones send screen-relative axes and dodge edges at 30 Hz, bound by the server to their own connection. Finite normalized inputs expire after 300 ms, sequence numbers reject replay/out-of-order messages, and pause/background/disconnect clears all input. The render thread polls reusable Controls objects and maps screen axes into world axes. The server publishes own-player health/cooldown feedback at 5 Hz during gameplay without render-thread I/O.
+
+ArenaRenderer projects the shared world isometrically, culls floor tiles, depth-sorts a bounded preallocated sprite list, and draws either one camera or two independently scissored vertical viewports. The original painted masters are baked once into a managed 1024x512 actor/prop/FX atlas and 512x512 floor texture (3 MiB total); large source pixmaps are immediately released. No framebuffers or post-processing are used. HUD text is cached at 5 Hz. See gameplay-art.md for provenance.
+
+The TV owns all transitions: Lobby -> Session -> Results; Pause -> Invite -> Pause -> Resume preserves the running world. A fresh second controller joins near its living companion on resume. Reconnection keeps the same generation and existing player health; a replacement controller has a new generation. Any participating controller disconnect pauses simulation, and app backgrounding also pauses. Class selection, distinct class weapons, progression, additional arenas and persistent saves remain future milestones.
 
 Sources: [LibGDX project structure](https://libgdx.com/wiki/start/project-generation), [Android TV setup](https://developer.android.com/training/tv/get-started/create), [NanoHTTPD](https://github.com/NanoHttpd/nanohttpd), [ZXing](https://github.com/zxing/zxing).

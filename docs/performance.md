@@ -33,3 +33,12 @@ The approved shared theme uses a 1536 x 864 background, 1536 x 384 transparent w
 Navigation reuses cached backgrounds and styles. Focus uses a separate prepainted gold/cream plate with the same crop and geometry as the normal plate; no framebuffer, glow pass, particle system, or per-frame texture generation is introduced. Buttons and labels remain functional Scene2D controls. Phones receive PNGs encoded once from the small baked textures, including a 512 x 128 logo and 640 x 360 background, avoiding retention/download of full-size paintings. Only a brief visual/navigation check is needed for this art/layout change; the existing joining protocol is unchanged.
 
 Brief software-emulator frame samples during this pass ranged from 55 to 61 FPS; a steady 60 FPS guarantee on physical TVs remains unverified. The Home screen used 11 SpriteBatch draw calls. These observations are not a long gameplay benchmark.
+
+
+## First playable slice — current measurement
+
+Gameplay adds a 1024x512 managed actor/prop/FX atlas and 512x512 floor texture, exactly 3 MiB. Combined resident art/font texture data is 23.0656 MiB plus QR, checked against a 32 MiB startup budget. Matching small CPU pixmaps are retained for GL context recovery; large source masters are decoded only during startup and disposed immediately after baking.
+
+Simulation uses fixed pools capped at 64 enemies, 96 bolts and 96 pickups, with a fixed 60 Hz step and bounded catch-up. World rendering uses culled floor diamonds, one actor atlas, no framebuffers/post-processing and one or two scissored cameras. HUD text refreshes at 5 Hz; reusable controller samples avoid render-loop input allocation. Networking and status broadcasts remain outside the render thread.
+
+A brief debug APK check on the visible Android 33 ARM64 emulator with Apple M2 Max OpenGL translation observed 59–61 FPS, about 5 MiB live Java heap after collection, and 8 combined draw calls in solo combat. This was a short launch/movement/dodge/late-join/split-screen check, not a full survival playthrough or maximum-enemy benchmark. Sustained 60 FPS and total process memory on representative physical TVs remain unverified. Gameplay art is temporary per user direction.

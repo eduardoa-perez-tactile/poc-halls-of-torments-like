@@ -9,9 +9,10 @@
 - Target the medieval/isometric dark-fantasy direction of PVGames' Other Worlds: Core Tiles: https://pvgames.itch.io/other-worlds-core-tiles. The reference is inspiration. The user authorized original generated lobby artwork from the first build; keep its prompts and provenance in docs/art-direction.md.
 - The UI flow is Home -> Lobby -> Session -> Results, with Pause -> Invite Player 2 available during a solo session. One connected phone enables Start Solo; two enable Start Co-op. Keep the QR area minimal: Scan to Join, the code, and Same Wi-Fi. There is one party per TV; internal session identifiers must not appear as room numbers or a room-entry requirement.
 - Fixed vertical split, shared experience, sequential remote-selected upgrades for both players, revival, and automatic pause on disconnect are proposed design choices; confirm them through design review before treating them as final requirements.
-- Current authorized milestone: implement the LibGDX foundation and lobby, TV remote navigation, and QR joining for two phones, with original art. Leave gameplay, movement controls, split-screen rendering, and combat for the next step.
+- Current authorized milestone: implement the first playable combat slice: phone joystick/dodge, one original-art arena with animated characters, automatic attacks, one enemy type, health/pickups, a short survival round, defeat/victory/restart, and solo/co-op cameras. Player 2 can join through Pause and spawn near Player 1. Keep existing remote-owned menus and approved visual theme.
 - The user approved the centered Home-menu concept on 2026-11-12: large original forged-gold Couch Crypt branding, torchlit ruins, carved stone controls (Play / How to Join / Settings), and a separate Exit. Build functional remote controls over separate art layers; do not use a flattened menu screenshot as the interface. Other major visual direction changes require design approval before implementation.
 - Keep this visual theme consistent across Home, lobby, pause, dialogs, and phone controls. Buttons must have clearly distinct normal and focused/pressed states; use the matching painted gold state with shared crop/anchors so focus does not move the button artwork.
+- The user considers the first gameplay floor, actor animations, enemies, and props temporary: they do not yet match the desired isometric art direction. Focus on functionality now; revisit and approve the gameplay art in a later visual pass. Preserve the approved menu/icon direction.
 - Treat 60 FPS (16.7 ms per frame) and low memory consumption as requirements. Keep texture dimensions bounded, reuse resources, avoid per-frame allocations and layout rebuilds, and keep network I/O off the render thread. Measure briefly and report limitations honestly; emulator results do not guarantee performance on physical TVs.
 
 ## Working process
@@ -56,4 +57,4 @@
 - Android SDK on this machine: /Users/eduardoleale/Library/Android/sdk.
 - Primary TV AVD: Television_1080p (1920x1080, ARM64). Inspect its current configuration rather than assuming an Android image version.
 - Keep local SDK configuration, SDK downloads, emulator images, logs, screenshots, credentials, generated caches, and build outputs out of Git.
-- Gameplay is outside the current foundation/lobby milestone.
+- Keep this gameplay slice bounded; additional dungeons, character progression menus, bosses, persistent saves, and monetization are outside the current milestone.

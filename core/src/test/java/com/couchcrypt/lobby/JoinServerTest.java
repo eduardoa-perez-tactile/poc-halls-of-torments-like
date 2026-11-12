@@ -74,4 +74,24 @@ class JoinServerTest {
             socket.abort();
         } finally { server.stop(); }
     }
+    @Test void inputOverWebSocketCanOnlyControlItsAssignedSlot() throws Exception {
+        var state = new LobbyState(); var server = new JoinServer(0, state, Map.of()); server.open();
+        try (var http = HttpClient.newHttpClient()) {
+            Client listener = new Client();
+            var socket = http.newWebSocketBuilder().buildAsync(URI.create("ws://127.0.0.1:" + server.getListeningPort() + "/socket?room=" + server.room()), listener).get(3, TimeUnit.SECONDS);
+            listener.expect("joined"); state.join(null, "second", System.currentTimeMillis());
+            state.setPhase(LobbyState.Phase.SESSION);
+            socket.sendText("{\"type\":\"input\",\"player\":2,\"x\":1,\"y\":0,\"dodge\":true,\"seq\":0}", true).get(3, TimeUnit.SECONDS);
+            var controls = new LobbyState.Controls();
+            long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+            do {
+                state.readControls(0, controls, System.currentTimeMillis());
+                if (controls.x == 1) break;
+                java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(5));
+            } while (System.nanoTime() < until);
+            assertEquals(1, controls.x); assertTrue(controls.dodge);
+            state.readControls(1, controls, System.currentTimeMillis()); assertEquals(0, controls.x); assertFalse(controls.dodge);
+            socket.abort();
+        } finally { server.stop(); }
+    }
 }
