@@ -65,6 +65,8 @@ public final class CryptLobby extends ApplicationAdapter {
     private ArenaRenderer arena;
     private final LobbyState.Controls[] controls = {new LobbyState.Controls(), new LobbyState.Controls()};
     private final long[] generations = new long[2];
+    private final LobbyState.UpgradeRequest[] upgradeRequests = {new LobbyState.UpgradeRequest(), new LobbyState.UpgradeRequest()};
+    private int notifiedLevel = 1;
     private boolean hostActive = true;
     private RemoteButton start, pauseResume;
     private Image qrImage;
@@ -297,12 +299,13 @@ public final class CryptLobby extends ApplicationAdapter {
 
     private void startSession() {
         if (state.snapshot(System.currentTimeMillis()).connected() < 1 || server == null || host == null) return;
-        world.reset(); hudState.reset(); finalWarning = false;
+        world.reset(); hudState.reset(); finalWarning = false; notifiedLevel = 1;
         for (int i = 0; i < 2; i++) { previouslyAlive[i] = false; lowHealthNotified[i] = false; }
         reconcilePlayers();
         hudState.notify("THE DESCENT BEGINS", "Survive the crypt. Gather the fallen souls.", ArenaHudState.Tone.INFO, 4f);
         arena.resetCameras();
         showSession();
+        publishProgression();
     }
 
     private void reconcilePlayers() {
@@ -463,6 +466,10 @@ public final class CryptLobby extends ApplicationAdapter {
     }
 
     private boolean key(int key) {
+        if (key == Input.Keys.F5 && config.profile() && screen == Screen.SESSION && overlay == null) {
+            world.progression.addXp(world.progression.xpToNext);
+            announceLevelUp(); publishProgression(); return true;
+        }
         if (key == Input.Keys.F4 && screen == Screen.SESSION) {
             if (hudState.bossVisible) hudState.clearBoss();
             else {
@@ -530,6 +537,25 @@ public final class CryptLobby extends ApplicationAdapter {
         label.setColor(player.connected() ? UiArt.GREEN : UiArt.GOLD);
     }
 
+    private void announceLevelUp() {
+        if (world.progression.level <= notifiedLevel) return;
+        notifiedLevel = world.progression.level;
+        hudState.notify("LEVEL " + notifiedLevel + "  /  CHOOSE ON YOUR PHONE", "Combat continues. Choose within 30 seconds.",
+            ArenaHudState.Tone.SUCCESS, 4f);
+    }
+
+    private void publishProgression() {
+        var progression = world.progression;
+        boolean inRun = (screen == Screen.SESSION || screen == Screen.INVITE) && world.outcome == ArenaWorld.Outcome.RUNNING;
+        for (int i = 0; i < 2; i++) {
+            var offer = progression.offers[i];
+            boolean pending = inRun && world.players[i].active && offer.pending;
+            state.publishProgression(i, progression.level, progression.xp, progression.xpToNext,
+                pending ? offer.id : 0, pending ? offer.level : 0, pending ? offer.secondsLeft : 0,
+                pending ? offer.options : null);
+        }
+    }
+
     private void updateCombatNotices() {
         for (int i = 0; i < 2; i++) {
             var player = world.players[i];
@@ -573,14 +599,22 @@ public final class CryptLobby extends ApplicationAdapter {
                     float scale = length > 0 ? magnitude / length : 0;
                     world.setInput(i, x * scale, y * scale, input.dodge);
                 }
+                for (int i = 0; i < 2; i++) {
+                    var request = upgradeRequests[i];
+                    if (state.pollUpgrade(i, request) && request.generation == controls[i].generation
+                        && world.progression.choose(i, request.offerId, request.option)) {
+                        hudState.notify(i == 0 ? "PLAYER I UPGRADED" : "PLAYER II UPGRADED", "", ArenaHudState.Tone.SUCCESS, 2f);
+                    }
+                }
                 world.update(delta);
+                announceLevelUp();
                 hudState.update(delta);
                 updateCombatNotices();
                 if (world.outcome != ArenaWorld.Outcome.RUNNING) showResults();
             }
         }
         if (refreshClock >= 0.2f) {
-            refreshClock = 0; updateStatus();
+            refreshClock = 0; updateStatus(); publishProgression();
             for (int i = 0; i < 2; i++) {
                 var player = world.players[i];
                 state.setPlayerFeedback(i, player.health, player.maxHealth, player.dodgeCooldown, player.alive);

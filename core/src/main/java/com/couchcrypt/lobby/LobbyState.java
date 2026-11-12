@@ -1,6 +1,7 @@
 package com.couchcrypt.lobby;
 
 import java.util.UUID;
+import com.couchcrypt.game.PartyProgression;
 
 /** The only owner of player slots. Network callbacks and the render thread use snapshots. */
 public final class LobbyState {
@@ -15,6 +16,14 @@ public final class LobbyState {
         public boolean dodge, connected;
         public long generation;
     }
+    /** Reused by the render thread; choices never mutate simulation state on a socket thread. */
+    public static final class UpgradeRequest {
+        public int offerId, option;
+        public long generation;
+    }
+    public record UpgradeFeedback(int id, int level, float secondsLeft,
+        PartyProgression.Upgrade first, PartyProgression.Upgrade second, PartyProgression.Upgrade third) {}
+    public record ProgressionFeedback(int level, int xp, int xpToNext, UpgradeFeedback upgrade) {}
     public record Snapshot(Player first, Player second, int connected, boolean hostActive, Phase phase, long revision) {}
     public record Join(int slot, String token, String error) {
         static Join rejected(String reason) { return new Join(-1, null, reason); }
@@ -26,10 +35,24 @@ public final class LobbyState {
         int sequence = -1;
         float x, y, health = 100, maxHealth = 100, dodgeCooldown;
         boolean pendingDodge, dodgeHeld, alive = true;
+        int level = 1, xp, xpToNext = 6, offerId, offerLevel, claimedOfferId;
+        float offerSeconds;
+        final PartyProgression.Upgrade[] options = new PartyProgression.Upgrade[3];
+        boolean upgradeQueued;
+        int upgradeOption;
+        void clearUpgradeRequest() {
+            if (upgradeQueued) claimedOfferId = 0;
+            upgradeQueued = false;
+        }
+        void clearProgression() {
+            level = 1; xp = 0; xpToNext = 6; offerId = offerLevel = claimedOfferId = 0;
+            offerSeconds = 0; upgradeQueued = false;
+            for (int i = 0; i < 3; i++) options[i] = null;
+        }
         void clearInput() { x = 0; y = 0; pendingDodge = false; dodgeHeld = false; lastInput = 0; }
         void clear() {
             token = null; connection = null; expires = 0; sequence = -1; clearInput();
-            health = maxHealth = 100; dodgeCooldown = 0; alive = true;
+            health = maxHealth = 100; dodgeCooldown = 0; alive = true; clearProgression();
         }
     }
     private final Slot[] slots = {new Slot(), new Slot()};
@@ -59,7 +82,7 @@ public final class LobbyState {
                 slot.token = UUID.randomUUID().toString();
                 slot.connection = connection;
                 slot.generation = ++nextGeneration;
-                slot.sequence = -1; slot.clearInput();
+                slot.sequence = -1; slot.clearInput(); slot.clearProgression();
                 revision++;
                 return new Join(i, slot.token, null);
             }
@@ -71,7 +94,7 @@ public final class LobbyState {
         for (Slot slot : slots) {
             if (connection.equals(slot.connection)) {
                 slot.connection = null;
-                slot.clearInput();
+                slot.clearInput(); slot.clearUpgradeRequest();
                 slot.expires = now + RECONNECT_MILLIS;
                 revision++;
             }
@@ -92,11 +115,11 @@ public final class LobbyState {
     }
 
     public synchronized void setHostActive(boolean active) {
-        if (hostActive != active) { hostActive = active; clearInputs(); revision++; }
+        if (hostActive != active) { hostActive = active; clearInputs(); if (!active) clearUpgradeRequests(); revision++; }
     }
 
     public synchronized void setPhase(Phase next) {
-        if (phase != next) { phase = next; clearInputs(); revision++; }
+        if (phase != next) { phase = next; clearInputs(); if (next != Phase.SESSION) clearUpgradeRequests(); revision++; }
     }
 
     /** Only the server supplies connection identities; clients cannot choose a player index. */
@@ -136,6 +159,60 @@ public final class LobbyState {
         Slot slot = slots[index];
         return new Feedback(slot.health, slot.maxHealth, slot.dodgeCooldown, slot.alive);
     }
+
+    /** Copies authoritative presentation data; this method does no network I/O or allocation. */
+    public synchronized void publishProgression(int index, int level, int xp, int xpToNext,
+        int offerId, int offerLevel, float secondsLeft, PartyProgression.Upgrade[] options) {
+        Slot slot = slots[index];
+        slot.level = Math.max(1, Math.min(20, level));
+        slot.xpToNext = slot.level == 20 ? 0 : Math.max(1, xpToNext);
+        slot.xp = Math.max(0, Math.min(slot.xpToNext, xp));
+        boolean offered = offerId > 0 && options != null && options.length >= 3
+            && options[0] != null && options[1] != null && options[2] != null
+            && Float.isFinite(secondsLeft) && secondsLeft > 0;
+        int nextId = offered ? offerId : 0;
+        if (slot.offerId != nextId || nextId == 0) {
+            slot.upgradeQueued = false;
+            slot.claimedOfferId = 0;
+        }
+        slot.offerId = nextId;
+        slot.offerLevel = offered ? Math.max(2, Math.min(20, offerLevel)) : 0;
+        slot.offerSeconds = offered ? Math.min(30, secondsLeft) : 0;
+        for (int i = 0; i < 3; i++) slot.options[i] = offered ? options[i] : null;
+    }
+
+    /** The request can only select the caller's own currently published offer. */
+    public synchronized boolean chooseUpgrade(String connection, int offerId, int option) {
+        if (!hostActive || phase != Phase.SESSION || offerId <= 0 || option < 0 || option >= 3) return false;
+        for (Slot slot : slots) {
+            if (!connection.equals(slot.connection)) continue;
+            if (slot.offerId != offerId || slot.offerSeconds <= 0 || slot.claimedOfferId == offerId) return false;
+            slot.claimedOfferId = offerId;
+            slot.upgradeOption = option;
+            slot.upgradeQueued = true;
+            return true;
+        }
+        return false;
+    }
+
+    /** One render-thread delivery, carrying identity to reject remove/rejoin races. */
+    public synchronized boolean pollUpgrade(int index, UpgradeRequest out) {
+        Slot slot = slots[index];
+        if (!slot.upgradeQueued || !hostActive || phase != Phase.SESSION || slot.connection == null) return false;
+        out.offerId = slot.offerId; out.option = slot.upgradeOption; out.generation = slot.generation;
+        slot.upgradeQueued = false;
+        return true;
+    }
+
+    /** Allocations here belong to the server thread, never the render loop. */
+    public synchronized ProgressionFeedback progressionFeedback(int index) {
+        Slot slot = slots[index];
+        UpgradeFeedback upgrade = slot.offerId > 0
+            ? new UpgradeFeedback(slot.offerId, slot.offerLevel, slot.offerSeconds, slot.options[0], slot.options[1], slot.options[2]) : null;
+        return new ProgressionFeedback(slot.level, slot.xp, slot.xpToNext, upgrade);
+    }
+
+    private void clearUpgradeRequests() { for (Slot slot : slots) slot.clearUpgradeRequest(); }
 
     private void clearInputs() { for (Slot slot : slots) slot.clearInput(); }
 

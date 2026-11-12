@@ -2,6 +2,7 @@ package com.couchcrypt.lobby;
 
 import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
+import com.couchcrypt.game.PartyProgression;
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoWSD;
 import java.io.IOException;
@@ -72,7 +73,41 @@ public final class JoinServer extends NanoWSD {
             + ",\"hostActive\":" + snapshot.hostActive() + ",\"phase\":\""
             + snapshot.phase().name().toLowerCase(java.util.Locale.ROOT) + "\",\"health\":" + feedback.health()
             + ",\"maxHealth\":" + feedback.maxHealth() + ",\"dodgeCooldown\":" + feedback.dodgeCooldown()
-            + ",\"alive\":" + feedback.alive() + "}";
+            + ",\"alive\":" + feedback.alive() + ",\"progression\":" + progressionJson(slot) + "}";
+    }
+
+    private String progressionJson(int slot) {
+        var feedback = state.progressionFeedback(slot);
+        StringBuilder result = new StringBuilder(512);
+        result.append("{\"level\":").append(feedback.level()).append(",\"xp\":").append(feedback.xp())
+            .append(",\"xpToNext\":").append(feedback.xpToNext()).append(",\"upgrade\":");
+        var upgrade = feedback.upgrade();
+        if (upgrade == null) return result.append("null}").toString();
+        result.append("{\"id\":").append(upgrade.id()).append(",\"level\":").append(upgrade.level())
+            .append(",\"secondsLeft\":").append(upgrade.secondsLeft()).append(",\"options\":[");
+        appendUpgrade(result, upgrade.first()); result.append(',');
+        appendUpgrade(result, upgrade.second()); result.append(',');
+        appendUpgrade(result, upgrade.third());
+        return result.append("]}}").toString();
+    }
+
+    private static void appendUpgrade(StringBuilder target, PartyProgression.Upgrade upgrade) {
+        target.append("{\"id\":"); quote(target, upgrade.id);
+        target.append(",\"title\":"); quote(target, upgrade.title);
+        target.append(",\"description\":"); quote(target, upgrade.description); target.append('}');
+    }
+
+    private static void quote(StringBuilder target, String text) {
+        target.append('"');
+        for (int i = 0; i < text.length(); i++) {
+            char value = text.charAt(i);
+            if (value == '"' || value == '\\') target.append('\\').append(value);
+            else if (value < 32) {
+                target.append("\\u00").append("0123456789abcdef".charAt(value >>> 4))
+                    .append("0123456789abcdef".charAt(value & 15));
+            } else target.append(value);
+        }
+        target.append('"');
     }
 
     private void tick() {
@@ -145,6 +180,15 @@ public final class JoinServer extends NanoWSD {
                 JsonValue message = new JsonReader().parse(text);
                 if ("ping".equals(message.getString("type", ""))) {
                     lastSeen = System.currentTimeMillis(); deliver(status(slot));
+                }
+                else if ("upgrade".equals(message.getString("type", ""))) {
+                    JsonValue offerId = message.get("offerId"), option = message.get("option");
+                    if (offerId == null || !offerId.isLong() || offerId.asLong() <= 0 || offerId.asLong() > Integer.MAX_VALUE
+                        || option == null || !option.isLong() || option.asLong() < 0 || option.asLong() > 2) return;
+                    if (state.owns(id)) {
+                        lastSeen = System.currentTimeMillis();
+                        state.chooseUpgrade(id, offerId.asInt(), option.asInt());
+                    }
                 }
                 else if ("input".equals(message.getString("type", ""))) {
                     JsonValue sequence = message.get("seq"), x = message.get("x"), y = message.get("y"), dodge = message.get("dodge");

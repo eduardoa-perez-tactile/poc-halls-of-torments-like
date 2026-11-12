@@ -2,6 +2,7 @@ package com.couchcrypt.lobby;
 
 import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
+import com.couchcrypt.game.PartyProgression;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -94,4 +95,43 @@ class JoinServerTest {
             socket.abort();
         } finally { server.stop(); }
     }
+    @Test void upgradeStatusAndSelectionStayBoundToTheirSocketPlayer() throws Exception {
+        var state = new LobbyState(); var server = new JoinServer(0, state, Map.of()); server.open();
+        try (var http = HttpClient.newHttpClient()) {
+            Client one = new Client(), two = new Client();
+            var url = URI.create("ws://127.0.0.1:" + server.getListeningPort() + "/socket?room=" + server.room());
+            var first = http.newWebSocketBuilder().buildAsync(url, one).get(3, TimeUnit.SECONDS);
+            var second = http.newWebSocketBuilder().buildAsync(url, two).get(3, TimeUnit.SECONDS);
+            one.expect("joined"); two.expect("joined");
+            var options = PartyProgression.Upgrade.values();
+            state.publishProgression(0, 2, 3, 8, 10, 2, 27.5f, options);
+            state.publishProgression(1, 2, 3, 8, 20, 2, 27.5f, options);
+            state.setPhase(LobbyState.Phase.SESSION);
+            JsonValue status;
+            do { status = one.expect("status"); } while (status.get("progression").get("upgrade").isNull());
+            var progression = status.get("progression"); var offer = progression.get("upgrade");
+            assertEquals(2, progression.getInt("level")); assertEquals(3, progression.getInt("xp"));
+            assertEquals(8, progression.getInt("xpToNext")); assertEquals(10, offer.getInt("id"));
+            assertEquals(27.5f, offer.getFloat("secondsLeft")); assertEquals(3, offer.get("options").size);
+            assertEquals(options[0].id, offer.get("options").get(0).getString("id"));
+            assertEquals(options[0].title, offer.get("options").get(0).getString("title"));
+            assertEquals(options[0].description, offer.get("options").get(0).getString("description"));
+            first.sendText("{\"type\":\"upgrade\",\"offerId\":20,\"option\":0}", true).get(3, TimeUnit.SECONDS);
+            first.sendText("{\"type\":\"upgrade\",\"offerId\":10,\"option\":-1}", true).get(3, TimeUnit.SECONDS);
+            first.sendText("{\"type\":\"upgrade\",\"player\":2,\"offerId\":10,\"option\":1}", true).get(3, TimeUnit.SECONDS);
+            var request = new LobbyState.UpgradeRequest();
+            long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+            boolean found;
+            do {
+                found = state.pollUpgrade(0, request);
+                if (found) break;
+                java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(5));
+            } while (System.nanoTime() < until);
+            assertTrue(found); assertEquals(10, request.offerId); assertEquals(1, request.option);
+            assertFalse(state.pollUpgrade(1, request));
+            assertEquals(2, state.snapshot(System.currentTimeMillis()).connected(), "Invalid or stale choices do not disconnect the controller");
+            first.abort(); second.abort();
+        } finally { server.stop(); }
+    }
+
 }

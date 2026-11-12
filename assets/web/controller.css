@@ -49,3 +49,31 @@ body.playing #game-controls { display: flex; flex: 1; flex-direction: column; ju
   body.playing #dodge { max-width: 190px; min-height: clamp(82px, 28svh, 120px); }
   body.playing .control-label { margin-top: 12px; }
 }
+
+
+/* Personal level-up choices do not cover or disable the two-thumb controller. */
+body.playing #game-controls { position: relative; min-height: 0; }
+body.playing .touch-controls { width: 100%; }
+#upgrade-choices { position: absolute; top: 0; left: 0; right: 0; touch-action: manipulation; }
+.upgrade-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.upgrade-heading h2 { margin: 0; color: var(--player); font-size: 12px; letter-spacing: .1em; font-weight: 600; }
+#upgrade-countdown { color: #eee7d8; font-size: 12px; white-space: nowrap; }
+.upgrade-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.upgrade-choice { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; margin: 0; min-height: 76px; padding: 10px 9px; touch-action: manipulation; letter-spacing: 0; line-height: 1.15; }
+.upgrade-choice strong { font-size: 14px; overflow-wrap: anywhere; }
+.upgrade-choice span { font-family: system-ui, sans-serif; font-size: 11px; font-weight: 500; line-height: 1.25; overflow-wrap: anywhere; }
+.upgrade-choice.selected { background-image: url('/art/home-button-focused.png'); }
+.upgrade-choice:disabled { opacity: .68; }
+body.playing.has-upgrade #game-controls { justify-content: flex-end; }
+body.playing.has-upgrade .touch-controls { margin-top: 112px; }
+@media (orientation: landscape) {
+  body.playing.has-upgrade .touch-controls { padding: 0 24px; }
+  body.playing.has-upgrade #joystick { width: min(100%, 32svh, 160px); }
+  body.playing.has-upgrade #dodge { min-height: clamp(64px, 23svh, 90px); }
+  .upgrade-choice { min-height: 64px; padding: 8px 16px; }
+}
+@media (max-width: 360px) {
+  body.playing.has-upgrade main { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+  .upgrade-choice { padding-left: 7px; padding-right: 7px; }
+  .upgrade-choice strong { font-size: 13px; }
+}

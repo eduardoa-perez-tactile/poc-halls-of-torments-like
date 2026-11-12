@@ -16,6 +16,7 @@ public final class ArenaWorld {
     public final Enemy[] enemies = new Enemy[MAX_ENEMIES];
     public final Bolt[] bolts = new Bolt[MAX_BOLTS];
     public final Pickup[] pickups = new Pickup[MAX_PICKUPS];
+    public final PartyProgression progression;
     private final float[] inputX = new float[2], inputY = new float[2];
     private final boolean[] pendingDodge = new boolean[2];
     private float accumulator, spawnCountdown;
@@ -25,6 +26,7 @@ public final class ArenaWorld {
         for (int i = 0; i < enemies.length; i++) enemies[i] = new Enemy();
         for (int i = 0; i < bolts.length; i++) bolts[i] = new Bolt();
         for (int i = 0; i < pickups.length; i++) pickups[i] = new Pickup();
+        progression = new PartyProgression(this);
         reset();
     }
 
@@ -35,10 +37,12 @@ public final class ArenaWorld {
         kills = souls = activeEnemies = 0;
         spawnCountdown = .65f;
         randomState = 0x5a17c9e3;
+        progression.reset();
         for (Player p : players) {
             p.active = p.alive = false;
             p.x = p.y = p.walkTime = p.reviveProgress = 0f;
             p.maxHealth = p.health = 100f;
+            p.damageMultiplier = p.attackRateMultiplier = p.moveMultiplier = p.dodgeCooldownMultiplier = 1f;
             p.dodgeCooldown = p.dodgeTime = p.invulnerable = p.attackCooldown = 0f;
             p.facingX = 0f; p.facingY = -1f; p.kills = 0;
             p.dodgeX = 0f; p.dodgeY = -1f;
@@ -62,11 +66,15 @@ public final class ArenaWorld {
         p.invulnerable = 1f;
         inputX[slot] = inputY[slot] = 0f;
         pendingDodge[slot] = false;
+        progression.activatePlayer(slot);
     }
 
     public void deactivatePlayer(int slot) {
         Player p = player(slot);
         p.active = p.alive = false;
+        p.damageMultiplier = p.attackRateMultiplier = p.moveMultiplier = p.dodgeCooldownMultiplier = 1f;
+        p.maxHealth = p.health = 100f;
+        progression.deactivatePlayer(slot);
         inputX[slot] = inputY[slot] = 0f;
         pendingDodge[slot] = false;
     }
@@ -110,6 +118,7 @@ public final class ArenaWorld {
         updateBolts();
         updatePickups();
         updateRevival();
+        progression.update(STEP);
         boolean living = false;
         for (Player p : players) living |= p.active && p.alive;
         if (!living) { outcome = Outcome.DEFEAT; return; }
@@ -136,18 +145,18 @@ public final class ArenaWorld {
         }
         if (dodge && p.dodgeCooldown <= 0f && p.dodgeTime <= 0f) {
             p.dodgeTime = DODGE_DURATION;
-            p.dodgeCooldown = DODGE_COOLDOWN;
+            p.dodgeCooldown = DODGE_COOLDOWN * p.dodgeCooldownMultiplier;
             p.invulnerable = Math.max(p.invulnerable, DODGE_DURATION);
             p.dodgeX = p.facingX; p.dodgeY = p.facingY;
         }
         if (p.dodgeTime > 0f) {
             float duration = Math.min(STEP, p.dodgeTime);
-            p.x += p.dodgeX * WALK_SPEED * 3f * duration;
-            p.y += p.dodgeY * WALK_SPEED * 3f * duration;
+            p.x += p.dodgeX * WALK_SPEED * p.moveMultiplier * 3f * duration;
+            p.y += p.dodgeY * WALK_SPEED * p.moveMultiplier * 3f * duration;
             p.dodgeTime = Math.max(0f, p.dodgeTime - STEP);
             p.walkTime += STEP * 2f;
         } else {
-            p.x += x * WALK_SPEED * STEP; p.y += y * WALK_SPEED * STEP;
+            p.x += x * WALK_SPEED * p.moveMultiplier * STEP; p.y += y * WALK_SPEED * p.moveMultiplier * STEP;
             if (magnitudeSquared > .0025f) p.walkTime += STEP;
         }
         p.x = clamp(p.x, -HALF_WIDTH + PLAYER_RADIUS, HALF_WIDTH - PLAYER_RADIUS);
@@ -170,8 +179,8 @@ public final class ArenaWorld {
             float length = (float) Math.sqrt(Math.max(.001f, dx * dx + dy * dy));
             b.active = true; b.x = p.x; b.y = p.y;
             b.vx = dx / length * 680f; b.vy = dy / length * 680f;
-            b.ttl = 1.15f; b.owner = p.slot;
-            p.attackCooldown = .55f;
+            b.ttl = 1.15f; b.owner = p.slot; b.damage = 12f * p.damageMultiplier;
+            p.attackCooldown = .55f / p.attackRateMultiplier;
             return;
         }
     }
@@ -219,7 +228,7 @@ public final class ArenaWorld {
                 float ex = e.x - (oldX + dx * t), ey = e.y - (oldY + dy * t);
                 if (ex * ex + ey * ey > 25f * 25f) continue;
                 b.active = false;
-                e.health -= 12f; e.hitFlash = .12f;
+                e.health -= b.damage; e.hitFlash = .12f;
                 if (e.health <= 0f) {
                     e.active = false; activeEnemies = Math.max(0, activeEnemies - 1);
                     kills++; players[b.owner].kills++;
@@ -250,7 +259,7 @@ public final class ArenaWorld {
                 float dx = p.x - pickup.x, dy = p.y - pickup.y;
                 if (dx * dx + dy * dy > 56f * 56f) continue;
                 if (pickup.healing) p.health = Math.min(p.maxHealth, p.health + pickup.value);
-                else souls += pickup.value;
+                else { souls += pickup.value; progression.addXp(pickup.value); }
                 pickup.active = false;
                 break;
             }
@@ -313,6 +322,7 @@ public final class ArenaWorld {
         public boolean active, alive;
         public float x, y, health, maxHealth, dodgeCooldown, dodgeTime, invulnerable, attackCooldown;
         public float reviveProgress, facingX, facingY, walkTime;
+        public float damageMultiplier = 1f, attackRateMultiplier = 1f, moveMultiplier = 1f, dodgeCooldownMultiplier = 1f;
         private float dodgeX, dodgeY;
         private Player(int slot) { this.slot = slot; }
     }
@@ -322,7 +332,7 @@ public final class ArenaWorld {
     }
     public static final class Bolt {
         public boolean active;
-        public float x, y, vx, vy, ttl;
+        public float x, y, vx, vy, ttl, damage = 12f;
         public int owner;
     }
     public static final class Pickup {
