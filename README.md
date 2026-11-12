@@ -43,7 +43,7 @@ adb -s YOUR_TV_SERIAL install -r android/build/outputs/apk/debug/android-debug.a
 adb -s YOUR_TV_SERIAL shell am start -n com.couchcrypt.tv/com.couchcrypt.android.AndroidLauncher
 ```
 
-Open **Gather Your Party** using the remote. A phone scans the QR and gets a slot automatically. The TV has one party; there is no room code to enter. Physical TVs serve their own phones directly; no computer relay or internet service is needed.
+Select **Play** using the remote. A phone scans the QR and gets a slot automatically. The TV has one party; there is no room code to enter. Physical TVs serve their own phones directly; no computer relay or internet service is needed.
 
 ## Lobby behavior
 
@@ -78,8 +78,10 @@ F3 toggles desktop diagnostics. `--profile` (or the Android `profile` intent ext
 - `assets`: original artwork, licensed fonts, and offline controller page.
 - `scripts/tv-dev.py`: emulator-to-LAN development relay with cleanup.
 
-The native lobby and phone page share original stone/brass panel and iron button artwork. Native UI textures are baked once into small nine-slice skins; the complete native art/font texture footprint is about 17.88 MiB plus QR.
+Home, lobby, pause, dialogs, and the phone page share the same carved stone, aged brass, and ruby-gem theme. Buttons have separate normal and bright gold focused/pressed artwork with aligned crops. Native UI textures are baked once and shared by all controls.
+
+The approved centered Home uses a crypt backdrop, forged-gold logo, and pale carved-stone controls for Play, How to Join, Settings, and Exit. These are live remote controls over separate artwork, not a flattened menu screenshot. Reusing that backdrop throughout the app keeps the shared texture footprint at about 20.07 MiB plus QR, within the 32 MiB budget. Settings contains the functional Network submenu; Exit asks for confirmation. Phones receive small, already baked versions of the same art rather than full-size source paintings.
 
 The Android launcher has a safe-zone adaptive icon, legacy icon densities, and 16:9 title banners. Its actual banner has been checked in the TV emulator's Installed Games row. Reproduce these code-native assets with `java -Djava.awt.headless=true scripts/GenerateLauncherArt.java` using JDK 21.
 
-See [AGENTS.md](AGENTS.md), [architecture](docs/architecture.md), [art direction and prompts](docs/art-direction.md), [TV launcher guidelines and assets](docs/tv-launcher.md), and [UI flow](docs/ui-flow.md).
+See [AGENTS.md](AGENTS.md), [architecture](docs/architecture.md), [art direction](docs/art-direction.md), [approved menu artwork and prompts](docs/home-menu-art.md), [TV launcher guidelines and assets](docs/tv-launcher.md), and [UI flow](docs/ui-flow.md).

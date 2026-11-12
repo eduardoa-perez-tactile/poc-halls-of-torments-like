@@ -5,7 +5,6 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.InputMultiplexer;
-import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -37,11 +36,13 @@ import java.util.Map;
 
 public final class CryptLobby extends ApplicationAdapter {
     private enum Screen { HOME, LOBBY, SESSION, INVITE }
-    private enum Modal { GENERAL, PAUSE, RETURN_CONFIRM }
+    private enum Modal { GENERAL, PAUSE, RETURN_CONFIRM, SETTINGS_NETWORK }
     private final GameConfig config;
     private final LobbyState state = new LobbyState();
     private Stage stage;
     private UiArt art;
+    private Image background, shade;
+    private TextureRegionDrawable homeBackground, partyBackground;
     private JoinServer server;
     private Table content, overlay;
     private final List<RemoteButton> buttons = new ArrayList<>();
@@ -69,9 +70,12 @@ public final class CryptLobby extends ApplicationAdapter {
         Gdx.input.setCatchKey(Input.Keys.BACK, true);
         stage = new Stage(new FitViewport(1920, 1080));
         art = new UiArt();
-        Image background = new Image(art.backdrop);
+        homeBackground = new TextureRegionDrawable(art.homeBackdrop);
+        partyBackground = homeBackground;
+        background = new Image(partyBackground);
         background.setBounds(0, 0, 1920, 1080); stage.addActor(background);
-        Image shade = new Image(art.pixel);
+        background.setTouchable(Touchable.disabled);
+        shade = new Image(art.pixel);
         shade.setColor(0.025f, 0.035f, 0.04f, 0.34f); shade.setBounds(0, 0, 1920, 1080);
         shade.setTouchable(Touchable.disabled); stage.addActor(shade);
         content = new Table(); content.setFillParent(true); stage.addActor(content);
@@ -92,9 +96,11 @@ public final class CryptLobby extends ApplicationAdapter {
             assets.put("/", web("web/index.html", "text/html; charset=utf-8"));
             assets.put("/controller.css", web("web/controller.css", "text/css; charset=utf-8"));
             assets.put("/controller.js", web("web/controller.js", "application/javascript; charset=utf-8"));
-            assets.put("/art/crypt.png", web("art/crypt.png", "image/png"));
-            assets.put("/art/ui-panel.png", web("art/ui-panel.png", "image/png"));
-            assets.put("/art/ui-button.png", web("art/ui-button.png", "image/png"));
+            assets.put("/art/crypt.png", new JoinServer.Asset(art.controllerBackdrop(), "image/png"));
+            assets.put("/art/ui-panel-v2.png", new JoinServer.Asset(art.controllerPanel(), "image/png"));
+            assets.put("/art/home-button.png", new JoinServer.Asset(art.controllerButton(false), "image/png"));
+            assets.put("/art/home-button-focused.png", new JoinServer.Asset(art.controllerButton(true), "image/png"));
+            assets.put("/art/home-logo.png", new JoinServer.Asset(art.controllerLogo(), "image/png"));
             server = new JoinServer(config.port(), state, assets); server.open(); serverError = null;
             Gdx.app.log("Lobby", "Join URL: " + (host == null ? "No LAN address" : server.url(host)));
         } catch (Exception failure) {
@@ -108,6 +114,8 @@ public final class CryptLobby extends ApplicationAdapter {
     private void reset(Screen next) {
         if (overlay != null) closeModal();
         screen = next; content.clearChildren(); buttons.clear(); focus = 0;
+        background.setDrawable(next == Screen.HOME ? homeBackground : partyBackground);
+        shade.setVisible(next != Screen.HOME);
         firstStatus = secondStatus = partyStatus = connectionLabel = startLabel = null;
         sessionStatus = sessionMode = null;
         start = null; qrImage = null; qrStatus = null; lastRevision = -1;
@@ -117,16 +125,40 @@ public final class CryptLobby extends ApplicationAdapter {
     private void home() {
         reset(Screen.HOME);
         state.setPhase(LobbyState.Phase.LOBBY);
-        Table menu = new Table(); menu.left();
-        menu.add(art.label("SOLO OR LOCAL CO-OP  /  1-2 PLAYERS", art.small, UiArt.GOLD)).left().padBottom(22).row();
-        menu.add(art.label("COUCH CRYPT", art.title, UiArt.IVORY)).left().padBottom(18).row();
-        menu.add(art.label("Two souls. One descent.", art.section, UiArt.MUTED)).left().padBottom(70).row();
-        menu.add(textButton("GATHER YOUR PARTY", this::showLobby)).width(510).height(82).left().padBottom(16).row();
-        menu.add(textButton("HOW TO JOIN", this::help)).width(510).height(72).left().padBottom(16).row();
-        menu.add(textButton("NETWORK", this::network)).width(510).height(72).left().row();
-        content.add(menu).expand().left().bottom().padBottom(100).row();
-        content.add(art.label("D-PAD  Navigate     OK  Select     BACK  Return", art.small, UiArt.MUTED)).left();
+        content.pad(30, 100, 30, 100);
+        Table menu = new Table();
+        Image wordmark = new Image(art.homeLogo);
+        wordmark.setScaling(Scaling.fit);
+        menu.add(wordmark).size(1360, 280).padBottom(8).row();
+        menu.add(art.label("T W O  S O U L S .   O N E  D E S C E N T .", art.small, UiArt.GOLD)).padBottom(32).row();
+        menu.add(homeButton("PLAY", this::showLobby)).width(680).height(106).padBottom(20).row();
+        menu.add(homeButton("HOW TO JOIN", this::help)).width(680).height(106).padBottom(20).row();
+        menu.add(homeButton("SETTINGS", this::settings)).width(680).height(106).padBottom(48).row();
+        menu.add(homeButton("EXIT", this::confirmExit)).width(360).height(76).row();
+        menu.add(art.label("1-2 PLAYERS  /  LOCAL CO-OP", art.small, UiArt.GOLD)).padTop(24);
+        content.add(menu).expand();
+        content.validate();
         setFocus(0);
+    }
+
+    private RemoteButton homeButton(String text, Runnable command) {
+        boolean compact = "EXIT".equals(text);
+        RemoteButton result = new RemoteButton(compact ? art.exitNormal : art.homeNormal,
+            compact ? art.exitFocused : art.homeFocused, command);
+        result.pad(6, 24, 6, 24);
+        result.add(art.label(text, compact ? art.section : art.heading, UiArt.BUTTON_INK));
+        buttons.add(result);
+        return result;
+    }
+
+    private void settings() {
+        modal("Settings", "Manage the local connection used by your phones.",
+            new String[]{"NETWORK", "BACK"}, new Runnable[]{() -> network(true), this::closeModal});
+    }
+
+    private void confirmExit() {
+        modal("Leave the crypt?", "Your connected controllers will be disconnected.",
+            new String[]{"STAY", "EXIT"}, new Runnable[]{this::closeModal, () -> Gdx.app.exit()});
     }
 
     private void showLobby() {
@@ -276,7 +308,7 @@ public final class CryptLobby extends ApplicationAdapter {
             new Runnable[]{this::resumeSession, () -> showPartyScreen(true), this::confirmReturnToLobby});
         modalKind = Modal.PAUSE;
         pauseResume = buttons.get(0);
-        pauseResume.setDisabled(state.snapshot(System.currentTimeMillis()).connected() == 0);
+        setTextButtonDisabled(pauseResume, state.snapshot(System.currentTimeMillis()).connected() == 0);
         if (pauseResume.isDisabled()) setFocus(1);
     }
 
@@ -302,14 +334,17 @@ public final class CryptLobby extends ApplicationAdapter {
             new String[]{"BACK"}, new Runnable[]{this::closeModal});
     }
 
-    private void network() {
+    private void network() { network(false); }
+
+    private void network(boolean fromSettings) {
+        Runnable finish = fromSettings ? this::settings : this::closeModal;
         List<String> addresses = new ArrayList<>(LanAddress.find());
         if (host != null && !addresses.contains(host)) addresses.add(0, host);
         List<String> labels = new ArrayList<>(); List<Runnable> actions = new ArrayList<>();
         for (String address : addresses) {
             labels.add((address.equals(host) ? "CURRENT: " : "USE: ") + address);
             actions.add(() -> {
-                host = address; closeModal();
+                host = address; finish.run();
                 if (partyScreen()) {
                     refreshQr(); connectionLabel.setText(connectionText());
                     connectionLabel.setVisible(!connectionText().isEmpty());
@@ -320,12 +355,13 @@ public final class CryptLobby extends ApplicationAdapter {
             closeModal();
             if (server == null) openServer();
             if (host == null) host = LanAddress.find().stream().findFirst().orElse(null);
-            if (partyScreen()) showPartyScreen(screen == Screen.INVITE); else network();
+            if (partyScreen()) showPartyScreen(screen == Screen.INVITE); else network(fromSettings);
         });
-        labels.add("BACK"); actions.add(this::closeModal);
+        labels.add("BACK"); actions.add(finish);
         modal("Local network", "Your phone must reach this address.\nPort " + config.port()
             + "\n\nFor emulator phone access, use the supplied TV development launcher.",
             labels.toArray(String[]::new), actions.toArray(Runnable[]::new));
+        if (fromSettings) modalKind = Modal.SETTINGS_NETWORK;
     }
 
     private void modal(String title, String message, String[] options, Runnable[] actions) {
@@ -357,7 +393,13 @@ public final class CryptLobby extends ApplicationAdapter {
     }
     private RemoteButton textButton(String text, Runnable command) {
         RemoteButton result = button(command);
-        result.add(art.label(text, art.body, UiArt.IVORY)); return result;
+        Label caption = art.label(text, art.section, UiArt.BUTTON_INK);
+        caption.setFontScale(0.82f);
+        result.add(caption); return result;
+    }
+    private void setTextButtonDisabled(RemoteButton button, boolean disabled) {
+        button.setDisabled(disabled);
+        ((Label) button.getChildren().first()).setColor(disabled ? UiArt.BUTTON_DISABLED_INK : UiArt.BUTTON_INK);
     }
     private void setFocus(int index) {
         if (buttons.isEmpty()) return;
@@ -371,10 +413,10 @@ public final class CryptLobby extends ApplicationAdapter {
             if (overlay != null) {
                 if (modalKind == Modal.PAUSE) resumeSession();
                 else if (modalKind == Modal.RETURN_CONFIRM) showPause();
+                else if (modalKind == Modal.SETTINGS_NETWORK) settings();
                 else closeModal();
             } else if (screen == Screen.SESSION) showPause();
-            else if (partyScreen()) backFromParty(); else
-                modal("Leave the crypt?", "Your connected controllers will be disconnected.", new String[]{"STAY", "EXIT"}, new Runnable[]{this::closeModal, () -> Gdx.app.exit()});
+            else if (partyScreen()) backFromParty(); else confirmExit();
             return true;
         }
         if (buttons.isEmpty()) return false;
@@ -408,9 +450,8 @@ public final class CryptLobby extends ApplicationAdapter {
             playerStatus(firstStatus, snapshot.first()); playerStatus(secondStatus, snapshot.second());
             partyStatus.setText(snapshot.connected() + " / 2 CONNECTED");
             if (start != null) {
-                start.setDisabled(snapshot.connected() == 0 || server == null || host == null);
+                setTextButtonDisabled(start, snapshot.connected() == 0 || server == null || host == null);
                 startLabel.setText(start.isDisabled() ? "CONNECT A PHONE TO START" : snapshot.connected() == 1 ? "START SOLO" : "START CO-OP");
-                startLabel.setColor(start.isDisabled() ? UiArt.MUTED : UiArt.IVORY);
             }
         } else {
             sessionMode.setText(snapshot.connected() > 1 ? "A shared descent" : "A solo descent");
@@ -418,7 +459,7 @@ public final class CryptLobby extends ApplicationAdapter {
                 : snapshot.connected() == 1 ? "1 PLAYER CONNECTED  /  A companion can join from Pause"
                 : "2 PLAYERS CONNECTED  /  Your companion is here");
             if (pauseResume != null) {
-                pauseResume.setDisabled(snapshot.connected() == 0);
+                setTextButtonDisabled(pauseResume, snapshot.connected() == 0);
                 if (pauseResume.isDisabled() && buttons.get(focus) == pauseResume) setFocus(1);
             }
             if (snapshot.connected() == 0 && overlay == null) showPause();

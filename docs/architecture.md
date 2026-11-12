@@ -16,6 +16,8 @@ LibGDX uses a fixed logical 1920x1080 FitViewport with safe margins. The UI is l
 
 Resources are shared across screens. File textures and retained font atlas data support Android GL context restoration; QR textures are regenerated on resume and disposed on replacement. Server threads are stopped and GPU resources disposed at application shutdown.
 
+Home, lobby, and dialogs now share the approved crypt backdrop and matching stone/brass/ruby theme. Normal and focused plates are separate painted textures baked with identical source bounds; nine-slice views reuse them at different control sizes. There is no post-processing glow or per-frame image processing. At startup, small PNGs for phone panels, button states, wordmark, and backdrop are encoded from the existing baked pixmaps; the server does not retain full-resolution source images for those routes. See docs/home-menu-art.md for the exact generation prompts and asset provenance.
+
 AndroidLauncher uses singleTask launch mode so reopening from the TV launcher reuses the existing activity, room, and controller server. A second activity would otherwise fail to bind the same local port and show an offline lobby. The QR area now displays an explicit network/host error instead of a blank artwork panel if hosting or QR generation is unavailable.
 
 Gameplay systems, movement input, split-screen cameras, class selection, combat, and progression are deliberately outside this milestone.

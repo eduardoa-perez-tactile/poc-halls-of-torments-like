@@ -3,6 +3,7 @@ package com.couchcrypt.ui;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.PixmapIO;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.NinePatch;
@@ -17,6 +18,9 @@ import com.badlogic.gdx.scenes.scene2d.utils.NinePatchDrawable;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Disposable;
+import com.badlogic.gdx.utils.GdxRuntimeException;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 public final class UiArt implements Disposable {
     public static final Color GOLD = Color.valueOf("d4b47c");
@@ -24,14 +28,17 @@ public final class UiArt implements Disposable {
     public static final Color MUTED = Color.valueOf("b5b4ac");
     public static final Color GREEN = Color.valueOf("9bc3a9");
     public static final Color PLAYER_TWO = Color.valueOf("9bc3bb");
-    public final Texture backdrop = load("art/crypt.png");
+    public static final Color BUTTON_INK = Color.valueOf("1d1710");
+    public static final Color BUTTON_DISABLED_INK = Color.valueOf("554b3e");
     public final Texture heroes = load("art/adventurers.png");
+    public final Texture homeBackdrop, homeLogo;
     public final TextureRegion knight = new TextureRegion(heroes, 0, 0, heroes.getWidth() / 2, heroes.getHeight());
     public final TextureRegion ranger = new TextureRegion(heroes, heroes.getWidth() / 2, 0, heroes.getWidth() / 2, heroes.getHeight());
     public final BitmapFont title, heading, section, body, small;
     public final Drawable pixel;
     public final Drawable panel, focusPanel, disabledPanel, scrim, goldLine;
-    public final Button.ButtonStyle normal, focused, cardNormal, cardFocused;
+    public final Button.ButtonStyle normal, focused, cardNormal, cardFocused, homeNormal, homeFocused, exitNormal, exitFocused;
+    private final Texture panelTexture, buttonTexture, focusedButtonTexture;
     private final Array<Texture> generated = new Array<>();
     private final Array<Pixmap> generatedPixmaps = new Array<>();
     private final PixmapPacker fontPacker;
@@ -57,22 +64,37 @@ public final class UiArt implements Disposable {
         goldLine = fill(new Color(GOLD.r, GOLD.g, GOLD.b, 0.42f));
         // Downsample the large source paintings once, before any frame is rendered.
         // Source masters stay untouched; only small managed runtime textures are retained.
-        panel = skin("art/ui-panel.png", null, 512, 512, 72, 72, 36);
-        NinePatchDrawable plate = skin("art/ui-button.png", new int[]{8, 132, 2156, 457},
-            1024, 224, 72, 48, 14);
+        panelTexture = baked("art/ui-panel-v2.png", null, 512, 512, false);
+        panel = patch(panelTexture, 72, 72, 36, 36);
+        // Shared bounds are essential: focused glow must not move or shrink the slab.
+        int[] buttonCrop = {0, 124, 2172, 456};
+        buttonTexture = baked("art/home-button.png", buttonCrop, 1024, 224, false);
+        focusedButtonTexture = baked("art/home-button-focused.png", buttonCrop, 1024, 224, false);
+        NinePatchDrawable plate = patch(buttonTexture, 144, 64, 42, 20);
+        NinePatchDrawable selectedPlate = patch(focusedButtonTexture, 144, 64, 42, 20);
         Drawable focusRim = bordered(Color.CLEAR, GOLD);
-        focusPanel = new FocusDrawable(panel, focusRim);
-        Drawable focusPlate = new FocusDrawable(plate, focusRim);
-        disabledPanel = plate.tint(new Color(0.58f, 0.62f, 0.64f, 0.78f));
-        normal = new Button.ButtonStyle(plate, focusPlate, plate);
+        focusPanel = new FocusDrawable(((NinePatchDrawable) panel).tint(new Color(1f, 0.94f, 0.82f, 1f)), focusRim);
+        disabledPanel = plate.tint(new Color(0.82f, 0.82f, 0.82f, 0.8f));
+        normal = new Button.ButtonStyle(plate, selectedPlate, plate);
         normal.disabled = disabledPanel;
-        focused = new Button.ButtonStyle(focusPlate, focusPlate, focusPlate);
+        focused = new Button.ButtonStyle(selectedPlate, selectedPlate, selectedPlate);
         focused.disabled = disabledPanel;
         cardNormal = new Button.ButtonStyle(panel, focusPanel, panel);
         cardFocused = new Button.ButtonStyle(focusPanel, focusPanel, focusPanel);
-        long bytes = (long) backdrop.getWidth() * backdrop.getHeight() * 4 + (long) heroes.getWidth() * heroes.getHeight() * 4;
+        homeBackdrop = baked("art/home-background.png", null, 1536, 864, false);
+        homeLogo = baked("art/home-logo.png", null, 1536, 384, true);
+        NinePatchDrawable homePlate = patch(buttonTexture, 144, 64, 72, 32);
+        NinePatchDrawable homeFocus = patch(focusedButtonTexture, 144, 64, 72, 32);
+        homeNormal = new Button.ButtonStyle(homePlate, homeFocus, homePlate);
+        homeFocused = new Button.ButtonStyle(homeFocus, homeFocus, homeFocus);
+        NinePatchDrawable exitPlate = patch(buttonTexture, 144, 64, 48, 20);
+        NinePatchDrawable exitFocus = patch(focusedButtonTexture, 144, 64, 48, 20);
+        exitNormal = new Button.ButtonStyle(exitPlate, exitFocus, exitPlate);
+        exitFocused = new Button.ButtonStyle(exitFocus, exitFocus, exitFocus);
+        long bytes = (long) heroes.getWidth() * heroes.getHeight() * 4;
         for (Texture texture : generated) bytes += (long) texture.getWidth() * texture.getHeight() * 4;
         textureBytes = bytes;
+        if (textureBytes > 32L * 1_048_576) throw new IllegalStateException("UI art exceeds its 32 MiB texture budget");
         Gdx.app.log("Art", "Resident texture budget: " + (textureBytes / 1_048_576f) + " MiB (excludes QR)");
     }
 
@@ -106,9 +128,16 @@ public final class UiArt implements Disposable {
         generatedPixmaps.add(pixmap); generated.add(texture);
         return new NinePatchDrawable(new NinePatch(texture, 4, 4, 4, 4));
     }
-    private NinePatchDrawable skin(String path, int[] crop, int width, int height,
-                                  int splitX, int splitY, float corner) {
+    private NinePatchDrawable patch(Texture texture, int splitX, int splitY, float cornerX, float cornerY) {
+        NinePatch patch = new NinePatch(texture, splitX, splitX, splitY, splitY);
+        patch.scale(cornerX / splitX, cornerY / splitY);
+        NinePatchDrawable drawable = new NinePatchDrawable(patch);
+        drawable.setMinWidth(0); drawable.setMinHeight(0);
+        return drawable;
+    }
+    private Texture baked(String path, int[] crop, int width, int height, boolean trimAlpha) {
         Pixmap source = new Pixmap(Gdx.files.internal(path));
+        if (crop == null && trimAlpha) crop = alphaBounds(source);
         Pixmap small = new Pixmap(width, height, Pixmap.Format.RGBA8888);
         small.setBlending(Pixmap.Blending.None);
         small.setFilter(Pixmap.Filter.BiLinear);
@@ -120,16 +149,52 @@ public final class UiArt implements Disposable {
         Texture texture = new Texture(new PixmapTextureData(small, null, false, false, true));
         texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         generated.add(texture); generatedPixmaps.add(small);
-        NinePatch patch = new NinePatch(texture, splitX, splitX, splitY, splitY);
-        patch.scale(corner / splitX, corner / splitY);
-        NinePatchDrawable drawable = new NinePatchDrawable(patch);
-        drawable.setMinWidth(0); drawable.setMinHeight(0);
-        return drawable;
+        return texture;
+    }
+    private int[] alphaBounds(Pixmap image) {
+        int minX = image.getWidth(), minY = image.getHeight(), maxX = -1, maxY = -1;
+        for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) {
+            if ((image.getPixel(x, y) & 255) >= 64) {
+                minX = Math.min(minX, x); minY = Math.min(minY, y);
+                maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+            }
+        }
+        if (maxX < minX) return new int[]{0, 0, image.getWidth(), image.getHeight()};
+        minX = Math.max(0, minX - 8); minY = Math.max(0, minY - 8);
+        maxX = Math.min(image.getWidth() - 1, maxX + 8); maxY = Math.min(image.getHeight() - 1, maxY + 8);
+        return new int[]{minX, minY, maxX - minX + 1, maxY - minY + 1};
+    }
+    /** Encode the already baked skins once for phones, rather than retaining full-size source PNGs. */
+    public byte[] controllerPanel() { return png(panelTexture, 512, 512); }
+    public byte[] controllerButton(boolean selected) { return png(selected ? focusedButtonTexture : buttonTexture, 1024, 224); }
+    public byte[] controllerLogo() { return png(homeLogo, 512, 128); }
+    public byte[] controllerBackdrop() { return png(homeBackdrop, 640, 360); }
+    private byte[] png(Texture texture, int width, int height) {
+        Pixmap source = texture.getTextureData().consumePixmap();
+        Pixmap outputImage = source;
+        if (source.getWidth() != width || source.getHeight() != height) {
+            outputImage = new Pixmap(width, height, Pixmap.Format.RGBA8888);
+            outputImage.setBlending(Pixmap.Blending.None);
+            outputImage.setFilter(Pixmap.Filter.BiLinear);
+            outputImage.drawPixmap(source, 0, 0, source.getWidth(), source.getHeight(), 0, 0, width, height);
+        }
+        PixmapIO.PNG encoder = new PixmapIO.PNG(128 * 1024);
+        encoder.setFlipY(false); encoder.setCompression(4);
+        try {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            encoder.write(bytes, outputImage);
+            return bytes.toByteArray();
+        } catch (IOException failure) {
+            throw new GdxRuntimeException("Cannot encode controller artwork", failure);
+        } finally {
+            encoder.dispose();
+            if (outputImage != source) outputImage.dispose();
+        }
     }
     public Label label(String text, BitmapFont font, Color color) { return new Label(text, new Label.LabelStyle(font, color)); }
     @Override public void dispose() {
         title.dispose(); heading.dispose(); section.dispose(); body.dispose(); small.dispose();
-        backdrop.dispose(); heroes.dispose();
+        heroes.dispose();
         for (Texture texture : generated) texture.dispose();
         fontPacker.dispose();
         for (Pixmap pixmap : generatedPixmaps) pixmap.dispose();

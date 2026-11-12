@@ -9,9 +9,12 @@ public final class RemoteButton extends Button {
     private final ButtonStyle focused;
     private final Runnable command;
     public RemoteButton(UiArt art, Runnable command, boolean panel) {
-        super(panel ? art.cardNormal : art.normal);
-        this.normal = panel ? art.cardNormal : art.normal;
-        this.focused = panel ? art.cardFocused : art.focused;
+        this(panel ? art.cardNormal : art.normal, panel ? art.cardFocused : art.focused, command);
+    }
+    public RemoteButton(ButtonStyle normal, ButtonStyle focused, Runnable command) {
+        super(normal);
+        this.normal = normal;
+        this.focused = focused;
         this.command = command;
         pad(18);
         addListener(new ChangeListener() {

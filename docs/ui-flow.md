@@ -2,10 +2,12 @@
 
 ```mermaid
 flowchart TD
-    Home[Home] -->|Remote: Gather Your Party| Lobby[Lobby: QR and two player slots]
+    Home[Home] -->|Remote: Play| Lobby[Lobby: QR and two player slots]
     Home -->|Remote| Help[How to Join]
     Help -->|Back| Home
-    Home -->|Remote| Network[Network address and retry]
+    Home -->|Remote| Settings[Settings]
+    Settings -->|Network| Network[Network address and retry]
+    Settings -->|Back| Home
     Network -->|Back| Previous[Return to previous screen]
     Lobby -->|Back| Home
     Lobby -->|Select player| Manage[Remove controller or return]
@@ -26,6 +28,8 @@ flowchart TD
     Confirm -->|Keep session or Back| Pause
     Confirm -->|Return to Lobby| Lobby
 ```
+
+The approved Home design centers the forged-gold logo and carved stone controls: **Play**, **How to Join**, **Settings**, and a separate **Exit**. Play is focused initially. Settings opens the functional local-network controls, and Back from those controls returns to Settings. Exit and Back from Home require confirmation.
 
 The lobby shows **Scan to Join**, the QR, and **Same Wi-Fi**. The TV has one party; players do not enter or see room codes. Network addresses and connection troubleshooting belong in the advanced Network panel. The QR area displays an explicit offline/network error instead of an empty frame if hosting is unavailable.
 
