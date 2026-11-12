@@ -16,6 +16,8 @@ LibGDX uses a fixed logical 1920x1080 FitViewport with safe margins. The UI is l
 
 Resources are shared across screens. File textures and retained font atlas data support Android GL context restoration; QR textures are regenerated on resume and disposed on replacement. Server threads are stopped and GPU resources disposed at application shutdown.
 
+AndroidLauncher uses singleTask launch mode so reopening from the TV launcher reuses the existing activity, room, and controller server. A second activity would otherwise fail to bind the same local port and show an offline lobby. The QR area now displays an explicit network/host error instead of a blank artwork panel if hosting or QR generation is unavailable.
+
 Gameplay systems, movement input, split-screen cameras, class selection, combat, and progression are deliberately outside this milestone.
 
 Sources: [LibGDX project structure](https://libgdx.com/wiki/start/project-generation), [Android TV setup](https://developer.android.com/training/tv/get-started/create), [NanoHTTPD](https://github.com/NanoHttpd/nanohttpd), [ZXing](https://github.com/zxing/zxing).
