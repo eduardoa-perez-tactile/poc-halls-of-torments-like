@@ -4,6 +4,19 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LobbyStateTest {
+    @Test void newCompanionRequiresHostInviteButExistingPlayerCanReconnectDuringSession() {
+        var state = new LobbyState();
+        var first = state.join(null, "a", 1);
+        state.setPhase(LobbyState.Phase.SESSION);
+        assertEquals("invite_required", state.join(null, "b", 2).error());
+        state.disconnected("a", 3);
+        assertEquals(0, state.join(first.token(), "a2", 4).slot());
+        state.setPhase(LobbyState.Phase.PAUSED);
+        assertEquals("invite_required", state.join(null, "b", 5).error());
+        state.setPhase(LobbyState.Phase.INVITE);
+        assertEquals(1, state.join(null, "b", 6).slot());
+        assertEquals(2, state.snapshot(6).connected());
+    }
     @Test void assignsTwoDistinctPlayersAndRejectsThird() {
         var state = new LobbyState();
         var first = state.join(null, "a", 1);

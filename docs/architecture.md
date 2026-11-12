@@ -2,13 +2,13 @@
 
 The TV/desktop host owns a two-slot LobbyState. Its synchronized methods are short; network sockets and asset I/O do not run in the render loop. The LibGDX UI reads snapshots twice per second and changes labels only when state or reconnect countdown changes.
 
-NanoWSD serves an allowlisted set of local assets over HTTP and accepts WebSockets on the same TCP port, 8787. ZXing generates the actual join QR from the advertised address and a fresh random room code. The controller page has no runtime third-party dependencies.
+NanoWSD serves an allowlisted set of local assets over HTTP and accepts WebSockets on the same TCP port, 8787. ZXing generates the join QR from the TV's plain local address. There is one party per TV. The controller page discovers an opaque internal session identifier from GET /session, then automatically connects; players never enter or see a room number. The page has no runtime third-party dependencies.
 
-The WebSocket handshake validates the room and browser Origin, claims one of two slots, and returns a player number plus an opaque reconnect token. The page sends a heartbeat every two seconds. Ten seconds without a heartbeat disconnects a phone; its slot is then reserved for 45 seconds. The host can remove an occupied or reserved slot. Late callbacks from a previous socket cannot disconnect its replacement. Unknown controller messages cannot invoke remote UI commands.
+The WebSocket handshake validates the internal session and browser Origin, claims one of two slots, and returns a player number plus an opaque reconnect token. New phones may join in the lobby or when the host opens Invite Player 2. Existing phones can reclaim reserved slots during any phase. The page sends a heartbeat every two seconds. Ten seconds without a heartbeat disconnects a phone; its slot is then reserved for 45 seconds. The host can remove an occupied or reserved slot. Late callbacks from a previous socket cannot disconnect its replacement. Unknown controller messages cannot invoke remote UI commands.
 
 The browser stores its token under a host/room-specific localStorage key, with a memory fallback if storage is blocked. It explicitly handles full rooms, duplicate tabs, invalid rooms, host removal, backgrounding, and bounded reconnect attempts. A removed phone stops retrying until its user explicitly joins again.
 
-Room codes are a local joining convenience. This is an unencrypted home-LAN prototype, not an internet-facing service. Do not expose or port-forward it onto the public internet.
+Session identifiers isolate browser reconnect tokens across app restarts. This is an unencrypted home-LAN prototype, not an internet-facing service. Do not expose or port-forward it onto the public internet.
 
 The Android launcher supplies an optional advertised host through the joinHost intent extra. On a physical TV, local IPv4 discovery supplies the address. During emulator development, the Python launcher forwards an ephemeral loopback ADB port and serves a bounded streaming relay on the computer's LAN port 8787. This keeps QR links usable by real phones without depending on the emulator's isolated address.
 

@@ -31,7 +31,7 @@ This builds the debug APK, starts or reuses the TV emulator, installs the app, a
 
 Options: `--no-build` to reuse an APK, `--headless` for a brief automated UI check, `--host YOUR_LAN_IP` to choose the address, and `--profile` for periodic frame/memory logging.
 
-The emulator's own `10.0.2.x` address is not reachable by physical phones; the helper bridges that boundary. Both phones and the computer must be on the same LAN, and the local firewall must allow incoming TCP 8787. Guest Wi-Fi client isolation can prevent joining.
+The emulator's own `10.0.2.x` address is not reachable by physical phones; the helper bridges that boundary. Phones and the computer must be on the same LAN, and the local firewall must allow incoming TCP 8787. Guest Wi-Fi client isolation can prevent joining.
 
 ## Run on a physical Android TV
 
@@ -43,16 +43,18 @@ adb -s YOUR_TV_SERIAL install -r android/build/outputs/apk/debug/android-debug.a
 adb -s YOUR_TV_SERIAL shell am start -n com.couchcrypt.tv/com.couchcrypt.android.AndroidLauncher
 ```
 
-Open **Gather Your Party** using the remote. Each phone scans the QR and gets a slot automatically. A fallback URL and room code are also shown. Physical TVs serve their own phones directly; no computer relay or internet service is needed.
+Open **Gather Your Party** using the remote. A phone scans the QR and gets a slot automatically. The TV has one party; there is no room code to enter. Physical TVs serve their own phones directly; no computer relay or internet service is needed.
 
 ## Lobby behavior
 
-- Exactly two phones can join. A third receives an explicit full-room message.
+- One phone is enough for solo; a second phone is optional for co-op. A third receives an explicit full-party message.
 - A disconnected slot is held for 45 seconds; the same browser can reclaim it using its stored token. The remote can free a slot immediately.
-- Tokens are scoped to this host and room. A duplicate tab cannot take over an active controller. A new app process creates a fresh room code; scan again after restarting the app.
+- Tokens are scoped to this host and app session. A duplicate tab cannot take over an active controller. A new app process creates a fresh session; scan again after restarting the app.
 - The TV remote owns menus and player removal. Phones cannot start the game or send shared UI actions.
-- **Start Game** unlocks at two connections and displays a party-ready confirmation. It deliberately does not launch gameplay.
-- Home/Back preserves connections. Android backgrounding informs connected phones that the host is away.
+- **Start Solo** unlocks at one connection; **Start Co-op** appears at two. They open the session-ready handoff; gameplay is the next milestone.
+- Press Back in the session to open **Pause**: Resume, Invite Player 2, or Return to Lobby. Invite shows the QR without leaving the session; Back returns to Pause. Returning to the lobby requires confirmation and keeps the party connected. Resume is disabled if no phones are connected.
+- Player 2 can join in the lobby or later from **Pause -> Invite Player 2**. The normal join area shows only the QR and a Same Wi-Fi reminder; address/port troubleshooting is under Network.
+- Home/Back preserves connections in the lobby. Android backgrounding informs connected phones that the host is away.
 - Network shows available LAN addresses and can retry a failed controller server.
 
 ## Focused verification
@@ -64,7 +66,7 @@ node --check assets/web/controller.js
 
 The small test suite covers slot allocation, reconnect reservations/expiry, duplicate tabs, host removal, room validation, and the real HTTP/WebSocket handshake. No whole-game playthroughs or broad regression runs are part of this milestone.
 
-Initial checks passed: eight core tests, desktop compilation, Android APK build/launch, D-pad/OK/Back navigation, and browser joining through the emulator LAN relay. A browser plus a separate WebSocket client filled both Android slots; a third client was rejected and the second client reclaimed its slot after disconnecting. Two physical phones and camera scanning still need the user's review.
+Checks passed: nine core tests, desktop compilation, Android APK build/launch, D-pad/OK/Back navigation, and automatic browser joining through the emulator LAN relay. The solo-ready -> Pause -> Invite Player 2 -> Resume flow was checked with a browser plus a separate WebSocket client. Slot-limit and reconnect checks remain covered by the focused suite. Two physical phones and camera scanning still need the user's review.
 
 F3 toggles desktop diagnostics. `--profile` (or the Android `profile` intent extra) logs FPS, live Java heap, resident art texture bytes, and draw calls every five seconds. These are brief diagnostics, not a guarantee of performance on every TV. See [performance notes](docs/performance.md).
 

@@ -1,15 +1,12 @@
 'use strict';
 (() => {
   const byId = (id) => document.getElementById(id);
-  const form = byId('join-form'), roomField = byId('room'), joinButton = byId('join');
+  const form = byId('join-form'), joinButton = byId('join');
   const connected = byId('connected'), title = byId('title'), message = byId('message');
   const player = byId('player'), party = byId('party'), network = byId('network-status');
   let socket, heartbeat, watchdog, retry, attempts = 0, stopped = false, joined = false, room = '';
   let lastSeen = Date.now();
   let memoryToken = '';
-  const params = new URLSearchParams(location.search);
-  const roomParam = (params.get('room') || '').toUpperCase();
-  if (/^[A-Z0-9]{6}$/.test(roomParam)) roomField.value = roomParam;
 
   function token(value) {
     const key = `couch-crypt:${location.host}:${room}`;
@@ -23,6 +20,23 @@
     connected.hidden = true; form.hidden = false; joinButton.disabled = false;
     joinButton.textContent = label; message.textContent = text;
     title.textContent = 'Join your party'; network.textContent = 'NOT CONNECTED';
+  }
+  async function discover() {
+    joinButton.disabled = true; stopped = false;
+    message.textContent = 'Finding your place in the party…';
+    network.textContent = 'CONNECTING';
+    const abort = new AbortController();
+    const timeout = setTimeout(() => abort.abort(), 6000);
+    try {
+      const response = await fetch('/session', { cache: 'no-store', signal: abort.signal });
+      if (!response.ok) throw new Error('Host unavailable');
+      const session = await response.json();
+      if (!/^[A-Z0-9]{6}$/.test(session.room)) throw new Error('Invalid session');
+      room = session.room; attempts = 0; connect();
+    } catch {
+      stopped = true;
+      showForm('Cannot reach the TV. Check that your phone is on the same Wi-Fi.');
+    } finally { clearTimeout(timeout); }
   }
   function connect() {
     stopTimers(); stopped = false; joined = false;
@@ -48,17 +62,24 @@
         document.documentElement.style.setProperty('--player', data.player === 1 ? '#d4b47c' : '#9bc3bb');
         title.textContent = 'You have a place';
         message.textContent = 'Connected. Look at the TV while your host gathers the party.';
-        network.textContent = `CONNECTED · ROOM ${room}`;
+        network.textContent = 'CONNECTED';
         heartbeat = setInterval(() => { if (current.readyState === WebSocket.OPEN) current.send('{"type":"ping"}'); }, 2000);
       } else if (data.type === 'status') {
-        party.textContent = data.connected === 2 ? 'Both souls are here' : 'Waiting for your companion';
-        message.textContent = data.hostActive ? 'Connected. Your host controls the lobby with the TV remote.' : 'The host has stepped away. Stay here to keep your place.';
+        party.textContent = data.connected === 2 ? 'Both souls are here' : data.phase === 'invite' ? 'Waiting for your companion' : 'Ready for a solo descent';
+        const descriptions = {
+          lobby: 'Connected. Your host can start solo or gather a companion.',
+          session: 'Your controller is connected. Look at the TV.',
+          paused: 'The host has paused. Stay connected to keep your place.',
+          invite: 'The host is inviting a companion. Stay connected to keep your place.'
+        };
+        message.textContent = data.hostActive ? (descriptions[data.phase] || descriptions.lobby) : 'The host has stepped away. Stay here to keep your place.';
       } else if (data.type === 'removed' || data.type === 'error') {
         stopped = true; stopTimers();
         const explanations = {
           lobby_full: 'Both places are taken or reserved for reconnecting players. Ask the host to free a place.',
           already_connected: 'This phone already has a connected tab. Use that tab, or close it before reconnecting.',
-          invalid_room: 'This room is no longer available. Scan the current QR code on the TV.',
+          invalid_room: 'The host has restarted. Tap Try again to rejoin.',
+          invite_required: 'Ask the host to open Invite Player 2 from the pause menu, then try again.',
           removed: 'The host removed your controller. You can join again if a place is free.'
         };
         if (data.type === 'removed') token('');
@@ -78,15 +99,13 @@
     };
   }
   form.addEventListener('submit', (event) => {
-    event.preventDefault(); room = roomField.value.trim().toUpperCase();
-    if (!/^[A-Z0-9]{6}$/.test(room)) return;
-    attempts = 0; connect();
+    event.preventDefault(); discover();
   });
   window.addEventListener('online', () => { if (!stopped && socket?.readyState !== WebSocket.OPEN && room) connect(); });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && room && !stopped && socket?.readyState !== WebSocket.OPEN) connect();
   });
   window.addEventListener('pagehide', () => { stopped = true; stopTimers(); socket?.close(); });
-  window.addEventListener('pageshow', (event) => { if (event.persisted && room) { stopped = false; connect(); } });
-  if (roomField.value) { room = roomField.value; connect(); }
+  window.addEventListener('pageshow', (event) => { if (event.persisted) discover(); });
+  discover();
 })();
