@@ -24,3 +24,38 @@ footer { margin-top: 30px; font-size: 12px; }
 [hidden] { display: none !important; }
 @media (max-width: 360px) { main { padding-right: 16px; padding-left: 16px; } .card { border-width: 16px; padding: 18px 12px; } h1 { font-size: 28px; } }
 @media (max-height: 600px) { main { padding-top: 12px; } header { margin-bottom: 12px; } .brand-logo { max-width: 240px; margin-bottom: 8px; } .card { padding-top: 12px; padding-bottom: 12px; } footer { margin-top: 12px; } }
+
+/* Two thumb controls; shared artwork stays aligned between normal and pressed states. */
+#game-controls { margin-top: 18px; padding: 14px 10px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.combat-status { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; letter-spacing: .08em; }
+#health-value { color: var(--player); }
+.health-track { height: 8px; margin-top: 8px; border: 1px solid #6c6049; background: #0d1012; }
+#health-fill { width: 100%; height: 100%; background: #9b4338; transition: width .15s linear; }
+.touch-controls { display: flex; justify-content: space-around; align-items: center; gap: 12px; margin-top: 22px; }
+.movement-control, .dodge-control { display: flex; flex: 1; flex-direction: column; align-items: center; min-width: 0; }
+#joystick { width: clamp(116px, 39vw, 180px); aspect-ratio: 1; position: relative; border: 2px solid #938064; border-radius: 50%; background: radial-gradient(circle, #424344bb, #141a1cee 70%); box-shadow: inset 0 0 0 7px #0c111888, 0 0 0 3px #171b1c; touch-action: none; }
+.stick-cross { position: absolute; inset: 25%; border: 1px solid #9e8f6e55; border-radius: 50%; }
+#stick { position: absolute; width: 40%; height: 40%; left: 30%; top: 30%; border: 2px solid var(--player); border-radius: 50%; background: radial-gradient(circle at 35% 30%, #a89c7f, #3e3b35 75%); box-shadow: 0 4px 8px #0008; will-change: transform; pointer-events: none; }
+#joystick.engaged { border-color: #f0d395; box-shadow: inset 0 0 0 7px #0c111888, 0 0 12px #d4b47c44; }
+#dodge { width: 100%; max-width: 170px; min-height: 82px; margin: 0; padding: 16px 8px; touch-action: none; }
+#dodge.pressed { background-image: url('/art/home-button-focused.png'); }
+.control-label { display: block; color: var(--player); font-size: 11px; letter-spacing: .12em; margin-top: 15px; min-height: 16px; }
+.combat-hint { color: #b5b4ac; font-size: 12px; margin: 20px 0 0; }
+body.playing main { max-width: 760px; width: 100%; }
+body.playing header { margin-bottom: 8px; }
+body.playing .brand-logo { max-width: 200px; margin-bottom: 0; }
+body.playing .subtitle, body.playing #connected, body.playing footer { display: none; }
+body.playing main > .card:first-of-type { border: 0; background: none; padding: 0; }
+body.playing h1 { font-size: 24px; margin: 6px 0; }
+body.playing #message { min-height: 0; font-size: 13px; margin: 4px 0; }
+body.playing .eyebrow { margin: 6px 0; }
+@media (orientation: landscape) and (max-height: 600px) {
+  body.playing main { padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  body.playing header { display: none; }
+  body.playing h1 { display: none; }
+  body.playing #game-controls { margin-top: 6px; padding: 6px 20px; border-width: 12px; }
+  .touch-controls { margin-top: 8px; justify-content: space-between; gap: 28%; }
+  #joystick { width: clamp(105px, 29vh, 170px); }
+  .control-label { margin-top: 6px; }
+  .combat-hint { margin-top: 4px; }
+}

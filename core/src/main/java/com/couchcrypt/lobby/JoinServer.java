@@ -39,7 +39,7 @@ public final class JoinServer extends NanoWSD {
         timer = Executors.newSingleThreadScheduledExecutor(task -> {
             Thread thread = new Thread(task, "lobby-heartbeat"); thread.setDaemon(true); return thread;
         });
-        timer.scheduleAtFixedRate(this::tick, 1, 1, TimeUnit.SECONDS);
+        timer.scheduleAtFixedRate(this::tick, 100, 100, TimeUnit.MILLISECONDS);
     }
 
     public String room() { return room; }
@@ -65,11 +65,14 @@ public final class JoinServer extends NanoWSD {
 
     @Override protected WebSocket openWebSocket(IHTTPSession session) { return new Phone(session); }
 
-    private String status() {
+    private String status(int slot) {
         LobbyState.Snapshot snapshot = state.snapshot(System.currentTimeMillis());
+        LobbyState.Feedback feedback = state.feedback(slot);
         return "{\"type\":\"status\",\"connected\":" + snapshot.connected()
             + ",\"hostActive\":" + snapshot.hostActive() + ",\"phase\":\""
-            + snapshot.phase().name().toLowerCase(java.util.Locale.ROOT) + "\"}";
+            + snapshot.phase().name().toLowerCase(java.util.Locale.ROOT) + "\",\"health\":" + feedback.health()
+            + ",\"maxHealth\":" + feedback.maxHealth() + ",\"dodgeCooldown\":" + feedback.dodgeCooldown()
+            + ",\"alive\":" + feedback.alive() + "}";
     }
 
     private void tick() {
@@ -80,7 +83,8 @@ public final class JoinServer extends NanoWSD {
             lastRevision = snapshot.revision();
             for (Phone phone : phones.values()) {
                 if (now - phone.lastSeen > 10_000) phone.end("timeout");
-                else if (changed || now - phone.lastStatus >= 3_000) phone.deliver(status());
+                else if (changed || now - phone.lastStatus >= (snapshot.phase() == LobbyState.Phase.SESSION ? 200 : 3_000))
+                    phone.deliver(status(phone.slot));
             }
         } catch (RuntimeException ignored) { /* A closed socket must not stop the heartbeat. */ }
     }
@@ -110,6 +114,7 @@ public final class JoinServer extends NanoWSD {
         private final String id = UUID.randomUUID().toString();
         private volatile long lastSeen = System.currentTimeMillis();
         private volatile long lastStatus;
+        private int slot;
         Phone(IHTTPSession request) { super(request); this.request = request; }
 
         @Override protected void onOpen() {
@@ -125,11 +130,12 @@ public final class JoinServer extends NanoWSD {
                 deliver("{\"type\":\"error\",\"reason\":\"" + joined.error() + "\"}");
                 end(joined.error()); return;
             }
+            slot = joined.slot();
             phones.put(id, this);
             if (!state.owns(id)) { end("removed"); return; }
             deliver("{\"type\":\"joined\",\"player\":" + (joined.slot() + 1)
                 + ",\"token\":\"" + joined.token() + "\"}");
-            deliver(status());
+            deliver(status(slot));
         }
 
         @Override protected void onMessage(WebSocketFrame frame) {
@@ -138,9 +144,22 @@ public final class JoinServer extends NanoWSD {
             try {
                 JsonValue message = new JsonReader().parse(text);
                 if ("ping".equals(message.getString("type", ""))) {
-                    lastSeen = System.currentTimeMillis(); deliver(status());
+                    lastSeen = System.currentTimeMillis(); deliver(status(slot));
                 }
-                // Controller input is deliberately not implemented in the lobby milestone.
+                else if ("input".equals(message.getString("type", ""))) {
+                    JsonValue sequence = message.get("seq"), x = message.get("x"), y = message.get("y"), dodge = message.get("dodge");
+                    if (sequence == null || !sequence.isLong() || sequence.asLong() < 0 || sequence.asLong() > Integer.MAX_VALUE
+                        || x == null || !x.isNumber() || y == null || !y.isNumber() || dodge == null || !dodge.isBoolean()) {
+                        end("bad_message"); return;
+                    }
+                    long now = System.currentTimeMillis();
+                    float inputX = x.asFloat(), inputY = y.asFloat();
+                    if (!Float.isFinite(inputX) || !Float.isFinite(inputY)) { end("bad_message"); return; }
+                    if (state.owns(id)) {
+                        lastSeen = now;
+                        state.input(id, sequence.asInt(), inputX, inputY, dodge.asBoolean(), now);
+                    }
+                }
             } catch (RuntimeException malformed) { end("bad_message"); }
         }
 
