@@ -86,6 +86,8 @@ public final class CryptLobby extends ApplicationAdapter {
             assets.put("/controller.css", web("web/controller.css", "text/css; charset=utf-8"));
             assets.put("/controller.js", web("web/controller.js", "application/javascript; charset=utf-8"));
             assets.put("/art/crypt.png", web("art/crypt.png", "image/png"));
+            assets.put("/art/ui-panel.png", web("art/ui-panel.png", "image/png"));
+            assets.put("/art/ui-button.png", web("art/ui-button.png", "image/png"));
             server = new JoinServer(config.port(), state, assets); server.open(); serverError = null;
             Gdx.app.log("Lobby", "Join URL: " + (host == null ? "No LAN address" : server.url(host)));
         } catch (Exception failure) {
@@ -146,7 +148,7 @@ public final class CryptLobby extends ApplicationAdapter {
     }
 
     private RemoteButton playerCard(int index) {
-        RemoteButton card = button(() -> managePlayer(index));
+        RemoteButton card = button(true, () -> managePlayer(index));
         card.pad(24);
         card.add(art.label(index == 0 ? "PLAYER I" : "PLAYER II", art.section,
             index == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO)).padBottom(10).row();
@@ -259,7 +261,10 @@ public final class CryptLobby extends ApplicationAdapter {
         setFocus(savedFocus);
     }
 
-    private RemoteButton button(Runnable command) { RemoteButton result = new RemoteButton(art, command); buttons.add(result); return result; }
+    private RemoteButton button(Runnable command) { return button(false, command); }
+    private RemoteButton button(boolean panel, Runnable command) {
+        RemoteButton result = new RemoteButton(art, command, panel); buttons.add(result); return result;
+    }
     private RemoteButton textButton(String text, Runnable command) {
         RemoteButton result = button(command);
         result.add(art.label(text, art.body, UiArt.IVORY)); return result;

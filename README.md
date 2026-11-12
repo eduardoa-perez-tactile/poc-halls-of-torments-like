@@ -76,4 +76,8 @@ F3 toggles desktop diagnostics. `--profile` (or the Android `profile` intent ext
 - `assets`: original artwork, licensed fonts, and offline controller page.
 - `scripts/tv-dev.py`: emulator-to-LAN development relay with cleanup.
 
-See [AGENTS.md](AGENTS.md), [architecture](docs/architecture.md), [art direction and prompts](docs/art-direction.md), and [UI flow](docs/ui-flow.md).
+The native lobby and phone page share original stone/brass panel and iron button artwork. Native UI textures are baked once into small nine-slice skins; the complete native art/font texture footprint is about 17.88 MiB plus QR.
+
+The Android launcher has a safe-zone adaptive icon, legacy icon densities, and 16:9 title banners. Its actual banner has been checked in the TV emulator's Installed Games row. Reproduce these code-native assets with `java -Djava.awt.headless=true scripts/GenerateLauncherArt.java` using JDK 21.
+
+See [AGENTS.md](AGENTS.md), [architecture](docs/architecture.md), [art direction and prompts](docs/art-direction.md), [TV launcher guidelines and assets](docs/tv-launcher.md), and [UI flow](docs/ui-flow.md).
