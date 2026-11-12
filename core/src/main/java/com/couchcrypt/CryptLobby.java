@@ -22,6 +22,7 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.Scaling;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.couchcrypt.game.ArenaWorld;
+import com.couchcrypt.game.ArenaHudState;
 import com.couchcrypt.game.GameArt;
 import com.couchcrypt.game.ArenaRenderer;
 import com.couchcrypt.lobby.JoinServer;
@@ -57,6 +58,9 @@ public final class CryptLobby extends ApplicationAdapter {
     private String host, serverError;
     private Label firstStatus, secondStatus, partyStatus, startLabel, connectionLabel, diagnostics;
     private final ArenaWorld world = new ArenaWorld();
+    private final ArenaHudState hudState = new ArenaHudState();
+    private final boolean[] previouslyAlive = new boolean[2], lowHealthNotified = new boolean[2];
+    private boolean finalWarning;
     private GameArt gameArt;
     private ArenaRenderer arena;
     private final LobbyState.Controls[] controls = {new LobbyState.Controls(), new LobbyState.Controls()};
@@ -293,8 +297,10 @@ public final class CryptLobby extends ApplicationAdapter {
 
     private void startSession() {
         if (state.snapshot(System.currentTimeMillis()).connected() < 1 || server == null || host == null) return;
-        world.reset();
+        world.reset(); hudState.reset(); finalWarning = false;
+        for (int i = 0; i < 2; i++) { previouslyAlive[i] = false; lowHealthNotified[i] = false; }
         reconcilePlayers();
+        hudState.notify("THE DESCENT BEGINS", "Survive the crypt. Gather the fallen souls.", ArenaHudState.Tone.INFO, 4f);
         arena.resetCameras();
         showSession();
     }
@@ -306,7 +312,14 @@ public final class CryptLobby extends ApplicationAdapter {
             if (!slot.reserved()) world.deactivatePlayer(i);
             if (slot.connected()) {
                 if (generations[i] != slot.generation()) world.deactivatePlayer(i);
+                boolean joining = !world.players[i].active;
                 world.activatePlayer(i);
+                previouslyAlive[i] = world.players[i].alive;
+                if (joining && world.elapsed > 0) {
+                    hudState.notify("A SOUL ANSWERS", i == 0 ? "Player I has joined the descent." : "Player II has joined the descent.",
+                        ArenaHudState.Tone.SUCCESS, 4f);
+                    arena.resetCameras();
+                }
                 generations[i] = slot.generation();
             }
         }
@@ -450,6 +463,14 @@ public final class CryptLobby extends ApplicationAdapter {
     }
 
     private boolean key(int key) {
+        if (key == Input.Keys.F4 && screen == Screen.SESSION) {
+            if (hudState.bossVisible) hudState.clearBoss();
+            else {
+                hudState.setBoss("THE HOLLOW SOVEREIGN", "HUD PREVIEW  /  PHASE I", 720, 1000);
+                hudState.notify("HUD PREVIEW", "Boss encounter UI preview. Press F4 to dismiss.", ArenaHudState.Tone.WARNING, 5f);
+            }
+            return true;
+        }
         if (key == Input.Keys.F3) { debug = !debug; diagnostics.setVisible(debug); return true; }
         if (key == Input.Keys.BACK || key == Input.Keys.ESCAPE) {
             if (overlay != null) {
@@ -509,6 +530,30 @@ public final class CryptLobby extends ApplicationAdapter {
         label.setColor(player.connected() ? UiArt.GREEN : UiArt.GOLD);
     }
 
+    private void updateCombatNotices() {
+        for (int i = 0; i < 2; i++) {
+            var player = world.players[i];
+            if (!player.active) continue;
+            if (previouslyAlive[i] && !player.alive)
+                hudState.notify(i == 0 ? "PLAYER I HAS FALLEN" : "PLAYER II HAS FALLEN",
+                    "Stand near your companion to revive them.", ArenaHudState.Tone.WARNING, 4f);
+            else if (!previouslyAlive[i] && player.alive)
+                hudState.notify("A SOUL REKINDLED", i == 0 ? "Player I returns to the fight." : "Player II returns to the fight.",
+                    ArenaHudState.Tone.SUCCESS, 3.5f);
+            previouslyAlive[i] = player.alive;
+            if (player.alive && player.health <= player.maxHealth * .25f && !lowHealthNotified[i]) {
+                lowHealthNotified[i] = true;
+                hudState.notify(i == 0 ? "PLAYER I IN PERIL" : "PLAYER II IN PERIL",
+                    "Dodge to safety. Seek a healing ember.", ArenaHudState.Tone.WARNING, 3.5f);
+            }
+            if (player.health > player.maxHealth * .4f) lowHealthNotified[i] = false;
+        }
+        if (!finalWarning && world.timeRemaining() <= 30 && world.outcome == ArenaWorld.Outcome.RUNNING) {
+            finalWarning = true;
+            hudState.notify("HOLD THE LINE", "Thirty seconds remain in this descent.", ArenaHudState.Tone.WARNING, 4f);
+        }
+    }
+
     @Override public void render() {
         float delta = Math.min(Gdx.graphics.getDeltaTime(), 0.1f);
         refreshClock += delta; profileClock += delta;
@@ -529,6 +574,8 @@ public final class CryptLobby extends ApplicationAdapter {
                     world.setInput(i, x * scale, y * scale, input.dodge);
                 }
                 world.update(delta);
+                hudState.update(delta);
+                updateCombatNotices();
                 if (world.outcome != ArenaWorld.Outcome.RUNNING) showResults();
             }
         }
@@ -549,7 +596,7 @@ public final class CryptLobby extends ApplicationAdapter {
             }
         }
         ScreenUtils.clear(0.025f, 0.035f, 0.04f, 1);
-        if (screen == Screen.SESSION || screen == Screen.RESULTS) arena.render(world, delta);
+        if (screen == Screen.SESSION || screen == Screen.RESULTS) arena.render(world, hudState, delta);
         stage.getViewport().apply(); stage.act(delta); stage.draw();
     }
     @Override public void resize(int width, int height) { stage.getViewport().update(width, height, true); }

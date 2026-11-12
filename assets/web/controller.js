@@ -8,7 +8,7 @@
   let lastSeen = Date.now();
   let memoryToken = '';
   const controls = byId('game-controls'), joystick = byId('joystick'), stick = byId('stick'), dodgeButton = byId('dodge');
-  const healthValue = byId('health-value'), healthFill = byId('health-fill'), dodgeStatus = byId('dodge-status');
+  const dodgeStatus = byId('dodge-status');
   let phase = 'lobby', hostActive = false, alive = true, foreground = true, sender, sequence = 0;
   let axisX = 0, axisY = 0, dodgeEdge = false, stickPointer = null, dodgePointer = null, stickBounds;
   const keys = new Set();
@@ -40,12 +40,8 @@
     phase = data.phase; hostActive = data.hostActive; alive = data.alive !== false;
     const show = phase === 'session' && hostActive;
     controls.hidden = !show; document.body.classList.toggle('playing', show);
-    title.textContent = show ? (alive ? 'Survive the crypt' : 'You have fallen') : 'You have a place';
+    title.textContent = data.phase === 'paused' || data.phase === 'invite' ? 'Paused' : data.phase === 'results' ? 'Round complete' : 'You have a place';
     if (wasSession !== show) releaseControls();
-    if (Number.isFinite(data.health) && Number.isFinite(data.maxHealth) && data.maxHealth > 0) {
-      healthValue.textContent = `${Math.ceil(data.health)} / ${Math.ceil(data.maxHealth)}`;
-      healthFill.style.width = `${Math.max(0, Math.min(100, data.health / data.maxHealth * 100))}%`;
-    }
     const cooldown = Number.isFinite(data.dodgeCooldown) ? Math.max(0, data.dodgeCooldown) : 0;
     dodgeStatus.textContent = alive ? (cooldown > 0.05 ? `${cooldown.toFixed(1)}s` : 'READY') : 'FALLEN';
     dodgeButton.disabled = !alive || cooldown > 0.05;
@@ -151,7 +147,7 @@
       if (data.type === 'joined') {
         joined = true; attempts = 0; token(data.token);
         form.hidden = true; connected.hidden = false;
-        player.textContent = `PLAYER ${data.player}`;
+        player.textContent = data.player === 1 ? 'PLAYER I' : 'PLAYER II';
         document.documentElement.style.setProperty('--player', data.player === 1 ? '#d4b47c' : '#9bc3bb');
         title.textContent = 'You have a place';
         message.textContent = 'Connected. Look at the TV while your host gathers the party.';
@@ -162,12 +158,12 @@
         party.textContent = data.connected === 2 ? 'Both souls are here' : data.phase === 'invite' ? 'Waiting for your companion' : 'Ready for a solo descent';
         const descriptions = {
           lobby: 'Connected. Your host can start solo or gather a companion.',
-          session: alive ? 'Move with your left thumb. Dodge with your right.' : 'Watch the TV. Your host can restart the round.',
-          results: 'Round complete. Your host controls what happens next.',
-          paused: 'The host has paused. Stay connected to keep your place.',
-          invite: 'The host is inviting a companion. Stay connected to keep your place.'
+          session: '',
+          results: 'Look at the TV.',
+          paused: 'Look at the TV.',
+          invite: 'Look at the TV.'
         };
-        message.textContent = data.hostActive ? (descriptions[data.phase] || descriptions.lobby) : 'The host has stepped away. Stay here to keep your place.';
+        message.textContent = data.hostActive ? (descriptions[data.phase] ?? descriptions.lobby) : 'The host has stepped away. Stay here to keep your place.';
       } else if (data.type === 'removed' || data.type === 'error') {
         stopped = true; stopTimers();
         const explanations = {
