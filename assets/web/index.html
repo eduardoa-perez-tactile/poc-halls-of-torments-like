@@ -11,7 +11,7 @@
 <body>
   <main>
     <header><img class="brand-logo" src="/art/home-logo.png" alt="Couch Crypt"><p class="subtitle">Two souls. One descent.</p></header>
-    <section class="card" aria-labelledby="title">
+    <section class="card connection-card" aria-labelledby="title">
       <p class="eyebrow" id="player">THE GATHERING</p>
       <h1 id="title">Join your party</h1>
       <p id="message" role="status" aria-live="polite">Keep your phone on the same Wi-Fi as the TV.</p>
@@ -21,8 +21,6 @@
       <div id="connected" hidden><div class="connection-mark" aria-hidden="true">✓</div><p id="party">Waiting for your companion</p><p class="hint">The TV remote controls the lobby.<br>Your phone controls your character when the adventure begins.</p></div>
     </section>
     <section id="game-controls" class="card" aria-label="Character controls" hidden>
-      <div class="combat-status"><span id="health-label">HEALTH</span><strong id="health-value">100 / 100</strong></div>
-      <div class="health-track" aria-hidden="true"><div id="health-fill"></div></div>
       <div class="touch-controls">
         <div class="movement-control">
           <div id="joystick" role="group" aria-label="Drag to move your character">
@@ -32,7 +30,6 @@
         </div>
         <div class="dodge-control"><button id="dodge" type="button" aria-label="Dodge">DODGE</button><span id="dodge-status" class="control-label">READY</span></div>
       </div>
-      <p class="combat-hint">Attacks are automatic. Watch the TV.</p>
     </section>
     <footer><span id="network-status">LOCAL NETWORK</span><br>Keep this page open while you play.</footer>
   </main>

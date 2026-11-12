@@ -42,3 +42,10 @@ Gameplay adds a 1024x512 managed actor/prop/FX atlas and 512x512 floor texture, 
 Simulation uses fixed pools capped at 64 enemies, 96 bolts and 96 pickups, with a fixed 60 Hz step and bounded catch-up. World rendering uses culled floor diamonds, one actor atlas, no framebuffers/post-processing and one or two scissored cameras. HUD text refreshes at 5 Hz; reusable controller samples avoid render-loop input allocation. Networking and status broadcasts remain outside the render thread.
 
 A brief debug APK check on the visible Android 33 ARM64 emulator with Apple M2 Max OpenGL translation observed 59–61 FPS, about 5 MiB live Java heap after collection, and 8 combined draw calls in solo combat. This was a short launch/movement/dodge/late-join/split-screen check, not a full survival playthrough or maximum-enemy benchmark. Sustained 60 FPS and total process memory on representative physical TVs remain unverified. Gameplay art is temporary per user direction.
+
+
+## Combat HUD follow-up
+
+The ornate vitals, timer crest, optional boss strip, and notification cards reuse the existing UI paintings, portraits, atlas pixels and font textures. No new textures or framebuffers are allocated. Combined resident texture estimate remains 23.0656 MiB plus QR. Text layouts are cached, stat strings refresh at 5 Hz, and the notification queue reuses three fixed objects. New notices arise only on gameplay transitions, not on every frame.
+
+A brief visual check of the debug APK on the same visible hardware-translated TV emulator observed 60–61 FPS, 21 combined draw calls with the boss preview visible (25 while a notification was also visible), and approximately 5–7 MiB live Java heap after startup collection. This is visual/layout evidence, not a maximum-load or sustained physical-TV benchmark. The four focused HUD-state tests cover queue overflow, duplicate suppression, timing, and boss-data reset/clamping. No full survival playthrough or broad regression run was performed.

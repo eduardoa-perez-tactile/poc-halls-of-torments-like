@@ -4,7 +4,6 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.Disposable;
@@ -16,7 +15,7 @@ public final class ArenaRenderer implements Disposable {
     private static final float HUD_WIDTH = 1920f, HUD_HEIGHT = 1080f;
     private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PROP_COUNT = 28;
     private final GameArt art;
-    private final UiArt ui;
+    private final GameHud gameHud;
     private final SpriteBatch batch = new SpriteBatch(1800);
     private final OrthographicCamera[] cameras = { new OrthographicCamera(), new OrthographicCamera() };
     private final OrthographicCamera hud = new OrthographicCamera();
@@ -25,16 +24,11 @@ public final class ArenaRenderer implements Disposable {
     private final float[] propX = new float[PROP_COUNT], propY = new float[PROP_COUNT];
     private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + PROP_COUNT];
     private final int[] types = new int[depths.length], indices = new int[depths.length];
-    private final String[] healthText = { "100 / 100", "100 / 100" };
-    private final String[] dodgeText = { "DODGE READY", "DODGE READY" };
-    private final StringBuilder textBuilder = new StringBuilder(72);
-    private String timerText = "2:00", rewardsText = "0 SLAIN    0 SOULS";
-    private float hudRefresh;
     private int sortCount;
     public int drawCalls;
 
     public ArenaRenderer(GameArt gameArt, UiArt uiArt) {
-        art = gameArt; ui = uiArt;
+        art = gameArt; gameHud = new GameHud(gameArt, uiArt);
         hud.setToOrtho(false, HUD_WIDTH, HUD_HEIGHT);
         for (int i = 0; i < 8; i++) {
             float x = -1080f + i * 300f;
@@ -50,17 +44,15 @@ public final class ArenaRenderer implements Disposable {
 
     public void resetCameras() {
         cameraReady[0] = cameraReady[1] = false;
-        hudRefresh = 0f;
+        gameHud.reset();
     }
 
-    public void render(ArenaWorld world, float delta) {
+    public void render(ArenaWorld world, ArenaHudState state, float delta) {
         int width = Gdx.graphics.getWidth(), height = Gdx.graphics.getHeight();
         if (width <= 0 || height <= 0) return;
         int active = (world.players[0].active ? 1 : 0) + (world.players[1].active ? 1 : 0);
         boolean split = active == 2;
         drawCalls = 0;
-        hudRefresh -= Math.max(0f, delta);
-        if (hudRefresh <= 0f) { refreshHud(world); hudRefresh = .2f; }
         Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST);
         for (int slot = 0; slot < 2; slot++) {
             if (!world.players[slot].active) continue;
@@ -85,7 +77,7 @@ public final class ArenaRenderer implements Disposable {
         Gdx.gl.glViewport(0, 0, width, height);
         batch.setProjectionMatrix(hud.combined);
         batch.begin();
-        drawHud(world, split);
+        gameHud.render(batch, world, state, split, delta);
         batch.setColor(Color.WHITE);
         batch.end();
         drawCalls += batch.renderCalls;
@@ -247,66 +239,6 @@ public final class ArenaRenderer implements Disposable {
     private void drawAnchored(TextureRegion region, float x, float y, float width, float height, float bottom, boolean flip) {
         float left = screenX(x, y) - width * .5f, base = screenY(x, y) - bottom;
         batch.draw(region, flip ? left + width : left, base, flip ? -width : width, height);
-    }
-
-    private void refreshHud(ArenaWorld world) {
-        int remaining = (int) Math.ceil(world.timeRemaining());
-        textBuilder.setLength(0);
-        textBuilder.append(remaining / 60).append(':');
-        if (remaining % 60 < 10) textBuilder.append('0');
-        timerText = textBuilder.append(remaining % 60).toString();
-        textBuilder.setLength(0);
-        rewardsText = textBuilder.append(world.kills).append(" SLAIN    ").append(world.souls).append(" SOULS").toString();
-        for (ArenaWorld.Player player : world.players) {
-            textBuilder.setLength(0);
-            healthText[player.slot] = textBuilder.append((int) Math.ceil(player.health)).append(" / ").append((int) player.maxHealth).toString();
-            if (!player.alive) dodgeText[player.slot] = "STAND NEAR TO REVIVE";
-            else if (player.dodgeCooldown <= 0f) dodgeText[player.slot] = "DODGE READY";
-            else {
-                textBuilder.setLength(0);
-                int tenths = (int) Math.ceil(player.dodgeCooldown * 10f);
-                dodgeText[player.slot] = textBuilder.append("DODGE ").append(tenths / 10).append('.').append(tenths % 10).append('s').toString();
-            }
-        }
-    }
-
-    private void drawHud(ArenaWorld world, boolean split) {
-        if (split) {
-            batch.setColor(.06f, .05f, .04f, 1f);
-            batch.draw(art.pixel, 957f, 0f, 6f, HUD_HEIGHT);
-            batch.setColor(UiArt.GOLD);
-            batch.draw(art.pixel, 959f, 0f, 2f, HUD_HEIGHT);
-        }
-        for (ArenaWorld.Player player : world.players) {
-            if (!player.active) continue;
-            float x = split && player.slot == 1 ? 1590f : 32f;
-            batch.setColor(.025f, .028f, .032f, .88f);
-            batch.draw(art.pixel, x - 12f, 924f, 330f, 132f);
-            batch.setColor(player.slot == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO);
-            batch.draw(art.pixel, x - 12f, 1054f, 330f, 2f);
-            text(ui.section, player.slot == 0 ? "PLAYER I" : "PLAYER II", x, 1040f, .75f,
-                    player.slot == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO);
-            text(ui.small, healthText[player.slot], x + 205f, 1037f, 1f, UiArt.IVORY);
-            batch.setColor(.18f, .08f, .075f, 1f);
-            batch.draw(art.pixel, x, 983f, 292f, 14f);
-            batch.setColor(player.alive ? .65f : .23f, .16f, .12f, 1f);
-            batch.draw(art.pixel, x, 983f, 292f * Math.max(0f, Math.min(1f, player.health / Math.max(1f, player.maxHealth))), 14f);
-            text(ui.small, dodgeText[player.slot], x, 966f, .85f, player.dodgeCooldown <= 0f ? UiArt.GOLD : UiArt.MUTED);
-        }
-        batch.setColor(.025f, .028f, .032f, .86f);
-        batch.draw(art.pixel, 780f, 949f, 360f, 106f);
-        text(ui.section, timerText, 920f, 1041f, 1f, UiArt.IVORY);
-        text(ui.small, rewardsText, 816f, 986f, .9f, UiArt.GOLD);
-        text(ui.small, "BACK  Pause", 1703f, 34f, 1f, UiArt.IVORY);
-    }
-
-    private void text(BitmapFont font, String text, float x, float y, float scale, Color color) {
-        float scaleX = font.getData().scaleX, scaleY = font.getData().scaleY;
-        float r = font.getColor().r, g = font.getColor().g, b = font.getColor().b, a = font.getColor().a;
-        font.getData().setScale(scale); font.setColor(color);
-        batch.setColor(Color.WHITE);
-        font.draw(batch, text, x, y);
-        font.getData().setScale(scaleX, scaleY); font.setColor(r, g, b, a);
     }
 
     private static boolean visible(OrthographicCamera camera, float x, float y, float margin) {

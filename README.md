@@ -64,6 +64,8 @@ The gameplay artwork is temporary pending a separate isometric art pass; the cur
 - Survive for two minutes against ghouls. Collect shared souls and occasional healing drops.
 - One connected player gets a full-screen view. Two get independent vertical split-screen cameras in the same world.
 - Invite a second phone from Pause; it enters beside its companion when resumed.
+- The TV displays ornate player vitals, timer/rewards, and queued combat notifications. A hidden boss status lane is ready for future encounters.
+- Phones show only player identity, movement, and Dodge during play; health stays on the TV.
 - Use the joystick to move and Dodge to escape. Both starter characters currently fire the same automatic magic bolt; differentiated weapons and progression are future work.
 - A living ally can revive a fallen companion by staying nearby for two seconds. If everyone falls, the run ends.
 - Victory/defeat offers Restart Run or Return to Lobby using the TV remote.
@@ -79,7 +81,7 @@ The small test suite covers slot allocation, reconnect reservations/expiry, dupl
 
 The focused tests cover simulation invariants and input/protocol safety. User playtesting covers combat feel, difficulty, two physical phones, and camera scanning. No automated full-round playthrough is required.
 
-F3 toggles desktop diagnostics. `--profile` (or the Android `profile` intent extra) logs FPS, live Java heap, resident art texture bytes, and draw calls every five seconds. These are brief diagnostics, not a guarantee of performance on every TV. See [performance notes](docs/performance.md).
+F3 toggles desktop diagnostics. F4 during a session toggles a labeled boss-HUD preview for visual review; boss gameplay is not implemented. `--profile` (or the Android `profile` intent extra) logs FPS, live Java heap, resident art texture bytes, and draw calls every five seconds. These are brief diagnostics, not a guarantee of performance on every TV. See [performance notes](docs/performance.md).
 
 ## Structure
 
