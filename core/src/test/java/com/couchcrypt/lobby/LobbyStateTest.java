@@ -1,6 +1,7 @@
 package com.couchcrypt.lobby;
 
 import org.junit.jupiter.api.Test;
+import com.couchcrypt.game.PartyProgression;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LobbyStateTest {
@@ -111,4 +112,70 @@ class LobbyStateTest {
         state.remove(0); state.setPhase(LobbyState.Phase.LOBBY); state.join(null, "new", 6);
         assertNotEquals(generation, state.snapshot(6).first().generation());
     }
+    @Test void upgradeChoicesAreOwnSlotBoundCurrentAndConsumedOnce() {
+        var state = new LobbyState(); state.join(null, "a", 1); state.join(null, "b", 1);
+        state.setPhase(LobbyState.Phase.SESSION);
+        var choices = PartyProgression.Upgrade.values();
+        var first = choices[0];
+        state.publishProgression(0, 2, 1, 8, 11, 2, 30, choices);
+        state.publishProgression(1, 2, 1, 8, 22, 2, 30, choices);
+        choices[0] = choices[3];
+        assertSame(first, state.progressionFeedback(0).upgrade().first(), "Publication copies the option references");
+        assertFalse(state.chooseUpgrade("a", 22, 0), "A phone cannot choose its companion's offer");
+        assertFalse(state.chooseUpgrade("intruder", 11, 0));
+        assertFalse(state.chooseUpgrade("a", 11, -1)); assertFalse(state.chooseUpgrade("a", 11, 3));
+        assertTrue(state.chooseUpgrade("a", 11, 1));
+        var request = new LobbyState.UpgradeRequest();
+        assertFalse(state.pollUpgrade(1, request));
+        assertTrue(state.pollUpgrade(0, request));
+        assertEquals(11, request.offerId); assertEquals(1, request.option);
+        assertEquals(state.snapshot(1).first().generation(), request.generation);
+        assertFalse(state.pollUpgrade(0, request));
+        assertFalse(state.chooseUpgrade("a", 11, 2), "A polled request cannot be replayed before publication catches up");
+        state.publishProgression(0, 2, 1, 8, 11, 2, 29, choices);
+        assertFalse(state.chooseUpgrade("a", 11, 0));
+        state.publishProgression(0, 3, 0, 10, 33, 3, 30, choices);
+        assertFalse(state.chooseUpgrade("a", 11, 0));
+        assertTrue(state.chooseUpgrade("a", 33, 2));
+    }
+
+    @Test void pauseBackgroundDisconnectAndReplacementDiscardUnconsumedChoices() {
+        var state = new LobbyState(); var joined = state.join(null, "a", 1);
+        state.setPhase(LobbyState.Phase.SESSION);
+        var choices = PartyProgression.Upgrade.values();
+        var request = new LobbyState.UpgradeRequest();
+        state.publishProgression(0, 2, 0, 8, 10, 2, 30, choices);
+        state.chooseUpgrade("a", 10, 1); state.setPhase(LobbyState.Phase.PAUSED);
+        assertFalse(state.pollUpgrade(0, request)); assertFalse(state.chooseUpgrade("a", 10, 1));
+        assertEquals(10, state.progressionFeedback(0).upgrade().id(), "Pause preserves presentation");
+        state.setPhase(LobbyState.Phase.SESSION); assertTrue(state.chooseUpgrade("a", 10, 2));
+        state.setHostActive(false); assertFalse(state.pollUpgrade(0, request));
+        assertFalse(state.chooseUpgrade("a", 10, 0)); state.setHostActive(true);
+        assertTrue(state.chooseUpgrade("a", 10, 1)); state.disconnected("a", 2);
+        assertFalse(state.pollUpgrade(0, request));
+        state.join(joined.token(), "replacement", 3);
+        assertFalse(state.chooseUpgrade("a", 10, 0)); assertTrue(state.chooseUpgrade("replacement", 10, 0));
+        long previousGeneration = state.snapshot(3).first().generation();
+        state.remove(0); state.setPhase(LobbyState.Phase.LOBBY); state.join(null, "fresh", 4);
+        state.setPhase(LobbyState.Phase.SESSION);
+        assertFalse(state.pollUpgrade(0, request)); assertFalse(state.chooseUpgrade("fresh", 10, 0));
+        assertNull(state.progressionFeedback(0).upgrade());
+        state.publishProgression(0, 2, 0, 8, 20, 2, 30, choices);
+        state.chooseUpgrade("fresh", 20, 0); assertTrue(state.pollUpgrade(0, request));
+        assertNotEquals(previousGeneration, request.generation);
+    }
+
+    @Test void authoritativeClearAndInvalidTimersCannotLeaveAnOfferSelectable() {
+        var state = new LobbyState(); state.join(null, "a", 1); state.setPhase(LobbyState.Phase.SESSION);
+        var choices = PartyProgression.Upgrade.values(); var request = new LobbyState.UpgradeRequest();
+        state.publishProgression(0, 2, 3, 8, 10, 2, 30, choices); state.chooseUpgrade("a", 10, 2);
+        state.publishProgression(0, 2, 3, 8, 0, 0, 0, null);
+        assertFalse(state.pollUpgrade(0, request)); assertNull(state.progressionFeedback(0).upgrade());
+        assertFalse(state.chooseUpgrade("a", 10, 0));
+        state.publishProgression(0, 2, 3, 8, 20, 2, Float.NaN, choices);
+        assertNull(state.progressionFeedback(0).upgrade());
+        state.publishProgression(0, 2, 3, 8, 30, 2, 100, choices);
+        assertEquals(30, state.progressionFeedback(0).upgrade().secondsLeft());
+    }
+
 }

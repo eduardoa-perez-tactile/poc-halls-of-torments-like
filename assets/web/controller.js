@@ -9,6 +9,10 @@
   let memoryToken = '';
   const controls = byId('game-controls'), joystick = byId('joystick'), stick = byId('stick'), dodgeButton = byId('dodge');
   const dodgeStatus = byId('dodge-status');
+  const upgradeChoices = byId('upgrade-choices'), upgradeLevel = byId('upgrade-level'), upgradeCountdown = byId('upgrade-countdown');
+  const upgradeButtons = [0, 1, 2].map((index) => byId(`upgrade-option-${index}`));
+  let upgradeOffer = null, upgradeSeconds = 0, upgradeSampleTime = 0, upgradeTicker;
+  let upgradeSelected = -1, upgradePendingSince = 0;
   let phase = 'lobby', hostActive = false, alive = true, foreground = true, sender, sequence = 0;
   let axisX = 0, axisY = 0, dodgeEdge = false, stickPointer = null, dodgePointer = null, stickBounds;
   const keys = new Set();
@@ -35,6 +39,69 @@
     if (!canControl()) { clearInterval(sender); sender = undefined; releaseControls(); }
     else if (!sender) { sendInput(); sender = setInterval(sendInput, 1000 / 30); }
   }
+  function clearUpgrade() {
+    const wasVisible = !upgradeChoices.hidden;
+    clearInterval(upgradeTicker); upgradeTicker = undefined;
+    upgradeOffer = null; upgradeSelected = -1; upgradePendingSince = 0;
+    upgradeChoices.hidden = true; document.body.classList.remove('has-upgrade');
+    if (wasVisible) releaseControls();
+  }
+  function canChooseUpgrade() {
+    return joined && phase === 'session' && hostActive && foreground && !document.hidden && socket?.readyState === WebSocket.OPEN;
+  }
+  function remainingUpgradeSeconds() {
+    // Interpolation is display-only. Only the host resolves expiry or applies an upgrade.
+    const elapsed = phase === 'session' && hostActive ? (performance.now() - upgradeSampleTime) / 1000 : 0;
+    return Math.max(0, upgradeSeconds - elapsed);
+  }
+  function paintUpgrade() {
+    if (!upgradeOffer) return;
+    const remaining = remainingUpgradeSeconds();
+    // A lost/rejected request can be retried after the next authoritative statuses arrive.
+    if (upgradeSelected >= 0 && performance.now() - upgradePendingSince >= 1200) {
+      upgradeSelected = -1; upgradePendingSince = 0;
+    }
+    upgradeCountdown.textContent = upgradeSelected >= 0 ? 'Applying choice…'
+      : !hostActive || phase !== 'session' ? 'Paused'
+      : remaining <= 0 ? 'Applying auto-pick…' : `Auto-pick in ${Math.ceil(remaining)}s`;
+    const disabled = !canChooseUpgrade() || remaining <= 0 || upgradeSelected >= 0;
+    upgradeButtons.forEach((button, index) => {
+      button.disabled = disabled;
+      button.classList.toggle('selected', index === upgradeSelected);
+    });
+    if (foreground && !document.hidden) {
+      if (!upgradeTicker) upgradeTicker = setInterval(paintUpgrade, 100);
+    } else { clearInterval(upgradeTicker); upgradeTicker = undefined; }
+  }
+  function setUpgradeOffer(progression) {
+    const next = progression?.upgrade;
+    if (!joined || !['session', 'paused', 'invite'].includes(phase) || !next
+      || !Number.isSafeInteger(next.id) || next.id <= 0 || !Number.isFinite(next.secondsLeft)
+      || !Array.isArray(next.options) || next.options.length !== 3
+      || !next.options.every((option) => typeof option?.title === 'string' && typeof option.description === 'string')) {
+      clearUpgrade(); return;
+    }
+    if (upgradeOffer?.id !== next.id) {
+      upgradeOffer = next; upgradeSelected = -1; upgradePendingSince = 0;
+      upgradeLevel.textContent = `LEVEL ${Number.isSafeInteger(next.level) ? next.level : ''} · CHOOSE A SKILL`;
+      upgradeButtons.forEach((button, index) => {
+        button.querySelector('strong').textContent = next.options[index].title.slice(0, 64);
+        button.querySelector('span').textContent = next.options[index].description.slice(0, 128);
+      });
+      upgradeChoices.hidden = false; document.body.classList.add('has-upgrade');
+      // The choice area changes controller geometry, so discard any captured old bounds.
+      releaseControls();
+    }
+    upgradeSeconds = Math.max(0, Math.min(30, next.secondsLeft));
+    upgradeSampleTime = performance.now();
+    paintUpgrade();
+  }
+  upgradeButtons.forEach((button, index) => button.addEventListener('click', () => {
+    if (!upgradeOffer || !canChooseUpgrade() || upgradeSelected >= 0 || remainingUpgradeSeconds() <= 0) return;
+    upgradeSelected = index; upgradePendingSince = performance.now();
+    socket.send(JSON.stringify({ type: 'upgrade', offerId: upgradeOffer.id, option: index }));
+    paintUpgrade();
+  }));
   function setControlScreen(data) {
     const wasSession = phase === 'session' && hostActive;
     phase = data.phase; hostActive = data.hostActive; alive = data.alive !== false;
@@ -46,6 +113,7 @@
     dodgeStatus.textContent = alive ? (cooldown > 0.05 ? `${cooldown.toFixed(1)}s` : 'READY') : 'FALLEN';
     dodgeButton.disabled = !alive || cooldown > 0.05;
     refreshSender();
+    setUpgradeOffer(data.progression);
   }
   function movePointer(event) {
     if (event.pointerId !== stickPointer || !canControl()) return;
@@ -85,14 +153,15 @@
   }
   window.addEventListener('keydown', (event) => {
     const key = event.key.toLowerCase();
+    if ((key === ' ' || key === 'enter') && event.target.closest?.('.upgrade-choice')) return;
     if (!canControl() || !['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(key)) return;
     event.preventDefault();
     if (key === ' ') { if (!event.repeat && !dodgeButton.disabled) { dodgeEdge = true; sendInput(); } }
     else { keys.add(key); keyboardAxes(); sendInput(); }
   });
   window.addEventListener('keyup', (event) => { if (keys.delete(event.key.toLowerCase())) { keyboardAxes(); sendInput(); } });
-  window.addEventListener('blur', () => { foreground = false; refreshSender(); });
-  window.addEventListener('focus', () => { foreground = true; refreshSender(); });
+  window.addEventListener('blur', () => { foreground = false; refreshSender(); paintUpgrade(); });
+  window.addEventListener('focus', () => { foreground = true; refreshSender(); paintUpgrade(); });
   window.addEventListener('resize', () => releaseControls());
 
   function token(value) {
@@ -102,7 +171,7 @@
       return localStorage.getItem(key) || memoryToken;
     } catch { if (value !== undefined) memoryToken = value; return memoryToken; }
   }
-  function stopTimers() { clearInterval(heartbeat); clearInterval(watchdog); clearTimeout(retry); clearInterval(sender); sender = undefined; releaseControls(); }
+  function stopTimers() { clearInterval(heartbeat); clearInterval(watchdog); clearTimeout(retry); clearInterval(sender); sender = undefined; clearUpgrade(); releaseControls(); }
   function showForm(text, label = 'Try again') {
     joined = false; controls.hidden = true; document.body.classList.remove('playing');
     connected.hidden = true; form.hidden = false; joinButton.disabled = false;
@@ -194,7 +263,7 @@
   });
   window.addEventListener('online', () => { if (!stopped && socket?.readyState !== WebSocket.OPEN && room) connect(); });
   document.addEventListener('visibilitychange', () => {
-    refreshSender();
+    refreshSender(); paintUpgrade();
     if (document.visibilityState === 'visible' && room && !stopped && socket?.readyState !== WebSocket.OPEN) connect();
   });
   window.addEventListener('pagehide', () => { stopped = true; stopTimers(); joined = false; socket?.close(); });

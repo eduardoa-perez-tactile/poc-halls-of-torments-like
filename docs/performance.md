@@ -54,3 +54,8 @@ A brief visual check of the debug APK on the same visible hardware-translated TV
 ## Compact unboxed HUD
 
 The latest layout removes painted backplates, timer slabs, portraits, duplicate class labels, and notification paragraphs. Small text and thin rails reuse the same pixel/font atlas resources; the resident texture estimate remains unchanged. Boss and notification presentation stay conditional and bounded. Layouts/stat strings remain cached. This is a visual-only follow-up: desktop/APK compilation and one brief rendering check are appropriate; no new unit tests or regression playthrough are required.
+
+
+## Shared XP and personal upgrades
+
+Progression and per-player offers use fixed objects and three enum references per offer; level entitlement queues are bounded by the level cap (20). No textures or render targets are added. XP/offer presentation copies at 5 Hz; WebSocket serialization remains on server threads. Countdown resolution and upgrade effects happen in the fixed simulation tick, and no tick advances during manual pause/background/disconnect. A short live check used the profiling-only F5 XP grant to show simultaneous level-ups and an actual phone selection while the other player's offer remained open; no full survival playthrough was performed. Focused tests cover progression, real stat effects, timeout/default, late joining, replay/ownership checks, and the real upgrade WebSocket message.

@@ -13,7 +13,7 @@ public final class GameHud {
     private static final Color WARNING = Color.valueOf("e5a56a");
     private static final Color SOUL = Color.valueOf("9bc3bb");
     private final GameArt art;
-    private final Text[] health = new Text[2], dodge = new Text[2], playerLabels = new Text[2];
+    private final Text[] health = new Text[2], dodge = new Text[2], playerLabels = new Text[2], experience = new Text[2];
     private final Text timer, slain, souls, bossName, bossPhase, noticeTitle, pause;
     private final StringBuilder builder = new StringBuilder(64);
     private final boolean[] wasActive = new boolean[2], wasAlive = new boolean[2];
@@ -24,8 +24,9 @@ public final class GameHud {
         for (int slot = 0; slot < 2; slot++) {
             Color accent = slot == 0 ? UiArt.GOLD : SOUL;
             health[slot] = new Text(ui.small, 1f, 120f, UiArt.IVORY);
-            dodge[slot] = new Text(ui.small, 1f, 258f, accent);
-            playerLabels[slot] = new Text(ui.small, 1f, 70f, accent);
+            dodge[slot] = new Text(ui.small, 1f, 165f, accent);
+            experience[slot] = new Text(ui.small, 1f, 105f, accent);
+            playerLabels[slot] = new Text(ui.small, 1f, 145f, accent);
             playerLabels[slot].set(slot == 0 ? "P1" : "P2");
         }
         timer = new Text(ui.section, .9f, 110f, UiArt.IVORY);
@@ -56,7 +57,7 @@ public final class GameHud {
         if (refresh <= 0 || changed) { refreshText(world); refresh = .2f; }
         if (split) rect(batch, 959.5f, 0, 1f, 1080f, Color.BLACK, .45f);
         for (ArenaWorld.Player player : world.players) if (player.active)
-            playerVitals(batch, player, split && player.slot == 1 ? 1592f : 48f);
+            playerVitals(batch, player, world.progression, split && player.slot == 1 ? 1592f : 48f);
         timer.center(batch, 960f, 1030f);
         slain.right(batch, 870f, 1025f);
         souls.draw(batch, 1050f, 1025f);
@@ -77,7 +78,17 @@ public final class GameHud {
         for (ArenaWorld.Player player : world.players) {
             int slot = player.slot;
             builder.setLength(0); health[slot].set(builder.append((int) Math.ceil(player.health)).append(" HP").toString());
-            if (!player.alive) dodge[slot].set("DOWNED  /  REVIVE NEARBY");
+            builder.setLength(0);
+            playerLabels[slot].set(builder.append(slot == 0 ? "P1  LV " : "P2  LV ").append(world.progression.level).toString());
+            builder.setLength(0);
+            experience[slot].set(world.progression.xpToNext > 0
+                ? builder.append("XP ").append(world.progression.xp).append('/').append(world.progression.xpToNext).toString() : "MAX LEVEL");
+            var offer = world.progression.offers[slot];
+            if (offer.pending) {
+                builder.setLength(0);
+                dodge[slot].set(builder.append("UPGRADE ").append((int) Math.ceil(offer.secondsLeft)).append('s').toString());
+            }
+            else if (!player.alive) dodge[slot].set("DOWNED");
             else if (player.dodgeCooldown <= 0) dodge[slot].set("DODGE READY");
             else {
                 int tenths = (int) Math.ceil(player.dodgeCooldown * 10);
@@ -87,16 +98,19 @@ public final class GameHud {
         }
     }
 
-    private void playerVitals(SpriteBatch batch, ArenaWorld.Player player, float x) {
+    private void playerVitals(SpriteBatch batch, ArenaWorld.Player player, PartyProgression progression, float x) {
         Color accent = player.slot == 0 ? UiArt.GOLD : SOUL;
         playerLabels[player.slot].draw(batch, x, 115f);
         health[player.slot].right(batch, x + 280f, 115f);
         float ratio = Math.max(0, Math.min(1, player.health / Math.max(1, player.maxHealth)));
         rail(batch, x, 85f, 280f, 6f, ratio, BLOOD);
+        float xpRatio = progression.xpToNext > 0 ? (float) progression.xp / progression.xpToNext : 1f;
+        rail(batch, x, 78f, 280f, 3f, Math.max(0, Math.min(1, xpRatio)), accent);
         diamond(batch, x + 4f, 65f, 5f, accent, 1f);
-        dodge[player.slot].draw(batch, x + 18f, 75f);
+        dodge[player.slot].draw(batch, x + 18f, 72f);
+        experience[player.slot].right(batch, x + 280f, 72f);
         // Revival and dodge progress share a hairline, so no extra meter or frame is needed.
-        float ready = player.alive ? 1f - Math.min(1, player.dodgeCooldown / 2.4f) : Math.min(1, player.reviveProgress / 2f);
+        float ready = player.alive ? 1f - Math.min(1, player.dodgeCooldown / (2.4f * player.dodgeCooldownMultiplier)) : Math.min(1, player.reviveProgress / 2f);
         if (ready < 1f || !player.alive) rect(batch, x + 18f, 48f, 262f * ready, 1f, accent, .9f);
     }
 

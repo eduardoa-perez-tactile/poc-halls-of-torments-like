@@ -50,7 +50,7 @@ Select **Play** using the remote. A phone scans the QR and gets a slot automatic
 - One phone is enough for solo; a second phone is optional for co-op. A third receives an explicit full-party message.
 - A disconnected slot is held for 45 seconds; the same browser can reclaim it using its stored token. The remote can free a slot immediately.
 - Tokens are scoped to this host and app session. A duplicate tab cannot take over an active controller. A new app process creates a fresh session; scan again after restarting the app.
-- The TV remote owns menus and player removal. Phones cannot start the game or send shared UI actions.
+- The TV remote owns shared menus and player removal. Phones cannot start the game or send shared UI actions; each phone can choose its own offered level-up upgrade.
 - **Start Solo** unlocks at one connection; **Start Co-op** appears at two. They start a two-minute survival round. Phones control movement and dodge; attacks automatically target nearby enemies.
 - Press Back in the session to open **Pause**: Resume, Invite Player 2, Restart Run, or Return to Lobby. Invite shows the QR without leaving the session; Back returns to Pause. Returning to the lobby requires confirmation and keeps the party connected. A disconnected player pauses the world. Reconnect that phone or remove its slot under Invite Player 2 before resuming.
 - Player 2 can join in the lobby or later from **Pause -> Invite Player 2**. The normal join area shows only the QR and a Same Wi-Fi reminder; address/port troubleshooting is under Network.
@@ -65,8 +65,9 @@ The gameplay artwork is temporary pending a separate isometric art pass; the cur
 - One connected player gets a full-screen view. Two get independent vertical split-screen cameras in the same world.
 - Invite a second phone from Pause; it enters beside its companion when resumed.
 - The TV uses compact, unboxed player vitals and timer/rewards, with one-line combat notifications. A slim boss status lane appears only when needed for future encounters.
-- Phones show only player identity, movement, and Dodge during play; health stays on the TV.
+- Phones show player identity, movement, and Dodge during play; health stays on the TV. When leveling, three personal upgrade choices appear alongside the controls.
 - Use the joystick to move and Dodge to escape. Both starter characters currently fire the same automatic magic bolt; differentiated weapons and progression are future work.
+- Collected souls award shared XP: the party levels together, with matching level/XP shown for each player. Each phone has 30 seconds to pick its own upgrade while combat continues; expiry applies the first offer. Manual pause freezes the timer. Additional earned levels queue choices, and a late companion receives catch-up choices.
 - A living ally can revive a fallen companion by staying nearby for two seconds. If everyone falls, the run ends.
 - Victory/defeat offers Restart Run or Return to Lobby using the TV remote.
 
@@ -81,7 +82,7 @@ The small test suite covers slot allocation, reconnect reservations/expiry, dupl
 
 The focused tests cover simulation invariants and input/protocol safety. User playtesting covers combat feel, difficulty, two physical phones, and camera scanning. No automated full-round playthrough is required.
 
-F3 toggles desktop diagnostics. F4 during a session toggles a labeled boss-HUD preview for visual review; boss gameplay is not implemented. `--profile` (or the Android `profile` intent extra) logs FPS, live Java heap, resident art texture bytes, and draw calls every five seconds. These are brief diagnostics, not a guarantee of performance on every TV. See [performance notes](docs/performance.md).
+F3 toggles desktop diagnostics. F4 during a session toggles a labeled boss-HUD preview for visual review; boss gameplay is not implemented. With profiling enabled, F5 grants the XP needed for a level-up for a brief UI check. `--profile` (or the Android `profile` intent extra) logs FPS, live Java heap, resident art texture bytes, and draw calls every five seconds. These are brief diagnostics, not a guarantee of performance on every TV. See [performance notes](docs/performance.md).
 
 ## Structure
 
