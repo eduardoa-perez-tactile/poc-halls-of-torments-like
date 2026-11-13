@@ -6,6 +6,39 @@ import com.couchcrypt.game.ItemCatalog;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LobbyStateTest {
+    @Test void catchUpMetadataUsesHostDurationAndSurvivesReservationButClearsOnReplacement() {
+        var state = new LobbyState(); var joined = state.join(null, "a", 1);
+        state.setPhase(LobbyState.Phase.SESSION);
+        var options = equipmentOptions(); var cards = equipmentCards(options);
+        state.publishProgression(0, 20, 0, 0, 31, 18, 15,
+            PartyProgression.Upgrade.values(), null, true, 15);
+        state.publishEquipment(0, 41, 15, options, cards, true, 15);
+        state.publishCatchUp(0, 3, 2, "Soulfire 3 / Soul Circle 2", "Gatekeeper Helm / Emberheart Pendant");
+        assertTrue(state.progressionFeedback(0).upgrade().catchUp());
+        assertEquals(15, state.progressionFeedback(0).upgrade().durationSeconds());
+        assertTrue(state.equipmentFeedback(0).catchUp());
+        assertEquals(15, state.equipmentFeedback(0).durationSeconds());
+        state.setPhase(LobbyState.Phase.PAUSED); state.setHostActive(false);
+        state.disconnected("a", 2);
+        assertFalse(state.chooseUpgrade("a", 31, 0));
+        assertEquals(15, state.progressionFeedback(0).upgrade().secondsLeft());
+        assertEquals(3, state.catchUpFeedback(0).skillsRemaining());
+        assertEquals("Soulfire 3 / Soul Circle 2", state.catchUpFeedback(0).skillFoundation());
+        assertEquals(0, state.join(joined.token(), "restored", 3).slot());
+        assertEquals(41, state.equipmentFeedback(0).id());
+        state.setHostActive(true); state.setPhase(LobbyState.Phase.SESSION);
+        assertTrue(state.chooseUpgrade("restored", 31, 0));
+        state.publishProgression(0, 20, 0, 0, 0, 0, 0, null);
+        assertTrue(state.chooseEquipment("restored", 41, -1));
+        state.publishEquipment(0, 42, 30, options, cards);
+        assertFalse(state.equipmentFeedback(0).catchUp());
+        assertEquals(30, state.equipmentFeedback(0).durationSeconds());
+        state.remove(0);
+        assertEquals(0, state.catchUpFeedback(0).skillsRemaining());
+        assertEquals(0, state.catchUpFeedback(0).equipmentRemaining());
+        assertEquals("", state.catchUpFeedback(0).skillFoundation());
+    }
+
     @Test void equipmentRequestsAreOwnSlotBoundAndSkillsTakePriorityEvenWithTheSameId() {
         var state = new LobbyState(); state.join(null, "a", 1); state.join(null, "b", 1);
         state.setPhase(LobbyState.Phase.SESSION);

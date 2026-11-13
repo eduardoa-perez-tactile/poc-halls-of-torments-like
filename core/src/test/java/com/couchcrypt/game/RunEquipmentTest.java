@@ -35,11 +35,15 @@ class RunEquipmentTest {
         assertTrue(gear.choose(0, old, 0));
         assertFalse(gear.choose(0, old, 0));
         world.activatePlayer(1);
-        assertEquals(0, gear.appliedCount(1));
+        assertEquals(6, gear.appliedCount(1));
+        assertEquals(6, gear.foundationCount(1));
+        assertEquals(2, gear.catchUpRemaining(1));
         assertTrue(gear.offers[1].pending);
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 2; i++) {
             var offer = gear.offers[1];
             assertTrue(offer.pending);
+            assertTrue(offer.catchUp);
+            assertEquals(15, offer.durationSeconds);
             for (var item : offer.options) assertTrue(item.supports(world.players[1].hero));
             assertTrue(gear.choose(1, offer.id, 0));
         }
@@ -50,6 +54,68 @@ class RunEquipmentTest {
         assertFalse(gear.choose(0, old, 0));
         assertEquals(0, gear.appliedCount(0));
         for (int position = 0; position < RunEquipment.SLOT_COUNT; position++) assertNull(gear.equipped(0, position));
+    }
+
+    @Test void lateJoinFoundationIsDistinctUsefulGearForEitherHeroAndReconnectDoesNotGrantAgain() {
+        for (ArenaWorld.Hero hero : ArenaWorld.Hero.values()) {
+            ArenaWorld world = solo(); RunEquipment gear = world.equipment;
+            for (int i = 0; i < 8; i++) gear.grantReward();
+            world.setHero(1, hero); world.activatePlayer(1);
+            assertEquals(6, gear.appliedCount(1));
+            assertEquals(160, gear.maxHealth(world.players[1]));
+            assertEquals(160, world.players[1].health);
+            java.util.Set<ItemCatalog.Item> items = new java.util.HashSet<>();
+            for (int position = 0; position < RunEquipment.SLOT_COUNT; position++) {
+                var item = gear.equipped(1, position);
+                if (item == null) continue;
+                assertTrue(items.add(item)); assertTrue(item.supports(hero));
+                assertTrue(gear.foundationSummary(1).contains(item.title()));
+            }
+            assertEquals(6, items.size());
+            assertNull(gear.equipped(1, 3), "The second ring remains a personal equipment decision");
+            int id = gear.offers[1].id;
+            gear.update(4);
+            world.players[1].health = 80;
+            world.activatePlayer(1); gear.activatePlayer(1);
+            assertEquals(id, gear.offers[1].id); assertEquals(11, gear.offers[1].secondsLeft);
+            assertEquals(6, gear.appliedCount(1)); assertEquals(80, world.players[1].health);
+        }
+    }
+
+    @Test void joiningWithOneRewardKeepsOnePersonalChoiceAndNewRewardsUseNormalTimers() {
+        ArenaWorld world = solo(); RunEquipment gear = world.equipment;
+        gear.grantReward(); world.activatePlayer(1);
+        assertEquals(0, gear.foundationCount(1));
+        assertEquals("", gear.foundationSummary(1));
+        assertEquals(1, gear.catchUpRemaining(1));
+        assertEquals(15, gear.offers[1].secondsLeft);
+        gear.grantReward();
+        int catchUpId = gear.offers[1].id;
+        assertTrue(gear.choose(1, catchUpId, -1), "Keep Current Gear consumes the inherited choice");
+        assertFalse(gear.catchingUp(1)); assertEquals(0, gear.catchUpRemaining(1));
+        assertTrue(gear.offers[1].pending); assertFalse(gear.offers[1].catchUp);
+        assertEquals(30, gear.offers[1].secondsLeft); assertEquals(30, gear.offers[1].durationSeconds);
+        assertFalse(gear.choose(1, catchUpId, 0));
+        assertEquals(0, gear.appliedCount(0), "The established participant's choices are untouched");
+    }
+
+    @Test void catchUpOfferRefreshPreservesItsShortTimerAndResetClearsMetadata() {
+        ArenaWorld world = solo(); RunEquipment gear = world.equipment;
+        for (int i = 0; i < 8; i++) gear.grantReward();
+        world.activatePlayer(1);
+        var offer = gear.offers[1]; gear.update(8);
+        int oldId = offer.id;
+        offer.options[0] = ItemCatalog.byId("gatekeeper_helm"); // Now invalid because foundation already owns it.
+        assertFalse(gear.choose(1, oldId, 0));
+        assertNotEquals(oldId, offer.id); assertTrue(offer.catchUp);
+        assertEquals(15, offer.durationSeconds); assertEquals(7, offer.secondsLeft);
+        assertEquals(2, gear.catchUpRemaining(1));
+        world.deactivatePlayer(1);
+        assertFalse(gear.catchingUp(1)); assertEquals(0, gear.foundationCount(1));
+        assertEquals("", gear.foundationSummary(1)); assertEquals(0, offer.durationSeconds);
+        assertFalse(gear.choose(1, offer.id, 0));
+        world.activatePlayer(1);
+        assertTrue(offer.id > oldId); assertEquals(6, gear.foundationCount(1));
     }
 
     @Test void levelChoicesFreezeEquipmentCountdownAndPreventHiddenSelection() {

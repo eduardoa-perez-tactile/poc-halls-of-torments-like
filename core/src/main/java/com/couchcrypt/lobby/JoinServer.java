@@ -75,7 +75,7 @@ public final class JoinServer extends NanoWSD {
             + snapshot.phase().name().toLowerCase(java.util.Locale.ROOT) + "\",\"health\":" + feedback.health()
             + ",\"maxHealth\":" + feedback.maxHealth() + ",\"dodgeCooldown\":" + feedback.dodgeCooldown()
             + ",\"alive\":" + feedback.alive() + ",\"progression\":" + progressionJson(slot)
-            + ",\"equipment\":" + equipmentJson(slot) + "}";
+            + ",\"equipment\":" + equipmentJson(slot) + ",\"catchUp\":" + catchUpJson(slot) + "}";
     }
 
     private String progressionJson(int slot) {
@@ -86,7 +86,9 @@ public final class JoinServer extends NanoWSD {
         var upgrade = feedback.upgrade();
         if (upgrade == null) return result.append("null}").toString();
         result.append("{\"id\":").append(upgrade.id()).append(",\"level\":").append(upgrade.level())
-            .append(",\"secondsLeft\":").append(upgrade.secondsLeft()).append(",\"options\":[");
+            .append(",\"secondsLeft\":").append(upgrade.secondsLeft())
+            .append(",\"catchUp\":").append(upgrade.catchUp()).append(",\"durationSeconds\":").append(upgrade.durationSeconds())
+            .append(",\"options\":[");
         appendUpgrade(result, upgrade.first(), upgrade.firstCard()); result.append(',');
         appendUpgrade(result, upgrade.second(), upgrade.secondCard()); result.append(',');
         appendUpgrade(result, upgrade.third(), upgrade.thirdCard());
@@ -112,11 +114,23 @@ public final class JoinServer extends NanoWSD {
         if (offer == null) return "null";
         StringBuilder result = new StringBuilder(768);
         result.append("{\"id\":").append(offer.id()).append(",\"secondsLeft\":").append(offer.secondsLeft())
+            .append(",\"catchUp\":").append(offer.catchUp()).append(",\"durationSeconds\":").append(offer.durationSeconds())
             .append(",\"options\":[");
         appendEquipment(result, offer.first(), offer.firstCard()); result.append(',');
         appendEquipment(result, offer.second(), offer.secondCard()); result.append(',');
         appendEquipment(result, offer.third(), offer.thirdCard());
         return result.append("]}").toString();
+    }
+
+    private String catchUpJson(int slot) {
+        var feedback = state.catchUpFeedback(slot);
+        if (feedback.skillsRemaining() == 0 && feedback.equipmentRemaining() == 0) return "null";
+        StringBuilder result = new StringBuilder(384);
+        result.append("{\"skillsRemaining\":").append(feedback.skillsRemaining())
+            .append(",\"equipmentRemaining\":").append(feedback.equipmentRemaining())
+            .append(",\"skillFoundation\":"); quote(result, feedback.skillFoundation());
+        result.append(",\"equipmentFoundation\":"); quote(result, feedback.equipmentFoundation());
+        return result.append('}').toString();
     }
 
     private static void appendEquipment(StringBuilder target, ItemCatalog.Item item, PartyProgression.CardPreview card) {

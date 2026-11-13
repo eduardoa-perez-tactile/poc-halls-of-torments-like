@@ -21,7 +21,7 @@ class Element {
         return on;
       }
     };
-    this.style = { setProperty() {} };
+    this.style = { values: new Map(), setProperty(name, value) { this.values.set(name, value); } };
   }
   addEventListener(name, handler) { this.listeners.set(name, handler); }
   querySelector(selector) {
@@ -127,7 +127,39 @@ async function main() {
   status({ progression: { upgrade } });
   assert.equal(first.querySelector('.skill-illustration').style.backgroundImage, '', 'Skill cards restore the existing skill atlas after gear');
   assert.equal(first.querySelector('.skill-illustration').style.backgroundSize, '');
-  console.log('Controller equipment/skill priority, typed identity, neutral input, acknowledgment, pause and restoration checks passed.');
+  const foundation = { skillsRemaining: 3, equipmentRemaining: 2,
+    skillFoundation: 'Soulfire 3 / Soul Circle 2', equipmentFoundation: 'Gatekeeper Helm / Emberheart Pendant' };
+  const fastSkill = { ...upgrade, id: 2, level: 18, catchUp: true, durationSeconds: 15, secondsLeft: 7.5 };
+  status({ progression: { upgrade: fastSkill }, catchUp: foundation });
+  assert.equal(get('upgrade-level').textContent, 'CATCH-UP SKILL');
+  assert.equal(choices.querySelector('.upgrade-kicker').textContent, '3 SKILL / 2 GEAR LEFT');
+  assert.equal(choices.style.values.get('--choice-progress'), '50%', 'Catch-up rails use the host-owned fifteen-second duration');
+  assert.equal(get('catch-up-build').hidden, false);
+  assert.equal(get('catch-up-skills').textContent, 'Skills: ' + foundation.skillFoundation);
+  assert.equal(get('catch-up-gear').textContent, 'Gear: ' + foundation.equipmentFoundation);
+  get('catch-up-build').open = true;
+  now += 12000;
+  status({ phase: 'paused', progression: { upgrade: fastSkill }, catchUp: foundation });
+  assert.equal(get('upgrade-seconds').textContent, '8'); assert.equal(first.disabled, true);
+  assert.equal(choices.style.values.get('--choice-progress'), '50%');
+  status({ progression: { upgrade: fastSkill }, catchUp: { ...foundation, skillsRemaining: 2 } });
+  assert.equal(choices.querySelector('.upgrade-kicker').textContent, '2 SKILL / 2 GEAR LEFT');
+  assert.equal(get('catch-up-build').open, true, 'Status refresh does not close an inspected foundation');
+  const fastGear = { ...equipment, id: 2, catchUp: true, durationSeconds: 15, secondsLeft: 15 };
+  status({ equipment: fastGear, catchUp: { ...foundation, skillsRemaining: 0 } });
+  assert.equal(get('upgrade-level').textContent, 'CATCH-UP GEAR');
+  assert.equal(choices.style.values.get('--choice-progress'), '100%');
+  get('equipment-keep').click();
+  assert.equal(socket.sent.at(-1).option, -1);
+  assert.equal(choices.hidden, false);
+  status({ equipment: null, catchUp: null });
+  assert.equal(choices.hidden, true); assert.equal(get('catch-up-build').hidden, true);
+  status({ progression: { upgrade: { ...upgrade, id: 3 } }, catchUp: null });
+  assert.equal(get('upgrade-level').textContent, 'LEVEL 2');
+  assert.ok(Math.abs(parseFloat(choices.style.values.get('--choice-progress')) - 28 / 30 * 100) < .001,
+    'Older normal offer payloads retain the thirty-second timer fallback');
+  assert.equal(get('catch-up-build').hidden, true);
+  console.log('Controller choice priority, typed identity, acknowledgment, pause/restoration and fast catch-up duration/summary checks passed.');
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });

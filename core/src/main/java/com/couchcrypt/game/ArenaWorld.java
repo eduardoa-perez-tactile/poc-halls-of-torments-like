@@ -105,7 +105,11 @@ public final class ArenaWorld {
         p.active = p.alive = true; p.health = p.maxHealth;
         p.dodgeCooldown = p.dodgeTime = p.attackCooldown = p.reviveProgress = 0;
         p.invulnerable = 1; inputX[slot] = inputY[slot] = 0; pendingDodge[slot] = false;
-        progression.activatePlayer(slot); equipment.activatePlayer(slot);
+        // Gear first: inherited skill cards must preview the foundation's effective stats.
+        equipment.activatePlayer(slot); progression.activatePlayer(slot);
+        // A new participant arrives ready to fight with their granted foundation's full health.
+        // Reconnecting an already-active participant returns above and never refills health.
+        p.health = equipment.maxHealth(p);
     }
 
     public void deactivatePlayer(int slot) {
