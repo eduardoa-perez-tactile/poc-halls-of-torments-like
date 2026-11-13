@@ -2,6 +2,8 @@
 
 Current environment: the user approved the [depth and material correction](menu-depth-art.md) after clarifying that the first painting felt flat and empty. Current code uses `menu-crypt-base-v2.png` and `menu-crypt-guardians-v2.png` with the improved `menu-crypt-orb-v2.png`. This keeps the same layer/resource contract below; the original scene/prompt descriptions remain as provenance.
 
+The later user-approved [menu ambience](menu-ambient-vfx.md) adds sparse dust and small gold orb motes through the existing atlas. Earlier no-particle descriptions below document the original static pass; the painting, separate layers and texture dimensions remain unchanged.
+
 Approved direction: 2026-11-13. The user requested simpler, consistent menu backgrounds based on Home, without fire or baked fog, and approved matte blue-grey stone, simplified hooded guardians, a charcoal central arch and two warm ivory soul orbs.
 
 This replaces the individual Home/Victory/Defeat environment paintings at runtime. Existing logos, title wordmarks, panel skins, buttons, summary values, remote navigation and detailed builds remain live and unchanged. Pause retains dimmed frozen gameplay as proposed.
