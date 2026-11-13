@@ -1,5 +1,7 @@
 # Lobby art direction
 
+Current environment direction (approved 2026-11-13): menus share the simplified layered crypt with warm soul orbs, without fire or fog. See [layered menu artwork and prompts](layered-menu-art.md). Earlier paintings and their prompts below remain as provenance; the panel/button theme is retained.
+
 PVGames' [Other Worlds: Core Tiles](https://pvgames.itch.io/other-worlds-core-tiles) is a mood and material reference: detailed medieval environments, weathered stone, grounded fantasy, and an elevated RPG camera. No PVGames assets are included or copied.
 
 The user authorized original generated art from the first build. The bundled images were created with the built-in image generation tool on 2026-11-12:

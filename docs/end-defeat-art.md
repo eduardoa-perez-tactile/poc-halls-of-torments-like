@@ -1,5 +1,7 @@
 # Approved Defeat screen layers
 
+The original environment below is superseded at runtime by the [shared layered crypt](layered-menu-art.md), approved 2026-11-13. The separate Defeat title remains in use; results retain their live summary and remote controls.
+
 The user approved the original Defeat concept on 2026-11-13. These separate image layers derive from that concept, leaving summary values and remote controls live in LibGDX.
 
 Reference concept: `/Users/eduardoleale/.codex/generated_images/01a1d415-2530-73a3-8474-f4251518c11c/exec-d189ae33-49dd-4145-8eb9-8beee8d216da.png`.

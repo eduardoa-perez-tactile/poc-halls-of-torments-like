@@ -1,5 +1,7 @@
 # Approved Victory artwork layers
 
+The original environment below is superseded at runtime by the [shared layered crypt](layered-menu-art.md), approved 2026-11-13. The separate Victory title remains in use; results retain their live summary and remote controls.
+
 The user approved the Victory and Defeat concepts before these production layers were extracted. These original paintings retain the approved Couch Crypt menu's worn stone, black iron, aged gold and torchlight direction. No Halls of Torment or Diablo source artwork was used.
 
 ## Assets
