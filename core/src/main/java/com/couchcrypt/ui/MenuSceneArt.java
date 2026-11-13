@@ -27,6 +27,8 @@ public final class MenuSceneArt extends BaseDrawable implements Disposable {
     private final Texture atlas;
     private final Pixmap basePixels, atlasPixels;
     private final Layer left, right, orb;
+    private final TextureRegion particlePoint;
+    private final MenuAmbientParticles particles = new MenuAmbientParticles(LEFT_ORB_X, RIGHT_ORB_X, ORB_Y);
     private float clock;
     private Mood mood = Mood.NEUTRAL;
     private boolean disposed;
@@ -52,12 +54,14 @@ public final class MenuSceneArt extends BaseDrawable implements Disposable {
             light = new Pixmap(Gdx.files.internal("art/menu-crypt-orb-v2.png"));
             orb = pack(light, packed, 0, light.getWidth(), 2, 770, 252, 252, 8);
             light.dispose(); light = null;
+            bakeParticlePoint(packed);
 
             roomTexture = texture(roomSmall);
             packedTexture = texture(packed);
             left.region = new TextureRegion(packedTexture, left.atlasX, left.atlasY, left.atlasWidth, left.atlasHeight);
             right.region = new TextureRegion(packedTexture, right.atlasX, right.atlasY, right.atlasWidth, right.atlasHeight);
             orb.region = new TextureRegion(packedTexture, orb.atlasX, orb.atlasY, orb.atlasWidth, orb.atlasHeight);
+            particlePoint = new TextureRegion(packedTexture, 260, 772, 32, 32);
             base = roomTexture; atlas = packedTexture;
             basePixels = roomSmall; atlasPixels = packed;
         } catch (RuntimeException | Error failure) {
@@ -79,11 +83,15 @@ public final class MenuSceneArt extends BaseDrawable implements Disposable {
 
     /** Call once for a displayed menu frame; geometry and atlas regions never change. */
     public void advance(float delta) {
-        clock = (clock + Math.max(0, Math.min(delta, .1f))) % 32f;
+        if (!Float.isFinite(delta) || delta <= 0) return;
+        float step = Math.min(delta, .1f);
+        clock = (clock + step) % 32f;
+        particles.advance(step);
     }
 
     @Override public void draw(Batch batch, float x, float y, float width, float height) {
         batch.draw(base, x, y, width, height);
+        particles.drawDust(batch, particlePoint, x, y, width, height);
         drawLayer(batch, left, x, y, width, height);
         drawLayer(batch, right, x, y, width, height);
         Color color = batch.getColor();
@@ -101,6 +109,17 @@ public final class MenuSceneArt extends BaseDrawable implements Disposable {
         batch.draw(orb.region, x + (RIGHT_ORB_X - ORB_WIDTH / 2) * width,
             y + (ORB_Y - haloHeight / 2) * height, ORB_WIDTH * width, haloHeight * height);
         batch.setColor(red, green, blue, alpha);
+        particles.drawOrbMotes(batch, particlePoint, x, y, width, height);
+    }
+
+    /** A soft white point in unused atlas space; no extra texture or image asset. */
+    private static void bakeParticlePoint(Pixmap target) {
+        for (int y = 0; y < 32; y++) for (int x = 0; x < 32; x++) {
+            float dx = (x + .5f - 16f) / 16f, dy = (y + .5f - 16f) / 16f;
+            float falloff = Math.max(0, 1 - dx * dx - dy * dy);
+            int alpha = Math.round(255 * falloff * falloff * falloff);
+            target.drawPixel(260 + x, 772 + y, 0xffffff00 | alpha);
+        }
     }
 
     private static void drawLayer(Batch batch, Layer layer, float x, float y, float width, float height) {
