@@ -8,8 +8,6 @@ import java.util.List;
 public final class PartyProgression {
     public static final int MAX_LEVEL = 20;
     public static final float CHOICE_SECONDS = 30f;
-    public static final float CATCH_UP_SECONDS = 15f;
-    public static final int CATCH_UP_CHOICES = 3;
     // Nineteen earned choices: 116 / 516 / 1,166 / 1,991 cumulative XP at levels 5 / 10 / 15 / 20.
     // Rising costs leave time to play between the unchanged thirty-second phone choices.
     private static final int[] LONG_RUN_THRESHOLDS = {
@@ -62,12 +60,14 @@ public final class PartyProgression {
     private static final Upgrade[] WARDEN_FOUNDATION = {
         Upgrade.POWER, Upgrade.SWEEP, Upgrade.VITALITY, Upgrade.AURA, Upgrade.HASTE, Upgrade.STORM,
         Upgrade.POWER, Upgrade.FLEET, Upgrade.SWEEP, Upgrade.VITALITY, Upgrade.HASTE, Upgrade.AURA,
-        Upgrade.EVASION, Upgrade.CRITICAL, Upgrade.POWER, Upgrade.MAGNET
+        Upgrade.EVASION, Upgrade.CRITICAL, Upgrade.POWER, Upgrade.MAGNET,
+        Upgrade.SWEEP, Upgrade.AURA, Upgrade.STORM
     };
     private static final Upgrade[] RANGER_FOUNDATION = {
         Upgrade.POWER, Upgrade.MULTISHOT, Upgrade.VITALITY, Upgrade.AURA, Upgrade.HASTE, Upgrade.STORM,
         Upgrade.POWER, Upgrade.FLEET, Upgrade.PIERCE, Upgrade.VITALITY, Upgrade.HASTE, Upgrade.AURA,
-        Upgrade.EVASION, Upgrade.CRITICAL, Upgrade.POWER, Upgrade.MAGNET
+        Upgrade.EVASION, Upgrade.CRITICAL, Upgrade.POWER, Upgrade.MAGNET,
+        Upgrade.MULTISHOT, Upgrade.AURA, Upgrade.STORM
     };
     private final ArenaWorld world;
     private final boolean[] participants = new boolean[2];
@@ -97,13 +97,13 @@ public final class PartyProgression {
         }
     }
 
-    /** Older ranks form an immediate class foundation; at most three inherited decisions remain personal. */
+    /** A fresh participant receives all earlier ranks as defaults; active-participant reconnect is untouched. */
     public void activatePlayer(int slot) {
         if (!validSlot(slot) || participants[slot]) return;
         participants[slot] = true; applied[slot] = 0;
         clearRanks(slot);
         catchUpUntil[slot] = level - 1;
-        grantFoundation(slot, Math.max(0, catchUpUntil[slot] - CATCH_UP_CHOICES));
+        grantFoundation(slot, catchUpUntil[slot]);
         startNextOffer(slot);
     }
 
@@ -223,16 +223,14 @@ public final class PartyProgression {
     private void startNextOffer(int slot) {
         Offer offer = offers[slot];
         if (!participants[slot] || offer.pending || applied[slot] >= level - 1) return;
-        boolean inherited = catchingUp(slot);
-        if (!inherited && world.equipment != null && world.equipment.catchingUp(slot)) return;
         offer.level = applied[slot] + 2;
         if (!populateOptions(slot)) {
             // Normal nineteen-choice runs cannot exhaust this catalog. No invalid/duplicate cards if debug stats do.
             applied[slot] = level - 1;
             return;
         }
-        offer.pending = true; offer.id = newOfferId(); offer.catchUp = inherited;
-        offer.durationSeconds = inherited ? CATCH_UP_SECONDS : CHOICE_SECONDS;
+        offer.pending = true; offer.id = newOfferId(); offer.catchUp = false;
+        offer.durationSeconds = CHOICE_SECONDS;
         offer.secondsLeft = offer.durationSeconds;
     }
 

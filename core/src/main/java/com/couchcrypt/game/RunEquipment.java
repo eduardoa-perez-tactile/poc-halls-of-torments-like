@@ -9,12 +9,10 @@ import static com.couchcrypt.game.ItemCatalog.Stat.*;
 public final class RunEquipment {
     public static final int SLOT_COUNT = 7, MAX_REWARDS = 8;
     public static final float CHOICE_SECONDS = 30f;
-    public static final int CATCH_UP_CHOICES = 2;
-    public static final float CATCH_UP_SECONDS = 15f;
     private static final ItemCatalog.Stat[] STATS = ItemCatalog.Stat.values();
     private static final String[] SLOT_NAMES = {"HELMET", "AMULET", "RING I", "RING II", "CHEST", "BOOTS", "GLOVES"};
     private static final String[] FOUNDATION_ITEMS = {"gatekeeper_helm", "pilgrims_stride", "swiftstitch_gloves",
-        "emberheart_pendant", "rustbound_signet", "cryptguard_plate"};
+        "emberheart_pendant", "rustbound_signet", "cryptguard_plate", "quickpulse_loop", "marching_spurs"};
     /** Snapshot of automatic equipment, using the item illustration atlas rather than effect icons. */
     public record FoundationItem(String id, String title, int icon, String slot) {}
     public static final class Offer {
@@ -56,20 +54,24 @@ public final class RunEquipment {
         if (!valid(slot) || participants[slot]) return;
         participants[slot] = true;
         catchUpTarget[slot] = earned;
-        int automatic = Math.max(0, earned - CATCH_UP_CHOICES);
-        StringBuilder summary = new StringBuilder(160);
-        List<FoundationItem> items = new ArrayList<>(automatic);
+        int automatic = earned;
         for (int i = 0; i < automatic; i++) {
             ItemCatalog.Item item = ItemCatalog.byId(FOUNDATION_ITEMS[i]);
             if (item == null || !item.supports(world.players[slot].hero))
                 throw new IllegalStateException("Invalid catch-up equipment foundation");
             equip(slot, target(slot, item.slot()), item);
             applied[slot]++;
+        }
+        foundationCount[slot] = automatic;
+        // Eight entitlements can include a replacement; show the final seven-slot build, not discarded gear.
+        StringBuilder summary = new StringBuilder(160);
+        List<FoundationItem> items = new ArrayList<>(SLOT_COUNT);
+        for (ItemCatalog.Item item : worn[slot]) {
+            if (item == null) continue;
             if (summary.length() > 0) summary.append(", ");
             summary.append(item.title());
             items.add(new FoundationItem(item.id(), item.title(), ItemCatalog.artIndex(item), item.slot().name()));
         }
-        foundationCount[slot] = automatic;
         foundationSummary[slot] = summary.toString();
         foundationItems.set(slot, List.copyOf(items));
         startNext(slot);
@@ -136,7 +138,6 @@ public final class RunEquipment {
     private void startNext(int slot) {
         Offer offer = offers[slot];
         if (!participants[slot] || offer.pending || applied[slot] >= earned) return;
-        if (!catchingUp(slot) && world.progression.catchingUp(slot)) return;
         int seed = world.runSeed ^ (applied[slot] + 1) * 0x45d9f3b ^ slot * 0x27d4eb2d;
         int first = Math.floorMod(seed ^ seed >>> 16, ItemCatalog.ALL.size());
         int count = 0;
@@ -160,8 +161,8 @@ public final class RunEquipment {
         }
         if (count < 3) return;
         if (++nextId <= 0) nextId = 1;
-        offer.id = nextId; offer.pending = true; offer.catchUp = catchingUp(slot);
-        offer.secondsLeft = offer.durationSeconds = offer.catchUp ? CATCH_UP_SECONDS : CHOICE_SECONDS;
+        offer.id = nextId; offer.pending = true; offer.catchUp = false;
+        offer.secondsLeft = offer.durationSeconds = CHOICE_SECONDS;
         previewSkillCount[slot] = world.progression.appliedUpgradeCount(slot);
     }
     private boolean eligible(int slot, ItemCatalog.Item item) {
