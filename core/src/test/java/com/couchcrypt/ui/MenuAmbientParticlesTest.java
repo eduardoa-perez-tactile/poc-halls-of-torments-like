@@ -26,7 +26,7 @@ class MenuAmbientParticlesTest {
                 float x = capture.values[offset], y = capture.values[offset + 1];
                 float alpha = capture.values[offset + 2];
                 assertTrue(Float.isFinite(x) && Float.isFinite(y) && Float.isFinite(alpha));
-                assertTrue(alpha >= 0 && alpha <= .56f);
+                assertTrue(alpha >= 0 && alpha <= capture.color.a);
                 if (i < 24) {
                     assertTrue(x > 0 && x < 1920 && y >= 54 && y <= 1026);
                     if (Math.abs(y - previous[offset + 1]) > 20) {
@@ -37,9 +37,9 @@ class MenuAmbientParticlesTest {
                 } else {
                     float anchor = i < 30 ? LEFT : RIGHT;
                     double distance = Math.hypot(x - anchor * 1920, y - ORB_Y * 1080);
-                    assertTrue(distance >= 19.9 && distance <= 43.1,
+                    assertTrue(distance >= 35.9 && distance <= 65.1,
                         "Motes must stay close to their own orb instead of drifting across the scene");
-                    assertTrue(Math.hypot(x - previous[offset], y - previous[offset + 1]) < 3,
+                    assertTrue(Math.hypot(x - previous[offset], y - previous[offset + 1]) < 6,
                         "A completed orbit must remain spatially continuous");
                 }
             }
@@ -88,7 +88,7 @@ class MenuAmbientParticlesTest {
                 "Particle opacity must multiply, not replace, the drawable's inherited alpha");
         }
         assertEquals(.8f * .91f, transformed.firstDustRed);
-        assertEquals(.6f * .78f, transformed.firstMoteGreen);
+        assertEquals(.6f * .90f, transformed.firstMoteGreen);
     }
 
     /** Records the real draw API without creating a GL context or adding a mocking dependency. */

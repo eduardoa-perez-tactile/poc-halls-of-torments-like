@@ -22,17 +22,17 @@ final class MenuAmbientParticles {
             boolean foreground = i % 6 == 2;
             float anchorX = center ? .34f + seed.nextFloat() * .32f
                 : (side++ % 2 == 0 ? .06f : .71f) + seed.nextFloat() * .23f;
-            dust[i] = new Particle(anchorX, 0, seed.nextDouble(), 90 + seed.nextDouble() * 90,
-                seed.nextDouble() * TAU, 16 + seed.nextFloat() * 20,
-                (foreground ? 6.5f : 3.8f) + seed.nextFloat() * 1.6f,
-                center ? .10f : .28f + seed.nextFloat() * .06f, 1, foreground ? .28f : .9f);
+            dust[i] = new Particle(anchorX, 0, seed.nextDouble(), 60 + seed.nextDouble() * 60,
+                seed.nextDouble() * TAU, 22 + seed.nextFloat() * 24,
+                (foreground ? 9f : 6f) + seed.nextFloat() * (foreground ? 3f : 2f),
+                center ? .16f : .48f + seed.nextFloat() * .12f, 1, foreground ? .28f : .9f);
             updateDust(dust[i]);
         }
         for (int i = 0; i < motes.length; i++) {
             motes[i] = new Particle(i < MOTES_PER_ORB ? leftOrbX : rightOrbX, orbY,
-                seed.nextDouble(), 14 + seed.nextDouble() * 12, seed.nextDouble() * TAU,
-                23 + seed.nextFloat() * 17, 8f + seed.nextFloat() * 2f,
-                .64f + seed.nextFloat() * .14f, i % 2 == 0 ? 1 : -1, 0);
+                seed.nextDouble(), 8 + seed.nextDouble() * 6, seed.nextDouble() * TAU,
+                39 + seed.nextFloat() * 23, 12f + seed.nextFloat() * 4f,
+                .86f + seed.nextFloat() * .12f, i % 2 == 0 ? 1 : -1, 0);
             updateMote(motes[i]);
         }
     }
@@ -78,7 +78,7 @@ final class MenuAmbientParticles {
     }
 
     void drawOrbMotes(Batch batch, TextureRegion point, float x, float y, float width, float height) {
-        draw(batch, point, motes, x, y, width, height, 1f, .78f, .39f);
+        draw(batch, point, motes, x, y, width, height, 1f, .90f, .60f);
     }
 
     private static void draw(Batch batch, TextureRegion region, Particle[] points,

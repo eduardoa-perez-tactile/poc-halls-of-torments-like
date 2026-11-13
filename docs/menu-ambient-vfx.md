@@ -13,6 +13,12 @@ User-approved addition on 2026-11-13: a few simple particles around the soul orb
 
 The shared scene remains 7.0625 MiB GPU and the same retained managed pixels. Additional particle state is a small fixed Java allocation, independent of elapsed time. Full-resolution painting sources are still freed after startup baking.
 
+## Visibility tuning
+
+The user liked the initial effect but found it too subtle. The current pass keeps the same 36 particles and atlas: orb motes are 12–16 pixels with brighter ivory-gold tint, 86–98% peak opacity, wider 36–65-pixel orbits and 8–14-second periods so most points separate visibly from the painted orb glow. Dust is 6–8 pixels (four foreground flecks 9–12), with 48–60% maximum side opacity and 60–120-second drift cycles. The six central points remain quieter at 16% maximum opacity. Existing fade, wrapping, inherited dimming and no-allocation behavior are preserved.
+
+The three bounded-state/batch tests and JDK 21 desktop/Android builds passed for this tuning. A fresh full-HD Home preview is stored locally as `.run/menu-ambient-stronger.mp4`; texture sizes and particle counts are unchanged. The performance observations below describe the initial pass, not a new benchmark for this small visibility adjustment.
+
 ## Verification
 
 All three focused helper tests passed: 600 simulated seconds exercise multiple invisible dust wraps and continuous bounded orbits; timestep partitioning, invalid/paused/large deltas, inherited color/alpha, scene scaling and untouched blend state are covered without GL. JDK 21 core tests, desktop compilation and Android debug packaging passed. After the initial rendering check, soft point sizes were increased slightly for full-HD visibility (orb motes 8–10 logical pixels, regular dust 3.8–5.4, four softer foreground flecks 6.5–8.1); the focused tests and Android build passed again.
