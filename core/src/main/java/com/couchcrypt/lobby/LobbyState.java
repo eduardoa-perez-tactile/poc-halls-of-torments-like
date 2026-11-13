@@ -1,8 +1,10 @@
 package com.couchcrypt.lobby;
 
 import java.util.UUID;
+import java.util.List;
 import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.ItemCatalog;
+import com.couchcrypt.game.RunEquipment;
 
 /** The only owner of player slots. Network callbacks and the render thread use snapshots. */
 public final class LobbyState {
@@ -33,7 +35,8 @@ public final class LobbyState {
     public record EquipmentFeedback(int id, float secondsLeft, boolean catchUp, float durationSeconds,
         ItemCatalog.Item first, ItemCatalog.Item second, ItemCatalog.Item third,
         PartyProgression.CardPreview firstCard, PartyProgression.CardPreview secondCard, PartyProgression.CardPreview thirdCard) {}
-    public record CatchUpFeedback(int skillsRemaining, int equipmentRemaining, String skillFoundation, String equipmentFoundation) {}
+    public record CatchUpFeedback(int skillsRemaining, int equipmentRemaining, String skillFoundation, String equipmentFoundation,
+        List<PartyProgression.FoundationSkill> skills, List<RunEquipment.FoundationItem> equipment) {}
     public record Snapshot(Player first, Player second, int connected, boolean hostActive, Phase phase, long revision) {}
     public record Join(int slot, String token, String error) {
         static Join rejected(String reason) { return new Join(-1, null, reason); }
@@ -57,6 +60,8 @@ public final class LobbyState {
         boolean equipmentCatchUp;
         int catchUpSkills, catchUpEquipment;
         String skillFoundation = "", equipmentFoundation = "";
+        List<PartyProgression.FoundationSkill> foundationSkills = List.of();
+        List<RunEquipment.FoundationItem> foundationItems = List.of();
         boolean equipmentQueued;
         final ItemCatalog.Item[] equipmentOptions = new ItemCatalog.Item[3];
         final PartyProgression.CardPreview[] equipmentCards = new PartyProgression.CardPreview[3];
@@ -77,6 +82,7 @@ public final class LobbyState {
             level = 1; xp = 0; xpToNext = 6; offerId = offerLevel = claimedOfferId = 0;
             offerSeconds = 0; offerDuration = PartyProgression.CHOICE_SECONDS; offerCatchUp = false; upgradeQueued = false;
             catchUpSkills = catchUpEquipment = 0; skillFoundation = equipmentFoundation = "";
+            foundationSkills = List.of(); foundationItems = List.of();
             for (int i = 0; i < 3; i++) { options[i] = null; cards[i] = null; }
             clearEquipment();
         }
@@ -325,16 +331,34 @@ public final class LobbyState {
     /** Immutable foundation summaries are prepared once by simulation and borrowed by server snapshots. */
     public synchronized void publishCatchUp(int index, int skillsRemaining, int equipmentRemaining,
         String skillFoundation, String equipmentFoundation) {
+        publishCatchUp(index, skillsRemaining, equipmentRemaining, skillFoundation, equipmentFoundation, List.of(), List.of());
+    }
+
+    public synchronized void publishCatchUp(int index, int skillsRemaining, int equipmentRemaining,
+        String skillFoundation, String equipmentFoundation, List<PartyProgression.FoundationSkill> skills,
+        List<RunEquipment.FoundationItem> equipment) {
         Slot slot = slots[index];
         slot.catchUpSkills = Math.max(0, Math.min(3, skillsRemaining));
         slot.catchUpEquipment = Math.max(0, Math.min(2, equipmentRemaining));
         slot.skillFoundation = boundedSummary(skillFoundation);
         slot.equipmentFoundation = boundedSummary(equipmentFoundation);
+        slot.foundationSkills = boundedFoundation(skills, slot.foundationSkills, 12);
+        slot.foundationItems = boundedFoundation(equipment, slot.foundationItems, RunEquipment.SLOT_COUNT);
     }
 
     public synchronized CatchUpFeedback catchUpFeedback(int index) {
         Slot slot = slots[index];
-        return new CatchUpFeedback(slot.catchUpSkills, slot.catchUpEquipment, slot.skillFoundation, slot.equipmentFoundation);
+        return new CatchUpFeedback(slot.catchUpSkills, slot.catchUpEquipment, slot.skillFoundation, slot.equipmentFoundation,
+            slot.foundationSkills, slot.foundationItems);
+    }
+
+    /** Copy on change only: the render publisher normally supplies the same immutable activation snapshots. */
+    private static <T> List<T> boundedFoundation(List<T> entries, List<T> previous, int maximum) {
+        if (entries == null || entries.isEmpty()) return List.of();
+        int count = Math.min(entries.size(), maximum);
+        boolean unchanged = previous.size() == count;
+        for (int i = 0; unchanged && i < count; i++) unchanged = previous.get(i).equals(entries.get(i));
+        return unchanged ? previous : List.copyOf(entries.subList(0, count));
     }
 
     private static String boundedSummary(String summary) {

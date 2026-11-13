@@ -9,7 +9,8 @@ const vm = require('node:vm');
 class Element {
   constructor() {
     this.hidden = false; this.disabled = false; this.textContent = ''; this.dataset = {};
-    this.listeners = new Map(); this.children = new Map(); this.attributes = new Map();
+    this.listeners = new Map(); this.children = new Map(); this.attributes = new Map(); this.childNodes = [];
+    this.open = false; this.replacements = 0;
     const classes = new Set();
     this.classList = {
       add: (...names) => names.forEach((name) => classes.add(name)),
@@ -29,6 +30,8 @@ class Element {
     return this.children.get(selector);
   }
   setAttribute(name, value) { this.attributes.set(name, value); }
+  appendChild(child) { this.childNodes.push(child); }
+  replaceChildren(...children) { this.childNodes = children; this.replacements++; }
   hasPointerCapture() { return false; }
   click() { this.listeners.get('click')?.({}); }
 }
@@ -40,7 +43,7 @@ async function main() {
     return elements.get(id);
   };
   const document = {
-    getElementById: get, querySelector: get, body: new Element(), documentElement: new Element(),
+    getElementById: get, querySelector: get, createElement: () => new Element(), body: new Element(), documentElement: new Element(),
     hidden: false, visibilityState: 'visible', addEventListener() {}
   };
   let now = 1000;
@@ -128,15 +131,54 @@ async function main() {
   assert.equal(first.querySelector('.skill-illustration').style.backgroundImage, '', 'Skill cards restore the existing skill atlas after gear');
   assert.equal(first.querySelector('.skill-illustration').style.backgroundSize, '');
   const foundation = { skillsRemaining: 3, equipmentRemaining: 2,
-    skillFoundation: 'Soulfire 3 / Soul Circle 2', equipmentFoundation: 'Gatekeeper Helm / Emberheart Pendant' };
+    skillFoundation: 'Soulfire 3 / Soul Circle 2', equipmentFoundation: 'Gatekeeper Helm / Emberheart Pendant',
+    skills: [{ id: 'power', title: 'Soulfire', icon: 0, rank: 3 }, { id: 'critical', title: 'Deadeye', icon: 11, rank: 2 }],
+    equipment: [{ id: 'gatekeeper', title: 'Gatekeeper Helm', icon: 0, slot: 'HELMET' },
+      { id: 'pendant', title: 'Emberheart Pendant', icon: 47, slot: 'AMULET' }] };
   const fastSkill = { ...upgrade, id: 2, level: 18, catchUp: true, durationSeconds: 15, secondsLeft: 7.5 };
   status({ progression: { upgrade: fastSkill }, catchUp: foundation });
   assert.equal(get('upgrade-level').textContent, 'CATCH-UP SKILL');
   assert.equal(choices.querySelector('.upgrade-kicker').textContent, '3 SKILL / 2 GEAR LEFT');
   assert.equal(choices.style.values.get('--choice-progress'), '50%', 'Catch-up rails use the host-owned fifteen-second duration');
   assert.equal(get('catch-up-build').hidden, false);
-  assert.equal(get('catch-up-skills').textContent, 'Skills: ' + foundation.skillFoundation);
-  assert.equal(get('catch-up-gear').textContent, 'Gear: ' + foundation.equipmentFoundation);
+  assert.equal(get('catch-up-build').open, false, 'Starting build is collapsed by default');
+  assert.equal(get('catch-up-summary').textContent, 'Starting build · 5 ranks · 2 gear');
+  const skillIcons = get('catch-up-skills').childNodes;
+  const gearIcons = get('catch-up-gear').childNodes;
+  assert.equal(skillIcons.length, 2); assert.equal(gearIcons.length, 2);
+  assert.equal(skillIcons[0].dataset.id, 'power');
+  assert.equal(skillIcons[0].style.backgroundImage, "url('/art/skill-icons.png')");
+  assert.equal(skillIcons[0].style.backgroundSize, '400% 300%');
+  assert.equal(skillIcons[0].style.values.get('--icon-x'), '0%');
+  assert.equal(skillIcons[0].childNodes[0].textContent, '3');
+  assert.equal(skillIcons[1].style.values.get('--icon-x'), '100%');
+  assert.equal(skillIcons[1].style.values.get('--icon-y'), '100%');
+  assert.equal(gearIcons[1].style.backgroundImage, "url('/art/item-icons.png')");
+  assert.equal(gearIcons[1].style.backgroundSize, '800% 600%');
+  assert.equal(gearIcons[1].style.values.get('--icon-x'), '100%');
+  assert.equal(gearIcons[1].style.values.get('--icon-y'), '100%');
+  assert.equal(gearIcons[1].childNodes.length, 0, 'Equipment has no invented skill rank');
+  const beforeInspect = socket.sent.length;
+  skillIcons[0].click();
+  assert.equal(get('catch-up-inspect').textContent, 'Soulfire · rank 3');
+  gearIcons[1].listeners.get('focus')();
+  assert.equal(get('catch-up-inspect').textContent, 'Emberheart Pendant · amulet');
+  assert.equal(socket.sent.length, beforeInspect, 'Read-only icon inspection sends no gameplay or offer messages');
+  assert.equal(first.disabled, false, 'Inspecting does not submit a choice');
+  for (let sample = 0; sample < 5; sample++) {
+    now += 200;
+    status({ progression: { upgrade: { ...fastSkill, secondsLeft: 7.5 - sample * .2 } },
+      catchUp: { ...foundation, skills: foundation.skills.map((entry) => ({ ...entry })), skillsRemaining: 2 } });
+  }
+  assert.equal(get('catch-up-skills').childNodes[0], skillIcons[0], 'Five-Hz status updates reuse icon DOM');
+  assert.equal(get('catch-up-skills').replacements, 1);
+  assert.equal(get('catch-up-inspect').textContent, 'Emberheart Pendant · amulet', 'Status refresh retains inspected caption');
+  socket.close(); socket.onclose();
+  socket.readyState = Socket.OPEN;
+  socket.receive({ type: 'joined', player: 1, token: 'test-token' });
+  status({ progression: { upgrade: fastSkill }, catchUp: foundation });
+  assert.equal(get('catch-up-skills').childNodes[0], skillIcons[0], 'Reconnect restores the same cached foundation');
+  assert.equal(get('catch-up-build').open, false, 'Reconnect restores a compact collapsed summary');
   get('catch-up-build').open = true;
   now += 12000;
   status({ phase: 'paused', progression: { upgrade: fastSkill }, catchUp: foundation });
@@ -149,6 +191,7 @@ async function main() {
   status({ equipment: fastGear, catchUp: { ...foundation, skillsRemaining: 0 } });
   assert.equal(get('upgrade-level').textContent, 'CATCH-UP GEAR');
   assert.equal(choices.style.values.get('--choice-progress'), '100%');
+  assert.equal(get('catch-up-skills').childNodes[0], skillIcons[0], 'Changing from skill to gear offer reuses automatic foundation');
   get('equipment-keep').click();
   assert.equal(socket.sent.at(-1).option, -1);
   assert.equal(choices.hidden, false);
@@ -159,7 +202,28 @@ async function main() {
   assert.ok(Math.abs(parseFloat(choices.style.values.get('--choice-progress')) - 28 / 30 * 100) < .001,
     'Older normal offer payloads retain the thirty-second timer fallback');
   assert.equal(get('catch-up-build').hidden, true);
-  console.log('Controller choice priority, typed identity, acknowledgment, pause/restoration and fast catch-up duration/summary checks passed.');
+  const malformed = { skillsRemaining: 1, equipmentRemaining: 1,
+    skills: [null, {}, { ...foundation.skills[0], icon: 12 }, { ...foundation.skills[0], rank: -1 },
+      { ...foundation.skills[0], icon: '0' }, { ...foundation.skills[0], title: '<img onerror=bad()>' }],
+    equipment: [{ ...foundation.equipment[0], icon: 48 }, { ...foundation.equipment[0], slot: 'UNKNOWN' },
+      { ...foundation.equipment[0], id: null }, foundation.equipment[1]] };
+  status({ progression: { upgrade: fastSkill }, catchUp: malformed });
+  assert.equal(get('catch-up-skills').childNodes.length, 1, 'Invalid skill metadata is omitted');
+  assert.equal(get('catch-up-gear').childNodes.length, 1, 'Invalid equipment metadata is omitted');
+  get('catch-up-skills').childNodes[0].click();
+  assert.equal(get('catch-up-inspect').textContent, '<img onerror=bad()> · rank 3', 'Names stay inert text');
+  assert.equal(get('catch-up-skills').childNodes[0].attributes.get('aria-label'), '<img onerror=bad()> · rank 3');
+  status({ progression: { upgrade: fastSkill }, catchUp: { skills: [], equipment: [] } });
+  assert.equal(get('catch-up-build').hidden, true, 'Empty or missing foundation metadata is safe');
+  status({ progression: { upgrade: fastSkill }, catchUp: { skillFoundation: 'Legacy long names', equipmentFoundation: 'Legacy gear' } });
+  assert.equal(get('catch-up-summary').textContent, 'Starting build granted');
+  assert.equal(get('catch-up-rows').hidden, true, 'Legacy strings do not become guessed icons or long visual lists');
+  status({ progression: { upgrade: fastSkill }, catchUp: {
+    skills: Array.from({ length: 20 }, (_, index) => ({ ...foundation.skills[0], id: `skill-${index}` })),
+    equipment: Array.from({ length: 20 }, (_, index) => ({ ...foundation.equipment[0], id: `gear-${index}` }))
+  } });
+  assert.equal(get('catch-up-skills').childNodes.length, 12); assert.equal(get('catch-up-gear').childNodes.length, 7);
+  console.log('Controller choice priority, acknowledgment, pause/restoration, catch-up timing and bounded cached icon summary checks passed.');
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });

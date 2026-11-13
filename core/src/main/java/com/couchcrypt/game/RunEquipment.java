@@ -1,6 +1,8 @@
 package com.couchcrypt.game;
 
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 import static com.couchcrypt.game.ItemCatalog.Stat.*;
 
 /** Bounded run-only equipment. Skill stats remain untouched; combat reads effective values here. */
@@ -13,6 +15,8 @@ public final class RunEquipment {
     private static final String[] SLOT_NAMES = {"HELMET", "AMULET", "RING I", "RING II", "CHEST", "BOOTS", "GLOVES"};
     private static final String[] FOUNDATION_ITEMS = {"gatekeeper_helm", "pilgrims_stride", "swiftstitch_gloves",
         "emberheart_pendant", "rustbound_signet", "cryptguard_plate"};
+    /** Snapshot of automatic equipment, using the item illustration atlas rather than effect icons. */
+    public record FoundationItem(String id, String title, int icon, String slot) {}
     public static final class Offer {
         public boolean pending, catchUp;
         public int id;
@@ -27,6 +31,7 @@ public final class RunEquipment {
     private final int[] applied = new int[2], previewSkillCount = new int[2];
     private final int[] catchUpTarget = new int[2], foundationCount = new int[2];
     private final String[] foundationSummary = {"", ""};
+    private final List<List<FoundationItem>> foundationItems = Arrays.asList(List.of(), List.of());
     private final boolean[] participants = new boolean[2], moving = new boolean[2];
     private final float[] sustain = new float[2], xpRemainder = new float[2];
     private int earned, nextId, cacheIndex, eliteRewards;
@@ -40,6 +45,7 @@ public final class RunEquipment {
     private void clearPlayer(int slot) {
         participants[slot] = moving[slot] = false; applied[slot] = 0;
         catchUpTarget[slot] = foundationCount[slot] = 0; foundationSummary[slot] = "";
+        foundationItems.set(slot, List.of());
         sustain[slot] = 2f; xpRemainder[slot] = 0;
         Arrays.fill(worn[slot], null); Arrays.fill(totals[slot], 0);
         Offer offer = offers[slot]; offer.pending = offer.catchUp = false; offer.id = 0;
@@ -52,6 +58,7 @@ public final class RunEquipment {
         catchUpTarget[slot] = earned;
         int automatic = Math.max(0, earned - CATCH_UP_CHOICES);
         StringBuilder summary = new StringBuilder(160);
+        List<FoundationItem> items = new ArrayList<>(automatic);
         for (int i = 0; i < automatic; i++) {
             ItemCatalog.Item item = ItemCatalog.byId(FOUNDATION_ITEMS[i]);
             if (item == null || !item.supports(world.players[slot].hero))
@@ -60,9 +67,11 @@ public final class RunEquipment {
             applied[slot]++;
             if (summary.length() > 0) summary.append(", ");
             summary.append(item.title());
+            items.add(new FoundationItem(item.id(), item.title(), ItemCatalog.artIndex(item), item.slot().name()));
         }
         foundationCount[slot] = automatic;
         foundationSummary[slot] = summary.toString();
+        foundationItems.set(slot, List.copyOf(items));
         startNext(slot);
     }
     public void deactivatePlayer(int slot) { if (valid(slot)) clearPlayer(slot); }
@@ -72,6 +81,7 @@ public final class RunEquipment {
     public int catchUpRemaining(int slot) { return valid(slot) ? Math.max(0, catchUpTarget[slot] - applied[slot]) : 0; }
     public int foundationCount(int slot) { return valid(slot) ? foundationCount[slot] : 0; }
     public String foundationSummary(int slot) { return valid(slot) ? foundationSummary[slot] : ""; }
+    public List<FoundationItem> foundationItems(int slot) { return valid(slot) ? foundationItems.get(slot) : List.of(); }
     public ItemCatalog.Item equipped(int slot, int position) {
         return valid(slot) && position >= 0 && position < SLOT_COUNT ? worn[slot][position] : null;
     }

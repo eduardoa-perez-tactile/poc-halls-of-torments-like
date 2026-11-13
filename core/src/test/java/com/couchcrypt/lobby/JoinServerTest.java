@@ -4,6 +4,8 @@ import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
 import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.ItemCatalog;
+import com.couchcrypt.game.RunEquipment;
+import java.util.List;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -90,7 +92,12 @@ class JoinServerTest {
             do { status = one.expect("status"); } while (!status.get("equipment").isNull());
             assertEquals(2, status.getInt("connected"));
             state.publishEquipment(0, 11, 14.5f, options, cards, true, 15);
-            state.publishCatchUp(0, 0, 2, "Soulfire 3 / Soul Circle 2", "Gatekeeper Helm / Emberheart Pendant");
+            var foundationItem = ItemCatalog.byId("emberheart_pendant");
+            state.publishCatchUp(0, 0, 2, "Soulfire 3 / Soul Circle 2", "Gatekeeper Helm / Emberheart Pendant",
+                List.of(new PartyProgression.FoundationSkill("power", "Soulfire", 0, 3),
+                    new PartyProgression.FoundationSkill("aura", "Soul Circle", 8, 2)),
+                List.of(new RunEquipment.FoundationItem(foundationItem.id(), foundationItem.title(),
+                    ItemCatalog.artIndex(foundationItem), foundationItem.slot().name())));
             first.sendText("{\"type\":\"ping\"}", true).get(3, TimeUnit.SECONDS);
             do { status = one.expect("status"); }
             while (status.get("equipment").isNull() || status.get("equipment").getInt("id") != 11);
@@ -99,6 +106,20 @@ class JoinServerTest {
             assertEquals(14.5f, status.get("equipment").getFloat("secondsLeft"));
             assertEquals(2, status.get("catchUp").getInt("equipmentRemaining"));
             assertEquals("Soulfire 3 / Soul Circle 2", status.get("catchUp").getString("skillFoundation"));
+            var foundation = status.get("catchUp");
+            assertEquals(2, foundation.get("skills").size);
+            assertEquals("power", foundation.get("skills").get(0).getString("id"));
+            assertEquals("Soulfire", foundation.get("skills").get(0).getString("title"));
+            assertEquals(0, foundation.get("skills").get(0).getInt("icon"));
+            assertEquals(3, foundation.get("skills").get(0).getInt("rank"));
+            assertEquals(8, foundation.get("skills").get(1).getInt("icon"));
+            assertEquals(2, foundation.get("skills").get(1).getInt("rank"));
+            assertEquals(1, foundation.get("equipment").size);
+            var itemJson = foundation.get("equipment").get(0);
+            assertEquals(foundationItem.id(), itemJson.getString("id"));
+            assertEquals(foundationItem.title(), itemJson.getString("title"));
+            assertEquals(ItemCatalog.artIndex(foundationItem), itemJson.getInt("icon"));
+            assertEquals(foundationItem.slot().name(), itemJson.getString("slot"));
             first.sendText("{\"type\":\"equipment\",\"offerId\":11,\"option\":-1}", true).get(3, TimeUnit.SECONDS);
             until = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
             do {
@@ -116,6 +137,8 @@ class JoinServerTest {
             assertTrue(status.get("progression").get("upgrade").getBoolean("catchUp"));
             assertEquals(15, status.get("progression").get("upgrade").getFloat("durationSeconds"));
             assertEquals(1, status.get("catchUp").getInt("skillsRemaining"));
+            assertEquals(0, status.get("catchUp").get("skills").size);
+            assertEquals(0, status.get("catchUp").get("equipment").size);
             first.abort(); second.abort();
         } finally { server.stop(); }
     }

@@ -14,6 +14,8 @@
   const upgradeButtons = [0, 1, 2].map((index) => byId(`upgrade-option-${index}`));
   const keepEquipment = byId('equipment-keep');
   const catchUpBuild = byId('catch-up-build'), catchUpSkills = byId('catch-up-skills'), catchUpGear = byId('catch-up-gear');
+  const catchUpSummary = byId('catch-up-summary'), catchUpRows = byId('catch-up-rows'), catchUpInspect = byId('catch-up-inspect');
+  let foundationSignature = '';
   let upgradeOffer = null, upgradeSeconds = 0, upgradeDuration = 30, upgradeSampleTime = 0, upgradeTicker;
   let choiceKind = 'upgrade';
   let upgradeSelected = -1, upgradePendingSince = 0;
@@ -121,6 +123,62 @@
     button.querySelector('.skill-after').textContent = hasPreview ? option.after.slice(0, equipment ? 128 : 40) : '';
     button.setAttribute('aria-label', `${option.title}. ${hasPreview ? `${option.headline}. ${option.before} to ${option.after}` : option.description}${equipment ? `. ${option.description}` : Number.isSafeInteger(option.rank) && option.rank > 0 ? `. Rank ${option.rank}` : ''}`);
   }
+  function foundationEntries(entries, equipment) {
+    if (!Array.isArray(entries)) return [];
+    const slots = ['HELMET', 'AMULET', 'RING', 'CHEST', 'BOOTS', 'GLOVES'];
+    return entries.slice(0, equipment ? 7 : 12).filter((entry) =>
+      typeof entry?.id === 'string' && entry.id.length > 0 && entry.id.length <= 64
+      && typeof entry.title === 'string' && entry.title.trim().length > 0
+      && Number.isInteger(entry.icon) && entry.icon >= 0 && entry.icon < (equipment ? 48 : 12)
+      && (equipment ? slots.includes(entry.slot) : Number.isSafeInteger(entry.rank) && entry.rank > 0 && entry.rank <= 99))
+      .map((entry) => ({ id: entry.id, title: entry.title.slice(0, 64), icon: entry.icon,
+        ...(equipment ? { slot: entry.slot } : { rank: entry.rank }) }));
+  }
+  function renderFoundationIcons(container, entries, equipment) {
+    const icons = entries.map((entry) => {
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'catch-up-icon';
+      button.dataset.kind = equipment ? 'gear' : 'skill';
+      button.dataset.id = entry.id;
+      const columns = equipment ? 8 : 4, rows = equipment ? 6 : 3;
+      button.style.backgroundImage = `url('/art/${equipment ? 'item' : 'skill'}-icons.png')`;
+      button.style.backgroundSize = `${columns * 100}% ${rows * 100}%`;
+      button.style.setProperty('--icon-x', `${entry.icon % columns / (columns - 1) * 100}%`);
+      button.style.setProperty('--icon-y', `${Math.floor(entry.icon / columns) / (rows - 1) * 100}%`);
+      button.style.backgroundPosition = 'var(--icon-x) var(--icon-y)';
+      const caption = equipment ? `${entry.title} · ${entry.slot.toLowerCase()}` : `${entry.title} · rank ${entry.rank}`;
+      button.title = caption; button.setAttribute('aria-label', caption);
+      if (!equipment) {
+        const badge = document.createElement('span'); badge.className = 'catch-up-rank';
+        badge.textContent = String(entry.rank); badge.setAttribute('aria-hidden', 'true'); button.appendChild(badge);
+      }
+      // Inspection is local and read-only; it must never submit an offer or move the player.
+      const inspect = () => { catchUpInspect.textContent = caption; };
+      button.addEventListener('click', inspect); button.addEventListener('focus', inspect);
+      return button;
+    });
+    container.replaceChildren(...icons);
+  }
+  function paintFoundation(catchUp, fast) {
+    if (!fast) { catchUpBuild.hidden = true; return; }
+    const skills = foundationEntries(catchUp?.skills, false);
+    const gear = foundationEntries(catchUp?.equipment, true);
+    const legacy = skills.length + gear.length === 0
+      && (typeof catchUp?.skillFoundation === 'string' && catchUp.skillFoundation.length > 0
+        || typeof catchUp?.equipmentFoundation === 'string' && catchUp.equipmentFoundation.length > 0);
+    catchUpBuild.hidden = skills.length + gear.length === 0 && !legacy;
+    if (catchUpBuild.hidden) return;
+    const signature = JSON.stringify([skills, gear, legacy]);
+    if (signature === foundationSignature) return;
+    foundationSignature = signature;
+    renderFoundationIcons(catchUpSkills, skills, false);
+    renderFoundationIcons(catchUpGear, gear, true);
+    catchUpRows.hidden = legacy;
+    const ranks = skills.reduce((total, entry) => total + entry.rank, 0);
+    catchUpSummary.textContent = legacy ? 'Starting build granted'
+      : `Starting build · ${ranks} ranks · ${gear.length} gear`;
+    catchUpInspect.textContent = legacy ? 'Build details unavailable on this host.' : 'Tap an icon for details.';
+  }
   function setUpgradeOffer(progression, equipment, catchUp) {
     const kind = progression?.upgrade ? 'upgrade' : 'equipment';
     const next = kind === 'upgrade' ? progression.upgrade : equipment;
@@ -146,15 +204,7 @@
       ? `${skillsLeft} SKILL / ${gearLeft} GEAR LEFT` : kind === 'equipment' ? 'CHOOSE YOUR EQUIPMENT' : 'CHOOSE YOUR POWER';
     upgradeLevel.textContent = fast ? kind === 'equipment' ? 'CATCH-UP GEAR' : 'CATCH-UP SKILL'
       : kind === 'equipment' ? 'EQUIPMENT' : `LEVEL ${Number.isSafeInteger(next.level) ? next.level : ''}`;
-    const skillFoundation = typeof catchUp?.skillFoundation === 'string' ? catchUp.skillFoundation.slice(0, 2048) : '';
-    const gearFoundation = typeof catchUp?.equipmentFoundation === 'string' ? catchUp.equipmentFoundation.slice(0, 2048) : '';
-    catchUpBuild.hidden = !fast || (!skillFoundation && !gearFoundation);
-    if (!catchUpBuild.hidden) {
-      const skills = skillFoundation ? `Skills: ${skillFoundation}` : 'Skills: no automatic grants';
-      const gear = gearFoundation ? `Gear: ${gearFoundation}` : 'Gear: no automatic grants';
-      if (catchUpSkills.textContent !== skills) catchUpSkills.textContent = skills;
-      if (catchUpGear.textContent !== gear) catchUpGear.textContent = gear;
-    }
+    paintFoundation(catchUp, fast);
     upgradeDuration = Number.isFinite(next.durationSeconds) && next.durationSeconds > 0
       ? Math.min(30, next.durationSeconds) : fast ? 15 : 30;
     upgradeSeconds = Math.max(0, Math.min(upgradeDuration, next.secondsLeft));

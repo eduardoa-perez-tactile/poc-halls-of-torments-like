@@ -37,6 +37,7 @@ class RunEquipmentTest {
         world.activatePlayer(1);
         assertEquals(6, gear.appliedCount(1));
         assertEquals(6, gear.foundationCount(1));
+        var foundation = gear.foundationItems(1);
         assertEquals(2, gear.catchUpRemaining(1));
         assertTrue(gear.offers[1].pending);
         for (int i = 0; i < 2; i++) {
@@ -49,10 +50,13 @@ class RunEquipmentTest {
         }
         assertFalse(gear.offers[1].pending);
         assertEquals(8, gear.appliedCount(1));
+        assertSame(foundation, gear.foundationItems(1));
+        assertEquals(6, foundation.size(), "Personal gear must not leak into the starting-build snapshot");
         assertEquals(1, gear.appliedCount(0));
         world.reset(); world.activatePlayer(0); gear.grantReward();
         assertFalse(gear.choose(0, old, 0));
         assertEquals(0, gear.appliedCount(0));
+        assertTrue(gear.foundationItems(1).isEmpty());
         for (int position = 0; position < RunEquipment.SLOT_COUNT; position++) assertNull(gear.equipped(0, position));
     }
 
@@ -72,6 +76,14 @@ class RunEquipmentTest {
                 assertTrue(gear.foundationSummary(1).contains(item.title()));
             }
             assertEquals(6, items.size());
+            var foundation = gear.foundationItems(1);
+            assertEquals(6, foundation.size());
+            for (var entry : foundation) {
+                var item = ItemCatalog.byId(entry.id());
+                assertTrue(items.contains(item)); assertEquals(item.title(), entry.title());
+                assertEquals(ItemCatalog.artIndex(item), entry.icon()); assertEquals(item.slot().name(), entry.slot());
+            }
+            assertThrows(UnsupportedOperationException.class, () -> foundation.clear());
             assertNull(gear.equipped(1, 3), "The second ring remains a personal equipment decision");
             int id = gear.offers[1].id;
             gear.update(4);
@@ -79,6 +91,7 @@ class RunEquipmentTest {
             world.activatePlayer(1); gear.activatePlayer(1);
             assertEquals(id, gear.offers[1].id); assertEquals(11, gear.offers[1].secondsLeft);
             assertEquals(6, gear.appliedCount(1)); assertEquals(80, world.players[1].health);
+            assertSame(foundation, gear.foundationItems(1));
         }
     }
 
@@ -113,6 +126,7 @@ class RunEquipmentTest {
         world.deactivatePlayer(1);
         assertFalse(gear.catchingUp(1)); assertEquals(0, gear.foundationCount(1));
         assertEquals("", gear.foundationSummary(1)); assertEquals(0, offer.durationSeconds);
+        assertTrue(gear.foundationItems(1).isEmpty());
         assertFalse(gear.choose(1, offer.id, 0));
         world.activatePlayer(1);
         assertTrue(offer.id > oldId); assertEquals(6, gear.foundationCount(1));

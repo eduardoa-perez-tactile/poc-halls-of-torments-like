@@ -130,7 +130,24 @@ public final class JoinServer extends NanoWSD {
             .append(",\"equipmentRemaining\":").append(feedback.equipmentRemaining())
             .append(",\"skillFoundation\":"); quote(result, feedback.skillFoundation());
         result.append(",\"equipmentFoundation\":"); quote(result, feedback.equipmentFoundation());
-        return result.append('}').toString();
+        result.append(",\"skills\":[");
+        for (int i = 0; i < feedback.skills().size(); i++) {
+            if (i > 0) result.append(',');
+            var skill = feedback.skills().get(i);
+            result.append("{\"id\":"); quote(result, skill.id());
+            result.append(",\"title\":"); quote(result, skill.title());
+            result.append(",\"icon\":").append(skill.icon()).append(",\"rank\":").append(skill.rank()).append('}');
+        }
+        result.append("],\"equipment\":[");
+        for (int i = 0; i < feedback.equipment().size(); i++) {
+            if (i > 0) result.append(',');
+            var item = feedback.equipment().get(i);
+            result.append("{\"id\":"); quote(result, item.id());
+            result.append(",\"title\":"); quote(result, item.title());
+            result.append(",\"icon\":").append(item.icon()).append(",\"slot\":"); quote(result, item.slot());
+            result.append('}');
+        }
+        return result.append("]}").toString();
     }
 
     private static void appendEquipment(StringBuilder target, ItemCatalog.Item item, PartyProgression.CardPreview card) {

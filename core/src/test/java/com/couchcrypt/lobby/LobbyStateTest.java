@@ -3,9 +3,44 @@ package com.couchcrypt.lobby;
 import org.junit.jupiter.api.Test;
 import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.ItemCatalog;
+import com.couchcrypt.game.RunEquipment;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LobbyStateTest {
+    @Test void structuredFoundationsAreBoundedImmutableSnapshotsReusedUntilChanged() {
+        var state = new LobbyState(); var joined = state.join(null, "a", 1);
+        state.setPhase(LobbyState.Phase.SESSION);
+        var skill = new PartyProgression.FoundationSkill("power", "Soulfire", 0, 3);
+        var item = new RunEquipment.FoundationItem("gatekeeper_helm", "Gatekeeper Helm", 0, "HELMET");
+        var skills = new ArrayList<>(Collections.nCopies(15, skill));
+        var items = new ArrayList<>(Collections.nCopies(10, item));
+        state.publishCatchUp(0, 3, 2, "Soulfire 3", "Gatekeeper Helm", skills, items);
+        var first = state.catchUpFeedback(0);
+        assertEquals(12, first.skills().size()); assertEquals(7, first.equipment().size());
+        assertThrows(UnsupportedOperationException.class, () -> first.skills().clear());
+        assertThrows(UnsupportedOperationException.class, () -> first.equipment().clear());
+        state.publishCatchUp(0, 2, 1, "Soulfire 3", "Gatekeeper Helm", skills, items);
+        assertSame(first.skills(), state.catchUpFeedback(0).skills());
+        assertSame(first.equipment(), state.catchUpFeedback(0).equipment());
+        skills.clear(); items.clear();
+        assertEquals(12, first.skills().size()); assertEquals(7, first.equipment().size());
+        state.disconnected("a", 2); state.join(joined.token(), "restored", 3);
+        assertSame(first.skills(), state.catchUpFeedback(0).skills());
+        assertSame(first.equipment(), state.catchUpFeedback(0).equipment());
+        state.publishCatchUp(0, 1, 1, "Soulfire 3", "Gatekeeper Helm", List.of(skill), List.of(item));
+        assertEquals(List.of(skill), state.catchUpFeedback(0).skills());
+        state.publishCatchUp(0, 1, 1, "Soulfire 3", "Gatekeeper Helm");
+        assertTrue(state.catchUpFeedback(0).skills().isEmpty());
+        assertTrue(state.catchUpFeedback(0).equipment().isEmpty());
+        state.publishCatchUp(0, 1, 1, "Soulfire 3", "Gatekeeper Helm", List.of(skill), List.of(item));
+        state.remove(0);
+        assertTrue(state.catchUpFeedback(0).skills().isEmpty());
+        assertTrue(state.catchUpFeedback(0).equipment().isEmpty());
+    }
+
     @Test void catchUpMetadataUsesHostDurationAndSurvivesReservationButClearsOnReplacement() {
         var state = new LobbyState(); var joined = state.join(null, "a", 1);
         state.setPhase(LobbyState.Phase.SESSION);

@@ -80,6 +80,14 @@ class PartyProgressionTest {
             assertEquals(2, progression.rank(1, PartyProgression.Upgrade.AURA));
             assertEquals(1, progression.rank(1, PartyProgression.Upgrade.STORM));
             assertTrue(progression.foundationSummary(1).contains("Soulfire 3"));
+            var foundation = progression.foundationSkills(1);
+            assertEquals(16, foundation.stream().mapToInt(PartyProgression.FoundationSkill::rank).sum());
+            for (var skill : foundation) {
+                var upgrade = PartyProgression.Upgrade.values()[skill.icon()];
+                assertEquals(upgrade.id, skill.id()); assertEquals(upgrade.title, skill.title());
+                assertTrue(upgrade.supports(hero)); assertEquals(progression.rank(1, upgrade), skill.rank());
+            }
+            assertThrows(UnsupportedOperationException.class, () -> foundation.clear());
             assertEquals(hero == ArenaWorld.Hero.WARDEN ? 2 : 0, progression.rank(1, PartyProgression.Upgrade.SWEEP));
             assertEquals(hero == ArenaWorld.Hero.RANGER ? 1 : 0, progression.rank(1, PartyProgression.Upgrade.MULTISHOT));
             assertEquals(hero == ArenaWorld.Hero.RANGER ? 1 : 0, progression.rank(1, PartyProgression.Upgrade.PIERCE));
@@ -89,6 +97,9 @@ class PartyProgressionTest {
             assertTrue(progression.choose(1, offer.id, 2));
             assertEquals(previousRank + 1, progression.rank(1, personal));
             assertEquals(2, progression.catchUpRemaining(1));
+            assertSame(foundation, progression.foundationSkills(1));
+            assertEquals(16, foundation.stream().mapToInt(PartyProgression.FoundationSkill::rank).sum(),
+                "Personal choices must not appear in the starting-build snapshot");
         }
     }
 
@@ -117,20 +128,25 @@ class PartyProgressionTest {
         progression.addXp(Integer.MAX_VALUE); world.activatePlayer(1);
         int id = progression.offers[1].id;
         String summary = progression.foundationSummary(1);
+        var foundation = progression.foundationSkills(1);
         progression.update(5);
         world.activatePlayer(1);
         assertEquals(id, progression.offers[1].id);
         assertEquals(10, progression.offers[1].secondsLeft);
         assertSame(summary, progression.foundationSummary(1));
+        assertSame(foundation, progression.foundationSkills(1));
         assertEquals(16, progression.foundationCount(1));
         world.deactivatePlayer(1);
         assertEquals(0, progression.foundationCount(1));
         assertEquals("", progression.foundationSummary(1));
+        assertTrue(progression.foundationSkills(1).isEmpty());
         world.activatePlayer(1);
         assertNotEquals(id, progression.offers[1].id);
         assertFalse(progression.choose(1, id, 0));
         assertEquals(16, progression.appliedUpgradeCount(1));
         assertEquals(15, progression.offers[1].secondsLeft);
+        progression.reset();
+        assertTrue(progression.foundationSkills(1).isEmpty());
     }
 
     @Test void normalSkillRewardsWaitForInheritedGearInsteadOfExtendingTheCatchupBacklog() {
