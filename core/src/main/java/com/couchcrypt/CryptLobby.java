@@ -742,9 +742,10 @@ public final class CryptLobby extends ApplicationAdapter {
     private void previewHud(int targetLevel) {
         while (world.progression.level < targetLevel) {
             world.progression.addXp(world.progression.xpToNext - world.progression.xp);
+            for (int round = 0; round < PartyProgression.MAX_LEVEL && world.levelUpPending(); round++)
             for (ArenaWorld.Player player : world.players) if (player.active) {
                 PartyProgression.Offer offer = world.progression.offers[player.slot];
-                for (int guard = 0; guard < PartyProgression.MAX_LEVEL && offer.pending; guard++) {
+                if (offer.pending) {
                     int choice = 0, leastRank = Integer.MAX_VALUE;
                     for (int i = 0; i < offer.options.length; i++) {
                         int rank = world.progression.rank(player.slot, offer.options[i]);

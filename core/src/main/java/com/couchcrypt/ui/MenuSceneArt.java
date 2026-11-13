@@ -22,6 +22,8 @@ public final class MenuSceneArt extends BaseDrawable implements Disposable {
     public enum Mood { NEUTRAL, VICTORY, DEFEAT }
 
     public final Texture base;
+    /** Level-up ornaments borrow unused atlas space; menu layers and texture dimensions stay fixed. */
+    public final TextureRegion levelUpCrest, levelUpLight;
     public final long textureBytes = ((long) WIDTH * HEIGHT + (long) ATLAS_WIDTH * ATLAS_HEIGHT) * 4;
     public final long retainedPixmapBytes = textureBytes;
     private final Texture atlas;
@@ -55,6 +57,10 @@ public final class MenuSceneArt extends BaseDrawable implements Disposable {
             orb = pack(light, packed, 0, light.getWidth(), 2, 770, 252, 252, 8);
             light.dispose(); light = null;
             bakeParticlePoint(packed);
+            // Bottom-right, below the ambience point (260,772,32,32), clear of both guardian/orb slots.
+            light = new Pixmap(Gdx.files.internal("art/level-up-crest.png"));
+            Layer crest = pack(light, packed, 0, light.getWidth(), 298, 810, 212, 212, 8);
+            light.dispose(); light = null;
 
             roomTexture = texture(roomSmall);
             packedTexture = texture(packed);
@@ -62,6 +68,8 @@ public final class MenuSceneArt extends BaseDrawable implements Disposable {
             right.region = new TextureRegion(packedTexture, right.atlasX, right.atlasY, right.atlasWidth, right.atlasHeight);
             orb.region = new TextureRegion(packedTexture, orb.atlasX, orb.atlasY, orb.atlasWidth, orb.atlasHeight);
             particlePoint = new TextureRegion(packedTexture, 260, 772, 32, 32);
+            levelUpLight = particlePoint;
+            levelUpCrest = new TextureRegion(packedTexture, crest.atlasX, crest.atlasY, crest.atlasWidth, crest.atlasHeight);
             base = roomTexture; atlas = packedTexture;
             basePixels = roomSmall; atlasPixels = packed;
         } catch (RuntimeException | Error failure) {

@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/** Shared party XP with independent, timed build choices owned by the simulation thread. */
+/** Shared party XP and one party choice clock, with personal builds owned by simulation. */
 public final class PartyProgression {
     public static final int MAX_LEVEL = 20;
     public static final float CHOICE_SECONDS = 30f;
@@ -77,6 +77,8 @@ public final class PartyProgression {
     private final List<List<FoundationSkill>> foundationSkills = Arrays.asList(List.of(), List.of());
     private final int[][] ranks = { new int[UPGRADES.length], new int[UPGRADES.length] };
     private int nextOfferId;
+    private float choiceSecondsLeft;
+    private boolean resolvingTimeout;
     public int level, xp, xpToNext, totalXp;
     public final Offer[] offers = { new Offer(), new Offer() };
 
@@ -85,6 +87,7 @@ public final class PartyProgression {
     /** Identities survive reset, so a packet from the previous run cannot select a new offer. */
     public void reset() {
         level = 1; xp = totalXp = 0; xpToNext = threshold(level);
+        choiceSecondsLeft = 0; resolvingTimeout = false;
         for (int slot = 0; slot < offers.length; slot++) {
             participants[slot] = false; applied[slot] = 0;
             catchUpUntil[slot] = foundationCounts[slot] = 0; foundations[slot] = "";
@@ -104,7 +107,7 @@ public final class PartyProgression {
         clearRanks(slot);
         catchUpUntil[slot] = level - 1;
         grantFoundation(slot, catchUpUntil[slot]);
-        startNextOffer(slot);
+        startNextRound();
     }
 
     public void deactivatePlayer(int slot) {
@@ -117,6 +120,7 @@ public final class PartyProgression {
         offer.pending = offer.catchUp = false; offer.id = offer.level = 0; offer.secondsLeft = 0;
         offer.durationSeconds = CHOICE_SECONDS;
         for (int i = 0; i < offer.cards.length; i++) offer.cards[i] = null;
+        startNextRound();
     }
 
     /** Collected soul XP is counted once for the party, whoever picked it up. */
@@ -129,22 +133,32 @@ public final class PartyProgression {
             available -= xpToNext;
             level++;
             xpToNext = level == MAX_LEVEL ? 0 : threshold(level);
-            for (int slot = 0; slot < offers.length; slot++) startNextOffer(slot);
         }
         xp = level == MAX_LEVEL ? 0 : (int) available;
+        startNextRound();
     }
 
-    /** Pause freezes this clock. A long delta expires one offer, never skips queued choices. */
+    /** Pause freezes this clock. A long delta resolves one party round, never skips queued rounds. */
     public void update(float delta) {
         if (!Float.isFinite(delta) || delta <= 0) return;
+        startNextRound();
+        if (!hasPendingOffers()) return;
+        choiceSecondsLeft = Math.max(0f, choiceSecondsLeft - delta);
         for (int slot = 0; slot < offers.length; slot++) {
             Offer offer = offers[slot];
-            if (!offer.pending) startNextOffer(slot);
-            if (!offer.pending) continue;
-            offer.secondsLeft = Math.max(0f, offer.secondsLeft - delta);
-            if (offer.secondsLeft <= .0001f) choose(slot, offer.id, 0);
+            if (offer.pending) offer.secondsLeft = choiceSecondsLeft;
+        }
+        if (choiceSecondsLeft <= .0001f) {
+            resolvingTimeout = true;
+            for (int slot = 0; slot < offers.length; slot++)
+                if (offers[slot].pending) choose(slot, offers[slot].id, 0);
+            resolvingTimeout = false;
+            startNextRound();
         }
     }
+
+    /** One authoritative deadline for every outstanding offer in this party round. */
+    public float choiceSecondsLeft() { return choiceSecondsLeft; }
 
     /** Only a player's current offer can be consumed, once. The host supplies the slot. */
     public boolean choose(int slot, int offerId, int optionIndex) {
@@ -155,14 +169,17 @@ public final class PartyProgression {
         if (!available(world.players[slot], upgrade)) {
             // External stat/hero changes invalidate an old selection without silently choosing another skill.
             offer.id = newOfferId();
-            if (!populateOptions(slot)) { offer.pending = false; applied[slot] = level - 1; }
+            if (!populateOptions(slot)) {
+                offer.pending = false; applied[slot] = level - 1;
+                startNextRound();
+            }
             return false;
         }
         apply(world.players[slot], upgrade);
         ranks[slot][upgrade.ordinal()]++;
         applied[slot]++;
         offer.pending = false; offer.secondsLeft = 0;
-        startNextOffer(slot);
+        startNextRound();
         return true;
     }
 
@@ -218,6 +235,19 @@ public final class PartyProgression {
         if (shown == 0) return "No upgrades";
         if (omitted > 0) summary.append(" +").append(omitted).append(" more");
         return summary.toString();
+    }
+
+    private boolean hasPendingOffers() {
+        for (Offer offer : offers) if (offer.pending) return true;
+        return false;
+    }
+
+    /** Everyone finishes the current round before any queued choice gets its fresh thirty seconds. */
+    private void startNextRound() {
+        if (resolvingTimeout || hasPendingOffers()) return;
+        choiceSecondsLeft = 0;
+        for (int slot = 0; slot < offers.length; slot++) startNextOffer(slot);
+        if (hasPendingOffers()) choiceSecondsLeft = CHOICE_SECONDS;
     }
 
     private void startNextOffer(int slot) {

@@ -87,6 +87,7 @@ class PartyProgressionTest {
         assertEquals(6, progression.foundationCount(1));
         assertFalse(progression.offers[1].pending);
         var foundation = progression.foundationSkills(1);
+        finishChoices(progression);
         progression.addXp(progression.xpToNext - progression.xp);
         var offer = progression.offers[1];
         assertTrue(offer.pending); assertFalse(offer.catchUp);
@@ -101,6 +102,7 @@ class PartyProgressionTest {
     @Test void reconnectPreservesBuildPersonalOfferAndClockWhileRemovalStartsWithDefaults() {
         ArenaWorld world = solo(); PartyProgression progression = world.progression;
         progression.addXp(48); world.activatePlayer(1); // Level five defaults.
+        finishChoices(progression);
         progression.addXp(progression.xpToNext - progression.xp);
         int id = progression.offers[1].id;
         String summary = progression.foundationSummary(1);
@@ -123,6 +125,7 @@ class PartyProgressionTest {
         assertFalse(progression.choose(1, id, 0));
         assertEquals(5, progression.appliedUpgradeCount(1));
         assertEquals(world.equipment.maxHealth(world.players[1]), world.players[1].health);
+        finishChoices(progression);
         progression.addXp(progression.xpToNext - progression.xp);
         assertTrue(progression.offers[1].id > id);
         progression.reset();
@@ -136,6 +139,7 @@ class PartyProgressionTest {
         world.activatePlayer(1);
         assertEquals(3, world.equipment.appliedCount(1));
         assertFalse(world.equipment.offers[1].pending);
+        finishChoices(progression);
         progression.addXp(progression.xpToNext - progression.xp);
         assertTrue(progression.offers[1].pending);
         assertFalse(progression.offers[1].catchUp);
@@ -199,17 +203,20 @@ class PartyProgressionTest {
         assertEquals(0, progression.rank(1, PartyProgression.Upgrade.POWER));
     }
 
-    @Test void thirtySecondTimeoutAppliesOnlyFirstChoiceAndKeepsCombatRunning() {
+    @Test void thirtySecondTimeoutAppliesOnlyFirstChoiceAndResumesCombat() {
         ArenaWorld world = duo();
         PartyProgression progression = world.progression;
         progression.addXp(6);
         int oldId = progression.offers[0].id;
         progression.update(29f);
         assertEquals(1f, progression.offers[0].secondsLeft, .001f);
+        assertEquals(1f, progression.choiceSecondsLeft(), .001f);
+        assertEquals(progression.offers[0].secondsLeft, progression.offers[1].secondsLeft);
         assertEquals(1f, world.players[0].damageMultiplier);
         progression.update(1f);
         assertFalse(progression.offers[0].pending);
         assertFalse(progression.offers[1].pending);
+        assertEquals(0, progression.choiceSecondsLeft());
         assertEquals(1.25f, world.players[0].damageMultiplier);
         assertEquals(1.25f, world.players[1].damageMultiplier);
         assertFalse(progression.choose(0, oldId, 0));
@@ -228,14 +235,53 @@ class PartyProgressionTest {
         assertEquals(firstId, progression.offers[0].id);
         assertEquals(25f, progression.offers[0].secondsLeft);
         assertTrue(progression.choose(0, firstId, 0));
-        assertEquals(3, progression.offers[0].level);
-        assertEquals(30f, progression.offers[0].secondsLeft);
-        assertNotEquals(firstId, progression.offers[0].id);
+        assertFalse(progression.offers[0].pending, "An early chooser waits for the other current choice");
+        assertEquals(25f, progression.choiceSecondsLeft());
         assertEquals(otherId, progression.offers[1].id);
         progression.update(100f);
-        assertEquals(4, progression.offers[0].level);
+        assertEquals(3, progression.offers[0].level);
         assertEquals(3, progression.offers[1].level);
-        assertEquals(30f, progression.offers[0].secondsLeft);
+        assertEquals(1, progression.appliedUpgradeCount(0));
+        assertEquals(1, progression.appliedUpgradeCount(1), "A long delta resolves only the current round");
+        assertNotEquals(firstId, progression.offers[0].id);
+        assertEquals(30f, progression.choiceSecondsLeft());
+        assertEquals(30f, progression.offers[0].secondsLeft); assertEquals(30f, progression.offers[1].secondsLeft);
+        assertTrue(progression.choose(0, progression.offers[0].id, 0));
+        assertFalse(progression.offers[0].pending);
+        assertTrue(progression.choose(1, progression.offers[1].id, 0));
+        assertEquals(4, progression.offers[0].level); assertEquals(4, progression.offers[1].level);
+        assertEquals(30f, progression.choiceSecondsLeft());
+    }
+
+    @Test void choosingEarlyNeverRestartsTheSharedClockAndTimeoutOnlyDefaultsUnansweredOffers() {
+        ArenaWorld world = duo(); var progression = world.progression;
+        progression.addXp(6); progression.update(5);
+        int otherId = progression.offers[1].id;
+        var personal = progression.offers[0].options[1];
+        assertTrue(progression.choose(0, progression.offers[0].id, 1));
+        assertEquals(25, progression.choiceSecondsLeft());
+        progression.update(2);
+        assertEquals(23, progression.choiceSecondsLeft());
+        assertEquals(23, progression.offers[1].secondsLeft); assertEquals(otherId, progression.offers[1].id);
+        progression.update(23);
+        assertEquals(1, progression.rank(0, personal));
+        assertEquals(1, progression.appliedUpgradeCount(0)); assertEquals(1, progression.appliedUpgradeCount(1));
+        assertFalse(world.levelUpPending()); assertEquals(0, progression.choiceSecondsLeft());
+    }
+
+    @Test void aNewEntitlementDuringAnOpenRoundWaitsForItsOwnFullPartyWindow() {
+        ArenaWorld world = solo(); var progression = world.progression;
+        progression.addXp(6); progression.update(5);
+        int hostId = progression.offers[0].id;
+        world.activatePlayer(1); // All earlier ranks are defaults, so this phone owes no current choice.
+        progression.addXp(10);
+        assertFalse(progression.offers[1].pending, "Do not expose a new choice with only25seconds left");
+        assertEquals(25, progression.choiceSecondsLeft()); assertEquals(hostId, progression.offers[0].id);
+        assertTrue(progression.choose(0, hostId, 0));
+        assertTrue(progression.offers[0].pending); assertTrue(progression.offers[1].pending);
+        assertEquals(3, progression.offers[0].level); assertEquals(3, progression.offers[1].level);
+        assertEquals(30, progression.choiceSecondsLeft());
+        assertEquals(30, progression.offers[0].secondsLeft); assertEquals(30, progression.offers[1].secondsLeft);
     }
 
     @Test void lateJoinReceivesDefaultsAndExistingParticipantKeepsPersonalRanksOnReconnect() {
@@ -496,10 +542,18 @@ class PartyProgressionTest {
     }
 
     private static void selectFixture(PartyProgression progression, int slot, PartyProgression.Upgrade upgrade) {
-        if (!progression.offers[slot].pending) progression.addXp(progression.xpToNext - progression.xp);
+        if (!progression.offers[slot].pending) {
+            finishChoices(progression);
+            progression.addXp(progression.xpToNext - progression.xp);
+        }
         PartyProgression.Offer offer = progression.offers[slot];
         offer.options[0] = upgrade;
         assertTrue(progression.choose(slot, offer.id, 0), "Fixture upgrade " + upgrade);
+    }
+    private static void finishChoices(PartyProgression progression) {
+        while (progression.offers[0].pending || progression.offers[1].pending)
+            for (int slot = 0; slot < 2; slot++)
+                if (progression.offers[slot].pending) assertTrue(progression.choose(slot, progression.offers[slot].id, 0));
     }
     private static void assertOffered(PartyProgression progression, int slot, PartyProgression.Upgrade upgrade) {
         for (PartyProgression.Upgrade option : progression.offers[slot].options) if (option == upgrade) return;

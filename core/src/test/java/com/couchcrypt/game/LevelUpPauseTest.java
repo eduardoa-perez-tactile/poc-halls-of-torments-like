@@ -67,13 +67,13 @@ class LevelUpPauseTest {
         ArenaWorld world = solo(); world.progression.addXp(16); // Two earned levels in the short fixture.
         var first = world.progression.offers[0];
         int firstId = first.id; var defaultUpgrade = first.options[0];
-        first.secondsLeft = ArenaWorld.STEP;
+        world.progression.update(PartyProgression.CHOICE_SECONDS - ArenaWorld.STEP);
         world.update(ArenaWorld.STEP);
         assertEquals(1, world.progression.rank(0, defaultUpgrade));
         assertEquals(1, world.progression.appliedUpgradeCount(0));
         assertTrue(world.levelUpPending()); assertTrue(first.id > firstId);
         assertEquals(30, first.secondsLeft); assertEquals(0, world.elapsed);
-        first.secondsLeft = ArenaWorld.STEP;
+        world.progression.update(PartyProgression.CHOICE_SECONDS - ArenaWorld.STEP);
         world.update(ArenaWorld.STEP);
         assertEquals(2, world.progression.appliedUpgradeCount(0));
         assertFalse(world.levelUpPending()); assertEquals(0, world.elapsed);
