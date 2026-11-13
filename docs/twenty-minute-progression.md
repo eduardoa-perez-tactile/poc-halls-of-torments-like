@@ -9,7 +9,7 @@ The normal arena uses a rising shared XP curve with the existing level-20 cap: a
 | 14 minutes | 14–15 | 1,016–1,166 |
 | 20 minutes | 17–20 | 1,481–1,991 |
 
-These are tuning targets, not measured playtest outcomes. The authored schedule can generate roughly 2,050 solo XP if enemies are killed and souls collected promptly; missed kills/pickups lower the final level. Later costs rise from 100 to 175 souls, intended to space choices roughly a minute or more apart rather than keep reopening the chooser. Efficient play can reach the cap near the final encounter, while less efficient collection leaves late upgrades available. No timer grants XP automatically.
+These are tuning targets, not measured playtest outcomes. The authored schedule can generate roughly 2,025 solo XP before spawn skips, pool caps, phase-transition delays and missed pickups; missed kills/pickups lower the final level. Later costs rise from 100 to 175 souls, intended to space choices roughly a minute or more apart rather than keep reopening the chooser. Reaching the cap near the final encounter requires nearly complete throughput and collection; levels 17–19 are more plausible with losses, pending playtesting. No timer grants XP automatically.
 
 Souls are shared once, not duplicated per player. The encounter implementation normalizes co-op drops against its faster reinforcement cadence, carrying fractional rewards so repeated small drops do not lose all their value. Existing pickups retain their value when another player joins.
 

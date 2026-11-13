@@ -51,7 +51,7 @@ Select **Play** using the remote. A phone scans the QR and gets a slot automatic
 - A disconnected slot is held for 45 seconds; the same browser can reclaim it using its stored token. The remote can free a slot immediately.
 - Tokens are scoped to this host and app session. A duplicate tab cannot take over an active controller. A new app process creates a fresh session; scan again after restarting the app.
 - The TV remote owns shared menus and player removal. Phones cannot start the game or send shared UI actions; each phone can choose its own offered level-up upgrade.
-- **Start Solo** unlocks at one connection; **Start Co-op** appears at two. They start three minutes of escalating waves followed by the final boss. Phones control movement and dodge; attacks automatically target nearby enemies.
+- **Start Solo** unlocks at one connection; **Start Co-op** appears at two. They start twenty minutes of escalating waves followed by the final boss. Phones control movement and dodge; attacks automatically target nearby enemies.
 - Press Back in the session to open **Pause**: Resume, Invite Player 2, Restart Run, or Return to Lobby. When both places are occupied, **Manage Party** replaces Invite Player 2. Invite/Manage shows the QR and player slots without leaving the session; Back returns to Pause. Returning to the lobby requires confirmation and keeps the party connected.
 - A disconnected participant pauses the world. Pause names the missing Player I/II and shows the remaining 45-second reservation. Reconnect that phone, or use its direct **Remove Player** action and confirm to release its place. Resume becomes available when the remaining participants are connected; the run and upgrade timers stay frozen throughout recovery.
 - Player 2 can join in the lobby or later from **Pause -> Invite Player 2**. The normal join area shows only the QR and a Same Wi-Fi reminder; address/port troubleshooting is under Network.
@@ -64,7 +64,7 @@ The gameplay artwork is temporary pending a separate isometric art pass; the cur
 
 - Choose **Warden** (sword cone) or **Ranger** (bow) on each TV lobby player card. Either hero works in solo; each participant keeps that hero for the run.
 - Open **Info** from character selection to read the hero's short bio, base stats and all learnable skills. The TV remote browses this reference; closing it preserves your selected hero.
-- Survive three authored phases: ghoul swarms, brute pressure and cultist formations with fast wraith escorts. Short reinforcement breathers create room to recover; existing enemies keep fighting. Elite checkpoints reward souls and healing. At three minutes, defeat **the Hollow Sovereign** to win; reaching zero on the wave timer does not grant victory.
+- Survive twelve authored phases across twenty minutes: early swarm/hunt introductions, mixed middle encounters, and late siege/onslaught combinations. Short reinforcement breathers create room to recover; existing enemies keep fighting. Five elite checkpoints reward souls and healing. At twenty minutes, **the Hollow Sovereign** arrives; kill it to win. Reaching zero on the wave timer does not grant victory.
 - One connected player gets a full-screen view. Two get independent vertical split-screen cameras in the same world.
 - Invite a second phone from Pause; it enters beside its companion when resumed.
 - The approved compact TV HUD uses forged-rim health orbs, health/XP rails, shared party level, up to five acquired skill emblems with current ranks and a +N overflow count, plus Dodge readiness. Gold/teal identify the two players. One-line notifications and a slim conditional boss lane leave combat visible. Ground warnings and slow projectile spreads signal boss attacks; below half health it enrages.
@@ -75,7 +75,7 @@ The gameplay artwork is temporary pending a separate isometric art pass; the cur
 - Victory and Defeat use their approved painted scenes and separate title art, with live time/level/kill summaries. The remote selects Play/Try Again, Return to Lobby, or Run Details for larger unboxed hero illustrations, damage/revive highlights, skill effect summaries and ranks.
 - Short original sound cues cover combat, pickups, levels and outcomes. Toggle Sound in Settings. Regenerate the compact mono WAV assets with `python3 scripts/GenerateCombatAudio.py`.
 
-The default run remains a three-minute slice. `ArenaTimeline.TWENTY_MINUTES` provides an explicit extensible twenty-minute schedule for future work; it is not a menu option or a balanced twenty-minute content milestone.
+Normal sessions use `ArenaTimeline.TWENTY_MINUTES`; `ArenaTimeline.SHORT` remains a three-minute development fixture. The party caps at level 20 (19 personal choices). Intended level targets are 4–5 at three minutes, 9–10 at eight, 14–15 at fourteen, and 17–20 before the boss, depending on clear speed and collection. These are tuning targets for user playtesting, not proven balance. See [progression tuning](docs/twenty-minute-progression.md).
 
 ## Focused verification
 
@@ -88,7 +88,7 @@ The small test suite covers slot allocation, reconnect reservations/expiry, dupl
 
 The focused tests cover simulation invariants and input/protocol safety. User playtesting covers combat feel, difficulty, two physical phones, and camera scanning. No automated full-round playthrough is required.
 
-F3 toggles desktop diagnostics. With profiling enabled, F4 previews the boss HUD, F6 starts the actual boss encounter, and F7/F8 show sample Victory/Defeat layouts for design review. F5 grants the XP needed for a level-up. In a two-player session, F9 first places a fallen Player II off-screen, then brings them into revival range for a brief UI check. `--profile` (or the Android `profile` intent extra) reports frame intervals, CPU submission times, Java heap, GPU texture bytes, retained CPU pixmaps, and draw calls. These are brief diagnostics, not a guarantee of performance on every TV. See [performance notes](docs/performance.md).
+F3 toggles desktop diagnostics. With profiling enabled, F4 previews the boss HUD, F6 starts the actual boss encounter, and F7/F8 show sample Victory/Defeat layouts for design review. F5 grants the XP needed for a level-up. F10 previews a real level-12 build; F11 jumps directly to a bounded late-run encounter with real level-18 builds for brief performance checks. In a two-player session, F9 first places a fallen Player II off-screen, then brings them into revival range for a brief UI check. `--profile` (or the Android `profile` intent extra) reports frame intervals, CPU submission times, Java heap, GPU texture bytes, retained CPU pixmaps, and draw calls. These are brief diagnostics, not a guarantee of performance on every TV. See [performance notes](docs/performance.md).
 
 Outcome backgrounds decode and downsample on one bounded worker. Prewarmed titles and live result controls appear immediately over the existing backdrop; the approved outcome scene replaces it when ready. GPU upload remains on the render thread, only the active outcome texture is retained, and leaving results cancels pending work. The performance notes describe the remaining measurement limits.
 
