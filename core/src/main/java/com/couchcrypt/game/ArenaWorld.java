@@ -1,268 +1,380 @@
 package com.couchcrypt.game;
 
-/** Fixed-step, allocation-free combat simulation. Coordinates are independent of rendering. */
+/** A bounded, fixed-step shared world. Presentation and sockets never run inside its tick. */
 public final class ArenaWorld {
-    public static final float HALF_WIDTH = 1200f, HALF_HEIGHT = 900f, ROUND_SECONDS = 120f;
+    public static final float HALF_WIDTH = 1200f, HALF_HEIGHT = 900f, ROUND_SECONDS = 180f;
     public static final int MAX_ENEMIES = 64, MAX_BOLTS = 96, MAX_PICKUPS = 96;
+    public static final int MAX_SHOTS = 96, MAX_HAZARDS = 12, MAX_EFFECTS = 96;
     public static final float STEP = 1f / 60f;
-    private static final float WALK_SPEED = 180f, DODGE_DURATION = .22f, DODGE_COOLDOWN = 2.4f;
-    private static final float PLAYER_RADIUS = 20f, ENEMY_RADIUS = 20f;
+    private static final float DODGE_DURATION = .22f, DODGE_COOLDOWN = 2.4f, PLAYER_RADIUS = 20f;
     public enum Outcome { RUNNING, VICTORY, DEFEAT }
+    public enum Hero { WARDEN, RANGER }
+    public enum EnemyKind { GHOUL, WRAITH, BRUTE, CULTIST, BOSS }
+    public enum EffectKind { SLASH, HIT, DEATH, AURA, LIGHTNING }
 
     public Outcome outcome;
     public float elapsed;
-    public int kills, souls, activeEnemies;
-    public final Player[] players = { new Player(0), new Player(1) };
+    public int kills, souls, activeEnemies, wave, elitesKilled, bossPhase, runSeed;
+    public boolean bossSpawned, bossDefeated;
+    public Enemy boss;
+    public int swordSwings, arrowsFired, enemyDeaths, pickupsCollected, heroHits;
+    public final Player[] players = {new Player(0), new Player(1)};
     public final Enemy[] enemies = new Enemy[MAX_ENEMIES];
     public final Bolt[] bolts = new Bolt[MAX_BOLTS];
     public final Pickup[] pickups = new Pickup[MAX_PICKUPS];
+    public final Shot[] shots = new Shot[MAX_SHOTS];
+    public final Hazard[] hazards = new Hazard[MAX_HAZARDS];
+    public final Effect[] effects = new Effect[MAX_EFFECTS];
     public final PartyProgression progression;
     private final float[] inputX = new float[2], inputY = new float[2];
     private final boolean[] pendingDodge = new boolean[2];
     private float accumulator, spawnCountdown;
-    private int randomState;
+    private int randomState, runNumber, eliteMask;
 
     public ArenaWorld() {
         for (int i = 0; i < enemies.length; i++) enemies[i] = new Enemy();
         for (int i = 0; i < bolts.length; i++) bolts[i] = new Bolt();
         for (int i = 0; i < pickups.length; i++) pickups[i] = new Pickup();
+        for (int i = 0; i < shots.length; i++) shots[i] = new Shot();
+        for (int i = 0; i < hazards.length; i++) hazards[i] = new Hazard();
+        for (int i = 0; i < effects.length; i++) effects[i] = new Effect();
         progression = new PartyProgression(this);
         reset();
     }
 
-    /** Clears the round; callers activate the connected slots explicitly. */
     public void reset() {
-        outcome = Outcome.RUNNING;
-        elapsed = accumulator = 0f;
-        kills = souls = activeEnemies = 0;
+        outcome = Outcome.RUNNING; elapsed = accumulator = 0;
+        kills = souls = activeEnemies = elitesKilled = eliteMask = 0;
+        wave = bossPhase = 1; bossSpawned = bossDefeated = false; boss = null;
+        swordSwings = arrowsFired = enemyDeaths = pickupsCollected = heroHits = 0;
         spawnCountdown = .65f;
-        randomState = 0x5a17c9e3;
+        runSeed = 0x5a17c9e3 ^ (++runNumber * 0x45d9f3b); randomState = runSeed;
         progression.reset();
         for (Player p : players) {
-            p.active = p.alive = false;
-            p.x = p.y = p.walkTime = p.reviveProgress = 0f;
-            p.maxHealth = p.health = 100f;
-            p.damageMultiplier = p.attackRateMultiplier = p.moveMultiplier = p.dodgeCooldownMultiplier = 1f;
-            p.dodgeCooldown = p.dodgeTime = p.invulnerable = p.attackCooldown = 0f;
-            p.facingX = 0f; p.facingY = -1f; p.kills = 0;
-            p.dodgeX = 0f; p.dodgeY = -1f;
-            inputX[p.slot] = inputY[p.slot] = 0f;
-            pendingDodge[p.slot] = false;
+            p.active = p.alive = false; p.x = p.y = p.walkTime = p.reviveProgress = 0;
+            resetBuild(p); p.dodgeCooldown = p.dodgeTime = p.invulnerable = p.attackCooldown = 0;
+            p.facingX = 0; p.facingY = -1; p.kills = p.revives = 0;
+            p.damageDealt = p.damageTaken = 0; p.dodgeX = 0; p.dodgeY = -1;
+            inputX[p.slot] = inputY[p.slot] = 0; pendingDodge[p.slot] = false;
         }
         for (Enemy e : enemies) e.active = false;
         for (Bolt b : bolts) b.active = false;
         for (Pickup p : pickups) p.active = false;
+        for (Shot s : shots) s.active = false;
+        for (Hazard h : hazards) h.active = false;
+        for (Effect e : effects) e.active = false;
+    }
+
+    private void resetBuild(Player p) {
+        p.maxHealth = p.health = 100;
+        p.damageMultiplier = p.attackRateMultiplier = p.moveMultiplier = p.dodgeCooldownMultiplier = 1;
+        p.cleaveMultiplier = p.pickupMultiplier = 1; p.critChance = 0;
+        p.projectileCount = 1; p.pierce = p.auraLevel = p.stormLevel = 0;
+        p.auraCooldown = p.stormCooldown = 0;
+    }
+
+    public void setHero(int slot, Hero hero) {
+        Player p = player(slot);
+        if (p.active) throw new IllegalStateException("Heroes can only change before joining a run");
+        if (hero == null) throw new IllegalArgumentException("Hero is required");
+        p.hero = hero;
     }
 
     public void activatePlayer(int slot) {
-        Player p = player(slot);
-        if (p.active) return;
+        Player p = player(slot); if (p.active) return;
         Player ally = players[1 - slot];
-        p.x = ally.active && ally.alive ? clamp(ally.x + (slot == 1 ? 64f : -64f), -HALF_WIDTH + PLAYER_RADIUS, HALF_WIDTH - PLAYER_RADIUS) : 0f;
-        p.y = ally.active && ally.alive ? ally.y : 0f;
-        p.active = p.alive = true;
-        p.health = p.maxHealth;
-        p.dodgeCooldown = p.dodgeTime = p.attackCooldown = p.reviveProgress = 0f;
-        p.invulnerable = 1f;
-        inputX[slot] = inputY[slot] = 0f;
-        pendingDodge[slot] = false;
+        p.x = ally.active && ally.alive ? clamp(ally.x + (slot == 1 ? 64 : -64), -HALF_WIDTH + 20, HALF_WIDTH - 20) : 0;
+        p.y = ally.active && ally.alive ? ally.y : 0;
+        p.active = p.alive = true; p.health = p.maxHealth;
+        p.dodgeCooldown = p.dodgeTime = p.attackCooldown = p.reviveProgress = 0;
+        p.invulnerable = 1; inputX[slot] = inputY[slot] = 0; pendingDodge[slot] = false;
         progression.activatePlayer(slot);
     }
 
     public void deactivatePlayer(int slot) {
-        Player p = player(slot);
-        p.active = p.alive = false;
-        p.damageMultiplier = p.attackRateMultiplier = p.moveMultiplier = p.dodgeCooldownMultiplier = 1f;
-        p.maxHealth = p.health = 100f;
-        progression.deactivatePlayer(slot);
-        inputX[slot] = inputY[slot] = 0f;
-        pendingDodge[slot] = false;
+        Player p = player(slot); p.active = p.alive = false; resetBuild(p);
+        p.kills = p.revives = 0; p.damageDealt = p.damageTaken = 0;
+        progression.deactivatePlayer(slot); inputX[slot] = inputY[slot] = 0; pendingDodge[slot] = false;
     }
 
-    /** Pausing must also discard a press waiting for the next fixed tick. */
     public void clearInputs() {
         for (int i = 0; i < 2; i++) { inputX[i] = inputY[i] = 0; pendingDodge[i] = false; }
     }
 
     public void setInput(int slot, float x, float y, boolean dodge) {
         player(slot);
-        if (!Float.isFinite(x) || !Float.isFinite(y)) { x = 0f; y = 0f; }
-        x = clamp(x, -1f, 1f); y = clamp(y, -1f, 1f);
-        float lengthSquared = x * x + y * y;
-        if (lengthSquared > 1f) {
-            float inverse = 1f / (float) Math.sqrt(lengthSquared);
-            x *= inverse; y *= inverse;
-        }
-        inputX[slot] = x; inputY[slot] = y;
-        pendingDodge[slot] |= dodge;
+        if (!Float.isFinite(x) || !Float.isFinite(y)) { x = y = 0; }
+        x = clamp(x, -1, 1); y = clamp(y, -1, 1);
+        float length = x * x + y * y;
+        if (length > 1) { float inverse = 1f / (float) Math.sqrt(length); x *= inverse; y *= inverse; }
+        inputX[slot] = x; inputY[slot] = y; pendingDodge[slot] |= dodge;
     }
 
     public void update(float delta) {
-        if (outcome != Outcome.RUNNING || !Float.isFinite(delta) || delta <= 0f) return;
-        boolean anyoneActive = false;
-        for (Player p : players) anyoneActive |= p.active;
-        if (!anyoneActive) return;
+        if (outcome != Outcome.RUNNING || !Float.isFinite(delta) || delta <= 0) return;
+        if (!players[0].active && !players[1].active) return;
         accumulator += Math.min(delta, .1f);
         while (accumulator + .000001f >= STEP && outcome == Outcome.RUNNING) {
-            accumulator = Math.max(0f, accumulator - STEP);
-            tick();
+            accumulator = Math.max(0, accumulator - STEP); tick();
         }
     }
 
-    public float timeRemaining() { return Math.max(0f, ROUND_SECONDS - elapsed); }
+    public float timeRemaining() { return Math.max(0, ROUND_SECONDS - elapsed); }
 
     private void tick() {
-        elapsed = Math.min(ROUND_SECONDS, elapsed + STEP);
+        elapsed += STEP; wave = elapsed < 60 ? 1 : elapsed < 120 ? 2 : 3;
+        for (Effect e : effects) if (e.active) { e.ttl -= STEP; if (e.ttl <= 0) e.active = false; }
         for (Player p : players) updatePlayer(p);
-        updateEnemies();
-        updateBolts();
-        updatePickups();
-        updateRevival();
+        updateEnemies(); updateBolts(); updateShots(); updateHazards(); updatePickups(); updateRevival();
         progression.update(STEP);
-        boolean living = false;
-        for (Player p : players) living |= p.active && p.alive;
+        boolean living = false; for (Player p : players) living |= p.active && p.alive;
         if (!living) { outcome = Outcome.DEFEAT; return; }
-        if (elapsed >= ROUND_SECONDS - .0001f) { elapsed = ROUND_SECONDS; outcome = Outcome.VICTORY; return; }
+        if (bossDefeated) { outcome = Outcome.VICTORY; return; }
+        if (elapsed >= ROUND_SECONDS - .0001f && !bossSpawned) debugStartBoss();
+        if (!bossSpawned) {
+            if (elapsed >= 60 && (eliteMask & 1) == 0) { spawnElite(); eliteMask |= 1; }
+            if (elapsed >= 120 && (eliteMask & 2) == 0) { spawnElite(); eliteMask |= 2; }
+        }
         spawnCountdown -= STEP;
-        if (spawnCountdown <= 0f) {
+        if (spawnCountdown <= 0) {
             spawnEnemy();
-            spawnCountdown += Math.max(.23f, 1.15f - elapsed * .007f);
+            spawnCountdown += bossSpawned ? 2.5f : Math.max(.32f, 1.05f - elapsed * .0036f);
         }
     }
 
     private void updatePlayer(Player p) {
-        p.dodgeCooldown = Math.max(0f, p.dodgeCooldown - STEP);
-        p.invulnerable = Math.max(0f, p.invulnerable - STEP);
-        p.attackCooldown = Math.max(0f, p.attackCooldown - STEP);
-        boolean dodge = pendingDodge[p.slot];
-        pendingDodge[p.slot] = false;
+        p.dodgeCooldown = Math.max(0, p.dodgeCooldown - STEP);
+        p.invulnerable = Math.max(0, p.invulnerable - STEP);
+        p.attackCooldown = Math.max(0, p.attackCooldown - STEP);
+        p.auraCooldown = Math.max(0, p.auraCooldown - STEP); p.stormCooldown = Math.max(0, p.stormCooldown - STEP);
+        boolean dodge = pendingDodge[p.slot]; pendingDodge[p.slot] = false;
         if (!p.active || !p.alive) return;
-        float x = inputX[p.slot], y = inputY[p.slot];
-        float magnitudeSquared = x * x + y * y;
-        if (magnitudeSquared > .0025f) {
-            float inverse = 1f / (float) Math.sqrt(magnitudeSquared);
-            p.facingX = x * inverse; p.facingY = y * inverse;
+        float x = inputX[p.slot], y = inputY[p.slot], magnitude = x * x + y * y;
+        if (magnitude > .0025f) {
+            float inverse = 1f / (float) Math.sqrt(magnitude); p.facingX = x * inverse; p.facingY = y * inverse;
         }
-        if (dodge && p.dodgeCooldown <= 0f && p.dodgeTime <= 0f) {
-            p.dodgeTime = DODGE_DURATION;
-            p.dodgeCooldown = DODGE_COOLDOWN * p.dodgeCooldownMultiplier;
-            p.invulnerable = Math.max(p.invulnerable, DODGE_DURATION);
-            p.dodgeX = p.facingX; p.dodgeY = p.facingY;
+        if (dodge && p.dodgeCooldown <= 0 && p.dodgeTime <= 0) {
+            p.dodgeTime = DODGE_DURATION; p.dodgeCooldown = DODGE_COOLDOWN * p.dodgeCooldownMultiplier;
+            p.invulnerable = Math.max(p.invulnerable, DODGE_DURATION); p.dodgeX = p.facingX; p.dodgeY = p.facingY;
         }
-        if (p.dodgeTime > 0f) {
-            float duration = Math.min(STEP, p.dodgeTime);
-            p.x += p.dodgeX * WALK_SPEED * p.moveMultiplier * 3f * duration;
-            p.y += p.dodgeY * WALK_SPEED * p.moveMultiplier * 3f * duration;
-            p.dodgeTime = Math.max(0f, p.dodgeTime - STEP);
-            p.walkTime += STEP * 2f;
+        float speed = (p.hero == Hero.RANGER ? 198 : 180) * p.moveMultiplier;
+        if (p.dodgeTime > 0) {
+            float duration = Math.min(STEP, p.dodgeTime); p.x += p.dodgeX * speed * 3 * duration;
+            p.y += p.dodgeY * speed * 3 * duration; p.dodgeTime = Math.max(0, p.dodgeTime - STEP); p.walkTime += STEP * 2;
         } else {
-            p.x += x * WALK_SPEED * p.moveMultiplier * STEP; p.y += y * WALK_SPEED * p.moveMultiplier * STEP;
-            if (magnitudeSquared > .0025f) p.walkTime += STEP;
+            p.x += x * speed * STEP; p.y += y * speed * STEP; if (magnitude > .0025f) p.walkTime += STEP;
         }
-        p.x = clamp(p.x, -HALF_WIDTH + PLAYER_RADIUS, HALF_WIDTH - PLAYER_RADIUS);
-        p.y = clamp(p.y, -HALF_HEIGHT + PLAYER_RADIUS, HALF_HEIGHT - PLAYER_RADIUS);
-        if (p.attackCooldown <= 0f) fire(p);
+        p.x = clamp(p.x, -HALF_WIDTH + 20, HALF_WIDTH - 20); p.y = clamp(p.y, -HALF_HEIGHT + 20, HALF_HEIGHT - 20);
+        if (p.attackCooldown <= 0) attack(p);
+        if (p.auraLevel > 0 && p.auraCooldown <= 0) aura(p);
+        if (p.stormLevel > 0 && p.stormCooldown <= 0) storm(p);
     }
 
-    private void fire(Player p) {
-        Enemy target = null;
-        float nearest = 700f * 700f;
-        for (Enemy e : enemies) {
-            if (!e.active) continue;
-            float dx = e.x - p.x, dy = e.y - p.y, distance = dx * dx + dy * dy;
-            if (distance < nearest) { nearest = distance; target = e; }
-        }
+    private void attack(Player p) {
+        float reach = p.hero == Hero.WARDEN ? 160 * p.cleaveMultiplier : 800;
+        Enemy target = nearest(p.x, p.y, reach, 0);
         if (target == null) return;
-        for (Bolt b : bolts) {
-            if (b.active) continue;
-            float dx = target.x - p.x, dy = target.y - p.y;
-            float length = (float) Math.sqrt(Math.max(.001f, dx * dx + dy * dy));
-            b.active = true; b.x = p.x; b.y = p.y;
-            b.vx = dx / length * 680f; b.vy = dy / length * 680f;
-            b.ttl = 1.15f; b.owner = p.slot; b.damage = 12f * p.damageMultiplier;
+        float dx = target.x - p.x, dy = target.y - p.y, length = length(dx, dy);
+        p.facingX = dx / length; p.facingY = dy / length;
+        if (p.hero == Hero.WARDEN) {
+            float halfArcCos = .5735764f; // cos(55 degrees)
+            Effect fx = effect(EffectKind.SLASH, p.x, p.y, p.slot, .18f);
+            if (fx != null) { fx.angle = (float) Math.atan2(dy, dx); fx.radius = reach; fx.sweep = 1.9198622f; }
+            swordSwings++;
+            for (Enemy e : enemies) {
+                if (!e.active) continue;
+                float ex = e.x - p.x, ey = e.y - p.y, distance = length(ex, ey);
+                if (distance > reach + e.radius || (ex * p.facingX + ey * p.facingY) / distance < halfArcCos) continue;
+                hit(e, critical(p, 28 * p.damageMultiplier), p.slot);
+                if (e.active) {
+                    e.stunTime = Math.max(e.stunTime, e.kind == EnemyKind.BOSS ? .02f : .16f);
+                    float knockback = e.kind == EnemyKind.BOSS ? 3 : e.kind == EnemyKind.BRUTE ? 12 : 25;
+                    e.x = clamp(e.x + ex / distance * knockback, -HALF_WIDTH + e.radius, HALF_WIDTH - e.radius);
+                    e.y = clamp(e.y + ey / distance * knockback, -HALF_HEIGHT + e.radius, HALF_HEIGHT - e.radius);
+                }
+            }
+            p.attackCooldown = .7f / p.attackRateMultiplier;
+        } else {
+            int count = Math.max(1, Math.min(5, p.projectileCount));
+            float angle = (float) Math.atan2(dy, dx);
+            for (int i = 0; i < count; i++) {
+                Bolt b = freeBolt(); if (b == null) break;
+                float direction = angle + (i - (count - 1) * .5f) * .13f;
+                b.active = true; b.x = p.x; b.y = p.y;
+                b.vx = (float) Math.cos(direction) * 760; b.vy = (float) Math.sin(direction) * 760;
+                b.ttl = 1.2f; b.owner = p.slot; b.damage = critical(p, 16 * p.damageMultiplier);
+                b.pierce = Math.max(0, Math.min(3, p.pierce)); b.hitMask = 0; arrowsFired++;
+            }
             p.attackCooldown = .55f / p.attackRateMultiplier;
-            return;
         }
     }
+
+    private void aura(Player p) {
+        p.auraCooldown = .7f; float radius = 100 + 20 * p.auraLevel;
+        Effect fx = effect(EffectKind.AURA, p.x, p.y, p.slot, .24f); if (fx != null) fx.radius = radius;
+        for (Enemy e : enemies) if (e.active && distanceSquared(p.x, p.y, e.x, e.y) <= radius * radius)
+            hit(e, (4 + p.auraLevel * 3) * p.damageMultiplier, p.slot);
+    }
+
+    private void storm(Player p) {
+        Enemy target = nearest(p.x, p.y, 500, 0); if (target == null) return;
+        p.stormCooldown = 2;
+        float x = p.x, y = p.y; long mask = 0;
+        for (int chain = 0; chain < p.stormLevel + 1; chain++) {
+            target = nearest(x, y, chain == 0 ? 500 : 240, mask); if (target == null) break;
+            int index = enemyIndex(target); mask |= 1L << index;
+            Effect fx = effect(EffectKind.LIGHTNING, x, y, p.slot, .2f);
+            if (fx != null) { fx.x2 = target.x; fx.y2 = target.y; }
+            x = target.x; y = target.y; hit(target, (12 + p.stormLevel * 5) * p.damageMultiplier, p.slot);
+        }
+    }
+
+    private float critical(Player p, float damage) { return damage * (random() < p.critChance ? 2 : 1); }
 
     private void updateEnemies() {
         for (Enemy e : enemies) {
             if (!e.active) continue;
-            e.animTime += STEP;
-            e.hitFlash = Math.max(0f, e.hitFlash - STEP);
-            Player target = null;
-            float nearest = Float.MAX_VALUE;
-            for (Player p : players) {
-                if (!p.active || !p.alive) continue;
-                float dx = p.x - e.x, dy = p.y - e.y, distance = dx * dx + dy * dy;
-                if (distance < nearest) { nearest = distance; target = p; }
+            e.animTime += STEP; e.hitFlash = Math.max(0, e.hitFlash - STEP);
+            e.stunTime = Math.max(0, e.stunTime - STEP); e.attackCooldown = Math.max(0, e.attackCooldown - STEP);
+            Player target = nearestPlayer(e.x, e.y); if (target == null) { e.vx = e.vy = 0; continue; }
+            if (e.kind == EnemyKind.BOSS) {
+                bossPhase = e.health <= e.maxHealth * .5f ? 2 : 1;
+                if (e.attackCooldown <= 0) bossAttack(e, target);
+            } else if (e.kind == EnemyKind.CULTIST && e.attackCooldown <= 0) {
+                e.windup = .7f; e.attackCooldown = 2.6f;
             }
-            if (target == null) { e.vx = e.vy = 0f; continue; }
-            float length = (float) Math.sqrt(Math.max(nearest, .001f));
-            float speed = 53f + elapsed * .16f;
-            e.vx = (target.x - e.x) / length * speed;
-            e.vy = (target.y - e.y) / length * speed;
-            if (nearest > 28f * 28f) { e.x += e.vx * STEP; e.y += e.vy * STEP; }
-            for (Player p : players) {
-                if (!p.active || !p.alive || p.invulnerable > 0f) continue;
-                float dx = p.x - e.x, dy = p.y - e.y;
-                if (dx * dx + dy * dy < (PLAYER_RADIUS + ENEMY_RADIUS) * (PLAYER_RADIUS + ENEMY_RADIUS)) {
-                    p.health = Math.max(0f, p.health - 12f);
-                    p.invulnerable = .75f;
-                    if (p.health <= 0f) { p.alive = false; p.dodgeTime = 0f; }
-                }
-            }
+            if (e.windup > 0) {
+                e.windup = Math.max(0, e.windup - STEP); e.vx = e.vy = 0;
+                if (e.windup <= 0 && e.kind == EnemyKind.CULTIST) fireShot(e.x, e.y, target.x - e.x, target.y - e.y, 180, e.damage);
+            } else if (e.stunTime <= 0) moveEnemy(e, target);
+            for (Player p : players) if (p.active && p.alive && distanceSquared(p.x, p.y, e.x, e.y) < square(PLAYER_RADIUS + e.radius))
+                hurt(p, e.damage);
+        }
+    }
+
+    private void moveEnemy(Enemy e, Player target) {
+        float dx = target.x - e.x, dy = target.y - e.y, distance = length(dx, dy);
+        float speed = switch (e.kind) {
+            case WRAITH -> 112; case BRUTE -> 37; case CULTIST -> 48; case BOSS -> bossPhase == 2 ? 56 : 44; default -> 57;
+        };
+        if (e.elite) speed *= 1.15f;
+        float desired = e.kind == EnemyKind.CULTIST ? 300 : e.radius + 18;
+        float direction = distance < desired - 30 && e.kind == EnemyKind.CULTIST ? -1 : distance > desired ? 1 : 0;
+        e.vx = dx / distance * speed * direction; e.vy = dy / distance * speed * direction;
+        e.x = clamp(e.x + e.vx * STEP, -HALF_WIDTH + e.radius, HALF_WIDTH - e.radius);
+        e.y = clamp(e.y + e.vy * STEP, -HALF_HEIGHT + e.radius, HALF_HEIGHT - e.radius);
+    }
+
+    private void bossAttack(Enemy e, Player target) {
+        e.windup = 1f;
+        e.attackCooldown = bossPhase == 2 ? 2.4f : 3.4f;
+        // A marked ground impact plus slow, dodgeable bolts; the boss never teleports on top of players.
+        groundWarning(target.x, target.y, bossPhase == 2 ? 150 : 125, 1f, bossPhase == 2 ? 28 : 22);
+        float angle = (float) Math.atan2(target.y - e.y, target.x - e.x);
+        int count = bossPhase == 2 ? 7 : 5;
+        for (int i = 0; i < count; i++) {
+            float a = angle + (i - (count - 1) * .5f) * .22f;
+            fireShot(e.x, e.y, (float) Math.cos(a), (float) Math.sin(a), bossPhase == 2 ? 165 : 145, 15);
         }
     }
 
     private void updateBolts() {
         for (Bolt b : bolts) {
             if (!b.active) continue;
-            float oldX = b.x, oldY = b.y;
-            b.x += b.vx * STEP; b.y += b.vy * STEP; b.ttl -= STEP;
-            for (Enemy e : enemies) {
-                if (!e.active) continue;
-                float dx = b.x - oldX, dy = b.y - oldY;
-                float segmentLength = dx * dx + dy * dy;
-                float t = segmentLength > 0f ? clamp(((e.x - oldX) * dx + (e.y - oldY) * dy) / segmentLength, 0f, 1f) : 0f;
-                float ex = e.x - (oldX + dx * t), ey = e.y - (oldY + dy * t);
-                if (ex * ex + ey * ey > 25f * 25f) continue;
-                b.active = false;
-                e.health -= b.damage; e.hitFlash = .12f;
-                if (e.health <= 0f) {
-                    e.active = false; activeEnemies = Math.max(0, activeEnemies - 1);
-                    kills++; players[b.owner].kills++;
-                    drop(e.x, e.y, false);
-                    if (kills % 7 == 0) drop(e.x + 14f, e.y, true);
-                }
-                break;
+            float oldX = b.x, oldY = b.y; b.x += b.vx * STEP; b.y += b.vy * STEP; b.ttl -= STEP;
+            for (int i = 0; i < enemies.length; i++) {
+                Enemy e = enemies[i]; long bit = 1L << i;
+                if (!e.active || (b.hitMask & bit) != 0 || segmentDistanceSquared(oldX, oldY, b.x, b.y, e.x, e.y) > square(e.radius + 5)) continue;
+                b.hitMask |= bit; hit(e, b.damage, b.owner);
+                if (b.pierce-- <= 0) { b.active = false; break; }
             }
-            if (b.ttl <= 0f || Math.abs(b.x) > HALF_WIDTH + 50f || Math.abs(b.y) > HALF_HEIGHT + 50f) b.active = false;
+            if (b.ttl <= 0 || Math.abs(b.x) > HALF_WIDTH + 50 || Math.abs(b.y) > HALF_HEIGHT + 50) b.active = false;
         }
     }
 
-    private void drop(float x, float y, boolean healing) {
-        for (Pickup p : pickups) {
-            if (p.active) continue;
-            p.active = true; p.x = x; p.y = y; p.healing = healing; p.value = healing ? 24 : 1;
-            return;
+    private void fireShot(float x, float y, float dx, float dy, float speed, float damage) {
+        for (Shot shot : shots) {
+            if (shot.active) continue;
+            float distance = length(dx, dy); shot.active = true; shot.x = x; shot.y = y;
+            shot.vx = dx / distance * speed; shot.vy = dy / distance * speed;
+            shot.ttl = 5; shot.damage = damage; shot.radius = 10; return;
         }
-        // A full pool retains rewards by merging into an existing pickup of the same type.
-        for (Pickup p : pickups) if (p.healing == healing) { p.value += healing ? 24 : 1; return; }
+    }
+
+    private void updateShots() {
+        for (Shot s : shots) {
+            if (!s.active) continue;
+            float oldX = s.x, oldY = s.y; s.x += s.vx * STEP; s.y += s.vy * STEP; s.ttl -= STEP;
+            for (Player p : players) if (p.active && p.alive && segmentDistanceSquared(oldX, oldY, s.x, s.y, p.x, p.y) <= square(PLAYER_RADIUS + s.radius)) {
+                hurt(p, s.damage); s.active = false; break;
+            }
+            if (s.ttl <= 0 || Math.abs(s.x) > HALF_WIDTH + 50 || Math.abs(s.y) > HALF_HEIGHT + 50) s.active = false;
+        }
+    }
+
+    private void groundWarning(float x, float y, float radius, float warning, float damage) {
+        for (Hazard h : hazards) if (!h.active) {
+            h.active = true; h.x = x; h.y = y; h.radius = radius; h.warning = warning; h.ttl = warning + .3f; h.damage = damage; return;
+        }
+    }
+
+    private void updateHazards() {
+        for (Hazard h : hazards) {
+            if (!h.active) continue;
+            float previous = h.warning; h.warning = Math.max(0, h.warning - STEP); h.ttl -= STEP;
+            if (previous > 0 && h.warning <= .00001f)
+                for (Player p : players) if (p.active && p.alive && distanceSquared(p.x, p.y, h.x, h.y) <= square(h.radius + PLAYER_RADIUS)) hurt(p, h.damage);
+            if (h.ttl <= 0) h.active = false;
+        }
+    }
+
+    private void hurt(Player p, float damage) {
+        if (p.invulnerable > 0 || !p.alive) return;
+        float actual = Math.min(p.health, damage); p.health = Math.max(0, p.health - damage); p.damageTaken += actual;
+        p.invulnerable = .75f; heroHits++;
+        effect(EffectKind.HIT, p.x, p.y, p.slot, .13f);
+        if (p.health <= 0) { p.alive = false; p.dodgeTime = 0; }
+    }
+
+    private void hit(Enemy enemy, float damage, int owner) {
+        if (!enemy.active) return;
+        float actual = Math.min(enemy.health, damage); players[owner].damageDealt += actual;
+        enemy.health -= damage; enemy.hitFlash = .12f;
+        Effect fx = effect(EffectKind.HIT, enemy.x, enemy.y, owner, .1f); if (fx != null) fx.radius = enemy.radius;
+        if (enemy.health > 0) return;
+        enemy.active = false; activeEnemies = Math.max(0, activeEnemies - 1); kills++; enemyDeaths++; players[owner].kills++;
+        fx = effect(EffectKind.DEATH, enemy.x, enemy.y, owner, .35f); if (fx != null) fx.radius = enemy.radius;
+        int reward = enemy.kind == EnemyKind.BOSS ? 20 : enemy.elite ? 8 : enemy.kind == EnemyKind.BRUTE ? 3 : enemy.kind == EnemyKind.CULTIST ? 2 : 1;
+        drop(enemy.x, enemy.y, false, reward);
+        if (enemy.elite) { elitesKilled++; drop(enemy.x + 14, enemy.y, true, 40); }
+        else if (kills % 7 == 0) drop(enemy.x + 14, enemy.y, true, 24);
+        if (enemy == boss) bossDefeated = true;
+    }
+
+    private void drop(float x, float y, boolean healing, int value) {
+        for (Pickup p : pickups) if (!p.active) { p.active = true; p.x = x; p.y = y; p.healing = healing; p.value = value; return; }
+        for (Pickup p : pickups) if (p.healing == healing) { p.value = (int) Math.min(Integer.MAX_VALUE, (long) p.value + value); return; }
     }
 
     private void updatePickups() {
         for (Pickup pickup : pickups) {
             if (!pickup.active) continue;
+            Player collector = null; float nearest = Float.MAX_VALUE;
             for (Player p : players) {
                 if (!p.active || !p.alive || (pickup.healing && p.health >= p.maxHealth)) continue;
-                float dx = p.x - pickup.x, dy = p.y - pickup.y;
-                if (dx * dx + dy * dy > 56f * 56f) continue;
-                if (pickup.healing) p.health = Math.min(p.maxHealth, p.health + pickup.value);
-                else { souls += pickup.value; progression.addXp(pickup.value); }
-                pickup.active = false;
-                break;
+                float distance = distanceSquared(p.x, p.y, pickup.x, pickup.y);
+                float attraction = (pickup.healing ? 110 : 200) * p.pickupMultiplier;
+                if (distance <= attraction * attraction && distance < nearest) { nearest = distance; collector = p; }
             }
+            if (collector == null) continue;
+            if (nearest > 52 * 52) {
+                float inverse = 1f / (float) Math.sqrt(nearest), travel = Math.min(380 * STEP, (float) Math.sqrt(nearest));
+                pickup.x += (collector.x - pickup.x) * inverse * travel; pickup.y += (collector.y - pickup.y) * inverse * travel;
+                continue;
+            }
+            if (pickup.healing) collector.health = Math.min(collector.maxHealth, collector.health + pickup.value);
+            else { souls += pickup.value; progression.addXp(pickup.value); }
+            pickup.active = false; pickupsCollected++;
         }
     }
 
@@ -270,75 +382,135 @@ public final class ArenaWorld {
         for (Player down : players) {
             if (!down.active || down.alive) continue;
             Player ally = players[1 - down.slot];
-            float dx = ally.x - down.x, dy = ally.y - down.y;
-            if (!ally.active || !ally.alive || dx * dx + dy * dy > 95f * 95f) { down.reviveProgress = 0f; continue; }
+            if (!ally.active || !ally.alive || distanceSquared(ally.x, ally.y, down.x, down.y) > 95 * 95) { down.reviveProgress = 0; continue; }
             down.reviveProgress += STEP;
-            if (down.reviveProgress >= 2f - .0001f) {
-                down.alive = true; down.health = down.maxHealth * .45f;
-                down.invulnerable = 1.5f; down.reviveProgress = 0f;
-                pendingDodge[down.slot] = false;
+            if (down.reviveProgress >= 2 - .0001f) {
+                down.alive = true; down.health = down.maxHealth * .45f; down.invulnerable = 1.5f;
+                down.reviveProgress = 0; pendingDodge[down.slot] = false; ally.revives++;
             }
         }
     }
 
     private void spawnEnemy() {
-        if (activeEnemies >= MAX_ENEMIES) return;
-        Player anchor = null;
-        int living = 0;
-        for (Player p : players) if (p.active && p.alive) living++;
-        int selected = (int) (random() * Math.max(1, living));
-        for (Player p : players) if (p.active && p.alive && selected-- == 0) { anchor = p; break; }
-        if (anchor == null) return;
+        // Leave two slots for scheduled elites; the final encounter can always claim a slot.
+        if (activeEnemies >= MAX_ENEMIES - 2) return;
+        EnemyKind kind = EnemyKind.GHOUL; float roll = random();
+        if (wave >= 2 && roll < .27f) kind = EnemyKind.WRAITH;
+        else if (wave >= 2 && roll < .43f) kind = EnemyKind.CULTIST;
+        else if (wave >= 3 && roll < .65f) kind = EnemyKind.BRUTE;
+        spawn(kind, false);
+    }
+
+    private void spawnElite() { spawn(eliteMask == 0 ? EnemyKind.BRUTE : EnemyKind.CULTIST, true); }
+
+    private Enemy spawn(EnemyKind kind, boolean elite) {
+        if (activeEnemies >= MAX_ENEMIES) return null;
+        Player anchor = livingAnchor(); if (anchor == null) return null;
         for (Enemy e : enemies) {
             if (e.active) continue;
             float angle = random() * (float) (Math.PI * 2);
-            e.x = clamp(anchor.x + (float) Math.cos(angle) * 650f, -HALF_WIDTH + ENEMY_RADIUS, HALF_WIDTH - ENEMY_RADIUS);
-            e.y = clamp(anchor.y + (float) Math.sin(angle) * 650f, -HALF_HEIGHT + ENEMY_RADIUS, HALF_HEIGHT - ENEMY_RADIUS);
-            float dx = e.x - anchor.x, dy = e.y - anchor.y;
-            if (dx * dx + dy * dy < 300f * 300f) {
-                e.x = clamp(anchor.x + (anchor.x > 0f ? -600f : 600f), -HALF_WIDTH + ENEMY_RADIUS, HALF_WIDTH - ENEMY_RADIUS);
-                e.y = anchor.y;
+            e.radius = kind == EnemyKind.BOSS ? 54 : kind == EnemyKind.BRUTE ? 31 : kind == EnemyKind.WRAITH ? 17 : 20;
+            e.x = clamp(anchor.x + (float) Math.cos(angle) * 620, -HALF_WIDTH + e.radius, HALF_WIDTH - e.radius);
+            e.y = clamp(anchor.y + (float) Math.sin(angle) * 620, -HALF_HEIGHT + e.radius, HALF_HEIGHT - e.radius);
+            if (distanceSquared(e.x, e.y, anchor.x, anchor.y) < 280 * 280) {
+                e.x = clamp(anchor.x + (anchor.x > 0 ? -560 : 560), -HALF_WIDTH + e.radius, HALF_WIDTH - e.radius); e.y = anchor.y;
             }
-            e.maxHealth = e.health = 24f + (int) (elapsed / 40f) * 12f;
-            e.animTime = random(); e.hitFlash = e.vx = e.vy = 0f;
-            e.active = true; activeEnemies++;
-            return;
+            e.kind = kind; e.elite = elite;
+            float health = switch (kind) { case WRAITH -> 18; case BRUTE -> 95; case CULTIST -> 35; case BOSS -> 1100; default -> 32; };
+            if (kind == EnemyKind.BOSS) health *= 1 + .6f * (activePlayerCount() - 1);
+            else health *= 1 + elapsed / 900;
+            e.maxHealth = e.health = health * (elite ? 4 : 1);
+            e.damage = kind == EnemyKind.BOSS ? 20 : kind == EnemyKind.BRUTE ? 18 : kind == EnemyKind.WRAITH ? 8 : 12;
+            e.animTime = random(); e.hitFlash = e.vx = e.vy = e.stunTime = e.windup = 0; e.attackCooldown = kind == EnemyKind.BOSS ? 1.5f : 1;
+            e.active = true; activeEnemies++; return e;
         }
+        return null;
     }
 
+    /** Developer fixture: start the final encounter immediately without a survival playthrough. */
+    public void debugStartBoss() {
+        if (bossSpawned || outcome != Outcome.RUNNING || activePlayerCount() == 0) return;
+        elapsed = Math.max(elapsed, ROUND_SECONDS); wave = 3;
+        if (activeEnemies >= MAX_ENEMIES) for (Enemy e : enemies) if (e.active) { e.active = false; activeEnemies--; break; }
+        boss = spawn(EnemyKind.BOSS, false); bossSpawned = boss != null; bossPhase = 1;
+    }
+
+    private Enemy nearest(float x, float y, float range, long excluded) {
+        Enemy result = null; float best = range * range;
+        for (int i = 0; i < enemies.length; i++) {
+            Enemy e = enemies[i]; if (!e.active || (excluded & (1L << i)) != 0) continue;
+            float distance = distanceSquared(x, y, e.x, e.y);
+            if (distance < best) { best = distance; result = e; }
+        }
+        return result;
+    }
+    private Player nearestPlayer(float x, float y) {
+        Player result = null; float best = Float.MAX_VALUE;
+        for (Player p : players) if (p.active && p.alive) {
+            float distance = distanceSquared(x, y, p.x, p.y); if (distance < best) { best = distance; result = p; }
+        }
+        return result;
+    }
+    private Player livingAnchor() {
+        int count = 0; for (Player p : players) if (p.active && p.alive) count++;
+        int chosen = (int) (random() * Math.max(1, count));
+        for (Player p : players) if (p.active && p.alive && chosen-- == 0) return p;
+        return null;
+    }
+    private int activePlayerCount() { int count = 0; for (Player p : players) if (p.active) count++; return count; }
+    private int enemyIndex(Enemy enemy) { for (int i = 0; i < enemies.length; i++) if (enemies[i] == enemy) return i; return 0; }
+    private Bolt freeBolt() { for (Bolt b : bolts) if (!b.active) return b; return null; }
+    private Effect effect(EffectKind kind, float x, float y, int owner, float duration) {
+        for (Effect e : effects) if (!e.active) {
+            e.active = true; e.kind = kind; e.x = x; e.y = y; e.x2 = x; e.y2 = y;
+            e.angle = e.radius = e.sweep = 0; e.ttl = e.maxTtl = duration; e.owner = owner; return e;
+        }
+        return null;
+    }
     private float random() {
         randomState ^= randomState << 13; randomState ^= randomState >>> 17; randomState ^= randomState << 5;
         return (randomState >>> 8) * (1f / 16777216f);
     }
-    private Player player(int slot) {
-        if (slot < 0 || slot >= players.length) throw new IllegalArgumentException("Player slot must be 0 or 1");
-        return players[slot];
+    private Player player(int slot) { if (slot < 0 || slot >= 2) throw new IllegalArgumentException("Player slot must be 0 or 1"); return players[slot]; }
+    private static float square(float n) { return n * n; }
+    private static float length(float x, float y) { return (float) Math.sqrt(Math.max(.0001f, x * x + y * y)); }
+    private static float distanceSquared(float x, float y, float xx, float yy) { return square(x - xx) + square(y - yy); }
+    private static float segmentDistanceSquared(float x, float y, float xx, float yy, float px, float py) {
+        float dx = xx - x, dy = yy - y, squared = dx * dx + dy * dy;
+        float t = squared > 0 ? clamp(((px - x) * dx + (py - y) * dy) / squared, 0, 1) : 0;
+        return distanceSquared(px, py, x + dx * t, y + dy * t);
     }
-    private static float clamp(float value, float min, float max) { return Math.max(min, Math.min(max, value)); }
+    private static float clamp(float n, float min, float max) { return Math.max(min, Math.min(max, n)); }
 
     public static final class Player {
         public final int slot;
-        public int kills;
+        public Hero hero;
+        public int kills, projectileCount = 1, pierce, auraLevel, stormLevel, revives;
         public boolean active, alive;
         public float x, y, health, maxHealth, dodgeCooldown, dodgeTime, invulnerable, attackCooldown;
         public float reviveProgress, facingX, facingY, walkTime;
-        public float damageMultiplier = 1f, attackRateMultiplier = 1f, moveMultiplier = 1f, dodgeCooldownMultiplier = 1f;
+        public float damageMultiplier = 1, attackRateMultiplier = 1, moveMultiplier = 1, dodgeCooldownMultiplier = 1;
+        public float cleaveMultiplier = 1, critChance, pickupMultiplier = 1, auraCooldown, stormCooldown, damageDealt, damageTaken;
         private float dodgeX, dodgeY;
-        private Player(int slot) { this.slot = slot; }
+        private Player(int slot) { this.slot = slot; hero = slot == 0 ? Hero.WARDEN : Hero.RANGER; }
     }
     public static final class Enemy {
-        public boolean active;
+        public boolean active, elite;
+        public EnemyKind kind = EnemyKind.GHOUL;
         public float x, y, health, maxHealth, animTime, hitFlash, vx, vy;
+        public float radius = 20, stunTime, attackCooldown, windup, damage = 12;
     }
     public static final class Bolt {
         public boolean active;
-        public float x, y, vx, vy, ttl, damage = 12f;
-        public int owner;
+        public float x, y, vx, vy, ttl, damage = 16;
+        public int owner, pierce;
+        public long hitMask;
     }
-    public static final class Pickup {
-        public boolean active;
-        public float x, y;
-        public int value;
-        public boolean healing;
+    public static final class Pickup { public boolean active, healing; public float x, y; public int value; }
+    public static final class Shot { public boolean active; public float x, y, vx, vy, ttl, damage, radius; }
+    public static final class Hazard { public boolean active; public float x, y, radius, warning, ttl, damage; }
+    public static final class Effect {
+        public boolean active; public EffectKind kind;
+        public float x, y, x2, y2, angle, radius, sweep, ttl, maxTtl; public int owner;
     }
 }

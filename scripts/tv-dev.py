@@ -112,9 +112,9 @@ def main():
             serial = f'emulator-{port}'
             (ROOT / '.run').mkdir(exist_ok=True)
             log = (ROOT / '.run/emulator.log').open('w')
-            command = [sdk / 'emulator/emulator', '-avd', args.avd, '-port', str(port), '-no-snapshot', '-no-audio']
+            command = [sdk / 'emulator/emulator', '-avd', args.avd, '-port', str(port), '-no-snapshot']
             if args.headless:
-                command += ['-no-window', '-gpu', 'swiftshader']
+                command += ['-no-window', '-gpu', 'swiftshader', '-no-audio']
             env = dict(os.environ, ANDROID_HOME=str(sdk), ANDROID_SDK_ROOT=str(sdk))
             created = subprocess.Popen([str(p) for p in command], stdout=log, stderr=subprocess.STDOUT, env=env)
         target = [adb, '-s', serial]

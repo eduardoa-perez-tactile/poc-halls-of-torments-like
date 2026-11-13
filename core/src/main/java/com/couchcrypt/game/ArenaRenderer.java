@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Disposable;
 import com.couchcrypt.ui.UiArt;
 
@@ -47,7 +48,7 @@ public final class ArenaRenderer implements Disposable {
         gameHud.reset();
     }
 
-    public void render(ArenaWorld world, ArenaHudState state, float delta) {
+    public void render(ArenaWorld world, ArenaHudState state, float delta, boolean showHud) {
         int width = Gdx.graphics.getWidth(), height = Gdx.graphics.getHeight();
         if (width <= 0 || height <= 0) return;
         int active = (world.players[0].active ? 1 : 0) + (world.players[1].active ? 1 : 0);
@@ -65,11 +66,15 @@ public final class ArenaRenderer implements Disposable {
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
             drawFloor(camera);
+            drawHazards(world, camera);
+            drawGroundMarks(world, camera);
             drawPickups(world, camera);
             gatherSprites(world, camera);
             drawShadows(world);
-            drawBolts(world, camera);
             drawSprites(world);
+            drawBolts(world, camera);
+            drawShots(world, camera);
+            drawEffects(world, camera);
             batch.end();
             drawCalls += batch.renderCalls;
         }
@@ -77,7 +82,7 @@ public final class ArenaRenderer implements Disposable {
         Gdx.gl.glViewport(0, 0, width, height);
         batch.setProjectionMatrix(hud.combined);
         batch.begin();
-        gameHud.render(batch, world, state, split, delta);
+        if (showHud) gameHud.render(batch, world, state, split, delta);
         batch.setColor(Color.WHITE);
         batch.end();
         drawCalls += batch.renderCalls;
@@ -132,7 +137,7 @@ public final class ArenaRenderer implements Disposable {
         for (int i = 0; i < PROP_COUNT; i++) if (visible(camera, propX[i], propY[i], 150f)) add(PROP, i, propX[i], propY[i]);
         for (int i = 0; i < world.enemies.length; i++) {
             ArenaWorld.Enemy enemy = world.enemies[i];
-            if (enemy.active && visible(camera, enemy.x, enemy.y, 100f)) add(ENEMY, i, enemy.x, enemy.y);
+            if (enemy.active && visible(camera, enemy.x, enemy.y, 230f)) add(ENEMY, i, enemy.x, enemy.y);
         }
         for (int i = 0; i < world.players.length; i++) {
             ArenaWorld.Player player = world.players[i];
@@ -160,7 +165,7 @@ public final class ArenaRenderer implements Disposable {
                 ArenaWorld.Player player = world.players[index];
                 x = player.x; y = player.y; width = player.alive ? 62f : 72f;
             } else if (types[i] == ENEMY) {
-                x = world.enemies[index].x; y = world.enemies[index].y; width = 44f;
+                x = world.enemies[index].x; y = world.enemies[index].y; width = 44f * enemyScale(world.enemies[index]);
             } else { x = propX[index]; y = propY[index]; width = 62f; }
             batch.draw(art.shadow, screenX(x, y) - width * .5f, screenY(x, y) - 9f, width, 20f);
         }
@@ -186,15 +191,168 @@ public final class ArenaRenderer implements Disposable {
 
     private void drawBolts(ArenaWorld world, OrthographicCamera camera) {
         for (ArenaWorld.Bolt bolt : world.bolts) {
-            if (!bolt.active || !visible(camera, bolt.x, bolt.y, 32f)) continue;
+            if (!bolt.active || !visible(camera, bolt.x, bolt.y, 36f)) continue;
             float x = screenX(bolt.x, bolt.y), y = screenY(bolt.x, bolt.y) + 24f;
-            if (bolt.owner == 0) batch.setColor(1f, .65f, .25f, .8f);
-            else batch.setColor(.4f, .9f, .85f, .8f);
-            batch.draw(art.glow, x - 13f, y - 9f, 26f, 18f);
-            batch.setColor(1f, .94f, .75f, 1f);
-            batch.draw(art.pixel, x - 3f, y - 2f, 6f, 4f);
+            float vx = screenX(bolt.vx, bolt.vy), vy = screenY(bolt.vx, bolt.vy);
+            float length = Math.max(.001f, (float) Math.sqrt(vx * vx + vy * vy));
+            float dx = vx / length, dy = vy / length;
+            batch.setColor(bolt.owner == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO);
+            line(x - dx * 21f, y - dy * 21f, x, y, 2f);
+            batch.setColor(1f, .95f, .8f, 1f);
+            line(x, y, x - dx * 7f - dy * 3f, y - dy * 7f + dx * 3f, 2f);
+            line(x, y, x - dx * 7f + dy * 3f, y - dy * 7f - dx * 3f, 2f);
         }
         batch.setColor(Color.WHITE);
+    }
+
+    private void drawShots(ArenaWorld world, OrthographicCamera camera) {
+        for (ArenaWorld.Shot shot : world.shots) {
+            if (!shot.active || !visible(camera, shot.x, shot.y, 40f)) continue;
+            float x = screenX(shot.x, shot.y), y = screenY(shot.x, shot.y) + 18f;
+            float radius = Math.max(8f, shot.radius * 1.5f);
+            batch.setColor(1f, .18f, .06f, .85f);
+            batch.draw(art.glow, x - radius * 1.5f, y - radius * 1.5f, radius * 3f, radius * 3f);
+            batch.setColor(1f, .68f, .24f, 1f);
+            batch.draw(art.pixel, x - 2.5f, y - 2.5f, 5f, 5f);
+        }
+        batch.setColor(Color.WHITE);
+    }
+
+    private void drawHazards(ArenaWorld world, OrthographicCamera camera) {
+        for (ArenaWorld.Hazard hazard : world.hazards) {
+            if (!hazard.active || !visible(camera, hazard.x, hazard.y, hazard.radius + 50f)) continue;
+            float x = screenX(hazard.x, hazard.y), y = screenY(hazard.x, hazard.y);
+            if (hazard.warning > 0f) {
+                float progress = Math.max(0f, Math.min(1f, 1f - hazard.warning));
+                batch.setColor(1f, .4f, .08f, .1f + progress * .1f);
+                batch.draw(art.glow, x - hazard.radius, y - hazard.radius * .5f,
+                    hazard.radius * 2f, hazard.radius);
+                batch.setColor(1f, .52f, .15f, .82f);
+                ring(hazard.x, hazard.y, hazard.radius, 0f, 2f, 32);
+                batch.setColor(1f, .75f, .3f, .55f);
+                ring(hazard.x, hazard.y, hazard.radius * Math.max(.04f, 1f - progress), 0f, 1.5f, 24);
+            } else {
+                float alpha = Math.min(1f, Math.max(0f, hazard.ttl * 3f));
+                batch.setColor(1f, .17f, .05f, alpha * .3f);
+                batch.draw(art.glow, x - hazard.radius, y - hazard.radius * .5f,
+                    hazard.radius * 2f, hazard.radius);
+                batch.setColor(1f, .62f, .25f, alpha);
+                ring(hazard.x, hazard.y, hazard.radius, 0f, 3f, 32);
+            }
+        }
+        batch.setColor(Color.WHITE);
+    }
+
+    private void drawGroundMarks(ArenaWorld world, OrthographicCamera camera) {
+        for (ArenaWorld.Enemy enemy : world.enemies) {
+            if (!enemy.active || !visible(camera, enemy.x, enemy.y, 170f)) continue;
+            if (enemy.kind == ArenaWorld.EnemyKind.BOSS || enemy.elite) {
+                boolean boss = enemy.kind == ArenaWorld.EnemyKind.BOSS;
+                batch.setColor(1f, boss ? .2f : .64f, boss ? .15f : .24f, .7f);
+                ring(enemy.x, enemy.y, Math.max(32f, enemy.radius + 12f), 0f, 2f, 24);
+            } else if (enemy.kind == ArenaWorld.EnemyKind.CULTIST && enemy.windup > 0f) {
+                batch.setColor(1f, .62f, .16f, .7f);
+                ring(enemy.x, enemy.y, 30f, 0f, 1.5f, 20);
+            }
+        }
+        for (ArenaWorld.Player player : world.players) {
+            if (!player.active || !player.alive || player.auraLevel <= 0
+                || !visible(camera, player.x, player.y, 180f)) continue;
+            batch.setColor(player.slot == 0 ? 1f : .4f, .8f, .65f, .16f);
+            ring(player.x, player.y, 100f + player.auraLevel * 20f, 0f, 1f, 28);
+        }
+        batch.setColor(Color.WHITE);
+    }
+
+    private void drawEffects(ArenaWorld world, OrthographicCamera camera) {
+        for (ArenaWorld.Effect effect : world.effects) {
+            if (!effect.active || !visible(camera, effect.x, effect.y,
+                effect.kind == ArenaWorld.EffectKind.LIGHTNING ? 600f : effect.radius + 80f)) continue;
+            float life = Math.max(0f, Math.min(1f, effect.ttl / Math.max(.001f, effect.maxTtl)));
+            float x = screenX(effect.x, effect.y), y = screenY(effect.x, effect.y);
+            switch (effect.kind) {
+                case SLASH -> {
+                    batch.setColor(1f, .9f, .64f, life * .85f);
+                    float previousX = 0f, previousY = 0f;
+                    for (int segment = 0; segment <= 13; segment++) {
+                        float angle = effect.angle - effect.sweep * .5f + effect.sweep * segment / 13f;
+                        float wx = effect.x + MathUtils.cos(angle) * effect.radius;
+                        float wy = effect.y + MathUtils.sin(angle) * effect.radius;
+                        float sx = screenX(wx, wy), sy = screenY(wx, wy) + 22f;
+                        if (segment > 0) line(previousX, previousY, sx, sy, 2.5f * Math.max(.3f, life));
+                        previousX = sx; previousY = sy;
+                    }
+                    float sweepAngle = effect.angle - effect.sweep * .5f + effect.sweep * (1f - life);
+                    float wx = effect.x + MathUtils.cos(sweepAngle) * effect.radius;
+                    float wy = effect.y + MathUtils.sin(sweepAngle) * effect.radius;
+                    batch.setColor(1f, .97f, .84f, life);
+                    line(x, y + 22f, screenX(wx, wy), screenY(wx, wy) + 22f, 2f);
+                }
+                case HIT -> {
+                    float size = 10f * life + 3f;
+                    batch.setColor(1f, .84f, .48f, life);
+                    line(x - size, y + 24f, x + size, y + 24f, 1.5f);
+                    line(x, y + 24f - size, x, y + 24f + size, 1.5f);
+                    batch.setColor(1f, .95f, .78f, life * .6f);
+                    batch.draw(art.glow, x - 12f, y + 12f, 24f, 24f);
+                }
+                case DEATH -> {
+                    float radius = 12f + 25f * (1f - life);
+                    batch.setColor(.7f, .65f, .52f, life * .4f);
+                    batch.draw(art.glow, x - radius, y - radius * .3f, radius * 2f, radius);
+                    batch.setColor(.8f, .7f, .56f, life * .6f);
+                    line(x - radius, y, x - radius * .65f, y + 6f, 1.5f);
+                    line(x + radius * .7f, y + 5f, x + radius, y + 10f, 1.5f);
+                }
+                case AURA -> {
+                    batch.setColor(effect.owner == 0 ? 1f : .4f, .8f, .7f, life * .65f);
+                    ring(effect.x, effect.y, effect.radius * (1f - life * .2f), 0f, 2f, 28);
+                }
+                case LIGHTNING -> {
+                    float x2 = screenX(effect.x2, effect.y2), y2 = screenY(effect.x2, effect.y2) + 24f;
+                    float dx = x2 - x, dy = y2 - (y + 32f);
+                    float length = Math.max(1f, (float) Math.sqrt(dx * dx + dy * dy));
+                    float nx = -dy / length, ny = dx / length;
+                    float previousX = x, previousY = y + 32f;
+                    batch.setColor(.66f, .86f, 1f, life);
+                    for (int segment = 1; segment <= 4; segment++) {
+                        float jag = segment == 4 ? 0f : (segment % 2 == 0 ? -9f : 9f);
+                        float sx = x + dx * segment / 4f + nx * jag;
+                        float sy = y + 32f + dy * segment / 4f + ny * jag;
+                        line(previousX, previousY, sx, sy, 2f);
+                        previousX = sx; previousY = sy;
+                    }
+                }
+            }
+        }
+        batch.setColor(Color.WHITE);
+    }
+
+    private void ring(float x, float y, float radius, float height, float thickness, int segments) {
+        float previousX = screenX(x + radius, y), previousY = screenY(x + radius, y) + height;
+        for (int segment = 1; segment <= segments; segment++) {
+            float angle = MathUtils.PI2 * segment / segments;
+            float wx = x + MathUtils.cos(angle) * radius, wy = y + MathUtils.sin(angle) * radius;
+            float sx = screenX(wx, wy), sy = screenY(wx, wy) + height;
+            line(previousX, previousY, sx, sy, thickness);
+            previousX = sx; previousY = sy;
+        }
+    }
+
+    /** Pixel-region line segments stay in the existing atlas and never allocate geometry. */
+    private void line(float x1, float y1, float x2, float y2, float thickness) {
+        float dx = x2 - x1, dy = y2 - y1;
+        float length = (float) Math.sqrt(dx * dx + dy * dy);
+        if (length < .001f) return;
+        batch.draw(art.pixel, x1, y1 - thickness * .5f, 0f, thickness * .5f,
+            length, thickness, 1f, 1f, MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees);
+    }
+
+    private static float enemyScale(ArenaWorld.Enemy enemy) {
+        float scale = enemy.kind == ArenaWorld.EnemyKind.BOSS ? 2.2f
+            : enemy.kind == ArenaWorld.EnemyKind.BRUTE ? 1.4f
+            : enemy.kind == ArenaWorld.EnemyKind.WRAITH ? .82f : 1f;
+        return scale * (enemy.elite ? 1.18f : 1f);
     }
 
     private void drawSprites(ArenaWorld world) {
@@ -204,16 +362,29 @@ public final class ArenaRenderer implements Disposable {
                 drawAnchored(art.props[index % art.props.length], propX[index], propY[index], 80f, 120f, 5f, false);
             } else if (types[i] == ENEMY) {
                 ArenaWorld.Enemy enemy = world.enemies[index];
-                if (enemy.hitFlash > 0f) batch.setColor(1f, .55f, .42f, 1f);
+                float scale = enemyScale(enemy);
+                if (enemy.kind == ArenaWorld.EnemyKind.WRAITH) batch.setColor(.54f, .94f, .92f, .72f);
+                else if (enemy.kind == ArenaWorld.EnemyKind.BRUTE) batch.setColor(.88f, .6f, .91f, 1f);
+                else if (enemy.kind == ArenaWorld.EnemyKind.CULTIST) batch.setColor(1f, .74f, .4f, 1f);
+                else if (enemy.kind == ArenaWorld.EnemyKind.BOSS) batch.setColor(1f, .48f, .37f, 1f);
+                else batch.setColor(Color.WHITE);
+                if (enemy.hitFlash > 0f) batch.setColor(1f, .95f, .78f, 1f);
                 drawAnchored(art.enemies[(int) (enemy.animTime * 7f) % art.enemies.length], enemy.x, enemy.y,
-                        74f, 84f, 5.25f, screenX(enemy.vx, enemy.vy) < 0f);
+                    74f * scale, 84f * scale, 5.25f * scale, screenX(enemy.vx, enemy.vy) < 0f);
+                if (enemy.elite && enemy.kind != ArenaWorld.EnemyKind.BOSS) {
+                    float x = screenX(enemy.x, enemy.y), y = screenY(enemy.x, enemy.y) + 84f * scale;
+                    batch.setColor(.15f, .1f, .12f, .85f); batch.draw(art.pixel, x - 25f, y, 50f, 3f);
+                    batch.setColor(.88f, .38f, .27f, .95f);
+                    batch.draw(art.pixel, x - 25f, y, 50f * Math.max(0f, Math.min(1f, enemy.health / Math.max(1f, enemy.maxHealth))), 3f);
+                }
                 batch.setColor(Color.WHITE);
             } else {
                 ArenaWorld.Player player = world.players[index];
                 float sx = screenX(player.x, player.y), sy = screenY(player.x, player.y);
+                int hero = player.hero == ArenaWorld.Hero.WARDEN ? 0 : 1;
                 if (!player.alive) {
                     batch.setColor(.27f, .3f, .31f, .8f);
-                    drawAnchored(art.players[index][0], player.x, player.y, 96f, 120f, 6f, false);
+                    drawAnchored(art.players[hero][0], player.x, player.y, 96f, 120f, 6f, false);
                     batch.setColor(.9f, .68f, .33f, 1f);
                     batch.draw(art.pixel, sx - 26f, sy + 122f, 52f * Math.min(1f, player.reviveProgress / 2f), 4f);
                     batch.setColor(Color.WHITE);
@@ -225,8 +396,8 @@ public final class ArenaRenderer implements Disposable {
                 }
                 float alpha = player.invulnerable > 0f && ((int) (world.elapsed * 16f) & 1) == 0 ? .58f : 1f;
                 batch.setColor(1f, 1f, 1f, alpha);
-                int frame = (int) (player.walkTime * 7f) % art.players[index].length;
-                drawAnchored(art.players[index][frame], player.x, player.y, 96f, 120f, 6f,
+                int frame = (int) (player.walkTime * 7f) % art.players[hero].length;
+                drawAnchored(art.players[hero][frame], player.x, player.y, 96f, 120f, 6f,
                         screenX(player.facingX, player.facingY) < 0f);
                 batch.setColor(Color.WHITE);
                 batch.setColor(index == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO);

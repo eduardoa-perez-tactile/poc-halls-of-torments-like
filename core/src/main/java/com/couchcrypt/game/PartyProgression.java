@@ -1,6 +1,6 @@
 package com.couchcrypt.game;
 
-/** Shared party XP with independent, timed upgrade choices owned by the simulation thread. */
+/** Shared party XP with independent, timed build choices owned by the simulation thread. */
 public final class PartyProgression {
     public static final int MAX_LEVEL = 20;
     public static final float CHOICE_SECONDS = 30f;
@@ -10,7 +10,14 @@ public final class PartyProgression {
         HASTE("haste", "Quickening", "Attack speed +15% of base."),
         FLEET("fleet", "Fleet Foot", "Move speed +12% of base."),
         VITALITY("vitality", "Vitality", "Max health +20. Restore 20 health."),
-        EVASION("evasion", "Shadow Step", "Dodge cooldown -15% of base.");
+        EVASION("evasion", "Shadow Step", "Dodge cooldown -15% of base."),
+        SWEEP("sweep", "Wide Sweep", "Warden sword reach +20% of base."),
+        MULTISHOT("multishot", "Split Shot", "Ranger fires one extra arrow."),
+        PIERCE("pierce", "Piercing Arrow", "Ranger arrows pierce one more target."),
+        AURA("aura", "Soul Circle", "Unlock or strengthen a nearby damage aura."),
+        STORM("storm", "Chain Storm", "Unlock or strengthen automatic chain strikes."),
+        MAGNET("magnet", "Soul Draw", "Pickup attraction +30% of base."),
+        CRITICAL("critical", "Critical Edge", "Critical hit chance +10 percentage points.");
 
         public final String id, title, description;
         Upgrade(String id, String title, String description) {
@@ -29,17 +36,19 @@ public final class PartyProgression {
     private final ArenaWorld world;
     private final boolean[] participants = new boolean[2];
     private final int[] applied = new int[2];
+    private final int[][] ranks = { new int[UPGRADES.length], new int[UPGRADES.length] };
     private int nextOfferId;
     public int level, xp, xpToNext, totalXp;
     public final Offer[] offers = { new Offer(), new Offer() };
 
     public PartyProgression(ArenaWorld world) { this.world = world; reset(); }
 
-    /** Offer identities intentionally survive reset, so an old phone packet cannot pick a new offer. */
+    /** Identities survive reset, so a packet from the previous run cannot select a new offer. */
     public void reset() {
         level = 1; xp = totalXp = 0; xpToNext = threshold(level);
         for (int slot = 0; slot < offers.length; slot++) {
             participants[slot] = false; applied[slot] = 0;
+            clearRanks(slot);
             Offer offer = offers[slot];
             offer.pending = false; offer.id = offer.level = 0; offer.secondsLeft = 0f;
             for (int i = 0; i < offer.options.length; i++) offer.options[i] = UPGRADES[i];
@@ -50,17 +59,19 @@ public final class PartyProgression {
     public void activatePlayer(int slot) {
         if (!validSlot(slot) || participants[slot]) return;
         participants[slot] = true; applied[slot] = 0;
+        clearRanks(slot);
         startNextOffer(slot);
     }
 
     public void deactivatePlayer(int slot) {
         if (!validSlot(slot)) return;
         participants[slot] = false; applied[slot] = 0;
+        clearRanks(slot);
         Offer offer = offers[slot];
         offer.pending = false; offer.id = offer.level = 0; offer.secondsLeft = 0;
     }
 
-    /** Collected soul XP is counted once for the party, regardless of which player collected it. */
+    /** Collected soul XP is counted once for the party, whoever picked it up. */
     public void addXp(int amount) {
         if (amount <= 0) return;
         totalXp = (int) Math.min(Integer.MAX_VALUE, (long) totalXp + amount);
@@ -75,7 +86,7 @@ public final class PartyProgression {
         xp = level == MAX_LEVEL ? 0 : (int) available;
     }
 
-    /** Not called while paused. A long delta can expire one offer, never skip queued unread offers. */
+    /** Pause freezes this clock. A long delta expires one offer, never skips queued choices. */
     public void update(float delta) {
         if (!Float.isFinite(delta) || delta <= 0) return;
         for (int slot = 0; slot < offers.length; slot++) {
@@ -86,12 +97,20 @@ public final class PartyProgression {
         }
     }
 
-    /** A connection may select only its current offer, once. The server supplies the player slot. */
+    /** Only a player's current offer can be consumed, once. The host supplies the slot. */
     public boolean choose(int slot, int offerId, int optionIndex) {
         if (!validSlot(slot) || !participants[slot] || !world.players[slot].active) return false;
         Offer offer = offers[slot];
         if (!offer.pending || offer.id != offerId || optionIndex < 0 || optionIndex >= offer.options.length) return false;
-        apply(world.players[slot], offer.options[optionIndex]);
+        Upgrade upgrade = offer.options[optionIndex];
+        if (!available(world.players[slot], upgrade)) {
+            // External stat/hero changes invalidate an old selection without silently choosing another skill.
+            offer.id = newOfferId();
+            if (!populateOptions(slot)) { offer.pending = false; applied[slot] = level - 1; }
+            return false;
+        }
+        apply(world.players[slot], upgrade);
+        ranks[slot][upgrade.ordinal()]++;
         applied[slot]++;
         offer.pending = false; offer.secondsLeft = 0;
         startNextOffer(slot);
@@ -99,19 +118,74 @@ public final class PartyProgression {
     }
 
     public int appliedUpgradeCount(int slot) { return validSlot(slot) ? applied[slot] : 0; }
+    public int rank(int slot, Upgrade upgrade) { return validSlot(slot) && upgrade != null ? ranks[slot][upgrade.ordinal()] : 0; }
+
+    /** Allocated only for the results screen; combat uses fixed rank arrays. */
+    public String buildSummary(int slot) {
+        if (!validSlot(slot)) return "No upgrades";
+        StringBuilder summary = new StringBuilder(160);
+        int shown = 0, omitted = 0;
+        for (Upgrade upgrade : UPGRADES) {
+            int rank = ranks[slot][upgrade.ordinal()];
+            if (rank == 0) continue;
+            if (shown == 8) { omitted++; continue; }
+            if (shown > 0) summary.append(shown == 4 ? "\n" : " / ");
+            summary.append(upgrade.title);
+            if (rank > 1) summary.append(' ').append(rank);
+            shown++;
+        }
+        if (shown == 0) return "No upgrades";
+        if (omitted > 0) summary.append(" +").append(omitted).append(" more");
+        return summary.toString();
+    }
 
     private void startNextOffer(int slot) {
         Offer offer = offers[slot];
         if (!participants[slot] || offer.pending || applied[slot] >= level - 1) return;
-        offer.pending = true; offer.id = ++nextOfferId; offer.level = applied[slot] + 2;
-        offer.secondsLeft = CHOICE_SECONDS;
-        int first = (offer.level - 2 + slot) % UPGRADES.length, count = 0;
+        offer.level = applied[slot] + 2;
+        if (!populateOptions(slot)) {
+            // Normal nineteen-choice runs cannot exhaust this catalog. No invalid/duplicate cards if debug stats do.
+            applied[slot] = level - 1;
+            return;
+        }
+        offer.pending = true; offer.id = newOfferId(); offer.secondsLeft = CHOICE_SECONDS;
+    }
+
+    private boolean populateOptions(int slot) {
+        ArenaWorld.Player player = world.players[slot];
+        Offer offer = offers[slot];
+        int count = 0;
+        Upgrade recommended = player.health < player.maxHealth * .6f && available(player, Upgrade.VITALITY)
+            ? Upgrade.VITALITY : available(player, Upgrade.POWER) ? Upgrade.POWER : Upgrade.HASTE;
+        if (available(player, recommended)) offer.options[count++] = recommended;
+        // Secondary attacks appear early; weapon-specific cards make the very first choice tangible.
+        Upgrade featured = offer.level == 3 ? Upgrade.AURA : offer.level == 4 ? Upgrade.STORM
+            : player.hero == ArenaWorld.Hero.WARDEN ? Upgrade.SWEEP
+            : (offer.level & 1) == 0 ? Upgrade.MULTISHOT : Upgrade.PIERCE;
+        if (available(player, featured) && !contains(offer, count, featured)) offer.options[count++] = featured;
+        int seed = world.runSeed ^ offer.level * 0x45d9f3b ^ slot * 0x27d4eb2d;
+        seed ^= seed >>> 16; seed *= 0x45d9f3b; seed ^= seed >>> 16;
+        int first = Math.floorMod(seed, UPGRADES.length);
         for (int i = 0; i < UPGRADES.length && count < offer.options.length; i++) {
             Upgrade candidate = UPGRADES[(first + i) % UPGRADES.length];
-            if (available(world.players[slot], candidate)) offer.options[count++] = candidate;
+            if (available(player, candidate) && !contains(offer, count, candidate)) offer.options[count++] = candidate;
         }
-        // With nineteen entitlements at most, three of the five stat caps always remain available.
-        while (count < offer.options.length) offer.options[count++] = Upgrade.VITALITY;
+        return count == offer.options.length;
+    }
+
+    private static boolean contains(Offer offer, int count, Upgrade candidate) {
+        for (int i = 0; i < count; i++) if (offer.options[i] == candidate) return true;
+        return false;
+    }
+
+    private int newOfferId() {
+        nextOfferId++;
+        if (nextOfferId <= 0) nextOfferId = 1;
+        return nextOfferId;
+    }
+
+    private void clearRanks(int slot) {
+        for (int i = 0; i < ranks[slot].length; i++) ranks[slot][i] = 0;
     }
 
     private static boolean available(ArenaWorld.Player player, Upgrade upgrade) {
@@ -121,6 +195,13 @@ public final class PartyProgression {
             case FLEET -> player.moveMultiplier < 2.2f - .00001f;
             case VITALITY -> player.maxHealth < 300f;
             case EVASION -> player.dodgeCooldownMultiplier > .25f + .00001f;
+            case SWEEP -> player.hero == ArenaWorld.Hero.WARDEN && player.cleaveMultiplier < 1.8f - .00001f;
+            case MULTISHOT -> player.hero == ArenaWorld.Hero.RANGER && player.projectileCount < 5;
+            case PIERCE -> player.hero == ArenaWorld.Hero.RANGER && player.pierce < 3;
+            case AURA -> player.auraLevel < 3;
+            case STORM -> player.stormLevel < 3;
+            case MAGNET -> player.pickupMultiplier < 2.5f - .00001f;
+            case CRITICAL -> player.critChance < .5f - .00001f;
         };
     }
 
@@ -142,6 +223,13 @@ public final class PartyProgression {
                 player.dodgeCooldownMultiplier = Math.max(.25f, previous - .15f);
                 player.dodgeCooldown *= player.dodgeCooldownMultiplier / previous;
             }
+            case SWEEP -> player.cleaveMultiplier = Math.min(1.8f, player.cleaveMultiplier + .2f);
+            case MULTISHOT -> player.projectileCount = Math.min(5, player.projectileCount + 1);
+            case PIERCE -> player.pierce = Math.min(3, player.pierce + 1);
+            case AURA -> player.auraLevel = Math.min(3, player.auraLevel + 1);
+            case STORM -> player.stormLevel = Math.min(3, player.stormLevel + 1);
+            case MAGNET -> player.pickupMultiplier = Math.min(2.5f, player.pickupMultiplier + .3f);
+            case CRITICAL -> player.critChance = Math.min(.5f, player.critChance + .1f);
         }
     }
 

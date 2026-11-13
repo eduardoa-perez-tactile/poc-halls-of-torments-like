@@ -1,6 +1,6 @@
 # Couch Crypt
 
-A LibGDX Android TV couch co-op arena survivor, using Couch Crypt as its working title. The first playable slice includes original dark-fantasy art, TV remote menus, QR phone controllers, and solo or two-player combat.
+A LibGDX Android TV couch co-op arena survivor, using Couch Crypt as its working title. One replayable arena includes remote-selected melee/bow heroes, timed waves, a final boss, shared XP, personal phone upgrades and per-player build results. World artwork remains temporary.
 
 ## Run on desktop
 
@@ -51,7 +51,7 @@ Select **Play** using the remote. A phone scans the QR and gets a slot automatic
 - A disconnected slot is held for 45 seconds; the same browser can reclaim it using its stored token. The remote can free a slot immediately.
 - Tokens are scoped to this host and app session. A duplicate tab cannot take over an active controller. A new app process creates a fresh session; scan again after restarting the app.
 - The TV remote owns shared menus and player removal. Phones cannot start the game or send shared UI actions; each phone can choose its own offered level-up upgrade.
-- **Start Solo** unlocks at one connection; **Start Co-op** appears at two. They start a two-minute survival round. Phones control movement and dodge; attacks automatically target nearby enemies.
+- **Start Solo** unlocks at one connection; **Start Co-op** appears at two. They start three minutes of escalating waves followed by the final boss. Phones control movement and dodge; attacks automatically target nearby enemies.
 - Press Back in the session to open **Pause**: Resume, Invite Player 2, Restart Run, or Return to Lobby. Invite shows the QR without leaving the session; Back returns to Pause. Returning to the lobby requires confirmation and keeps the party connected. A disconnected player pauses the world. Reconnect that phone or remove its slot under Invite Player 2 before resuming.
 - Player 2 can join in the lobby or later from **Pause -> Invite Player 2**. The normal join area shows only the QR and a Same Wi-Fi reminder; address/port troubleshooting is under Network.
 - Home/Back preserves connections in the lobby. Android backgrounding informs connected phones that the host is away.
@@ -59,17 +59,19 @@ Select **Play** using the remote. A phone scans the QR and gets a slot automatic
 
 The gameplay artwork is temporary pending a separate isometric art pass; the current focus is functionality.
 
-## First playable slice
+## Complete arena loop
 
-- Survive for two minutes against ghouls. Collect shared souls and occasional healing drops.
+- Choose **Warden** (sword cone) or **Ranger** (bow) on each TV lobby player card. Either hero works in solo; each participant keeps that hero for the run.
+- Survive three escalating waves of ghouls, fast wraiths, brutes and ranged cultists. Elite checkpoints reward souls and healing. At three minutes, defeat **the Hollow Sovereign** to win; reaching zero on the wave timer does not grant victory.
 - One connected player gets a full-screen view. Two get independent vertical split-screen cameras in the same world.
 - Invite a second phone from Pause; it enters beside its companion when resumed.
-- The TV uses compact, unboxed player vitals and timer/rewards, with one-line combat notifications. A slim boss status lane appears only when needed for future encounters.
+- The TV uses compact, unboxed player vitals and timer/rewards, with one-line combat notifications. A slim boss status lane appears during the final encounter. Ground warnings and slow projectile spreads signal its attacks; below half health it enrages.
 - Phones show player identity, movement, and Dodge during play; health stays on the TV. When leveling, three personal upgrade choices appear alongside the controls.
-- Use the joystick to move and Dodge to escape. Both starter characters currently fire the same automatic magic bolt; differentiated weapons and progression are future work.
+- Use the joystick to move and Dodge to escape. Warden hits a cone and knocks enemies back; Ranger fires arrows. Weapon traits add wider sweeps, multishot and piercing. Additional choices unlock a radial soul attack, chain lightning, critical hits and pickup attraction.
 - Collected souls award shared XP: the party levels together, with matching level/XP shown for each player. Each phone has 30 seconds to pick its own upgrade while combat continues; expiry applies the first offer. Manual pause freezes the timer. Additional earned levels queue choices, and a late companion receives catch-up choices.
 - A living ally can revive a fallen companion by staying nearby for two seconds. If everyone falls, the run ends.
-- Victory/defeat offers Restart Run or Return to Lobby using the TV remote.
+- Victory and Defeat use their approved painted scenes and separate title art, with live time/level/kill summaries. The remote selects Play/Try Again, Return to Lobby, or Run Details for unboxed hero illustrations, damage/revive highlights and illustrated skill ranks.
+- Short original sound cues cover combat, pickups, levels and outcomes. Toggle Sound in Settings. Regenerate the compact mono WAV assets with `python3 scripts/GenerateCombatAudio.py`.
 
 ## Focused verification
 
@@ -82,7 +84,7 @@ The small test suite covers slot allocation, reconnect reservations/expiry, dupl
 
 The focused tests cover simulation invariants and input/protocol safety. User playtesting covers combat feel, difficulty, two physical phones, and camera scanning. No automated full-round playthrough is required.
 
-F3 toggles desktop diagnostics. F4 during a session toggles a labeled boss-HUD preview for visual review; boss gameplay is not implemented. With profiling enabled, F5 grants the XP needed for a level-up for a brief UI check. `--profile` (or the Android `profile` intent extra) logs FPS, live Java heap, resident art texture bytes, and draw calls every five seconds. These are brief diagnostics, not a guarantee of performance on every TV. See [performance notes](docs/performance.md).
+F3 toggles desktop diagnostics. With profiling enabled, F4 previews the boss HUD, F6 starts the actual boss encounter, and F7/F8 show sample Victory/Defeat layouts for design review. With profiling enabled, F5 grants the XP needed for a level-up for a brief UI check. `--profile` (or the Android `profile` intent extra) logs FPS, live Java heap, resident art texture bytes, and draw calls every five seconds. These are brief diagnostics, not a guarantee of performance on every TV. See [performance notes](docs/performance.md).
 
 ## Structure
 
@@ -94,8 +96,11 @@ F3 toggles desktop diagnostics. F4 during a session toggles a labeled boss-HUD p
 
 Home, lobby, pause, dialogs, and the phone page share the same carved stone, aged brass, and ruby-gem theme. Buttons have separate normal and bright gold focused/pressed artwork with aligned crops. Native UI textures are baked once and shared by all controls.
 
-The approved centered Home uses a crypt backdrop, forged-gold logo, and pale carved-stone controls for Play, How to Join, Settings, and Exit. These are live remote controls over separate artwork, not a flattened menu screenshot. Reusing that backdrop throughout the app keeps the shared texture footprint at about 23.07 MiB plus QR, including the 3 MiB gameplay atlas and floor, within the 32 MiB budget. Settings contains the functional Network submenu; Exit asks for confirmation. Phones receive small, already baked versions of the same art rather than full-size source paintings.
+The approved centered Home uses a crypt backdrop, forged-gold logo, and pale carved-stone controls for Play, How to Join, Settings, and Exit. These are live remote controls over separate artwork, not a flattened menu screenshot. Reusing that backdrop throughout the app keeps the shared texture footprint at about 25.82 MiB plus QR during play, including prewarmed outcome titles and skill icons. Only the active outcome's background is loaded for results, bringing it to about 30.88 MiB plus QR, within the 32 MiB budget. Settings contains the functional Network submenu; Exit asks for confirmation. Phones receive small, already baked versions of the same art rather than full-size source paintings.
 
 The Android launcher has a safe-zone adaptive icon, legacy icon densities, and 16:9 title banners. Its actual banner has been checked in the TV emulator's Installed Games row. Reproduce these code-native assets with `java -Djava.awt.headless=true scripts/GenerateLauncherArt.java` using JDK 21.
 
-See [AGENTS.md](AGENTS.md), [architecture](docs/architecture.md), [art direction](docs/art-direction.md), [approved menu artwork and prompts](docs/home-menu-art.md), [TV launcher guidelines and assets](docs/tv-launcher.md), and [UI flow](docs/ui-flow.md).
+See [AGENTS.md](AGENTS.md), [architecture](docs/architecture.md), [art direction](docs/art-direction.md), [approved menu artwork and prompts](docs/home-menu-art.md), [TV launcher guidelines and assets](docs/tv-launcher.md), and [UI flow](docs/ui-flow.md), and [arena design/reference](docs/arena-design.md).
+
+
+Approved outcome art is stored as separate background/title layers: `assets/art/end-victory-background.png`, `end-victory-title.png`, `end-defeat-background.png`, and `end-defeat-title.png`. Live buttons, summary labels and focus states remain Scene2D controls. See [Victory artwork/prompts](docs/end-victory-art.md) and [Defeat artwork/prompts](docs/end-defeat-art.md), and [skill emblems/prompts](docs/skill-icons-art.md). These were created with built-in image generation and approved on 2026-11-13.

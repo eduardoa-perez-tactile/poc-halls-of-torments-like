@@ -59,3 +59,19 @@ The latest layout removes painted backplates, timer slabs, portraits, duplicate 
 ## Shared XP and personal upgrades
 
 Progression and per-player offers use fixed objects and three enum references per offer; level entitlement queues are bounded by the level cap (20). No textures or render targets are added. XP/offer presentation copies at 5 Hz; WebSocket serialization remains on server threads. Countdown resolution and upgrade effects happen in the fixed simulation tick, and no tick advances during manual pause/background/disconnect. A short live check used the profiling-only F5 XP grant to show simultaneous level-ups and an actual phone selection while the other player's offer remained open; no full survival playthrough was performed. Focused tests cover progression, real stat effects, timeout/default, late joining, replay/ownership checks, and the real upgrade WebSocket message.
+
+
+## Complete one-arena combat
+
+The wave director, melee cone, arrows, two secondary attacks and final boss add no resident textures. New fixed pools hold 96 hostile shots, 12 warnings and 96 visual effects. Ground rings, sword arcs and lightning reuse the existing atlas pixels and are culled per camera; there are no new framebuffers or post-processing passes. Eight original mono PCM cues total 133,970 bytes on disk and are generated offline, loaded once, then rate-limited during playback.
+
+Thirty focused combat/progression tests passed (ten simulation boundary tests, nine combat fixtures and eleven progression tests). Desktop compilation and the debug APK build passed. A brief emulator fixture verified hero selection, split rendering, the live boss bar and encounter sprites. Samples during the visible emulator check were 60–61 FPS with about 7–8 MiB Java heap and the unchanged 23.0656 MiB art estimate, excluding QR and platform/audio/driver overhead. No full three-minute survival playthrough or sustained physical-TV benchmark was run. The replacement outcome concepts were subsequently approved and layered for runtime.
+
+
+## Approved outcome artwork and Run Details
+
+Both 1024x256 outcome titles (2 MiB) and the 512x384 skill atlas (0.75 MiB) are prepared once during startup. Alpha scanning, icon recentering and normalization do not run when opening Run Details. Only the active 1536x864 outcome scene is loaded on entry, adding 5.0625 MiB; it is disposed on replay/lobby. The UI/game/title/icon baseline is 25.8156 MiB and the outcome total 30.8781 MiB, or about 31.3725 MiB including the 0.49 MiB QR. Source paintings are released after preparation, and retained small pixmaps support managed GL restoration.
+
+Results skip world/camera rendering. Live summary controls and the unboxed hero/build view use shared fonts, textures and menu styles; no framebuffers or per-frame image processing are introduced. A brief TV check verified both outcome layouts, the new illustrated details view and Back/focus behavior using explicit sample-data fixtures. These screenshots verify UI presentation, not a completed survival playthrough.
+
+Visible-emulator frame samples were mostly 60–61 FPS, with occasional 51–59 FPS readings during transitions/development activity. Shared title/icon preparation removes known Java alpha-scan work from those transitions, but hitch-free transitions and sustained 60 FPS on representative physical TVs remain unverified. The latest results estimate stays below the combined 32 MiB art budget.

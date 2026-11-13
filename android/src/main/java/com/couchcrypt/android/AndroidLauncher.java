@@ -14,7 +14,7 @@ public final class AndroidLauncher extends AndroidApplication {
         AndroidApplicationConfiguration config = new AndroidApplicationConfiguration();
         config.useImmersiveMode = true;
         config.useAccelerometer = false; config.useCompass = false; config.useGyroscope = false;
-        config.disableAudio = true; config.numSamples = 0;
+        config.disableAudio = false; config.numSamples = 0;
         config.r = 8; config.g = 8; config.b = 8; config.a = 0; config.depth = 0; config.stencil = 0;
         String host = getIntent().getStringExtra("joinHost");
         int port = getIntent().getIntExtra("joinPort", GameConfig.DEFAULT_PORT);
