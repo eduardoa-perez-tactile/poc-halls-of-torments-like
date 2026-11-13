@@ -4,6 +4,83 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RunEquipmentTest {
+    @Test void partyLootSharesOneClockAndEarlyChooserWaitsBeforeQueuedReward() {
+        ArenaWorld world = solo(); world.activatePlayer(1);
+        var gear = world.equipment; gear.grantReward();
+        int firstId = gear.offers[0].id, secondId = gear.offers[1].id;
+        gear.updateChoices(5);
+        assertEquals(25, gear.choiceSecondsLeft());
+        assertEquals(25, gear.offers[0].secondsLeft); assertEquals(25, gear.offers[1].secondsLeft);
+        assertTrue(gear.choose(0, firstId, -1));
+        gear.grantReward();
+        assertFalse(gear.offers[0].pending, "An early finisher must wait for the current party round");
+        assertEquals(secondId, gear.offers[1].id); assertEquals(25, gear.choiceSecondsLeft());
+        assertFalse(gear.choose(0, firstId, 0));
+        gear.updateChoices(4);
+        assertEquals(21, gear.choiceSecondsLeft()); assertEquals(21, gear.offers[1].secondsLeft);
+        assertTrue(gear.choose(1, secondId, 2));
+        assertEquals(1, gear.appliedCount(0)); assertEquals(1, gear.appliedCount(1));
+        assertTrue(gear.offers[0].pending); assertTrue(gear.offers[1].pending);
+        assertTrue(gear.offers[0].id > firstId); assertTrue(gear.offers[1].id > secondId);
+        assertEquals(30, gear.choiceSecondsLeft());
+        assertEquals(30, gear.offers[0].secondsLeft); assertEquals(30, gear.offers[1].secondsLeft);
+    }
+
+    @Test void timeoutDefaultsOnlyUnansweredLootAndStartsOneFreshQueuedRound() {
+        ArenaWorld world = solo(); world.activatePlayer(1);
+        var gear = world.equipment; gear.grantReward(); gear.grantReward();
+        var personal = gear.offers[0].options[1]; var defaultItem = gear.offers[1].options[0];
+        int old = gear.offers[1].id;
+        assertTrue(gear.choose(0, gear.offers[0].id, 1));
+        gear.updateChoices(90);
+        assertEquals(1, gear.appliedCount(0)); assertEquals(1, gear.appliedCount(1));
+        assertTrue(wearing(gear, 0, personal)); assertTrue(wearing(gear, 1, defaultItem));
+        assertTrue(gear.offers[0].pending); assertTrue(gear.offers[1].pending);
+        assertTrue(gear.offers[1].id > old); assertFalse(gear.choose(1, old, 0));
+        assertEquals(30, gear.choiceSecondsLeft(), "A long delta must not spend the queued reward's new window");
+        gear.updateChoices(30);
+        assertEquals(2, gear.appliedCount(0)); assertEquals(2, gear.appliedCount(1));
+        assertEquals(0, gear.choiceSecondsLeft());
+        assertFalse(gear.offers[0].pending); assertFalse(gear.offers[1].pending);
+    }
+
+    @Test void skillPriorityDefersNewLootAndFreezesWholeExistingLootRound() {
+        ArenaWorld world = solo(); world.activatePlayer(1);
+        var gear = world.equipment;
+        world.progression.addXp(world.progression.xpToNext);
+        gear.grantReward();
+        assertFalse(gear.offers[0].pending); assertFalse(gear.offers[1].pending);
+        assertEquals(0, gear.choiceSecondsLeft());
+        for (int slot = 0; slot < 2; slot++)
+            assertTrue(world.progression.choose(slot, world.progression.offers[slot].id, 0));
+        gear.updateChoices(0);
+        assertTrue(gear.offers[0].pending); assertTrue(gear.offers[1].pending);
+        assertEquals(30, gear.choiceSecondsLeft());
+        gear.updateChoices(5);
+        int firstId = gear.offers[0].id;
+        world.progression.addXp(world.progression.xpToNext);
+        assertTrue(world.progression.choose(0, world.progression.offers[0].id, 0));
+        assertTrue(world.levelUpPending());
+        assertFalse(gear.choose(0, firstId, -1), "A player finished with skills still waits for the companion");
+        gear.updateChoices(20);
+        assertEquals(25, gear.choiceSecondsLeft()); assertEquals(25, gear.offers[0].secondsLeft);
+        assertEquals(25, gear.offers[1].secondsLeft);
+    }
+
+    @Test void choiceOnlyUpdatesDoNotGrantTimedRewardsOrRefillCombatSustainBudget() {
+        ArenaWorld world = solo(); var gear = world.equipment;
+        gear.equip(0, 6, ItemCatalog.byId("reapers_wrappings"));
+        world.players[0].health = 50;
+        for (int i = 0; i < 3; i++) gear.drain(world.players[0], 100);
+        assertEquals(52, world.players[0].health, .0001f);
+        gear.grantReward(); world.elapsed = 1140;
+        gear.updateChoices(5);
+        gear.drain(world.players[0], 100);
+        assertEquals(52, world.players[0].health, .0001f);
+        assertEquals(1, gear.rewardsEarned(), "Reliquary scheduling belongs to combat updates");
+        assertEquals(25, gear.choiceSecondsLeft());
+    }
+
     @Test void equipmentPreviewsKeepExactFractionalHealingAndTradeoffValues() {
         assertEquals("+0.25 HP/s / +10 HP", RunEquipment.modifiers(ItemCatalog.byId("emberheart_pendant")));
         assertEquals("+0.35 HP/s / -5% DMG", RunEquipment.modifiers(ItemCatalog.byId("penitents_habit")));
@@ -93,6 +170,7 @@ class RunEquipmentTest {
         assertEquals(0, gear.catchUpRemaining(1));
         assertFalse(gear.offers[1].pending);
         var foundation = gear.foundationItems(1);
+        assertTrue(gear.choose(0, gear.offers[0].id, -1));
         gear.grantReward();
         assertTrue(gear.offers[1].pending); assertFalse(gear.offers[1].catchUp);
         assertEquals(30, gear.offers[1].secondsLeft); assertEquals(30, gear.offers[1].durationSeconds);
@@ -108,12 +186,13 @@ class RunEquipmentTest {
         assertFalse(gear.offers[1].pending);
         assertEquals(2, gear.appliedCount(1));
         assertFalse(gear.choose(1, personalId, 0));
-        assertEquals(0, gear.appliedCount(0), "The established participant's choices are untouched");
+        assertEquals(1, gear.appliedCount(0), "Joining player's choices never consume the host's current reward");
     }
 
     @Test void futureOfferRefreshPreservesNormalTimerAndRemovalRebuildsDefaults() {
         ArenaWorld world = solo(); RunEquipment gear = world.equipment;
         gear.grantReward(); world.activatePlayer(1);
+        assertTrue(gear.choose(0, gear.offers[0].id, -1));
         gear.grantReward();
         var offer = gear.offers[1]; gear.update(8);
         int oldId = offer.id;
@@ -129,6 +208,8 @@ class RunEquipmentTest {
         assertFalse(gear.choose(1, oldId, 0));
         world.activatePlayer(1);
         assertFalse(offer.pending); assertEquals(2, gear.foundationCount(1));
+        assertEquals(22, gear.choiceSecondsLeft(), "Removing a player preserves the other player's deadline");
+        assertTrue(gear.choose(0, gear.offers[0].id, -1));
         gear.grantReward();
         assertTrue(offer.id > oldId); assertEquals(30, offer.secondsLeft);
     }
@@ -218,5 +299,11 @@ class RunEquipmentTest {
 
     private static ArenaWorld solo() {
         ArenaWorld world = new ArenaWorld(ArenaTimeline.TWENTY_MINUTES); world.activatePlayer(0); return world;
+    }
+
+    private static boolean wearing(RunEquipment gear, int slot, ItemCatalog.Item item) {
+        for (int position = 0; position < RunEquipment.SLOT_COUNT; position++)
+            if (gear.equipped(slot, position) == item) return true;
+        return false;
     }
 }

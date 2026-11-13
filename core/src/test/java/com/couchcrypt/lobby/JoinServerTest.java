@@ -20,6 +20,39 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JoinServerTest {
+    @Test void lootStatusAllowsEquipmentChoiceWithoutGameplayInput() throws Exception {
+        var state = new LobbyState(); var server = new JoinServer(0, state, Map.of()); server.open();
+        try (var http = HttpClient.newHttpClient()) {
+            var listener = new Client();
+            var socket = http.newWebSocketBuilder().buildAsync(URI.create("ws://127.0.0.1:"
+                + server.getListeningPort() + "/socket?room=" + server.room()), listener).get(3, TimeUnit.SECONDS);
+            listener.expect("joined");
+            var items = ItemCatalog.ALL.subList(0, 3).toArray(ItemCatalog.Item[]::new);
+            var cards = new PartyProgression.CardPreview[3];
+            for (int i = 0; i < 3; i++) cards[i] = new PartyProgression.CardPreview(items[i].icon(), 0,
+                "DEFENSE", "HELMET: EMPTY", "EMPTY", items[i].description());
+            state.publishEquipment(0, 20, 21.5f, items, cards);
+            state.setPhase(LobbyState.Phase.LOOT);
+            JsonValue status;
+            do { status = listener.expect("status"); } while (!status.getString("phase").equals("loot"));
+            assertEquals(20, status.get("equipment").getInt("id"));
+            assertEquals(21.5f, status.get("equipment").getFloat("secondsLeft"));
+            socket.sendText("{\"type\":\"input\",\"x\":1,\"y\":0,\"dodge\":true,\"seq\":0}", true).get(3, TimeUnit.SECONDS);
+            socket.sendText("{\"type\":\"equipment\",\"offerId\":20,\"option\":-1}", true).get(3, TimeUnit.SECONDS);
+            var request = new LobbyState.EquipmentRequest();
+            long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+            boolean found;
+            do {
+                found = state.pollEquipment(0, request);
+                if (!found) java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(5));
+            } while (!found && System.nanoTime() < until);
+            assertTrue(found); assertEquals(20, request.offerId); assertEquals(-1, request.option);
+            var controls = new LobbyState.Controls(); state.readControls(0, controls, System.currentTimeMillis());
+            assertEquals(0, controls.x); assertFalse(controls.dodge);
+            socket.abort();
+        } finally { server.stop(); }
+    }
+
     @Test void levelUpStatusKeepsSkillSelectionLiveWhileGameplayIsPaused() throws Exception {
         var state = new LobbyState(); var server = new JoinServer(0, state, Map.of()); server.open();
         try (var http = HttpClient.newHttpClient()) {

@@ -103,6 +103,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private RemoteButton start, pauseResume;
     private Label modalMessage, pauseMessage;
     private LevelUpView levelUpView;
+    private boolean lootCeremony;
     private int pauseTopology;
     private Image qrImage;
     private Label qrStatus;
@@ -631,6 +632,7 @@ public final class CryptLobby extends ApplicationAdapter {
         if (screen == Screen.SESSION) {
             if (overlay != null) return "PAUSED";
             if (world.levelUpPending()) return "LEVEL_UP";
+            if (world.lootPending()) return "LOOT";
             boolean coop = world.players[0].active && world.players[1].active;
             if (world.bossSpawned) return coop ? "COOP_BOSS" : "SOLO_BOSS";
             if (world.elapsed >= world.durationSeconds() * .75f) return coop ? "COOP_LATE" : "SOLO_LATE";
@@ -773,10 +775,10 @@ public final class CryptLobby extends ApplicationAdapter {
 
     private void previewEquipment() {
         for (int guard = 0; guard < 8 && world.equipment.rewardsEarned() < 8; guard++) world.equipment.grantReward();
+        for (int round = 0; round < 8 && world.lootPending(); round++)
         for (int slot = 0; slot < 2; slot++) {
             var offer = world.equipment.offers[slot];
-            for (int guard = 0; guard < 8 && offer.pending; guard++)
-                if (!world.equipment.choose(slot, offer.id, 0)) break;
+            if (offer.pending) world.equipment.choose(slot, offer.id, 0);
         }
     }
 
@@ -904,15 +906,17 @@ public final class CryptLobby extends ApplicationAdapter {
             ArenaHudState.Tone.SUCCESS, 4f);
     }
 
-    private void syncLevelUp() {
+    private void syncChoices() {
         boolean visible = screen == Screen.SESSION && overlay == null
-            && world.outcome == ArenaWorld.Outcome.RUNNING && world.levelUpPending();
-        boolean changed = levelUpView.isVisible() != visible;
+            && world.outcome == ArenaWorld.Outcome.RUNNING && world.choicePending();
+        boolean loot = visible && !world.levelUpPending();
+        boolean changed = levelUpView.isVisible() != visible || lootCeremony != loot;
+        lootCeremony = loot;
         levelUpView.setVisible(visible);
         if (visible) { world.clearInputs(); levelUpView.update(world); }
         if (changed) publishProgression();
         if (screen == Screen.SESSION && overlay == null)
-            state.setPhase(visible ? LobbyState.Phase.LEVEL_UP : LobbyState.Phase.SESSION);
+            state.setPhase(visible ? loot ? LobbyState.Phase.LOOT : LobbyState.Phase.LEVEL_UP : LobbyState.Phase.SESSION);
     }
 
     private void publishProgression() {
@@ -998,7 +1002,7 @@ public final class CryptLobby extends ApplicationAdapter {
         refreshClock += delta; profileClock += delta;
         long now = System.currentTimeMillis();
         for (int i = 0; i < 2; i++) state.readControls(i, controls[i], now);
-        syncLevelUp();
+        syncChoices();
         if (screen == Screen.SESSION && overlay == null && hostActive) {
             boolean disconnected = false;
             for (int i = 0; i < 2; i++) disconnected |= world.players[i].active && !controls[i].connected;
@@ -1039,7 +1043,7 @@ public final class CryptLobby extends ApplicationAdapter {
                 if (world.outcome != ArenaWorld.Outcome.RUNNING) showResults();
             }
         }
-        syncLevelUp();
+        syncChoices();
         if (refreshClock >= 0.2f) {
             refreshClock = 0; updateStatus(); publishProgression();
             for (int i = 0; i < 2; i++) {
@@ -1059,7 +1063,7 @@ public final class CryptLobby extends ApplicationAdapter {
         if (hostActive && background.isVisible()) art.menuScene.advance(delta);
         ScreenUtils.clear(0.025f, 0.035f, 0.04f, 1);
         if (screen == Screen.SESSION) arena.render(world, hudState,
-            overlay != null || world.levelUpPending() ? 0f : delta, !world.levelUpPending());
+            overlay != null || world.choicePending() ? 0f : delta, !world.choicePending());
         stage.getViewport().apply(); stage.act(delta); stage.draw();
         if (frameMetrics != null) frameMetrics.endFrame(profileMode(), residentArtBytes(), residentPixmapBytes(),
             Gdx.app.getJavaHeap(), (screen == Screen.SESSION ? arena.drawCalls : 0) + ((SpriteBatch) stage.getBatch()).renderCalls);

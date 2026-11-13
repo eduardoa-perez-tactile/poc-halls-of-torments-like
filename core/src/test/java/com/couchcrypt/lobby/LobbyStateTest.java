@@ -7,6 +7,46 @@ import com.couchcrypt.game.RunEquipment;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LobbyStateTest {
+    @Test void lootPhaseAcceptsOnlyEquipmentAndPreservesPendingChoicesAcrossRecovery() {
+        var state = new LobbyState(); var joined = state.join(null, "first", 1);
+        state.setPhase(LobbyState.Phase.SESSION);
+        var items = equipmentOptions(); var cards = equipmentCards(items);
+        state.publishEquipment(0, 20, 26, items, cards);
+        assertTrue(state.chooseEquipment("first", 20, -1));
+        state.setPhase(LobbyState.Phase.LOOT);
+        var request = new LobbyState.EquipmentRequest();
+        assertTrue(state.pollEquipment(0, request), "Entering loot preserves an in-flight gear choice");
+        assertEquals(20, request.offerId); assertEquals(-1, request.option);
+        assertFalse(state.input("first", 0, 1, 0, true, 2));
+        state.publishEquipment(0, 21, 19, items, cards);
+        assertTrue(state.chooseEquipment("first", 21, 1));
+        state.setPhase(LobbyState.Phase.PAUSED);
+        assertFalse(state.pollEquipment(0, request)); assertFalse(state.chooseEquipment("first", 21, 0));
+        assertEquals(19, state.equipmentFeedback(0).secondsLeft());
+        state.disconnected("first", 3); state.join(joined.token(), "restored", 4);
+        assertEquals(21, state.equipmentFeedback(0).id()); assertEquals(19, state.equipmentFeedback(0).secondsLeft());
+        state.setPhase(LobbyState.Phase.LOOT); state.setHostActive(false);
+        assertFalse(state.chooseEquipment("restored", 21, -1));
+        state.setHostActive(true);
+        assertTrue(state.chooseEquipment("restored", 21, -1)); assertTrue(state.pollEquipment(0, request));
+        assertEquals(-1, request.option);
+        state.publishEquipment(0, 22, 30, items, cards);
+        assertTrue(state.chooseEquipment("restored", 22, 0));
+        state.setPhase(LobbyState.Phase.LEVEL_UP);
+        assertFalse(state.pollEquipment(0, request), "Skill priority cancels queued hidden gear input");
+        state.publishProgression(0, 2, 0, 22, 10, 2, 24, PartyProgression.Upgrade.values());
+        assertTrue(state.chooseUpgrade("restored", 10, 1));
+        state.setPhase(LobbyState.Phase.LOOT);
+        assertFalse(state.pollUpgrade(0, new LobbyState.UpgradeRequest()));
+        assertFalse(state.chooseUpgrade("restored", 10, 0));
+        assertFalse(state.chooseEquipment("restored", 22, 0), "An unacknowledged skill still has priority");
+        state.publishProgression(0, 2, 0, 22, 0, 0, 0, null);
+        assertTrue(state.chooseEquipment("restored", 22, 2));
+        state.setPhase(LobbyState.Phase.SESSION);
+        assertTrue(state.pollEquipment(0, request), "Completion transition preserves the last gear acknowledgment");
+        assertTrue(state.input("restored", 0, 1, 0, false, 5));
+    }
+
     @Test void levelUpPhaseAcceptsOnlyPersonalSkillsAndPreservesThemAcrossPauseAndReconnect() {
         var state = new LobbyState(); var joined = state.join(null, "first", 1);
         state.setPhase(LobbyState.Phase.SESSION);

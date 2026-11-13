@@ -9,7 +9,7 @@ import com.couchcrypt.game.RunEquipment;
 public final class LobbyState {
     public static final long RECONNECT_MILLIS = 45_000;
     public static final long INPUT_TIMEOUT_MILLIS = 300;
-    public enum Phase { LOBBY, SESSION, LEVEL_UP, PAUSED, INVITE, RESULTS }
+    public enum Phase { LOBBY, SESSION, LEVEL_UP, LOOT, PAUSED, INVITE, RESULTS }
     public record Player(int index, boolean connected, boolean reserved, int secondsLeft, long generation) {}
     public record Feedback(float health, float maxHealth, float dodgeCooldown, boolean alive) {}
     /** Reuse one instance per player on the render thread. Axes are screen right and up. */
@@ -153,8 +153,10 @@ public final class LobbyState {
     public synchronized void setPhase(Phase next) {
         if (phase != next) {
             phase = next; clearInputs();
-            if (next != Phase.SESSION && next != Phase.LEVEL_UP) clearUpgradeRequests();
-            else if (next == Phase.LEVEL_UP) for (Slot slot : slots) slot.clearEquipmentRequest();
+            if (next != Phase.SESSION) for (Slot slot : slots) {
+                if (next != Phase.LEVEL_UP) slot.clearUpgradeRequest();
+                if (next != Phase.LOOT) slot.clearEquipmentRequest();
+            }
             if (next == Phase.LOBBY || next == Phase.RESULTS)
                 for (Slot slot : slots) slot.participating = false;
             revision++;
@@ -302,8 +304,10 @@ public final class LobbyState {
         }
     }
 
+    private boolean equipmentChoicePhase() { return phase == Phase.SESSION || phase == Phase.LOOT; }
+
     public synchronized boolean chooseEquipment(String connection, int offerId, int option) {
-        if (!hostActive || phase != Phase.SESSION || offerId <= 0 || option < -1 || option >= 3) return false;
+        if (!hostActive || !equipmentChoicePhase() || offerId <= 0 || option < -1 || option >= 3) return false;
         for (Slot slot : slots) {
             if (!connection.equals(slot.connection)) continue;
             if (slot.offerId > 0 || slot.equipmentId != offerId || slot.equipmentSeconds <= 0
@@ -317,7 +321,7 @@ public final class LobbyState {
 
     public synchronized boolean pollEquipment(int index, EquipmentRequest out) {
         Slot slot = slots[index];
-        if (!slot.equipmentQueued || slot.offerId > 0 || !hostActive || phase != Phase.SESSION || slot.connection == null) return false;
+        if (!slot.equipmentQueued || slot.offerId > 0 || !hostActive || !equipmentChoicePhase() || slot.connection == null) return false;
         out.offerId = slot.equipmentId; out.option = slot.equipmentOption; out.generation = slot.generation;
         slot.equipmentQueued = false;
         return true;
