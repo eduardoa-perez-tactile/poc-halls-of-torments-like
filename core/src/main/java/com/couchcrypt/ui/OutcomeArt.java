@@ -14,12 +14,14 @@ public final class OutcomeArt implements Disposable {
     public final boolean victory;
     public final Texture backdrop, title;
     public final long textureBytes = 1536L * 864 * 4;
+    public final long retainedPixmapBytes = textureBytes;
     private final Pixmap backdropPixels;
     private boolean disposed;
 
     /** Both small wordmarks are prepared before the first frame to avoid transition-time alpha scans. */
     public static final class Titles implements Disposable {
         public final long textureBytes = 2L * TITLE_WIDTH * TITLE_HEIGHT * 4;
+        public final long retainedPixmapBytes = textureBytes;
         private final Texture[] textures = new Texture[2];
         private final Pixmap[] pixels = new Pixmap[2];
         private boolean disposed;
@@ -36,7 +38,7 @@ public final class OutcomeArt implements Disposable {
             }
         }
 
-        private Texture get(boolean victory) {
+        public Texture get(boolean victory) {
             if (disposed) throw new IllegalStateException("Outcome titles have been disposed");
             return textures[victory ? 0 : 1];
         }
@@ -49,17 +51,116 @@ public final class OutcomeArt implements Disposable {
         }
     }
 
-    public OutcomeArt(boolean victory, Titles titles) {
-        if (titles == null) throw new IllegalArgumentException("Shared outcome titles are required");
+    /** Takes ownership of a worker-prepared pixmap; call only on the render thread. */
+    private OutcomeArt(boolean victory, Titles titles, Pixmap background) {
         this.victory = victory;
-        title = titles.get(victory);
-        String path = victory ? "art/end-victory-background.png" : "art/end-defeat-background.png";
-        Pixmap background = bakeBackdrop(path);
         Texture backgroundTexture;
-        try { backgroundTexture = texture(background); }
-        catch (RuntimeException | Error failure) { background.dispose(); throw failure; }
+        Texture titleTexture;
+        try {
+            if (titles == null) throw new IllegalArgumentException("Shared outcome titles are required");
+            titleTexture = titles.get(victory);
+            backgroundTexture = texture(background);
+        } catch (RuntimeException | Error failure) { background.dispose(); throw failure; }
+        title = titleTexture;
         backdropPixels = background;
         backdrop = backgroundTexture;
+    }
+
+    /**
+     * One worker and one replaceable request, rather than an unbounded task queue. Native decode,
+     * crop and downsample run here; texture creation and ownership transfer happen only in poll().
+     */
+    public static final class Loader implements Disposable {
+        @FunctionalInterface interface Decoder { Pixmap decode(boolean victory); }
+        private final Decoder decoder;
+        private final Thread worker;
+        private long generation, requestedId, readyId;
+        private boolean requestedVictory, readyVictory, queued, disposed;
+        private Pixmap prepared;
+        private Throwable failure;
+
+        public Loader() {
+            this(victory -> bakeBackdrop(victory ? "art/end-victory-background.png" : "art/end-defeat-background.png"));
+        }
+
+        Loader(Decoder decoder) {
+            this.decoder = decoder;
+            worker = new Thread(this::run, "outcome-art-decode");
+            worker.setDaemon(true);
+            worker.start();
+        }
+
+        /** Replaces the waiting request. An already running decode will be discarded if stale. */
+        public synchronized long request(boolean victory) {
+            if (disposed) throw new IllegalStateException("Outcome loader has been disposed");
+            discardPrepared();
+            requestedId = ++generation; requestedVictory = victory; queued = true;
+            notifyAll();
+            return requestedId;
+        }
+
+        /** Returns null while waiting. A decode failure is reported once; no GPU work runs on the worker. */
+        public OutcomeArt poll(long id, Titles titles) {
+            Pixmap pixels;
+            boolean victory;
+            synchronized (this) {
+                if (disposed || id != requestedId || readyId != id) return null;
+                if (failure != null) {
+                    Throwable cause = failure; failure = null; readyId = 0;
+                    throw new GdxRuntimeException("Cannot prepare outcome background", cause);
+                }
+                pixels = prepared; victory = readyVictory;
+                prepared = null; readyId = 0;
+            }
+            return new OutcomeArt(victory, titles, pixels);
+        }
+
+        /** Ready CPU pixel storage awaiting render-thread upload; transient source decode is not retained. */
+        public synchronized long preparedPixmapBytes() {
+            return prepared == null ? 0 : (long) prepared.getWidth() * prepared.getHeight() * 4;
+        }
+
+        public synchronized void cancel() {
+            requestedId = ++generation; queued = false; discardPrepared();
+        }
+
+        private void discardPrepared() {
+            if (prepared != null) { prepared.dispose(); prepared = null; }
+            readyId = 0; failure = null;
+        }
+
+        private void run() {
+            while (true) {
+                long id;
+                boolean victory;
+                synchronized (this) {
+                    while (!queued && !disposed) {
+                        try { wait(); }
+                        catch (InterruptedException ignored) { if (disposed) return; }
+                    }
+                    if (disposed) return;
+                    id = requestedId; victory = requestedVictory; queued = false;
+                }
+                Pixmap pixels = null;
+                Throwable problem = null;
+                try { pixels = decoder.decode(victory); }
+                catch (RuntimeException | Error error) { problem = error; }
+                synchronized (this) {
+                    if (disposed || id != requestedId) {
+                        if (pixels != null) pixels.dispose();
+                    } else {
+                        prepared = pixels; readyVictory = victory; readyId = id; failure = problem;
+                    }
+                }
+            }
+        }
+
+        /** Does not block rendering on a native decode. Its final stale result is disposed before exit. */
+        @Override public synchronized void dispose() {
+            if (disposed) return;
+            disposed = true; requestedId = ++generation; queued = false;
+            discardPrepared(); notifyAll(); worker.interrupt();
+        }
     }
 
     private static Pixmap bakeBackdrop(String path) {

@@ -35,12 +35,16 @@ public final class ArenaWorld {
     public final Hazard[] hazards = new Hazard[MAX_HAZARDS];
     public final Effect[] effects = new Effect[MAX_EFFECTS];
     public final PartyProgression progression;
+    public final ArenaTimeline timeline;
     private final float[] inputX = new float[2], inputY = new float[2];
     private final boolean[] pendingDodge = new boolean[2];
     private float accumulator, spawnCountdown;
-    private int randomState, runNumber, eliteMask;
+    private int randomState, runNumber, nextCheckpoint, encounterPhase;
 
-    public ArenaWorld() {
+    public ArenaWorld() { this(ArenaTimeline.SHORT); }
+
+    public ArenaWorld(ArenaTimeline timeline) {
+        this.timeline = java.util.Objects.requireNonNull(timeline);
         for (int i = 0; i < enemies.length; i++) enemies[i] = new Enemy();
         for (int i = 0; i < bolts.length; i++) bolts[i] = new Bolt();
         for (int i = 0; i < pickups.length; i++) pickups[i] = new Pickup();
@@ -53,7 +57,7 @@ public final class ArenaWorld {
 
     public void reset() {
         outcome = Outcome.RUNNING; elapsed = accumulator = 0;
-        kills = souls = activeEnemies = elitesKilled = eliteMask = 0;
+        kills = souls = activeEnemies = elitesKilled = nextCheckpoint = encounterPhase = 0;
         wave = bossPhase = 1; bossSpawned = bossDefeated = false; boss = null;
         swordSwings = arrowsFired = enemyDeaths = pickupsCollected = heroHits = 0;
         spawnCountdown = .65f;
@@ -128,10 +132,12 @@ public final class ArenaWorld {
         }
     }
 
-    public float timeRemaining() { return Math.max(0, ROUND_SECONDS - elapsed); }
+    public float durationSeconds() { return timeline.durationSeconds(); }
+    public int waveCount() { return timeline.phaseCount(); }
+    public float timeRemaining() { return Math.max(0, durationSeconds() - elapsed); }
 
     private void tick() {
-        elapsed += STEP; wave = elapsed < 60 ? 1 : elapsed < 120 ? 2 : 3;
+        elapsed += STEP; wave = timeline.phaseIndex(elapsed) + 1;
         for (Effect e : effects) if (e.active) { e.ttl -= STEP; if (e.ttl <= 0) e.active = false; }
         for (Player p : players) updatePlayer(p);
         updateEnemies(); updateBolts(); updateShots(); updateHazards(); updatePickups(); updateRevival();
@@ -139,16 +145,14 @@ public final class ArenaWorld {
         boolean living = false; for (Player p : players) living |= p.active && p.alive;
         if (!living) { outcome = Outcome.DEFEAT; return; }
         if (bossDefeated) { outcome = Outcome.VICTORY; return; }
-        if (elapsed >= ROUND_SECONDS - .0001f && !bossSpawned) debugStartBoss();
+        if (elapsed >= durationSeconds() - .0001f && !bossSpawned) debugStartBoss();
         if (!bossSpawned) {
-            if (elapsed >= 60 && (eliteMask & 1) == 0) { spawnElite(); eliteMask |= 1; }
-            if (elapsed >= 120 && (eliteMask & 2) == 0) { spawnElite(); eliteMask |= 2; }
+            while (nextCheckpoint < timeline.phaseCount() && elapsed >= timeline.phaseStart(nextCheckpoint)) {
+                EnemyKind elite = timeline.phase(nextCheckpoint++).eliteKind();
+                if (elite != null) spawn(elite, true);
+            }
         }
-        spawnCountdown -= STEP;
-        if (spawnCountdown <= 0) {
-            spawnEnemy();
-            spawnCountdown += bossSpawned ? 2.5f : Math.max(.32f, 1.05f - elapsed * .0036f);
-        }
+        updateEncounters();
     }
 
     private void updatePlayer(Player p) {
@@ -400,34 +404,59 @@ public final class ArenaWorld {
         }
     }
 
-    private void spawnEnemy() {
-        // Leave two slots for scheduled elites; the final encounter can always claim a slot.
-        if (activeEnemies >= MAX_ENEMIES - 2) return;
-        EnemyKind kind = EnemyKind.GHOUL; float roll = random();
-        if (wave >= 2 && roll < .27f) kind = EnemyKind.WRAITH;
-        else if (wave >= 2 && roll < .43f) kind = EnemyKind.CULTIST;
-        else if (wave >= 3 && roll < .65f) kind = EnemyKind.BRUTE;
-        spawn(kind, false);
+    private void updateEncounters() {
+        int phaseIndex = wave - 1;
+        ArenaTimeline.Phase phase = timeline.phase(phaseIndex);
+        if (encounterPhase != phaseIndex) {
+            encounterPhase = phaseIndex;
+            spawnCountdown = 1.4f; // Give a new checkpoint elite a moment of its own.
+        }
+        if (!bossSpawned && phase.breathing(elapsed - timeline.phaseStart(phaseIndex))) {
+            spawnCountdown = Math.min(spawnCountdown, .35f);
+            return; // Existing enemies remain dangerous; only reinforcements pause.
+        }
+        spawnCountdown -= STEP;
+        if (spawnCountdown > 0) return;
+        if (bossSpawned) {
+            if (activeEnemies < MAX_ENEMIES - 2)
+                spawn(phase.pattern().member((int) (random() * phase.pattern().size())), false);
+            spawnCountdown = 2.5f;
+            return;
+        }
+        Player anchor = livingAnchor();
+        float angle = random() * (float) (Math.PI * 2);
+        ArenaTimeline.Pattern pattern = phase.pattern();
+        for (int member = 0; member < pattern.size() && activeEnemies < MAX_ENEMIES - 2; member++) {
+            float offset = (member - (pattern.size() - 1) * .5f) * .3f;
+            spawn(pattern.member(member), false, anchor, angle + offset);
+        }
+        spawnCountdown = phase.encounterInterval();
     }
 
-    private void spawnElite() { spawn(eliteMask == 0 ? EnemyKind.BRUTE : EnemyKind.CULTIST, true); }
-
     private Enemy spawn(EnemyKind kind, boolean elite) {
+        return spawn(kind, elite, livingAnchor(), random() * (float) (Math.PI * 2));
+    }
+
+    private Enemy spawn(EnemyKind kind, boolean elite, Player anchor, float angle) {
         if (activeEnemies >= MAX_ENEMIES) return null;
-        Player anchor = livingAnchor(); if (anchor == null) return null;
+        if (anchor == null) return null;
         for (Enemy e : enemies) {
             if (e.active) continue;
-            float angle = random() * (float) (Math.PI * 2);
             e.radius = kind == EnemyKind.BOSS ? 54 : kind == EnemyKind.BRUTE ? 31 : kind == EnemyKind.WRAITH ? 17 : 20;
-            e.x = clamp(anchor.x + (float) Math.cos(angle) * 620, -HALF_WIDTH + e.radius, HALF_WIDTH - e.radius);
-            e.y = clamp(anchor.y + (float) Math.sin(angle) * 620, -HALF_HEIGHT + e.radius, HALF_HEIGHT - e.radius);
-            if (distanceSquared(e.x, e.y, anchor.x, anchor.y) < 280 * 280) {
-                e.x = clamp(anchor.x + (anchor.x > 0 ? -560 : 560), -HALF_WIDTH + e.radius, HALF_WIDTH - e.radius); e.y = anchor.y;
+            boolean safe = false;
+            for (int attempt = 0; attempt < 12 && !safe; attempt++) {
+                float direction = angle + attempt * 2.3999632f;
+                e.x = clamp(anchor.x + (float) Math.cos(direction) * 620, -HALF_WIDTH + e.radius, HALF_WIDTH - e.radius);
+                e.y = clamp(anchor.y + (float) Math.sin(direction) * 620, -HALF_HEIGHT + e.radius, HALF_HEIGHT - e.radius);
+                safe = true;
+                for (Player p : players) if (p.active && p.alive && distanceSquared(e.x, e.y, p.x, p.y) < 300 * 300)
+                    safe = false;
             }
+            if (!safe) return null; // Skip a reinforcement rather than materializing on either player.
             e.kind = kind; e.elite = elite;
             float health = switch (kind) { case WRAITH -> 18; case BRUTE -> 95; case CULTIST -> 35; case BOSS -> 1100; default -> 32; };
             if (kind == EnemyKind.BOSS) health *= 1 + .6f * (activePlayerCount() - 1);
-            else health *= 1 + elapsed / 900;
+            else health *= 1 + Math.min(elapsed / durationSeconds(), 1) * .2f;
             e.maxHealth = e.health = health * (elite ? 4 : 1);
             e.damage = kind == EnemyKind.BOSS ? 20 : kind == EnemyKind.BRUTE ? 18 : kind == EnemyKind.WRAITH ? 8 : 12;
             e.animTime = random(); e.hitFlash = e.vx = e.vy = e.stunTime = e.windup = 0; e.attackCooldown = kind == EnemyKind.BOSS ? 1.5f : 1;
@@ -439,7 +468,7 @@ public final class ArenaWorld {
     /** Developer fixture: start the final encounter immediately without a survival playthrough. */
     public void debugStartBoss() {
         if (bossSpawned || outcome != Outcome.RUNNING || activePlayerCount() == 0) return;
-        elapsed = Math.max(elapsed, ROUND_SECONDS); wave = 3;
+        elapsed = Math.max(elapsed, durationSeconds()); wave = timeline.phaseCount();
         if (activeEnemies >= MAX_ENEMIES) for (Enemy e : enemies) if (e.active) { e.active = false; activeEnemies--; break; }
         boss = spawn(EnemyKind.BOSS, false); bossSpawned = boss != null; bossPhase = 1;
     }

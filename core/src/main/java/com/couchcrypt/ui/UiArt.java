@@ -43,6 +43,8 @@ public final class UiArt implements Disposable {
     private final Array<Pixmap> generatedPixmaps = new Array<>();
     private final PixmapPacker fontPacker;
     public final long textureBytes;
+    /** Native CPU pixel copies retained for managed Android texture restoration. */
+    public final long retainedPixmapBytes;
 
     public UiArt() {
         PixmapPacker packer = new PixmapPacker(1024, 1024, Pixmap.Format.RGBA8888, 2, false);
@@ -94,6 +96,13 @@ public final class UiArt implements Disposable {
         long bytes = (long) heroes.getWidth() * heroes.getHeight() * 4;
         for (Texture texture : generated) bytes += (long) texture.getWidth() * texture.getHeight() * 4;
         textureBytes = bytes;
+        long retained = 0;
+        for (Pixmap image : generatedPixmaps) retained += (long) image.getWidth() * image.getHeight() * 4;
+        for (PixmapPacker.Page page : fontPacker.getPages()) {
+            Pixmap image = page.getPixmap();
+            retained += (long) image.getWidth() * image.getHeight() * 4;
+        }
+        retainedPixmapBytes = retained;
         if (textureBytes > 32L * 1_048_576) throw new IllegalStateException("UI art exceeds its 32 MiB texture budget");
         Gdx.app.log("Art", "Resident texture budget: " + (textureBytes / 1_048_576f) + " MiB (excludes QR)");
     }

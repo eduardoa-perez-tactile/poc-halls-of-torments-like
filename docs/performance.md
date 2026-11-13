@@ -1,77 +1,81 @@
-# Lobby performance
+# Bounded performance checks
 
-## Targets and design
+The target is 60 FPS (about 16.7 ms per frame) with low memory use. The existing 32 MiB limit applies to resident uncompressed GPU texture data, including QR. It is not a limit on the whole Android process.
 
-Target 60 FPS with a 16.7 ms frame budget and low memory usage. This milestone has a static painted background, two regions of one portrait texture, a shared font atlas, and a small QR texture. There are no gameplay entities, post-processing effects, multisampling, mipmaps, or offscreen framebuffers. Audio is disabled until it is implemented.
+## Measurements
 
-The render loop does not allocate layouts, read files, generate art, or send network data. Lobby snapshots are sampled twice per second; labels change only when their values change. The heartbeat runs on a daemon thread, and host removal queues its socket messages away from the render thread. The QR is generated only when entering the lobby, changing its advertised address, or restoring the app.
+Start the installed Android build with the `profile` intent extra (or desktop `--profile`). `FrameMetrics` allocates two fixed 2,048-entry arrays only in profiling mode and reports about every five seconds or on mode changes. Normal builds do not sample these metrics. Each report includes:
 
-Art/font textures are budgeted below 32 MiB. The initial assets use approximately 16.01 MiB, plus 0.49 MiB for a 360 x 360 QR. GPU texture byte estimates exclude driver overhead. Fonts retain their small CPU atlas for Android GL context recovery; file-backed artwork is restored from assets.
+- Raw frame-start interval p95/p99/max, plus counts above 16.7 and 33.4 ms. Intervals use monotonic time before the simulation delta clamp, so long frames are not hidden.
+- CPU duration of `render()` submission, separately. This excludes asynchronous GPU completion, display presentation and work before the render callback. A low CPU value does not prove the GPU meets its budget.
+- Screen/mode (including solo/co-op boss and paused/results), sample count, final draw calls and memory snapshot. Mode changes preserve the transition interval; a lazy outcome load may appear as a large maximum.
+- `gpuTextureBytes`: bounded RGBA texture storage, including QR. Driver overhead and framebuffer storage are not included.
+- `retainedPixmapBytes`: native CPU pixel copies intentionally kept for managed texture restoration. This includes generated art/font atlases and QR. File-backed portraits are reloaded from their source and have no permanently retained decoded pixmap.
+- `javaHeapBytes`: LibGDX's used Java-heap estimate. It excludes native pixmaps, audio, graphics-driver allocations and much of the Android process.
 
-## Brief initial measurement — 2026-11-12
+Pause/resume reset the frame baseline, so time spent backgrounded is not reported as a rendering stall. Arrays are sorted only when reporting; collection has no per-frame object creation. Reports allocate their log strings. A mode-change report uses the previous mode's latest memory snapshot, rather than mislabeling the newly loaded mode's resources.
 
-Device: Television_1080p, Android 33 ARM64, 1920 x 1080, software SwiftShader rendering on the development Mac. Debug APK; no long playthrough or regression exercise.
+Use Android `dumpsys meminfo com.couchcrypt.tv` for process PSS/native/Java measurements. PSS is an OS estimate, not directly comparable to texture bytes, and includes shared pages proportionally. A short increase may reflect heap growth or collection timing rather than a leak. No arbitrary total-process memory threshold has been introduced.
 
-- Frame counter samples: mostly 60–61 FPS, with some 56–57 FPS readings while development work was active. Consistent 60 FPS is not yet proven.
-- Static home: 9 SpriteBatch draw calls; lobby: 19.
-- Live Java heap samples: approximately 4–9 MiB.
-- Android dumpsys meminfo after entering the lobby: total PSS 55,555 KiB (~54.3 MiB); total RSS 153,664 KiB (~150.1 MiB). PSS/RSS include platform/native costs and are not interchangeable with Java heap or art texture bytes.
-- The headless software emulator reports zero graphics PSS; this does not mean textures cost no memory. Use the resource estimate above and actual hardware graphics accounting when available.
+## Short fixture capture
 
-These are observations from a short foundation check. They do not establish an all-devices frame-rate or memory guarantee. Profile a representative physical TV with hardware rendering before accepting the sustained 60 FPS requirement; gameplay will need its own bounded entity/effect budgets in the next milestone.
+`scripts/capture-performance.py` uses only Python's standard library and an existing ADB forward/relay. It does not build or install an APK, create a relay, touch a physical device, or run a survival playthrough. It restarts the installed profiling build, opens the lobby, creates heartbeat-only synthetic controllers, then uses the existing F6 boss/F7 outcome fixtures. These controllers do not move or dodge; a boss fixture may end in defeat. Read the mode labels rather than treating the entire log as sustained boss rendering.
 
-## Recheck only when relevant
+Example with the current local setup:
 
-The subsequent UI art pass adds two baked textures (512 x 512 and 1024 x 224), totaling 1.875 MiB of GPU data and 1.875 MiB of retained CPU pixmaps. Large painted UI source pixmaps are freed after the one-time startup bake. The estimated art/font texture total is approximately 17.88 MiB plus QR, within the 32 MiB budget. A static gold focus rim adds one small draw layer, with no animation or post-processing.
+```sh
+python3 scripts/capture-performance.py --serial emulator-5554 \
+  --host 192.168.14.248 --forward-port 51849 --fixture boss-coop --seconds 20 --lifecycle
+```
 
-Run `python3 scripts/tv-dev.py --profile`, inspect a few LobbyPerf log lines and one dumpsys meminfo snapshot. F3 displays the same frame/resource summary on desktop. No prolonged automated playtesting is required for the static lobby.
+Other fixtures are `boss-solo`, `results` and `lobby`. Choose the directly relevant fixture; do not run all of them as a default regression suite. Duration defaults to 20 seconds and is bounded to 5–30 seconds; use a short results-only capture for a directly affected transition. Logging starts before entering the fixture so the first transition is included. Logs and beginning/end memory snapshots replace the same fixture's files under ignored `.run/`. The results fixture returns to the lobby once to observe resource release. Optional `--lifecycle` adds one sample victory/lobby transition and a brief Home/resume check, with a resume screenshot; it does not force GL-context loss. This is not a repeated leak test. The script closes synthetic clients, stops its logcat process, and restores a fresh empty lobby, leaving the existing emulator/relay/forward running.
 
-## Approved Home menu
+For a context-restoration check, briefly background/resume the app and inspect the QR/art. QR now retains a managed pixmap and disposes both pixels and texture on replacement/shutdown. Android may retain the GL context on this brief transition, so this verifies lifecycle behavior without proving a forced GL-context loss.
 
-The approved shared theme uses a 1536 x 864 background, 1536 x 384 transparent wordmark, two 1024 x 224 button states, and one 512 x 512 panel. Home, lobby, pause, and dialogs reuse these textures through appropriately scaled nine-slices. The former background and blue/iron UI skins are no longer loaded. Including portraits and the font atlas, the measured art texture footprint is 20.0656 MiB before the QR. Small managed textures retain their CPU pixmaps for Android context recovery. Large source pixmaps are released immediately after baking. A startup check rejects art above the 32 MiB GPU texture budget.
+## Interpretation and limits
 
-Navigation reuses cached backgrounds and styles. Focus uses a separate prepainted gold/cream plate with the same crop and geometry as the normal plate; no framebuffer, glow pass, particle system, or per-frame texture generation is introduced. Buttons and labels remain functional Scene2D controls. Phones receive PNGs encoded once from the small baked textures, including a 512 x 128 logo and 640 x 360 background, avoiding retention/download of full-size paintings. Only a brief visual/navigation check is needed for this art/layout change; the existing joining protocol is unchanged.
+Emulator timings depend on host load, the emulator GPU backend, scheduling and ADB observation overhead. They can reveal stalls, resource accounting errors and regressions; they do not establish sustained 60 FPS on a physical TV. CPU submission time is not GPU timing. Short fixtures do not represent the maximum simultaneous effects/enemies, thermal throttling or a full run's memory behavior.
 
-Brief software-emulator frame samples during this pass ranged from 55 to 61 FPS; a steady 60 FPS guarantee on physical TVs remains unverified. The Home screen used 11 SpriteBatch draw calls. These observations are not a long gameplay benchmark.
+Use one focused build and a short capture after relevant changes. Fix concrete findings, then remeasure only the affected fixture. Physical-TV acceptance should later cover representative hardware at native TV resolution, including the busiest co-op encounter; the user remains responsible for gameplay playtesting.
 
+## 2026-11-13 emulator observation
 
-## First playable slice — current measurement
+One 20-second co-op boss fixture ran on `Television_1080p` / `emulator-5554`, followed by one sample Victory -> lobby -> Home/resume observation. Both synthetic controllers supplied heartbeats only. No full run, physical-phone automation or full regression was performed. Local raw evidence is ignored under `.run/performance-boss-coop.log`, `.memory.txt` and `.resume.png`.
 
-Gameplay adds a 1024x512 managed actor/prop/FX atlas and 512x512 floor texture, exactly 3 MiB. Combined resident art/font texture data is 23.0656 MiB plus QR, checked against a 32 MiB startup budget. Matching small CPU pixmaps are retained for GL context recovery; large source masters are decoded only during startup and disposed immediately after baking.
+Four full windows contained 1,203 boss frames:
 
-Simulation uses fixed pools capped at 64 enemies, 96 bolts and 96 pickups, with a fixed 60 Hz step and bounded catch-up. World rendering uses culled floor diamonds, one actor atlas, no framebuffers/post-processing and one or two scissored cameras. HUD text refreshes at 5 Hz; reusable controller samples avoid render-loop input allocation. Networking and status broadcasts remain outside the render thread.
+| Measurement | Observed range across full windows |
+| --- | --- |
+| Raw interval p95 | 18.59–19.21 ms |
+| Raw interval p99 | 19.41–20.06 ms |
+| CPU submission p95 | 2.33–3.09 ms |
+| CPU submission p99 | 2.97–7.23 ms |
+| Longest boss interval / CPU submission | 40.83 / 40.26 ms |
+| Boss frames above 16.7 / 33.4 ms | 576 / 1 |
 
-A brief debug APK check on the visible Android 33 ARM64 emulator with Apple M2 Max OpenGL translation observed 59–61 FPS, about 5 MiB live Java heap after collection, and 8 combined draw calls in solo combat. This was a short launch/movement/dodge/late-join/split-screen check, not a full survival playthrough or maximum-enemy benchmark. Sustained 60 FPS and total process memory on representative physical TVs remain unverified. Gameplay art is temporary per user direction.
+The existing coarse counter showed about 61 FPS while these raw intervals exposed pacing variation. This capture does **not** satisfy a strict every-frame 16.7 ms claim. The sample Victory transition had an 81.59 ms interval; its render callback CPU maximum was 2.30 ms. In this initial build, synchronous artwork preparation happened before that render callback, illustrating why both metrics are needed. The measured transition prompted the bounded asynchronous fix below; the isolated boss spike has no established cause and did not prompt a speculative simulation/renderer refactor.
 
+| Memory observation | Boss | Active Victory | Lobby after release | Lobby after resume |
+| --- | --- | --- | --- | --- |
+| Accounted GPU textures | 26.31 MiB | 31.37 MiB | 26.31 MiB | 26.31 MiB |
+| Accounted retained CPU pixmaps | 20.31 MiB | 25.37 MiB | 20.31 MiB | 20.31 MiB |
+| Android total PSS | 75.75 MiB | 82.67 MiB | 75.25 MiB | 75.31 MiB |
 
-## Initial framed HUD measurement
-
-The ornate vitals, timer crest, optional boss strip, and notification cards reuse the existing UI paintings, portraits, atlas pixels and font textures. No new textures or framebuffers are allocated. Combined resident texture estimate remains 23.0656 MiB plus QR. Text layouts are cached, stat strings refresh at 5 Hz, and the notification queue reuses three fixed objects. New notices arise only on gameplay transitions, not on every frame.
-
-A brief visual check of the debug APK on the same visible hardware-translated TV emulator observed 60–61 FPS, 21 combined draw calls with the boss preview visible (25 while a notification was also visible), and approximately 5–7 MiB live Java heap after startup collection. This is visual/layout evidence, not a maximum-load or sustained physical-TV benchmark. The four focused HUD-state tests cover queue overflow, duplicate suppression, timing, and boss-data reset/clamping. No full survival playthrough or broad regression run was performed.
-
-
-## Compact unboxed HUD
-
-The latest layout removes painted backplates, timer slabs, portraits, duplicate class labels, and notification paragraphs. Small text and thin rails reuse the same pixel/font atlas resources; the resident texture estimate remains unchanged. Boss and notification presentation stay conditional and bounded. Layouts/stat strings remain cached. This is a visual-only follow-up: desktop/APK compilation and one brief rendering check are appropriate; no new unit tests or regression playthrough are required.
-
-
-## Shared XP and personal upgrades
-
-Progression and per-player offers use fixed objects and three enum references per offer; level entitlement queues are bounded by the level cap (20). No textures or render targets are added. XP/offer presentation copies at 5 Hz; WebSocket serialization remains on server threads. Countdown resolution and upgrade effects happen in the fixed simulation tick, and no tick advances during manual pause/background/disconnect. A short live check used the profiling-only F5 XP grant to show simultaneous level-ups and an actual phone selection while the other player's offer remained open; no full survival playthrough was performed. Focused tests cover progression, real stat effects, timeout/default, late joining, replay/ownership checks, and the real upgrade WebSocket message.
-
-
-## Complete one-arena combat
-
-The wave director, melee cone, arrows, two secondary attacks and final boss add no resident textures. New fixed pools hold 96 hostile shots, 12 warnings and 96 visual effects. Ground rings, sword arcs and lightning reuse the existing atlas pixels and are culled per camera; there are no new framebuffers or post-processing passes. Eight original mono PCM cues total 133,970 bytes on disk and are generated offline, loaded once, then rate-limited during playback.
-
-Thirty focused combat/progression tests passed (ten simulation boundary tests, nine combat fixtures and eleven progression tests). Desktop compilation and the debug APK build passed. A brief emulator fixture verified hero selection, split rendering, the live boss bar and encounter sprites. Samples during the visible emulator check were 60–61 FPS with about 7–8 MiB Java heap and the unchanged 23.0656 MiB art estimate, excluding QR and platform/audio/driver overhead. No full three-minute survival playthrough or sustained physical-TV benchmark was run. The replacement outcome concepts were subsequently approved and layered for runtime.
+Texture accounting remained below 32 MiB, and the outcome's roughly 5.06 MiB texture/pixmap pair was released when returning to the lobby. PSS returned near the end-of-boss baseline in this single observation. Startup PSS was higher (103.61 MiB); decoding/collection timing means those samples are not evidence of a long-term leak. The resumed lobby screenshot showed the QR and both connected controllers. Synthetic clients were then closed and the app restarted into an empty lobby. No fatal runtime error appeared in the captured log. Brief background/resume did not force GL-context loss, and a short capture does not establish long-run memory stability or physical-TV frame pacing.
 
 
-## Approved outcome artwork and Run Details
+## Asynchronous outcome preparation
 
-Both 1024x256 outcome titles (2 MiB) and the 512x384 skill atlas (0.75 MiB) are prepared once during startup. Alpha scanning, icon recentering and normalization do not run when opening Run Details. Only the active 1536x864 outcome scene is loaded on entry, adding 5.0625 MiB; it is disposed on replay/lobby. The UI/game/title/icon baseline is 25.8156 MiB and the outcome total 30.8781 MiB, or about 31.3725 MiB including the 0.49 MiB QR. Source paintings are released after preparation, and retained small pixmaps support managed GL restoration.
+The measured synchronous outcome decode/downsample was moved to one daemon worker. It holds one running decode and one replaceable latest request, without an executor backlog. Results immediately show their prewarmed title, live summary and functional controls over the existing approved crypt backdrop; the final approved outcome scene replaces that backdrop when ready. GPU texture upload remains on the render thread. Only the active outcome backdrop resides on the GPU.
 
-Results skip world/camera rendering. Live summary controls and the unboxed hero/build view use shared fonts, textures and menu styles; no framebuffers or per-frame image processing are introduced. A brief TV check verified both outcome layouts, the new illustrated details view and Back/focus behavior using explicit sample-data fixtures. These screenshots verify UI presentation, not a completed survival playthrough.
+Request generations reject stale Victory/Defeat completions. Returning to lobby, restarting or shutting down cancels pending work and disposes prepared/stale native pixels. Shutdown is nonblocking: a native decode already in progress completes, disposes its stale result and exits. The loader's ready-to-upload CPU pixmap bytes are included in `retainedPixmapBytes`; temporary full-resolution source decode/downsample allocations are transient and visible in process PSS, not reported as permanently retained pixels. The decoded result transfers ownership into the active outcome without keeping a second copy.
 
-Visible-emulator frame samples were mostly 60–61 FPS, with occasional 51–59 FPS readings during transitions/development activity. Shared title/icon preparation removes known Java alpha-scan work from those transitions, but hitch-free transitions and sustained 60 FPS on representative physical TVs remain unverified. The latest results estimate stays below the combined 32 MiB art budget.
+Two focused loader tests cover waiting-request coalescing, stale failure rejection, single-delivery errors, and cancellation/disposal during an in-flight decode. They use an injected failing decoder without GL/native dependencies; visual arrival and resource release are checked in the short integrated transition observation.
+
+### Targeted outcome remeasurement
+
+After the async fix, one eight-second results-only capture included the initial F7 transition and a rapid F7/F8/Back cancellation check. The approved Victory backdrop uploaded successfully, with the same 31.37 MiB combined GPU texture total. The first results window contained 294 frames: interval p95 22.71 ms, p99 33.63 ms, maximum 68.15 ms; CPU submission p95 8.23 ms, p99 16.76 ms, maximum 50.78 ms. The following partial window had interval maximum 52.89 ms. The rapid switch/cancel screenshot showed the lobby, rather than a stale outcome scene. No fatal Android runtime error appeared.
+
+The previously observed outcome maximum was 81.59 ms, versus 68.15 ms in this sample. These are short emulator observations with different warm-up histories, not a controlled proof of a particular speedup. Native image decode/downsampling no longer runs on the render thread, but GPU upload/driver work and initial result rendering still occur there. The new CPU maximum includes those operations; this capture does not isolate their individual costs. The strict every-frame 16.7 ms target remains unverified and was exceeded in this emulator sample. Further optimization should follow a representative physical-TV trace rather than guessing from one emulator maximum.
+
+The capture harness initially stopped after the useful window because a slow ADB screenshot blocked its main-thread synthetic heartbeats. Its finally cleanup still closed clients and restored an empty lobby. Heartbeats/draining now run independently on bounded per-client threads, so ADB operations do not suspend controller liveness; partial memory snapshots are saved immediately. The revised harness passed syntax validation; no additional device run was performed solely to retest that development helper. The targeted log and cancellation screenshot remain under ignored `.run/performance-results.*`. The existing 20-second boss memory observation above is the measured memory baseline; no new full performance/gameplay regression was run.

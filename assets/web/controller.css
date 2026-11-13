@@ -36,44 +36,42 @@ footer { margin-top: 30px; font-size: 12px; }
 #dodge { width: 100%; max-width: 190px; min-height: 108px; margin: 0; padding: 16px 8px; touch-action: none; }
 #dodge.pressed { background-image: url('/art/home-button-focused.png'); }
 .control-label { display: block; color: var(--player); font-size: 11px; letter-spacing: .12em; margin-top: 18px; min-height: 16px; }
-body.playing { height: 100svh; overflow: hidden; touch-action: none; }
-body.playing main { display: flex; flex-direction: column; max-width: 900px; width: 100%; height: 100svh; padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); }
+body.playing { height: 100svh; overflow: hidden; touch-action: auto; }
+body.playing main { display: flex; flex-direction: column; max-width: 1000px; width: 100%; height: 100svh; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
 body.playing header, body.playing h1, body.playing #message, body.playing #connected, body.playing #join-form, body.playing footer { display: none; }
 body.playing .connection-card { border: 0; background: none; padding: 0; }
-body.playing .eyebrow { margin: 6px 0; font-size: 12px; }
-body.playing #game-controls { display: flex; flex: 1; flex-direction: column; justify-content: center; margin: 0; padding: 0; border: 0; background: none; }
+body.playing .eyebrow { margin: 0 0 12px; font-size: 12px; }
+body.playing #game-controls { display: flex; flex: 1; flex-direction: column; justify-content: center; min-height: 0; margin: 0; padding: 0; border: 0; background: none; touch-action: auto; }
+body.playing .touch-controls { width: 100%; flex-shrink: 0; gap: 24px; }
+body.playing .control-label { margin-top: 12px; font-size: 12px; }
+
+/* Choices occupy real layout space; the thumb controls always keep their own area. */
+#upgrade-choices { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: thin; scrollbar-color: var(--gold) #141a1c; padding: 3px; }
+.upgrade-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 6px; text-align: left; }
+.upgrade-heading h2 { margin: 0; color: var(--player); font-size: 14px; letter-spacing: .05em; font-weight: 600; }
+#upgrade-countdown { color: #eee7d8; font-size: 14px; white-space: nowrap; }
+.upgrade-options { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.upgrade-choice { display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 4px; margin: 0; min-height: 80px; padding: 4px 8px; border: solid transparent; border-width: 8px 18px; border-image: url('/art/home-button.png') 20% 14% fill stretch; background: none; touch-action: manipulation; text-align: left; letter-spacing: 0; line-height: 1.3; }
+.upgrade-choice strong { font-size: 16px; overflow-wrap: anywhere; }
+.upgrade-choice span { font-family: system-ui, sans-serif; font-size: 14px; font-weight: 500; line-height: 1.35; overflow-wrap: anywhere; }
+.upgrade-choice.selected, button.upgrade-choice:focus-visible:not(:disabled), button.upgrade-choice:active:not(:disabled) { border-image-source: url('/art/home-button-focused.png'); background-image: none; }
+.upgrade-choice:focus-visible { outline-offset: -3px; outline-width: 2px; }
+.upgrade-choice:disabled { opacity: .68; }
+body.playing.has-upgrade #game-controls { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: clamp(12px, 3svh, 24px); }
+body.playing.has-upgrade #upgrade-choices { align-self: center; max-height: 100%; }
+body.playing.has-upgrade #joystick { width: min(100%, 24svh, 170px); }
+body.playing.has-upgrade #dodge { min-height: 88px; }
 @media (orientation: landscape) {
   body.playing main { padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: max(12px, env(safe-area-inset-bottom)); }
   body.playing .touch-controls { gap: clamp(40px, 20vw, 220px); padding: 0 24px; }
   body.playing #joystick { width: min(100%, 48svh, 210px); }
   body.playing #dodge { max-width: 190px; min-height: clamp(82px, 28svh, 120px); }
-  body.playing .control-label { margin-top: 12px; }
-}
-
-
-/* Personal level-up choices do not cover or disable the two-thumb controller. */
-body.playing #game-controls { position: relative; min-height: 0; }
-body.playing .touch-controls { width: 100%; }
-#upgrade-choices { position: absolute; top: 0; left: 0; right: 0; touch-action: manipulation; }
-.upgrade-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
-.upgrade-heading h2 { margin: 0; color: var(--player); font-size: 12px; letter-spacing: .1em; font-weight: 600; }
-#upgrade-countdown { color: #eee7d8; font-size: 12px; white-space: nowrap; }
-.upgrade-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.upgrade-choice { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; margin: 0; min-height: 76px; padding: 10px 9px; touch-action: manipulation; letter-spacing: 0; line-height: 1.15; }
-.upgrade-choice strong { font-size: 14px; overflow-wrap: anywhere; }
-.upgrade-choice span { font-family: system-ui, sans-serif; font-size: 11px; font-weight: 500; line-height: 1.25; overflow-wrap: anywhere; }
-.upgrade-choice.selected { background-image: url('/art/home-button-focused.png'); }
-.upgrade-choice:disabled { opacity: .68; }
-body.playing.has-upgrade #game-controls { justify-content: flex-end; }
-body.playing.has-upgrade .touch-controls { margin-top: 112px; }
-@media (orientation: landscape) {
-  body.playing.has-upgrade .touch-controls { padding: 0 24px; }
-  body.playing.has-upgrade #joystick { width: min(100%, 32svh, 160px); }
-  body.playing.has-upgrade #dodge { min-height: clamp(64px, 23svh, 90px); }
-  .upgrade-choice { min-height: 64px; padding: 8px 16px; }
-}
-@media (max-width: 360px) {
-  body.playing.has-upgrade main { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
-  .upgrade-choice { padding-left: 7px; padding-right: 7px; }
-  .upgrade-choice strong { font-size: 13px; }
+  body.playing.has-upgrade #game-controls { grid-template-columns: minmax(100px, 1fr) minmax(200px, 1.7fr) minmax(100px, 1fr); grid-template-rows: minmax(0, 1fr); column-gap: 16px; }
+  body.playing.has-upgrade .touch-controls { display: contents; }
+  body.playing.has-upgrade .movement-control { grid-column: 1; grid-row: 1; align-self: center; }
+  body.playing.has-upgrade .dodge-control { grid-column: 3; grid-row: 1; align-self: center; }
+  body.playing.has-upgrade #upgrade-choices { grid-column: 2; grid-row: 1; }
+  body.playing.has-upgrade #joystick { width: min(100%, 38svh, 180px); }
+  body.playing.has-upgrade #dodge { min-height: clamp(80px, 25svh, 100px); }
+  body.playing.has-upgrade .upgrade-choice { min-height: 76px; }
 }
