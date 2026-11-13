@@ -37,6 +37,7 @@ import com.couchcrypt.ui.UiArt;
 import com.couchcrypt.ui.OutcomeArt;
 import com.couchcrypt.ui.BuildIcons;
 import com.couchcrypt.ui.RunDetailsView;
+import com.couchcrypt.ui.CharacterInfoView;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
 import com.google.zxing.qrcode.QRCodeWriter;
@@ -46,7 +47,7 @@ import java.util.List;
 import java.util.Map;
 
 public final class CryptLobby extends ApplicationAdapter {
-    private enum Screen { HOME, LOBBY, SESSION, INVITE, RESULTS }
+    private enum Screen { HOME, LOBBY, SESSION, INVITE, CHARACTER_INFO, RESULTS }
     private enum Modal { GENERAL, PAUSE, RETURN_CONFIRM, SETTINGS_NETWORK }
     private final GameConfig config;
     private final LobbyState state = new LobbyState();
@@ -76,6 +77,8 @@ public final class CryptLobby extends ApplicationAdapter {
     private BuildIcons buildIcons;
     private boolean resultDetails;
     private RemoteButton resultDetailsLink;
+    private int characterInfoSlot, characterInfoFocus;
+    private boolean characterInfoInvitation;
     private final ArenaWorld.Hero[] selectedHeroes = {ArenaWorld.Hero.WARDEN, ArenaWorld.Hero.RANGER};
     private int notifiedWave = 1, notifiedEliteKills;
     private boolean bossAnnounced, enrageAnnounced, hudPreview;
@@ -319,12 +322,14 @@ public final class CryptLobby extends ApplicationAdapter {
             boolean invitation = screen == Screen.INVITE;
             List<String> labels = new ArrayList<>(); List<Runnable> actions = new ArrayList<>();
             labels.add("WARDEN  /  SWORD SWEEP"); actions.add(() -> { selectedHeroes[index] = ArenaWorld.Hero.WARDEN; showPartyScreen(invitation); });
+            labels.add("WARDEN INFO"); actions.add(() -> showCharacterInfo(index, ArenaWorld.Hero.WARDEN, invitation, 1));
             labels.add("RANGER  /  BOW"); actions.add(() -> { selectedHeroes[index] = ArenaWorld.Hero.RANGER; showPartyScreen(invitation); });
+            labels.add("RANGER INFO"); actions.add(() -> showCharacterInfo(index, ArenaWorld.Hero.RANGER, invitation, 3));
             if (player.reserved()) {
                 labels.add("REMOVE CONTROLLER"); actions.add(() -> { server.remove(index); showPartyScreen(invitation); });
             }
             labels.add("BACK"); actions.add(this::closeModal);
-            modal("Choose a hero", "Warden sweeps nearby enemies with a sword. Ranger fires arrows from a distance. Both attack automatically.",
+            modal("Choose a hero", "Attacks are automatic. View a hero's story, base stats and available skills before choosing.",
                 labels.toArray(String[]::new), actions.toArray(Runnable[]::new));
             return;
         }
@@ -333,7 +338,25 @@ public final class CryptLobby extends ApplicationAdapter {
                 new String[]{"BACK TO LOBBY"}, new Runnable[]{this::closeModal}); return;
         }
         modal("Player " + (index + 1), "Remove this controller to free its place for another phone?",
-            new String[]{"KEEP PLAYER", "REMOVE PLAYER"}, new Runnable[]{this::closeModal, () -> { server.remove(index); closeModal(); updateStatus(); }});
+            new String[]{"HERO INFO", "KEEP PLAYER", "REMOVE PLAYER"}, new Runnable[]{
+                () -> showCharacterInfo(index, world.players[index].hero, true, 0), this::closeModal,
+                () -> { server.remove(index); closeModal(); updateStatus(); }});
+    }
+
+    private void showCharacterInfo(int slot, ArenaWorld.Hero hero, boolean invitation, int returnFocus) {
+        characterInfoSlot = slot; characterInfoInvitation = invitation; characterInfoFocus = returnFocus;
+        reset(Screen.CHARACTER_INFO);
+        // Leave the existing LOBBY/INVITE phase intact: viewing lore never changes joining or a paused run.
+        content.setBackground(art.scrim); content.pad(0);
+        content.add(CharacterInfoView.create(art, hero, buildIcons.regions,
+            this::backFromCharacterInfo, buttons::add)).grow();
+        content.validate(); setFocus(0);
+    }
+
+    private void backFromCharacterInfo() {
+        showPartyScreen(characterInfoInvitation);
+        managePlayer(characterInfoSlot);
+        setFocus(characterInfoFocus);
     }
 
     private void startSession() {
@@ -628,6 +651,7 @@ public final class CryptLobby extends ApplicationAdapter {
                 else if (modalKind == Modal.SETTINGS_NETWORK) settings();
                 else closeModal();
             } else if (screen == Screen.SESSION) showPause();
+            else if (screen == Screen.CHARACTER_INFO) backFromCharacterInfo();
             else if (screen == Screen.RESULTS) { if (resultDetails) backToResults(); else showLobby(); }
             else if (partyScreen()) backFromParty(); else confirmExit();
             return true;
@@ -687,7 +711,8 @@ public final class CryptLobby extends ApplicationAdapter {
 
     private void publishProgression() {
         var progression = world.progression;
-        boolean inRun = (screen == Screen.SESSION || screen == Screen.INVITE) && world.outcome == ArenaWorld.Outcome.RUNNING;
+        boolean inRun = (screen == Screen.SESSION || screen == Screen.INVITE
+            || screen == Screen.CHARACTER_INFO && characterInfoInvitation) && world.outcome == ArenaWorld.Outcome.RUNNING;
         for (int i = 0; i < 2; i++) {
             var offer = progression.offers[i];
             boolean pending = inRun && world.players[i].active && offer.pending;

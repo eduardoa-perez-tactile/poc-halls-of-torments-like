@@ -6,9 +6,18 @@ public final class ArenaWorld {
     public static final int MAX_ENEMIES = 64, MAX_BOLTS = 96, MAX_PICKUPS = 96;
     public static final int MAX_SHOTS = 96, MAX_HAZARDS = 12, MAX_EFFECTS = 96;
     public static final float STEP = 1f / 60f;
-    private static final float DODGE_DURATION = .22f, DODGE_COOLDOWN = 2.4f, PLAYER_RADIUS = 20f;
+    private static final float DODGE_DURATION = .22f, PLAYER_RADIUS = 20f;
     public enum Outcome { RUNNING, VICTORY, DEFEAT }
-    public enum Hero { WARDEN, RANGER }
+    public enum Hero {
+        WARDEN(100, 28, .7f, 180, 160, 2.4f),
+        RANGER(100, 16, .55f, 198, 800, 2.4f);
+
+        public final float baseHealth, baseDamage, attackInterval, moveSpeed, attackRange, dodgeCooldown;
+        Hero(float baseHealth, float baseDamage, float attackInterval, float moveSpeed, float attackRange, float dodgeCooldown) {
+            this.baseHealth = baseHealth; this.baseDamage = baseDamage; this.attackInterval = attackInterval;
+            this.moveSpeed = moveSpeed; this.attackRange = attackRange; this.dodgeCooldown = dodgeCooldown;
+        }
+    }
     public enum EnemyKind { GHOUL, WRAITH, BRUTE, CULTIST, BOSS }
     public enum EffectKind { SLASH, HIT, DEATH, AURA, LIGHTNING }
 
@@ -66,7 +75,7 @@ public final class ArenaWorld {
     }
 
     private void resetBuild(Player p) {
-        p.maxHealth = p.health = 100;
+        p.maxHealth = p.health = p.hero.baseHealth;
         p.damageMultiplier = p.attackRateMultiplier = p.moveMultiplier = p.dodgeCooldownMultiplier = 1;
         p.cleaveMultiplier = p.pickupMultiplier = 1; p.critChance = 0;
         p.projectileCount = 1; p.pierce = p.auraLevel = p.stormLevel = 0;
@@ -154,10 +163,10 @@ public final class ArenaWorld {
             float inverse = 1f / (float) Math.sqrt(magnitude); p.facingX = x * inverse; p.facingY = y * inverse;
         }
         if (dodge && p.dodgeCooldown <= 0 && p.dodgeTime <= 0) {
-            p.dodgeTime = DODGE_DURATION; p.dodgeCooldown = DODGE_COOLDOWN * p.dodgeCooldownMultiplier;
+            p.dodgeTime = DODGE_DURATION; p.dodgeCooldown = p.hero.dodgeCooldown * p.dodgeCooldownMultiplier;
             p.invulnerable = Math.max(p.invulnerable, DODGE_DURATION); p.dodgeX = p.facingX; p.dodgeY = p.facingY;
         }
-        float speed = (p.hero == Hero.RANGER ? 198 : 180) * p.moveMultiplier;
+        float speed = p.hero.moveSpeed * p.moveMultiplier;
         if (p.dodgeTime > 0) {
             float duration = Math.min(STEP, p.dodgeTime); p.x += p.dodgeX * speed * 3 * duration;
             p.y += p.dodgeY * speed * 3 * duration; p.dodgeTime = Math.max(0, p.dodgeTime - STEP); p.walkTime += STEP * 2;
@@ -171,7 +180,7 @@ public final class ArenaWorld {
     }
 
     private void attack(Player p) {
-        float reach = p.hero == Hero.WARDEN ? 160 * p.cleaveMultiplier : 800;
+        float reach = p.hero.attackRange * (p.hero == Hero.WARDEN ? p.cleaveMultiplier : 1);
         Enemy target = nearest(p.x, p.y, reach, 0);
         if (target == null) return;
         float dx = target.x - p.x, dy = target.y - p.y, length = length(dx, dy);
@@ -185,7 +194,7 @@ public final class ArenaWorld {
                 if (!e.active) continue;
                 float ex = e.x - p.x, ey = e.y - p.y, distance = length(ex, ey);
                 if (distance > reach + e.radius || (ex * p.facingX + ey * p.facingY) / distance < halfArcCos) continue;
-                hit(e, critical(p, 28 * p.damageMultiplier), p.slot);
+                hit(e, critical(p, p.hero.baseDamage * p.damageMultiplier), p.slot);
                 if (e.active) {
                     e.stunTime = Math.max(e.stunTime, e.kind == EnemyKind.BOSS ? .02f : .16f);
                     float knockback = e.kind == EnemyKind.BOSS ? 3 : e.kind == EnemyKind.BRUTE ? 12 : 25;
@@ -193,7 +202,7 @@ public final class ArenaWorld {
                     e.y = clamp(e.y + ey / distance * knockback, -HALF_HEIGHT + e.radius, HALF_HEIGHT - e.radius);
                 }
             }
-            p.attackCooldown = .7f / p.attackRateMultiplier;
+            p.attackCooldown = p.hero.attackInterval / p.attackRateMultiplier;
         } else {
             int count = Math.max(1, Math.min(5, p.projectileCount));
             float angle = (float) Math.atan2(dy, dx);
@@ -202,10 +211,10 @@ public final class ArenaWorld {
                 float direction = angle + (i - (count - 1) * .5f) * .13f;
                 b.active = true; b.x = p.x; b.y = p.y;
                 b.vx = (float) Math.cos(direction) * 760; b.vy = (float) Math.sin(direction) * 760;
-                b.ttl = 1.2f; b.owner = p.slot; b.damage = critical(p, 16 * p.damageMultiplier);
+                b.ttl = 1.2f; b.owner = p.slot; b.damage = critical(p, p.hero.baseDamage * p.damageMultiplier);
                 b.pierce = Math.max(0, Math.min(3, p.pierce)); b.hitMask = 0; arrowsFired++;
             }
-            p.attackCooldown = .55f / p.attackRateMultiplier;
+            p.attackCooldown = p.hero.attackInterval / p.attackRateMultiplier;
         }
     }
 

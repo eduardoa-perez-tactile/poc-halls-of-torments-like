@@ -62,6 +62,7 @@ The gameplay artwork is temporary pending a separate isometric art pass; the cur
 ## Complete arena loop
 
 - Choose **Warden** (sword cone) or **Ranger** (bow) on each TV lobby player card. Either hero works in solo; each participant keeps that hero for the run.
+- Open **Info** from character selection to read the hero's short bio, base stats and all learnable skills. The TV remote browses this reference; closing it preserves your selected hero.
 - Survive three escalating waves of ghouls, fast wraiths, brutes and ranged cultists. Elite checkpoints reward souls and healing. At three minutes, defeat **the Hollow Sovereign** to win; reaching zero on the wave timer does not grant victory.
 - One connected player gets a full-screen view. Two get independent vertical split-screen cameras in the same world.
 - Invite a second phone from Pause; it enters beside its companion when resumed.
@@ -70,7 +71,7 @@ The gameplay artwork is temporary pending a separate isometric art pass; the cur
 - Use the joystick to move and Dodge to escape. Warden hits a cone and knocks enemies back; Ranger fires arrows. Weapon traits add wider sweeps, multishot and piercing. Additional choices unlock a radial soul attack, chain lightning, critical hits and pickup attraction.
 - Collected souls award shared XP: the party levels together, with matching level/XP shown for each player. Each phone has 30 seconds to pick its own upgrade while combat continues; expiry applies the first offer. Manual pause freezes the timer. Additional earned levels queue choices, and a late companion receives catch-up choices.
 - A living ally can revive a fallen companion by staying nearby for two seconds. If everyone falls, the run ends.
-- Victory and Defeat use their approved painted scenes and separate title art, with live time/level/kill summaries. The remote selects Play/Try Again, Return to Lobby, or Run Details for unboxed hero illustrations, damage/revive highlights and illustrated skill ranks.
+- Victory and Defeat use their approved painted scenes and separate title art, with live time/level/kill summaries. The remote selects Play/Try Again, Return to Lobby, or Run Details for larger unboxed hero illustrations, damage/revive highlights, skill effect summaries and ranks.
 - Short original sound cues cover combat, pickups, levels and outcomes. Toggle Sound in Settings. Regenerate the compact mono WAV assets with `python3 scripts/GenerateCombatAudio.py`.
 
 ## Focused verification
