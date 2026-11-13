@@ -6,6 +6,7 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Vector2;
@@ -16,6 +17,8 @@ import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.scenes.scene2d.ui.Button;
+import com.badlogic.gdx.scenes.scene2d.utils.BaseDrawable;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.ScreenUtils;
@@ -24,12 +27,16 @@ import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.couchcrypt.game.ArenaWorld;
 import com.couchcrypt.game.ArenaHudState;
 import com.couchcrypt.game.GameArt;
+import com.couchcrypt.game.GameAudio;
 import com.couchcrypt.game.ArenaRenderer;
 import com.couchcrypt.lobby.JoinServer;
 import com.couchcrypt.lobby.LanAddress;
 import com.couchcrypt.lobby.LobbyState;
 import com.couchcrypt.ui.RemoteButton;
 import com.couchcrypt.ui.UiArt;
+import com.couchcrypt.ui.OutcomeArt;
+import com.couchcrypt.ui.BuildIcons;
+import com.couchcrypt.ui.RunDetailsView;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
 import com.google.zxing.qrcode.QRCodeWriter;
@@ -63,6 +70,15 @@ public final class CryptLobby extends ApplicationAdapter {
     private boolean finalWarning;
     private GameArt gameArt;
     private ArenaRenderer arena;
+    private GameAudio audio;
+    private OutcomeArt outcomeArt;
+    private OutcomeArt.Titles outcomeTitles;
+    private BuildIcons buildIcons;
+    private boolean resultDetails;
+    private RemoteButton resultDetailsLink;
+    private final ArenaWorld.Hero[] selectedHeroes = {ArenaWorld.Hero.WARDEN, ArenaWorld.Hero.RANGER};
+    private int notifiedWave = 1, notifiedEliteKills;
+    private boolean bossAnnounced, enrageAnnounced, hudPreview;
     private final LobbyState.Controls[] controls = {new LobbyState.Controls(), new LobbyState.Controls()};
     private final long[] generations = new long[2];
     private final LobbyState.UpgradeRequest[] upgradeRequests = {new LobbyState.UpgradeRequest(), new LobbyState.UpgradeRequest()};
@@ -85,10 +101,13 @@ public final class CryptLobby extends ApplicationAdapter {
         stage = new Stage(new FitViewport(1920, 1080));
         art = new UiArt();
         gameArt = new GameArt();
+        outcomeTitles = new OutcomeArt.Titles();
+        buildIcons = new BuildIcons();
         arena = new ArenaRenderer(gameArt, art);
-        if (art.textureBytes + gameArt.textureBytes > 32L * 1_048_576)
+        audio = new GameAudio();
+        if (residentArtBytes() > 32L * 1_048_576)
             throw new IllegalStateException("Combined art exceeds 32 MiB texture budget");
-        Gdx.app.log("GameArt", "Combined resident textures: " + (art.textureBytes + gameArt.textureBytes) / 1_048_576f + " MiB");
+        Gdx.app.log("GameArt", "Combined resident textures: " + residentArtBytes() / 1_048_576f + " MiB");
         homeBackground = new TextureRegionDrawable(art.homeBackdrop);
         partyBackground = homeBackground;
         background = new Image(partyBackground);
@@ -132,7 +151,13 @@ public final class CryptLobby extends ApplicationAdapter {
 
     private void reset(Screen next) {
         if (overlay != null) closeModal();
-        screen = next; content.clearChildren(); buttons.clear(); focus = 0;
+        screen = next; content.clearChildren(); content.setBackground((com.badlogic.gdx.scenes.scene2d.utils.Drawable) null); buttons.clear(); focus = 0;
+        resultDetailsLink = null;
+        if (next != Screen.RESULTS) {
+            resultDetails = false;
+            background.setDrawable(homeBackground);
+            if (outcomeArt != null) { outcomeArt.dispose(); outcomeArt = null; }
+        }
         background.setDrawable(next == Screen.HOME ? homeBackground : partyBackground);
         boolean gameView = next == Screen.SESSION || next == Screen.RESULTS;
         background.setVisible(!gameView);
@@ -172,8 +197,9 @@ public final class CryptLobby extends ApplicationAdapter {
     }
 
     private void settings() {
-        modal("Settings", "Manage the local connection used by your phones.",
-            new String[]{"NETWORK", "BACK"}, new Runnable[]{() -> network(true), this::closeModal});
+        modal("Settings", "Sound and local phone connection.",
+            new String[]{audio.enabled() ? "SOUND: ON" : "SOUND: OFF", "NETWORK", "BACK"},
+            new Runnable[]{() -> { audio.setEnabled(!audio.enabled()); settings(); }, () -> network(true), this::closeModal});
     }
 
     private void confirmExit() {
@@ -225,13 +251,13 @@ public final class CryptLobby extends ApplicationAdapter {
         card.pad(24);
         card.add(art.label(index == 0 ? "PLAYER I" : "PLAYER II", art.section,
             index == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO)).padBottom(10).row();
-        Image portrait = new Image(index == 0 ? art.knight : art.ranger);
+        Image portrait = new Image(selectedHeroes[index] == ArenaWorld.Hero.WARDEN ? art.knight : art.ranger);
         portrait.setScaling(Scaling.fit);
         card.add(portrait).size(380, 300).padBottom(10).row();
         Label status = art.label("AWAITING A SOUL", art.body, UiArt.GOLD);
         if (index == 0) firstStatus = status; else secondStatus = status;
         card.add(status).padBottom(12).row();
-        card.add(art.label(index == 0 ? "SOLO OR CO-OP" : "Join later from Pause", art.small, UiArt.MUTED));
+        card.add(art.label(selectedHeroes[index] == ArenaWorld.Hero.WARDEN ? "WARDEN  /  SWORD SWEEP" : "RANGER  /  BOW", art.small, UiArt.MUTED));
         return card;
     }
 
@@ -289,6 +315,19 @@ public final class CryptLobby extends ApplicationAdapter {
     private void managePlayer(int index) {
         var snapshot = state.snapshot(System.currentTimeMillis());
         var player = index == 0 ? snapshot.first() : snapshot.second();
+        if (screen == Screen.LOBBY || !world.players[index].active || generations[index] != player.generation()) {
+            boolean invitation = screen == Screen.INVITE;
+            List<String> labels = new ArrayList<>(); List<Runnable> actions = new ArrayList<>();
+            labels.add("WARDEN  /  SWORD SWEEP"); actions.add(() -> { selectedHeroes[index] = ArenaWorld.Hero.WARDEN; showPartyScreen(invitation); });
+            labels.add("RANGER  /  BOW"); actions.add(() -> { selectedHeroes[index] = ArenaWorld.Hero.RANGER; showPartyScreen(invitation); });
+            if (player.reserved()) {
+                labels.add("REMOVE CONTROLLER"); actions.add(() -> { server.remove(index); showPartyScreen(invitation); });
+            }
+            labels.add("BACK"); actions.add(this::closeModal);
+            modal("Choose a hero", "Warden sweeps nearby enemies with a sword. Ranger fires arrows from a distance. Both attack automatically.",
+                labels.toArray(String[]::new), actions.toArray(Runnable[]::new));
+            return;
+        }
         if (!player.reserved()) {
             modal("An empty place", "Player " + (index + 1) + " joins by scanning the QR code on their phone.",
                 new String[]{"BACK TO LOBBY"}, new Runnable[]{this::closeModal}); return;
@@ -300,9 +339,11 @@ public final class CryptLobby extends ApplicationAdapter {
     private void startSession() {
         if (state.snapshot(System.currentTimeMillis()).connected() < 1 || server == null || host == null) return;
         world.reset(); hudState.reset(); finalWarning = false; notifiedLevel = 1;
+        notifiedWave = 1; notifiedEliteKills = 0; bossAnnounced = enrageAnnounced = hudPreview = false;
         for (int i = 0; i < 2; i++) { previouslyAlive[i] = false; lowHealthNotified[i] = false; }
         reconcilePlayers();
-        hudState.notify("THE DESCENT BEGINS", "Survive the crypt. Gather the fallen souls.", ArenaHudState.Tone.INFO, 4f);
+        audio.reset(world);
+        hudState.notify("THE DESCENT BEGINS", "Survive the waves, then defeat the Hollow Sovereign.", ArenaHudState.Tone.INFO, 4f);
         arena.resetCameras();
         showSession();
         publishProgression();
@@ -316,6 +357,7 @@ public final class CryptLobby extends ApplicationAdapter {
             if (slot.connected()) {
                 if (generations[i] != slot.generation()) world.deactivatePlayer(i);
                 boolean joining = !world.players[i].active;
+                if (joining) world.setHero(i, selectedHeroes[i]);
                 world.activatePlayer(i);
                 previouslyAlive[i] = world.players[i].alive;
                 if (joining && world.elapsed > 0) {
@@ -344,6 +386,7 @@ public final class CryptLobby extends ApplicationAdapter {
     }
 
     private void showPause() {
+        audio.stop();
         world.clearInputs();
         state.setPhase(LobbyState.Phase.PAUSED);
         modal("Paused", "Resume, invite a companion, or restart using the TV remote.\nIf a phone disconnects, reconnect it or remove it under Invite Player 2.",
@@ -367,13 +410,106 @@ public final class CryptLobby extends ApplicationAdapter {
         modalKind = Modal.RETURN_CONFIRM;
     }
 
-    private void showResults() {
-        reset(Screen.RESULTS);
+    /** Profiling-only sample data for reviewing both end screens without playing a full run. */
+    private void previewResults(boolean victory) {
+        world.reset();
+        for (int i = 0; i < 2; i++) { world.setHero(i, selectedHeroes[i]); world.activatePlayer(i); }
+        world.progression.addXp(96);
+        for (int i = 0; i < 2; i++) {
+            while (world.progression.offers[i].pending)
+                world.progression.choose(i, world.progression.offers[i].id, 1);
+            var player = world.players[i];
+            player.kills = i == 0 ? 81 : 62; player.damageDealt = i == 0 ? 4820 : 3960;
+            player.damageTaken = i == 0 ? 154 : 112; player.revives = i == 0 ? 1 : 2;
+        }
+        world.elapsed = 214; world.kills = 143; world.souls = 96;
+        world.bossDefeated = victory;
+        world.outcome = victory ? ArenaWorld.Outcome.VICTORY : ArenaWorld.Outcome.DEFEAT;
+        showResults();
+    }
+
+    private void prepareResults() {
+        boolean victory = world.outcome == ArenaWorld.Outcome.VICTORY;
+        if (outcomeArt == null || outcomeArt.victory != victory) {
+            if (outcomeArt != null) { outcomeArt.dispose(); outcomeArt = null; }
+            outcomeArt = new OutcomeArt(victory, outcomeTitles);
+            long bytes = residentArtBytes();
+            if (bytes > 32L * 1_048_576) throw new IllegalStateException("Outcome art exceeds combined texture budget");
+            Gdx.app.log("OutcomeArt", "Combined resident art: " + bytes / 1_048_576f + " MiB (excludes QR)");
+        }
         state.setPhase(LobbyState.Phase.RESULTS);
-        modal(world.outcome == ArenaWorld.Outcome.VICTORY ? "The crypt endures no longer" : "Your descent ends here",
-            (world.outcome == ArenaWorld.Outcome.VICTORY ? "SURVIVED" : "FALLEN") + "  /  " + (int) world.elapsed
-                + " SECONDS\n\n" + world.kills + " SLAIN  /  " + world.souls + " SOULS GATHERED",
-            new String[]{"RESTART RUN", "RETURN TO LOBBY"}, new Runnable[]{this::startSession, this::showLobby});
+        background.setDrawable(new TextureRegionDrawable(outcomeArt.backdrop));
+        background.setVisible(true); shade.setVisible(false);
+    }
+
+    private void showResults() {
+        reset(Screen.RESULTS); prepareResults(); resultDetails = false;
+        content.pad(0);
+        Image title = new Image(outcomeArt.title); title.setScaling(Scaling.fit);
+        title.setTouchable(Touchable.disabled); title.setBounds(360, 790, 1200, 230); content.addActor(title);
+        Label subtitle = art.label(outcomeArt.victory ? "THE HOLLOW SOVEREIGN HAS FALLEN" : "THE CRYPT CLAIMS ANOTHER SOUL", art.section, UiArt.IVORY);
+        subtitle.setFontScale(.88f); subtitle.setAlignment(Align.center);
+        subtitle.setBounds(240, 730, 1440, 60); content.addActor(subtitle);
+        Label summary = art.label(formatTime(world.elapsed) + "   /   LEVEL " + world.progression.level + "   /   " + world.kills + " SLAIN", art.section, UiArt.IVORY);
+        summary.setFontScale(.85f); summary.setAlignment(Align.center);
+        summary.setBounds(400, 250, 1120, 40); content.addActor(summary);
+        Table actions = new Table();
+        actions.add(resultAction(outcomeArt.victory ? "PLAY AGAIN" : "TRY AGAIN", this::playAgain)).width(500).height(94).padRight(32);
+        actions.add(resultAction("RETURN TO LOBBY", this::showLobby)).width(500).height(94);
+        actions.setBounds(444, 126, 1032, 94); content.addActor(actions);
+        Button.ButtonStyle normal = new Button.ButtonStyle(), focused = new Button.ButtonStyle();
+        normal.up = new ResultUnderline(false); normal.down = new ResultUnderline(true);
+        focused.up = focused.down = new ResultUnderline(true);
+        resultDetailsLink = new RemoteButton(normal, focused, this::showRunDetails);
+        resultDetailsLink.pad(0); resultDetailsLink.add(art.label("RUN DETAILS", art.section, UiArt.IVORY));
+        resultDetailsLink.setBounds(800, 46, 320, 58);
+        buttons.add(resultDetailsLink); content.addActor(resultDetailsLink);
+        content.validate(); actions.validate(); setFocus(0);
+    }
+
+    private void playAgain() {
+        if (state.snapshot(System.currentTimeMillis()).connected() > 0) startSession();
+        else showLobby();
+    }
+
+    private RemoteButton resultAction(String text, Runnable command) {
+        RemoteButton result = button(command);
+        result.add(art.label(text, art.section, UiArt.BUTTON_INK));
+        return result;
+    }
+
+    private final class ResultUnderline extends BaseDrawable {
+        private final boolean selected;
+        private ResultUnderline(boolean selected) { this.selected = selected; }
+        @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float x, float y, float width, float height) {
+            Color saved = batch.getColor();
+            float r = saved.r, g = saved.g, b = saved.b, a = saved.a;
+            batch.setColor(UiArt.GOLD.r, UiArt.GOLD.g, UiArt.GOLD.b, selected ? 1f : .45f);
+            art.pixel.draw(batch, x + 28, y + 2, width - 56, selected ? 4 : 1);
+            batch.setColor(r, g, b, a);
+        }
+    }
+
+    private void showRunDetails() {
+        reset(Screen.RESULTS); prepareResults(); resultDetails = true;
+        if (buildIcons == null) buildIcons = new BuildIcons();
+        if (residentArtBytes() + (qr == null ? 0 : (long) qr.getWidth() * qr.getHeight() * 4) > 32L * 1_048_576)
+            throw new IllegalStateException("Run details exceeds combined texture budget");
+        content.setBackground(art.scrim); content.pad(0);
+        content.add(RunDetailsView.create(art, world, buildIcons.regions, this::backToResults, buttons::add)).grow();
+        content.validate(); setFocus(0);
+    }
+
+    private void backToResults() { showResults(); setFocus(2); }
+
+    private long residentArtBytes() {
+        return art.textureBytes + gameArt.textureBytes + (outcomeTitles == null ? 0 : outcomeTitles.textureBytes)
+            + (outcomeArt == null ? 0 : outcomeArt.textureBytes) + (buildIcons == null ? 0 : buildIcons.textureBytes);
+    }
+
+    private static String formatTime(float seconds) {
+        int time = (int) seconds;
+        return time / 60 + ":" + (time % 60 < 10 ? "0" : "") + time % 60;
     }
 
     private void confirmReturnToLobby() {
@@ -388,7 +524,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private boolean partyScreen() { return screen == Screen.LOBBY || screen == Screen.INVITE; }
 
     private void help() {
-        modal("Answer the call", "1. Connect one or two phones to the same Wi-Fi as the TV.\n\n2. Open the lobby and scan its QR code with your phone.\n\n3. Start solo, or connect a second phone for co-op.\n\nMove with the phone joystick and tap Dodge. Attacks are automatic. Stay near a fallen ally to revive them.\n\nA companion can also join later: press Back to pause, then choose Invite Player 2.",
+        modal("Answer the call", "1. Connect one or two phones to the same Wi-Fi as the TV.\n\n2. Open the lobby and scan its QR code with your phone.\n\n3. Start solo, or connect a second phone for co-op.\n\nChoose a hero on the TV. Move with the phone joystick and tap Dodge. Attacks are automatic. Shared XP grants personal phone upgrades. Stay near a fallen ally to revive them. Survive three waves, then defeat the Sovereign.\n\nA companion can also join later: press Back to pause, then choose Invite Player 2.",
             new String[]{"BACK"}, new Runnable[]{this::closeModal});
     }
 
@@ -462,7 +598,10 @@ public final class CryptLobby extends ApplicationAdapter {
     private void setFocus(int index) {
         if (buttons.isEmpty()) return;
         focus = Math.max(0, Math.min(index, buttons.size() - 1));
-        for (int i = 0; i < buttons.size(); i++) buttons.get(i).focused(i == focus);
+        for (int i = 0; i < buttons.size(); i++) {
+            RemoteButton button = buttons.get(i); button.focused(i == focus);
+            if (button == resultDetailsLink) ((Label) button.getChildren().first()).setColor(i == focus ? UiArt.GOLD : UiArt.IVORY);
+        }
     }
 
     private boolean key(int key) {
@@ -470,13 +609,15 @@ public final class CryptLobby extends ApplicationAdapter {
             world.progression.addXp(world.progression.xpToNext);
             announceLevelUp(); publishProgression(); return true;
         }
-        if (key == Input.Keys.F4 && screen == Screen.SESSION) {
-            if (hudState.bossVisible) hudState.clearBoss();
-            else {
-                hudState.setBoss("THE HOLLOW SOVEREIGN", "HUD PREVIEW  /  PHASE I", 720, 1000);
-                hudState.notify("HUD PREVIEW", "Boss encounter UI preview. Press F4 to dismiss.", ArenaHudState.Tone.WARNING, 5f);
-            }
-            return true;
+        if (config.profile() && (screen == Screen.SESSION || screen == Screen.RESULTS)
+            && (key == Input.Keys.F7 || key == Input.Keys.F8)) {
+            previewResults(key == Input.Keys.F7); return true;
+        }
+        if (key == Input.Keys.F6 && config.profile() && screen == Screen.SESSION && overlay == null) {
+            world.debugStartBoss(); syncEncounterHud(); return true;
+        }
+        if (key == Input.Keys.F4 && config.profile() && screen == Screen.SESSION && !world.bossSpawned) {
+            hudPreview = !hudPreview; syncEncounterHud(); return true;
         }
         if (key == Input.Keys.F3) { debug = !debug; diagnostics.setVisible(debug); return true; }
         if (key == Input.Keys.BACK || key == Input.Keys.ESCAPE) {
@@ -487,7 +628,7 @@ public final class CryptLobby extends ApplicationAdapter {
                 else if (modalKind == Modal.SETTINGS_NETWORK) settings();
                 else closeModal();
             } else if (screen == Screen.SESSION) showPause();
-            else if (screen == Screen.RESULTS) showLobby();
+            else if (screen == Screen.RESULTS) { if (resultDetails) backToResults(); else showLobby(); }
             else if (partyScreen()) backFromParty(); else confirmExit();
             return true;
         }
@@ -556,7 +697,31 @@ public final class CryptLobby extends ApplicationAdapter {
         }
     }
 
+    private void syncEncounterHud() {
+        if (world.bossSpawned && !world.bossDefeated && world.boss != null && world.boss.active)
+            hudState.setBoss("THE HOLLOW SOVEREIGN", world.bossPhase == 2 ? "ENRAGED" : "PHASE I", world.boss.health, world.boss.maxHealth);
+        else if (hudPreview) hudState.setBoss("THE HOLLOW SOVEREIGN", "HUD PREVIEW", 720, 1000);
+        else hudState.clearBoss();
+    }
+
     private void updateCombatNotices() {
+        syncEncounterHud();
+        if (world.wave > notifiedWave && !world.bossSpawned) {
+            notifiedWave = world.wave;
+            hudState.notify(world.wave == 2 ? "WAVE II  /  THE HUNT" : "WAVE III  /  THE ONSLAUGHT", "", ArenaHudState.Tone.WARNING, 3f);
+        }
+        if (world.elitesKilled > notifiedEliteKills) {
+            notifiedEliteKills = world.elitesKilled;
+            hudState.notify("ELITE SLAIN  /  CLAIM ITS SOULS", "", ArenaHudState.Tone.SUCCESS, 3f);
+        }
+        if (world.bossSpawned && !bossAnnounced) {
+            bossAnnounced = true; hudPreview = false;
+            hudState.notify("THE HOLLOW SOVEREIGN AWAKENS", "", ArenaHudState.Tone.WARNING, 4f);
+        }
+        if (world.bossPhase == 2 && !enrageAnnounced) {
+            enrageAnnounced = true;
+            hudState.notify("THE SOVEREIGN IS ENRAGED", "", ArenaHudState.Tone.WARNING, 3f);
+        }
         for (int i = 0; i < 2; i++) {
             var player = world.players[i];
             if (!player.active) continue;
@@ -574,9 +739,9 @@ public final class CryptLobby extends ApplicationAdapter {
             }
             if (player.health > player.maxHealth * .4f) lowHealthNotified[i] = false;
         }
-        if (!finalWarning && world.timeRemaining() <= 30 && world.outcome == ArenaWorld.Outcome.RUNNING) {
+        if (!finalWarning && !world.bossSpawned && world.timeRemaining() <= 30 && world.outcome == ArenaWorld.Outcome.RUNNING) {
             finalWarning = true;
-            hudState.notify("30 SECONDS REMAIN", "Thirty seconds remain in this descent.", ArenaHudState.Tone.WARNING, 4f);
+            hudState.notify("THE SOVEREIGN ARRIVES IN 30s", "", ArenaHudState.Tone.WARNING, 4f);
         }
     }
 
@@ -607,6 +772,7 @@ public final class CryptLobby extends ApplicationAdapter {
                     }
                 }
                 world.update(delta);
+                audio.update(world, delta);
                 announceLevelUp();
                 hudState.update(delta);
                 updateCombatNotices();
@@ -624,18 +790,19 @@ public final class CryptLobby extends ApplicationAdapter {
             profileClock = 0;
             if (debug || config.profile()) {
                 String stats = Gdx.graphics.getFramesPerSecond() + " FPS  /  Java " + Gdx.app.getJavaHeap() / 1_048_576
-                    + " MiB  /  Art " + (art.textureBytes + gameArt.textureBytes) / 1_048_576 + " MiB  /  Draws " + (arena.drawCalls + ((SpriteBatch) stage.getBatch()).renderCalls);
+                    + " MiB  /  Art " + residentArtBytes() / 1_048_576 + " MiB  /  Draws " + (arena.drawCalls + ((SpriteBatch) stage.getBatch()).renderCalls);
                 diagnostics.setText(stats);
                 if (config.profile()) Gdx.app.log("LobbyPerf", stats);
             }
         }
         ScreenUtils.clear(0.025f, 0.035f, 0.04f, 1);
-        if (screen == Screen.SESSION || screen == Screen.RESULTS) arena.render(world, hudState, delta);
+        if (screen == Screen.SESSION) arena.render(world, hudState, delta, true);
         stage.getViewport().apply(); stage.act(delta); stage.draw();
     }
     @Override public void resize(int width, int height) { stage.getViewport().update(width, height, true); }
     @Override public void pause() {
         hostActive = false; state.setHostActive(false);
+        if (audio != null) audio.stop();
         if (screen == Screen.SESSION && overlay == null) showPause();
     }
     @Override public void resume() {
@@ -645,6 +812,10 @@ public final class CryptLobby extends ApplicationAdapter {
     @Override public void dispose() {
         if (server != null) server.stop();
         if (qr != null) qr.dispose();
-        stage.dispose(); arena.dispose(); gameArt.dispose(); art.dispose();
+        stage.dispose(); arena.dispose(); audio.dispose();
+        if (outcomeArt != null) outcomeArt.dispose();
+        if (buildIcons != null) buildIcons.dispose();
+        if (outcomeTitles != null) outcomeTitles.dispose();
+        gameArt.dispose(); art.dispose();
     }
 }

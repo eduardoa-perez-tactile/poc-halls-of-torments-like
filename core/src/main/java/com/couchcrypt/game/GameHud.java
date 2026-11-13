@@ -72,7 +72,7 @@ public final class GameHud {
         int remaining = (int) Math.ceil(world.timeRemaining());
         builder.setLength(0); builder.append(remaining / 60).append(':');
         if (remaining % 60 < 10) builder.append('0');
-        timer.set(builder.append(remaining % 60).toString());
+        timer.set(world.bossSpawned ? "BOSS" : builder.append(remaining % 60).toString());
         builder.setLength(0); slain.set(builder.append(world.kills).append(" SLAIN").toString());
         builder.setLength(0); souls.set(builder.append(world.souls).append(" SOULS").toString());
         for (ArenaWorld.Player player : world.players) {

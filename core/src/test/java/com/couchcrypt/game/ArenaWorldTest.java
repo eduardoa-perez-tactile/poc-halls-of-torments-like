@@ -125,12 +125,14 @@ class ArenaWorldTest {
         assertTrue(down.invulnerable > 1f);
     }
 
-    @Test void survivalBoundaryFinishesWithoutSimulatingWholeRoundAndResetReusesPools() {
+    @Test void survivalBoundaryStartsFinalEncounterWithoutPlaythroughAndResetReusesPools() {
         ArenaWorld world = solo();
         ArenaWorld.Enemy pooled = world.enemies[0];
         world.elapsed = ArenaWorld.ROUND_SECONDS - ArenaWorld.STEP;
         world.update(ArenaWorld.STEP);
-        assertEquals(ArenaWorld.Outcome.VICTORY, world.outcome);
+        assertEquals(ArenaWorld.Outcome.RUNNING, world.outcome);
+        assertTrue(world.bossSpawned);
+        assertNotNull(world.boss);
         assertEquals(0f, world.timeRemaining());
         world.reset();
         assertSame(pooled, world.enemies[0]);

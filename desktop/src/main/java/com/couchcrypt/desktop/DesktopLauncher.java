@@ -19,7 +19,7 @@ public final class DesktopLauncher {
         window.setWindowSizeLimits(960, 540, -1, -1);
         window.useVsync(true); window.setForegroundFPS(60); window.setIdleFPS(20);
         window.setBackBufferConfig(8, 8, 8, 0, 0, 0, 0);
-        window.disableAudio(true);
+        window.disableAudio(false);
         new Lwjgl3Application(new CryptLobby(new GameConfig(host, port, profile)), window);
     }
 }
