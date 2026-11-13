@@ -35,6 +35,7 @@ public final class ArenaWorld {
     public final Hazard[] hazards = new Hazard[MAX_HAZARDS];
     public final Effect[] effects = new Effect[MAX_EFFECTS];
     public final PartyProgression progression;
+    public final RunEquipment equipment;
     public final ArenaTimeline timeline;
     private final float[] inputX = new float[2], inputY = new float[2];
     private final boolean[] pendingDodge = new boolean[2];
@@ -54,6 +55,7 @@ public final class ArenaWorld {
         for (int i = 0; i < hazards.length; i++) hazards[i] = new Hazard();
         for (int i = 0; i < effects.length; i++) effects[i] = new Effect();
         progression = new PartyProgression(this);
+        equipment = new RunEquipment(this);
         reset();
     }
 
@@ -64,7 +66,7 @@ public final class ArenaWorld {
         swordSwings = arrowsFired = enemyDeaths = pickupsCollected = heroHits = 0;
         spawnCountdown = .65f;
         runSeed = 0x5a17c9e3 ^ (++runNumber * 0x45d9f3b); randomState = runSeed;
-        progression.reset();
+        progression.reset(); equipment.reset();
         for (Player p : players) {
             p.active = p.alive = false; p.x = p.y = p.walkTime = p.reviveProgress = 0;
             resetBuild(p); p.dodgeCooldown = p.dodgeTime = p.invulnerable = p.attackCooldown = 0;
@@ -103,13 +105,13 @@ public final class ArenaWorld {
         p.active = p.alive = true; p.health = p.maxHealth;
         p.dodgeCooldown = p.dodgeTime = p.attackCooldown = p.reviveProgress = 0;
         p.invulnerable = 1; inputX[slot] = inputY[slot] = 0; pendingDodge[slot] = false;
-        progression.activatePlayer(slot);
+        progression.activatePlayer(slot); equipment.activatePlayer(slot);
     }
 
     public void deactivatePlayer(int slot) {
         Player p = player(slot); p.active = p.alive = false; resetBuild(p);
         p.kills = p.revives = 0; p.damageDealt = p.damageTaken = 0;
-        progression.deactivatePlayer(slot); inputX[slot] = inputY[slot] = 0; pendingDodge[slot] = false;
+        progression.deactivatePlayer(slot); equipment.deactivatePlayer(slot); inputX[slot] = inputY[slot] = 0; pendingDodge[slot] = false;
     }
 
     public void clearInputs() {
@@ -147,7 +149,7 @@ public final class ArenaWorld {
         for (Effect e : effects) if (e.active) { e.ttl -= STEP; if (e.ttl <= 0) e.active = false; }
         for (Player p : players) updatePlayer(p);
         updateEnemies(); updateBolts(); updateShots(); updateHazards(); updatePickups(); updateRevival();
-        progression.update(STEP);
+        progression.update(STEP); equipment.update(STEP);
         boolean living = false; for (Player p : players) living |= p.active && p.alive;
         if (!living) { outcome = Outcome.DEFEAT; return; }
         if (bossDefeated) { outcome = Outcome.VICTORY; return; }
@@ -169,15 +171,19 @@ public final class ArenaWorld {
         p.auraCooldown = Math.max(0, p.auraCooldown - STEP); p.stormCooldown = Math.max(0, p.stormCooldown - STEP);
         boolean dodge = pendingDodge[p.slot]; pendingDodge[p.slot] = false;
         if (!p.active || !p.alive) return;
-        float x = inputX[p.slot], y = inputY[p.slot], magnitude = x * x + y * y;
+        boolean choosing = equipment.choosing(p.slot);
+        float x = choosing ? 0 : inputX[p.slot], y = choosing ? 0 : inputY[p.slot], magnitude = x * x + y * y;
+        if (choosing) dodge = false;
+        equipment.setMoving(p, magnitude > .0025f || p.dodgeTime > 0);
+        p.health = Math.min(equipment.maxHealth(p), p.health + equipment.regeneration(p) * STEP);
         if (magnitude > .0025f) {
             float inverse = 1f / (float) Math.sqrt(magnitude); p.facingX = x * inverse; p.facingY = y * inverse;
         }
         if (dodge && p.dodgeCooldown <= 0 && p.dodgeTime <= 0) {
-            p.dodgeTime = DODGE_DURATION; p.dodgeCooldown = p.hero.dodgeCooldown * p.dodgeCooldownMultiplier;
+            p.dodgeTime = DODGE_DURATION; p.dodgeCooldown = equipment.dodgeCooldown(p);
             p.invulnerable = Math.max(p.invulnerable, DODGE_DURATION); p.dodgeX = p.facingX; p.dodgeY = p.facingY;
         }
-        float speed = p.hero.moveSpeed * p.moveMultiplier;
+        float speed = p.hero.moveSpeed * equipment.moveMultiplier(p);
         if (p.dodgeTime > 0) {
             float duration = Math.min(STEP, p.dodgeTime); p.x += p.dodgeX * speed * 3 * duration;
             p.y += p.dodgeY * speed * 3 * duration; p.dodgeTime = Math.max(0, p.dodgeTime - STEP); p.walkTime += STEP * 2;
@@ -191,7 +197,7 @@ public final class ArenaWorld {
     }
 
     private void attack(Player p) {
-        float reach = p.hero.attackRange * (p.hero == Hero.WARDEN ? p.cleaveMultiplier : 1);
+        float reach = p.hero.attackRange * (p.hero == Hero.WARDEN ? equipment.reachMultiplier(p) : 1);
         Enemy target = nearest(p.x, p.y, reach, 0);
         if (target == null) return;
         float dx = target.x - p.x, dy = target.y - p.y, length = length(dx, dy);
@@ -205,7 +211,7 @@ public final class ArenaWorld {
                 if (!e.active) continue;
                 float ex = e.x - p.x, ey = e.y - p.y, distance = length(ex, ey);
                 if (distance > reach + e.radius || (ex * p.facingX + ey * p.facingY) / distance < halfArcCos) continue;
-                hit(e, critical(p, p.hero.baseDamage * p.damageMultiplier), p.slot);
+                hit(e, critical(p, p.hero.baseDamage * equipment.damageMultiplier(p)), p.slot);
                 if (e.active) {
                     e.stunTime = Math.max(e.stunTime, e.kind == EnemyKind.BOSS ? .02f : .16f);
                     float knockback = e.kind == EnemyKind.BOSS ? 3 : e.kind == EnemyKind.BRUTE ? 12 : 25;
@@ -213,19 +219,19 @@ public final class ArenaWorld {
                     e.y = clamp(e.y + ey / distance * knockback, -HALF_HEIGHT + e.radius, HALF_HEIGHT - e.radius);
                 }
             }
-            p.attackCooldown = p.hero.attackInterval / p.attackRateMultiplier;
+            p.attackCooldown = p.hero.attackInterval / equipment.attackRate(p);
         } else {
-            int count = Math.max(1, Math.min(5, p.projectileCount));
+            int count = equipment.projectileCount(p);
             float angle = (float) Math.atan2(dy, dx);
             for (int i = 0; i < count; i++) {
                 Bolt b = freeBolt(); if (b == null) break;
                 float direction = angle + (i - (count - 1) * .5f) * .13f;
                 b.active = true; b.x = p.x; b.y = p.y;
                 b.vx = (float) Math.cos(direction) * 760; b.vy = (float) Math.sin(direction) * 760;
-                b.ttl = 1.2f; b.owner = p.slot; b.damage = critical(p, p.hero.baseDamage * p.damageMultiplier);
-                b.pierce = Math.max(0, Math.min(3, p.pierce)); b.hitMask = 0; arrowsFired++;
+                b.ttl = 1.2f; b.owner = p.slot; b.damage = critical(p, p.hero.baseDamage * equipment.damageMultiplier(p));
+                b.pierce = equipment.pierce(p); b.hitMask = 0; arrowsFired++;
             }
-            p.attackCooldown = p.hero.attackInterval / p.attackRateMultiplier;
+            p.attackCooldown = p.hero.attackInterval / equipment.attackRate(p);
         }
     }
 
@@ -233,7 +239,7 @@ public final class ArenaWorld {
         p.auraCooldown = .7f; float radius = 100 + 20 * p.auraLevel;
         Effect fx = effect(EffectKind.AURA, p.x, p.y, p.slot, .24f); if (fx != null) fx.radius = radius;
         for (Enemy e : enemies) if (e.active && distanceSquared(p.x, p.y, e.x, e.y) <= radius * radius)
-            hit(e, (4 + p.auraLevel * 3) * p.damageMultiplier, p.slot);
+            hit(e, (4 + p.auraLevel * 3) * equipment.damageMultiplier(p) * equipment.auraMultiplier(p), p.slot);
     }
 
     private void storm(Player p) {
@@ -245,11 +251,11 @@ public final class ArenaWorld {
             int index = enemyIndex(target); mask |= 1L << index;
             Effect fx = effect(EffectKind.LIGHTNING, x, y, p.slot, .2f);
             if (fx != null) { fx.x2 = target.x; fx.y2 = target.y; }
-            x = target.x; y = target.y; hit(target, (12 + p.stormLevel * 5) * p.damageMultiplier, p.slot);
+            x = target.x; y = target.y; hit(target, (12 + p.stormLevel * 5) * equipment.damageMultiplier(p) * equipment.stormMultiplier(p), p.slot);
         }
     }
 
-    private float critical(Player p, float damage) { return damage * (random() < p.critChance ? 2 : 1); }
+    private float critical(Player p, float damage) { return damage * (random() < equipment.critChance(p) ? equipment.critDamage(p) : 1); }
 
     private void updateEnemies() {
         for (Enemy e : enemies) {
@@ -267,8 +273,8 @@ public final class ArenaWorld {
                 e.windup = Math.max(0, e.windup - STEP); e.vx = e.vy = 0;
                 if (e.windup <= 0 && e.kind == EnemyKind.CULTIST) fireShot(e.x, e.y, target.x - e.x, target.y - e.y, 180, e.damage);
             } else if (e.stunTime <= 0) moveEnemy(e, target);
-            for (Player p : players) if (p.active && p.alive && distanceSquared(p.x, p.y, e.x, e.y) < square(PLAYER_RADIUS + e.radius))
-                hurt(p, e.damage);
+            for (Player p : players) if (e.active && p.active && p.alive && distanceSquared(p.x, p.y, e.x, e.y) < square(PLAYER_RADIUS + e.radius))
+                hurt(p, e.damage, e);
         }
     }
 
@@ -349,29 +355,42 @@ public final class ArenaWorld {
         }
     }
 
-    private void hurt(Player p, float damage) {
+    private void hurt(Player p, float damage) { hurt(p, damage, null); }
+
+    private void hurt(Player p, float damage, Enemy attacker) {
         if (p.invulnerable > 0 || !p.alive) return;
+        if (equipment.blockChance(p) > 0 && random() < equipment.blockChance(p)) { p.invulnerable = .3f; return; }
+        damage *= 1 - equipment.damageReduction(p);
         float actual = Math.min(p.health, damage); p.health = Math.max(0, p.health - damage); p.damageTaken += actual;
         p.invulnerable = .75f; heroHits++;
         effect(EffectKind.HIT, p.x, p.y, p.slot, .13f);
         if (p.health <= 0) { p.alive = false; p.dodgeTime = 0; }
+        if (attacker != null && attacker.active && equipment.thorns(p) > 0) hit(attacker, equipment.thorns(p), p.slot, false);
     }
 
-    private void hit(Enemy enemy, float damage, int owner) {
+    private void hit(Enemy enemy, float damage, int owner) { hit(enemy, damage, owner, true); }
+
+    private void hit(Enemy enemy, float damage, int owner, boolean drains) {
         if (!enemy.active) return;
         float actual = Math.min(enemy.health, damage); players[owner].damageDealt += actual;
+        if (drains) equipment.drain(players[owner], actual);
         enemy.health -= damage; enemy.hitFlash = .12f;
         Effect fx = effect(EffectKind.HIT, enemy.x, enemy.y, owner, .1f); if (fx != null) fx.radius = enemy.radius;
         if (enemy.health > 0) return;
         enemy.active = false; activeEnemies = Math.max(0, activeEnemies - 1); kills++; enemyDeaths++; players[owner].kills++;
+        equipment.killHeal(players[owner]);
         fx = effect(EffectKind.DEATH, enemy.x, enemy.y, owner, .35f); if (fx != null) fx.radius = enemy.radius;
         int reward = enemy.kind == EnemyKind.BOSS ? 20 : enemy.elite ? 8 : enemy.kind == EnemyKind.BRUTE ? 3 : enemy.kind == EnemyKind.CULTIST ? 2 : 1;
         // Snapshot party scaling at spawn; late joining cannot alter souls already on the floor.
         int rewardHundredths = reward * enemy.soulPercent + sharedXpRemainder;
         int soulReward = rewardHundredths / 100; sharedXpRemainder = rewardHundredths % 100;
         if (soulReward > 0) drop(enemy.x, enemy.y, false, soulReward);
-        if (enemy.elite) { elitesKilled++; drop(enemy.x + 14, enemy.y, true, 40); }
-        else if (kills % 7 == 0) drop(enemy.x + 14, enemy.y, true, 24);
+        if (enemy.elite) { elitesKilled++; equipment.rewardElite(); drop(enemy.x + 14, enemy.y, true, 40); }
+        else {
+            // Keep the opening forgiving; gear sustain replaces some late-run incidental healing.
+            boolean gearedRun = timeline.isFullRun() && elapsed >= 180;
+            if (kills % (gearedRun ? 12 : 7) == 0) drop(enemy.x + 14, enemy.y, true, gearedRun ? 16 : 24);
+        }
         if (enemy == boss) bossDefeated = true;
     }
 
@@ -385,9 +404,9 @@ public final class ArenaWorld {
             if (!pickup.active) continue;
             Player collector = null; float nearest = Float.MAX_VALUE;
             for (Player p : players) {
-                if (!p.active || !p.alive || (pickup.healing && p.health >= p.maxHealth)) continue;
+                if (!p.active || !p.alive || (pickup.healing && p.health >= equipment.maxHealth(p))) continue;
                 float distance = distanceSquared(p.x, p.y, pickup.x, pickup.y);
-                float attraction = (pickup.healing ? 110 : 200) * p.pickupMultiplier;
+                float attraction = (pickup.healing ? 110 : 200) * equipment.pickupMultiplier(p);
                 if (distance <= attraction * attraction && distance < nearest) { nearest = distance; collector = p; }
             }
             if (collector == null) continue;
@@ -396,8 +415,8 @@ public final class ArenaWorld {
                 pickup.x += (collector.x - pickup.x) * inverse * travel; pickup.y += (collector.y - pickup.y) * inverse * travel;
                 continue;
             }
-            if (pickup.healing) collector.health = Math.min(collector.maxHealth, collector.health + pickup.value);
-            else { souls += pickup.value; progression.addXp(pickup.value); }
+            if (pickup.healing) collector.health = Math.min(equipment.maxHealth(collector), collector.health + pickup.value);
+            else { souls += pickup.value; progression.addXp(equipment.collectedXp(collector, pickup.value)); }
             pickup.active = false; pickupsCollected++;
         }
     }
@@ -409,7 +428,7 @@ public final class ArenaWorld {
             if (!ally.active || !ally.alive || distanceSquared(ally.x, ally.y, down.x, down.y) > 95 * 95) { down.reviveProgress = 0; continue; }
             down.reviveProgress += STEP;
             if (down.reviveProgress >= 2 - .0001f) {
-                down.alive = true; down.health = down.maxHealth * .45f; down.invulnerable = 1.5f;
+                down.alive = true; down.health = equipment.maxHealth(down) * .45f; down.invulnerable = 1.5f;
                 down.reviveProgress = 0; pendingDodge[down.slot] = false; ally.revives++;
             }
         }
@@ -470,7 +489,7 @@ public final class ArenaWorld {
             float health = switch (kind) { case WRAITH -> 18; case BRUTE -> 95; case CULTIST -> 35; case BOSS -> 1100; default -> 32; };
             ArenaTimeline.Phase phase = timeline.phase(timeline.phaseIndex(elapsed));
             if (kind == EnemyKind.BOSS) {
-                if (timeline.isFullRun()) health = 6200;
+                if (timeline.isFullRun()) health = 8200;
                 health *= 1 + .6f * (activePlayerCount() - 1);
             } else if (timeline.isFullRun()) {
                 health *= phase.healthMultiplier() * (1 + .2f * (livingPlayerCount() - 1));

@@ -174,7 +174,7 @@ public final class PartyProgression {
         ArenaWorld.Player player = world.players[slot];
         Offer offer = offers[slot];
         int count = 0;
-        Upgrade recommended = player.health < player.maxHealth * .6f && available(player, Upgrade.VITALITY)
+        Upgrade recommended = player.health < world.equipment.maxHealth(player) * .6f && available(player, Upgrade.VITALITY)
             ? Upgrade.VITALITY : available(player, Upgrade.POWER) ? Upgrade.POWER : Upgrade.HASTE;
         if (available(player, recommended)) offer.options[count++] = recommended;
         // Secondary attacks appear early; weapon-specific cards make the very first choice tangible.
@@ -202,78 +202,83 @@ public final class PartyProgression {
         switch (upgrade) {
             case POWER -> {
                 category = "OFFENSE";
-                current = player.damageMultiplier * 100;
-                next = Math.min(4f, player.damageMultiplier + .25f) * 100;
+                current = world.equipment.baseDamageMultiplier(player, player.damageMultiplier) * 100;
+                next = world.equipment.baseDamageMultiplier(player, Math.min(4f, player.damageMultiplier + .25f)) * 100;
                 headline = "+" + number(next - current) + "% BASE DAMAGE";
                 before = number(current) + "% DAMAGE"; after = number(next) + "% DAMAGE";
             }
             case HASTE -> {
                 category = "OFFENSE";
-                current = player.attackRateMultiplier * 100;
-                next = Math.min(3f, player.attackRateMultiplier + .15f) * 100;
+                current = world.equipment.baseAttackRate(player, player.attackRateMultiplier) * 100;
+                next = world.equipment.baseAttackRate(player, Math.min(3f, player.attackRateMultiplier + .15f)) * 100;
                 headline = "+" + number(next - current) + "% BASE ATTACK SPEED";
                 before = number(current) + "% ATTACK SPEED"; after = number(next) + "% ATTACK SPEED";
             }
             case FLEET -> {
                 category = "MOBILITY";
-                current = player.moveMultiplier * 100;
-                next = Math.min(2.2f, player.moveMultiplier + .12f) * 100;
+                current = world.equipment.moveMultiplier(player, player.moveMultiplier) * 100;
+                next = world.equipment.moveMultiplier(player, Math.min(2.2f, player.moveMultiplier + .12f)) * 100;
                 headline = "+" + number(next - current) + "% BASE MOVE SPEED";
                 before = number(current) + "% MOVE SPEED"; after = number(next) + "% MOVE SPEED";
             }
             case VITALITY -> {
-                category = "DEFENSE"; current = player.maxHealth; next = Math.min(300f, current + 20f);
+                category = "DEFENSE"; current = world.equipment.maxHealth(player);
+                next = Math.max(20, Math.min(300f, player.maxHealth + 20f) + current - player.maxHealth);
                 headline = "+" + number(next - current) + " MAX HP · HEAL UP TO 20";
                 before = number(current) + " MAX HP"; after = number(next) + " MAX HP";
             }
             case EVASION -> {
                 category = "MOBILITY";
-                current = player.hero.dodgeCooldown * player.dodgeCooldownMultiplier;
-                next = player.hero.dodgeCooldown * Math.max(.25f, player.dodgeCooldownMultiplier - .15f);
+                current = world.equipment.dodgeCooldown(player);
+                next = world.equipment.dodgeCooldown(player, Math.max(.25f, player.dodgeCooldownMultiplier - .15f));
                 headline = "-" + number(current - next) + "s DODGE COOLDOWN";
                 before = number(current) + "s"; after = number(next) + "s";
             }
             case SWEEP -> {
-                category = "WEAPON"; current = player.cleaveMultiplier * 100;
-                next = Math.min(1.8f, player.cleaveMultiplier + .2f) * 100;
+                category = "WEAPON"; current = world.equipment.reachMultiplier(player) * 100;
+                next = world.equipment.reachMultiplier(player, Math.min(1.8f, player.cleaveMultiplier + .2f)) * 100;
                 headline = "+" + number(next - current) + "% BASE SWORD REACH";
                 before = number(current) + "% SWORD REACH"; after = number(next) + "% SWORD REACH";
             }
             case MULTISHOT -> {
-                category = "WEAPON"; int arrows = Math.min(5, player.projectileCount + 1);
-                headline = "+" + (arrows - player.projectileCount) + " ARROW";
-                before = player.projectileCount + (player.projectileCount == 1 ? " ARROW" : " ARROWS");
+                category = "WEAPON"; int currentArrows = world.equipment.projectileCount(player);
+                int arrows = Math.min(5, currentArrows + 1);
+                headline = "+" + (arrows - currentArrows) + " ARROW";
+                before = currentArrows + (currentArrows == 1 ? " ARROW" : " ARROWS");
                 after = arrows + (arrows == 1 ? " ARROW" : " ARROWS");
             }
             case PIERCE -> {
-                category = "WEAPON"; int targets = Math.min(3, player.pierce + 1);
-                headline = "+" + (targets - player.pierce) + " PIERCE TARGET";
-                before = player.pierce + (player.pierce == 1 ? " EXTRA TARGET" : " EXTRA TARGETS");
+                category = "WEAPON"; int currentPierce = world.equipment.pierce(player);
+                int targets = Math.min(3, currentPierce + 1);
+                headline = "+" + (targets - currentPierce) + " PIERCE TARGET";
+                before = currentPierce + (currentPierce == 1 ? " EXTRA TARGET" : " EXTRA TARGETS");
                 after = targets + (targets == 1 ? " EXTRA TARGET" : " EXTRA TARGETS");
             }
             case AURA -> {
                 category = "OFFENSE"; int aura = Math.min(3, player.auraLevel + 1);
-                current = (4 + player.auraLevel * 3) * player.damageMultiplier;
-                next = (4 + aura * 3) * player.damageMultiplier;
+                current = (4 + player.auraLevel * 3) * world.equipment.baseDamageMultiplier(player, player.damageMultiplier) * world.equipment.auraMultiplier(player);
+                next = (4 + aura * 3) * world.equipment.baseDamageMultiplier(player, player.damageMultiplier) * world.equipment.auraMultiplier(player);
                 headline = player.auraLevel == 0 ? "UNLOCK" : "+" + number(next - current) + " AURA DAMAGE";
                 before = player.auraLevel == 0 ? "NONE" : auraValues(current, player.auraLevel);
                 after = auraValues(next, aura);
             }
             case STORM -> {
                 category = "OFFENSE"; int storm = Math.min(3, player.stormLevel + 1);
-                current = (12 + player.stormLevel * 5) * player.damageMultiplier;
-                next = (12 + storm * 5) * player.damageMultiplier;
+                current = (12 + player.stormLevel * 5) * world.equipment.baseDamageMultiplier(player, player.damageMultiplier) * world.equipment.stormMultiplier(player);
+                next = (12 + storm * 5) * world.equipment.baseDamageMultiplier(player, player.damageMultiplier) * world.equipment.stormMultiplier(player);
                 headline = player.stormLevel == 0 ? "UNLOCK" : "+" + (storm - player.stormLevel) + " CHAIN TARGET";
                 before = player.stormLevel == 0 ? "NONE" : stormValues(current, player.stormLevel);
                 after = stormValues(next, storm);
             }
             case MAGNET -> {
-                category = "UTILITY"; current = player.pickupMultiplier * 100; next = Math.min(2.5f, player.pickupMultiplier + .3f) * 100;
+                category = "UTILITY"; current = world.equipment.pickupMultiplier(player) * 100;
+                next = world.equipment.pickupMultiplier(player, Math.min(2.5f, player.pickupMultiplier + .3f)) * 100;
                 headline = "+" + number(next - current) + "% BASE PICKUP RANGE";
                 before = number(current) + "% PICKUP RANGE"; after = number(next) + "% PICKUP RANGE";
             }
             case CRITICAL -> {
-                category = "OFFENSE"; current = player.critChance * 100; next = Math.min(.5f, player.critChance + .1f) * 100;
+                category = "OFFENSE"; current = world.equipment.critChance(player) * 100;
+                next = world.equipment.critChance(player, Math.min(.5f, player.critChance + .1f)) * 100;
                 headline = "+" + number(next - current) + " PTS CRIT CHANCE";
                 before = number(current) + "% CRIT"; after = number(next) + "% CRIT";
             }
@@ -310,7 +315,7 @@ public final class PartyProgression {
         for (int i = 0; i < ranks[slot].length; i++) ranks[slot][i] = 0;
     }
 
-    private static boolean available(ArenaWorld.Player player, Upgrade upgrade) {
+    private boolean available(ArenaWorld.Player player, Upgrade upgrade) {
         if (!upgrade.supports(player.hero)) return false;
         return switch (upgrade) {
             case POWER -> player.damageMultiplier < 4f - .00001f;
@@ -319,16 +324,16 @@ public final class PartyProgression {
             case VITALITY -> player.maxHealth < 300f;
             case EVASION -> player.dodgeCooldownMultiplier > .25f + .00001f;
             case SWEEP -> player.cleaveMultiplier < 1.8f - .00001f;
-            case MULTISHOT -> player.projectileCount < 5;
-            case PIERCE -> player.pierce < 3;
+            case MULTISHOT -> player.projectileCount < 5 && world.equipment.projectileCount(player) < 5;
+            case PIERCE -> player.pierce < 3 && world.equipment.pierce(player) < 3;
             case AURA -> player.auraLevel < 3;
             case STORM -> player.stormLevel < 3;
             case MAGNET -> player.pickupMultiplier < 2.5f - .00001f;
-            case CRITICAL -> player.critChance < .5f - .00001f;
+            case CRITICAL -> player.critChance < .5f - .00001f && world.equipment.critChance(player) < .75f - .00001f;
         };
     }
 
-    private static void apply(ArenaWorld.Player player, Upgrade upgrade) {
+    private void apply(ArenaWorld.Player player, Upgrade upgrade) {
         switch (upgrade) {
             case POWER -> player.damageMultiplier = Math.min(4f, player.damageMultiplier + .25f);
             case HASTE -> {
@@ -339,7 +344,7 @@ public final class PartyProgression {
             case FLEET -> player.moveMultiplier = Math.min(2.2f, player.moveMultiplier + .12f);
             case VITALITY -> {
                 player.maxHealth = Math.min(300f, player.maxHealth + 20f);
-                if (player.alive) player.health = Math.min(player.maxHealth, player.health + 20f);
+                if (player.alive) player.health = Math.min(world.equipment.maxHealth(player), player.health + 20f);
             }
             case EVASION -> {
                 float previous = player.dodgeCooldownMultiplier;
