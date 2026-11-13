@@ -41,6 +41,7 @@ import com.couchcrypt.ui.UiArt;
 import com.couchcrypt.ui.OutcomeArt;
 import com.couchcrypt.ui.MenuSceneArt;
 import com.couchcrypt.ui.BuildIcons;
+import com.couchcrypt.ui.ItemArt;
 import com.couchcrypt.ui.RunDetailsView;
 import com.couchcrypt.ui.CharacterInfoView;
 import com.couchcrypt.game.FrameMetrics;
@@ -82,7 +83,9 @@ public final class CryptLobby extends ApplicationAdapter {
     private GameAudio audio;
     private OutcomeArt.Titles outcomeTitles;
     private BuildIcons buildIcons;
+    private ItemArt itemArt;
     private boolean resultDetails;
+    private boolean equipmentDetails;
     private RemoteButton resultDetailsLink;
     private int characterInfoSlot, characterInfoFocus;
     private boolean characterInfoInvitation;
@@ -92,7 +95,9 @@ public final class CryptLobby extends ApplicationAdapter {
     private final LobbyState.Controls[] controls = {new LobbyState.Controls(), new LobbyState.Controls()};
     private final long[] generations = new long[2];
     private final LobbyState.UpgradeRequest[] upgradeRequests = {new LobbyState.UpgradeRequest(), new LobbyState.UpgradeRequest()};
+    private final LobbyState.EquipmentRequest[] equipmentRequests = {new LobbyState.EquipmentRequest(), new LobbyState.EquipmentRequest()};
     private int notifiedLevel = 1;
+    private int notifiedReliquaries;
     private boolean hostActive = true;
     private RemoteButton start, pauseResume;
     private Label modalMessage, pauseMessage;
@@ -118,11 +123,12 @@ public final class CryptLobby extends ApplicationAdapter {
         gameArt = new GameArt();
         outcomeTitles = new OutcomeArt.Titles();
         buildIcons = new BuildIcons();
+        itemArt = new ItemArt();
         hudArt = new HudArt();
         arena = new ArenaRenderer(gameArt, art, buildIcons, hudArt);
         audio = new GameAudio();
-        if (residentArtBytes() > 32L * 1_048_576)
-            throw new IllegalStateException("Combined art exceeds 32 MiB texture budget");
+        if (residentArtBytes() + 360L * 360 * 4 > 32L * 1_048_576)
+            throw new IllegalStateException("Combined art and join QR exceed 32 MiB texture budget");
         Gdx.app.log("GameArt", "Combined resident textures: " + residentArtBytes() / 1_048_576f + " MiB");
         homeBackground = art.menuScene;
         partyBackground = homeBackground;
@@ -156,6 +162,7 @@ public final class CryptLobby extends ApplicationAdapter {
             assets.put("/art/home-button-focused.png", new JoinServer.Asset(art.controllerButton(true), "image/png"));
             assets.put("/art/home-logo.png", new JoinServer.Asset(art.controllerLogo(), "image/png"));
             assets.put("/art/skill-icons.png", new JoinServer.Asset(buildIcons.controllerIcons(), "image/png"));
+            assets.put("/art/item-icons.png", web("art/item-icons.png", "image/png"));
             server = new JoinServer(config.port(), state, assets); server.open(); serverError = null;
             Gdx.app.log("Lobby", "Join URL: " + (host == null ? "No LAN address" : server.url(host)));
         } catch (Exception failure) {
@@ -381,7 +388,7 @@ public final class CryptLobby extends ApplicationAdapter {
 
     private void startSession() {
         if (state.snapshot(System.currentTimeMillis()).connected() < 1 || server == null || host == null) return;
-        world.reset(); hudState.reset(); finalWarning = false; notifiedLevel = 1;
+        world.reset(); hudState.reset(); finalWarning = false; notifiedLevel = 1; notifiedReliquaries = 0;
         notifiedWave = 1; notifiedEliteKills = 0; bossAnnounced = enrageAnnounced = hudPreview = false;
         for (int i = 0; i < 2; i++) { previouslyAlive[i] = false; lowHealthNotified[i] = false; }
         reconcilePlayers();
@@ -518,6 +525,7 @@ public final class CryptLobby extends ApplicationAdapter {
             player.kills = i == 0 ? 81 : 62; player.damageDealt = i == 0 ? 4820 : 3960;
             player.damageTaken = i == 0 ? 154 : 112; player.revives = i == 0 ? 1 : 2;
         }
+        previewEquipment();
         world.elapsed = 214; world.kills = 143; world.souls = 96;
         world.bossDefeated = victory;
         world.outcome = victory ? ArenaWorld.Outcome.VICTORY : ArenaWorld.Outcome.DEFEAT;
@@ -581,13 +589,18 @@ public final class CryptLobby extends ApplicationAdapter {
         }
     }
 
-    private void showRunDetails() {
+    private void showRunDetails() { equipmentDetails = false; renderRunDetails(); }
+
+    private void toggleRunDetails() { equipmentDetails = !equipmentDetails; renderRunDetails(); setFocus(1); }
+
+    private void renderRunDetails() {
         reset(Screen.RESULTS); prepareResults(); resultDetails = true;
         if (buildIcons == null) buildIcons = new BuildIcons();
         if (residentArtBytes() > 32L * 1_048_576)
             throw new IllegalStateException("Run details exceeds combined texture budget");
         content.setBackground(art.scrim); content.pad(0);
-        content.add(RunDetailsView.create(art, world, buildIcons.regions, this::backToResults, buttons::add)).grow();
+        content.add(RunDetailsView.create(art, world, buildIcons.regions, itemArt.regions,
+            equipmentDetails, this::toggleRunDetails, this::backToResults, buttons::add)).grow();
         content.validate(); setFocus(0);
     }
 
@@ -595,7 +608,7 @@ public final class CryptLobby extends ApplicationAdapter {
 
     private long residentArtBytes() {
         return art.textureBytes + gameArt.textureBytes + (hudArt == null ? 0 : hudArt.textureBytes) + (outcomeTitles == null ? 0 : outcomeTitles.textureBytes)
-            + (buildIcons == null ? 0 : buildIcons.textureBytes)
+            + (buildIcons == null ? 0 : buildIcons.textureBytes) + (itemArt == null ? 0 : itemArt.textureBytes)
             + (qr == null ? 0 : (long) qr.getWidth() * qr.getHeight() * 4);
     }
 
@@ -739,8 +752,8 @@ public final class CryptLobby extends ApplicationAdapter {
         }
         for (ArenaWorld.Player player : world.players) if (player.active) {
             player.alive = true; player.reviveProgress = 0; player.invulnerable = 999;
-            player.health = player.maxHealth * (player.slot == 0 ? .72f : .54f);
-            player.dodgeCooldown = player.slot == 0 ? 0 : player.hero.dodgeCooldown * player.dodgeCooldownMultiplier * .5f;
+            player.health = world.equipment.maxHealth(player) * (player.slot == 0 ? .72f : .54f);
+            player.dodgeCooldown = player.slot == 0 ? 0 : world.equipment.dodgeCooldown(player) * .5f;
         }
         world.souls = world.progression.totalXp;
         hudPreview = true; syncEncounterHud();
@@ -749,7 +762,25 @@ public final class CryptLobby extends ApplicationAdapter {
         publishProgression();
     }
 
+    private void previewEquipment() {
+        for (int guard = 0; guard < 8 && world.equipment.rewardsEarned() < 8; guard++) world.equipment.grantReward();
+        for (int slot = 0; slot < 2; slot++) {
+            var offer = world.equipment.offers[slot];
+            for (int guard = 0; guard < 8 && offer.pending; guard++)
+                if (!world.equipment.choose(slot, offer.id, 0)) break;
+        }
+    }
+
     private boolean key(int key) {
+        if (key == Input.Keys.F2 && config.profile() && screen == Screen.SESSION && overlay == null) {
+            world.equipment.grantReward(); publishProgression(); return true;
+        }
+        if (key == Input.Keys.F12 && config.profile() && screen == Screen.SESSION && overlay == null) {
+            previewHud(18); previewEquipment(); world.debugStartLateEncounter();
+            hudPreview = false; notifiedWave = world.wave;
+            notifiedReliquaries = world.equipment.rewardsEarned();
+            syncEncounterHud(); publishProgression(); return true;
+        }
         if (key == Input.Keys.F11 && config.profile() && screen == Screen.SESSION && overlay == null) {
             world.debugStartLateEncounter();
             previewHud(18);
@@ -874,6 +905,10 @@ public final class CryptLobby extends ApplicationAdapter {
             state.publishProgression(i, progression.level, progression.xp, progression.xpToNext,
                 pending ? offer.id : 0, pending ? offer.level : 0, pending ? offer.secondsLeft : 0,
                 pending ? offer.options : null, pending ? offer.cards : null);
+            var itemOffer = world.equipment.offers[i];
+            boolean itemPending = inRun && world.players[i].active && itemOffer.pending;
+            state.publishEquipment(i, itemPending ? itemOffer.id : 0, itemPending ? itemOffer.secondsLeft : 0,
+                itemPending ? itemOffer.options : null, itemPending ? itemOffer.cards : null);
         }
     }
 
@@ -886,6 +921,10 @@ public final class CryptLobby extends ApplicationAdapter {
 
     private void updateCombatNotices() {
         syncEncounterHud();
+        if (world.equipment.rewardsEarned() > notifiedReliquaries) {
+            notifiedReliquaries = world.equipment.rewardsEarned();
+            hudState.notify("RELIQUARY FOUND  /  CHOOSE GEAR ON YOUR PHONE", "", ArenaHudState.Tone.SUCCESS, 4f);
+        }
         if (world.wave > notifiedWave && !world.bossSpawned) {
             notifiedWave = world.wave;
             hudState.notify("WAVE " + world.wave + " / " + world.waveCount() + "  /  "
@@ -913,12 +952,12 @@ public final class CryptLobby extends ApplicationAdapter {
                 hudState.notify(i == 0 ? "PLAYER I REVIVED" : "PLAYER II REVIVED", i == 0 ? "Player I returns to the fight." : "Player II returns to the fight.",
                     ArenaHudState.Tone.SUCCESS, 3.5f);
             previouslyAlive[i] = player.alive;
-            if (player.alive && player.health <= player.maxHealth * .25f && !lowHealthNotified[i]) {
+            if (player.alive && player.health <= world.equipment.maxHealth(player) * .25f && !lowHealthNotified[i]) {
                 lowHealthNotified[i] = true;
                 hudState.notify(i == 0 ? "PLAYER I LOW HEALTH" : "PLAYER II LOW HEALTH",
                     "Dodge to safety. Seek a healing ember.", ArenaHudState.Tone.WARNING, 3.5f);
             }
-            if (player.health > player.maxHealth * .4f) lowHealthNotified[i] = false;
+            if (player.health > world.equipment.maxHealth(player) * .4f) lowHealthNotified[i] = false;
         }
         if (!finalWarning && !world.bossSpawned && world.timeRemaining() <= 30 && world.outcome == ArenaWorld.Outcome.RUNNING) {
             finalWarning = true;
@@ -939,6 +978,10 @@ public final class CryptLobby extends ApplicationAdapter {
             else {
                 for (int i = 0; i < 2; i++) {
                     var input = controls[i];
+                    if (world.progression.offers[i].pending || world.equipment.offers[i].pending) {
+                        world.setInput(i, 0, 0, false);
+                        continue;
+                    }
                     float x = .7071068f * input.x + 1.4142136f * input.y;
                     float y = -.7071068f * input.x + 1.4142136f * input.y;
                     float magnitude = (float) Math.sqrt(input.x * input.x + input.y * input.y);
@@ -951,6 +994,13 @@ public final class CryptLobby extends ApplicationAdapter {
                     if (state.pollUpgrade(i, request) && request.generation == controls[i].generation
                         && world.progression.choose(i, request.offerId, request.option)) {
                         hudState.notify(i == 0 ? "PLAYER I UPGRADED" : "PLAYER II UPGRADED", "", ArenaHudState.Tone.SUCCESS, 2f);
+                    }
+                    var itemRequest = equipmentRequests[i];
+                    if (!world.progression.offers[i].pending && state.pollEquipment(i, itemRequest)
+                        && itemRequest.generation == controls[i].generation
+                        && world.equipment.choose(i, itemRequest.offerId, itemRequest.option)) {
+                        hudState.notify((i == 0 ? "PLAYER I " : "PLAYER II ")
+                            + (itemRequest.option < 0 ? "GEAR KEPT" : "EQUIPPED"), "", ArenaHudState.Tone.SUCCESS, 2f);
                     }
                 }
                 world.update(delta);
@@ -965,7 +1015,7 @@ public final class CryptLobby extends ApplicationAdapter {
             refreshClock = 0; updateStatus(); publishProgression();
             for (int i = 0; i < 2; i++) {
                 var player = world.players[i];
-                state.setPlayerFeedback(i, player.health, player.maxHealth, player.dodgeCooldown, player.alive);
+                state.setPlayerFeedback(i, player.health, world.equipment.maxHealth(player), player.dodgeCooldown, player.alive);
             }
         }
         if (profileClock >= 5) {
@@ -1001,6 +1051,7 @@ public final class CryptLobby extends ApplicationAdapter {
         disposeQr();
         stage.dispose(); arena.dispose(); audio.dispose();
         if (buildIcons != null) buildIcons.dispose();
+        if (itemArt != null) itemArt.dispose();
         if (outcomeTitles != null) outcomeTitles.dispose();
         if (hudArt != null) hudArt.dispose();
         gameArt.dispose(); art.dispose();

@@ -3,6 +3,7 @@ package com.couchcrypt.lobby;
 import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
 import com.couchcrypt.game.PartyProgression;
+import com.couchcrypt.game.ItemCatalog;
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoWSD;
 import java.io.IOException;
@@ -73,7 +74,8 @@ public final class JoinServer extends NanoWSD {
             + ",\"hostActive\":" + snapshot.hostActive() + ",\"phase\":\""
             + snapshot.phase().name().toLowerCase(java.util.Locale.ROOT) + "\",\"health\":" + feedback.health()
             + ",\"maxHealth\":" + feedback.maxHealth() + ",\"dodgeCooldown\":" + feedback.dodgeCooldown()
-            + ",\"alive\":" + feedback.alive() + ",\"progression\":" + progressionJson(slot) + "}";
+            + ",\"alive\":" + feedback.alive() + ",\"progression\":" + progressionJson(slot)
+            + ",\"equipment\":" + equipmentJson(slot) + "}";
     }
 
     private String progressionJson(int slot) {
@@ -102,6 +104,31 @@ public final class JoinServer extends NanoWSD {
             target.append(",\"before\":"); quote(target, card.before());
             target.append(",\"after\":"); quote(target, card.after());
         }
+        target.append('}');
+    }
+
+    private String equipmentJson(int slot) {
+        var offer = state.equipmentFeedback(slot);
+        if (offer == null) return "null";
+        StringBuilder result = new StringBuilder(768);
+        result.append("{\"id\":").append(offer.id()).append(",\"secondsLeft\":").append(offer.secondsLeft())
+            .append(",\"options\":[");
+        appendEquipment(result, offer.first(), offer.firstCard()); result.append(',');
+        appendEquipment(result, offer.second(), offer.secondCard()); result.append(',');
+        appendEquipment(result, offer.third(), offer.thirdCard());
+        return result.append("]}").toString();
+    }
+
+    private static void appendEquipment(StringBuilder target, ItemCatalog.Item item, PartyProgression.CardPreview card) {
+        target.append("{\"id\":"); quote(target, item.id());
+        target.append(",\"title\":"); quote(target, item.title());
+        target.append(",\"description\":"); quote(target, item.description());
+        target.append(",\"slot\":"); quote(target, item.slot().name());
+        target.append(",\"icon\":").append(ItemCatalog.artIndex(item)).append(",\"rank\":0");
+        target.append(",\"category\":"); quote(target, card.category());
+        target.append(",\"headline\":"); quote(target, card.headline());
+        target.append(",\"before\":"); quote(target, card.before());
+        target.append(",\"after\":"); quote(target, card.after());
         target.append('}');
     }
 
@@ -189,13 +216,15 @@ public final class JoinServer extends NanoWSD {
                 if ("ping".equals(message.getString("type", ""))) {
                     lastSeen = System.currentTimeMillis(); deliver(status(slot));
                 }
-                else if ("upgrade".equals(message.getString("type", ""))) {
+                else if ("upgrade".equals(message.getString("type", "")) || "equipment".equals(message.getString("type", ""))) {
+                    boolean equipment = "equipment".equals(message.getString("type"));
                     JsonValue offerId = message.get("offerId"), option = message.get("option");
                     if (offerId == null || !offerId.isLong() || offerId.asLong() <= 0 || offerId.asLong() > Integer.MAX_VALUE
-                        || option == null || !option.isLong() || option.asLong() < 0 || option.asLong() > 2) return;
+                        || option == null || !option.isLong() || option.asLong() < (equipment ? -1 : 0) || option.asLong() > 2) return;
                     if (state.owns(id)) {
                         lastSeen = System.currentTimeMillis();
-                        state.chooseUpgrade(id, offerId.asInt(), option.asInt());
+                        if (equipment) state.chooseEquipment(id, offerId.asInt(), option.asInt());
+                        else state.chooseUpgrade(id, offerId.asInt(), option.asInt());
                     }
                 }
                 else if ("input".equals(message.getString("type", ""))) {

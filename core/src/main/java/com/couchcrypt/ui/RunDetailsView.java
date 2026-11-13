@@ -11,6 +11,8 @@ import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Scaling;
 import com.couchcrypt.game.ArenaWorld;
 import com.couchcrypt.game.PartyProgression;
+import com.couchcrypt.game.ItemCatalog;
+import com.couchcrypt.game.RunEquipment;
 import java.util.function.Consumer;
 
 /** A finished character-and-build composition, prepared once when opening the run chronicle. */
@@ -20,8 +22,8 @@ public final class RunDetailsView {
     private RunDetailsView() {}
 
     /** Parent supplies the dimmed outcome scene and owns every texture and font used here. */
-    public static Table create(UiArt art, ArenaWorld world, TextureRegion[] skillIcons,
-        Runnable back, Consumer<RemoteButton> register) {
+    public static Table create(UiArt art, ArenaWorld world, TextureRegion[] skillIcons, TextureRegion[] itemIcons,
+        boolean equipment, Runnable toggle, Runnable back, Consumer<RemoteButton> register) {
         Table root = new Table();
         root.pad(32, 80, 32, 80);
         Table heading = new Table();
@@ -42,14 +44,14 @@ public final class RunDetailsView {
         for (ArenaWorld.Player player : world.players) if (player.active) {
             active++;
             int skills = skillCount(world, player.slot);
-            tallest = Math.max(tallest, preferredPlayerHeight(skills));
+            tallest = Math.max(tallest, equipment ? 728 : preferredPlayerHeight(skills));
         }
         Table party = new Table();
         boolean added = false;
         for (ArenaWorld.Player player : world.players) {
             if (!player.active) continue;
             if (added) party.add(rule(art, UiArt.GOLD)).width(1).height(tallest).pad(0, 36, 0, 36);
-            party.add(player(art, world, player, skillIcons, active == 1 ? 1080 : 800)).top();
+            party.add(player(art, world, player, skillIcons, itemIcons, equipment, active == 1 ? 1080 : 800)).top();
             added = true;
         }
         if (!added) party.add(art.label("No heroes took part in this descent.", art.body, UiArt.MUTED));
@@ -58,16 +60,22 @@ public final class RunDetailsView {
         RemoteButton backButton = new RemoteButton(art, back, false);
         backButton.add(art.label("BACK TO SUMMARY", art.section, UiArt.BUTTON_INK));
         register.accept(backButton);
-        root.add(backButton).width(500).height(78).padTop(16);
+        RemoteButton toggleButton = new RemoteButton(art, toggle, false);
+        toggleButton.add(art.label(equipment ? "VIEW SKILLS" : "VIEW EQUIPMENT", art.section, UiArt.BUTTON_INK));
+        register.accept(toggleButton);
+        Table actions = new Table();
+        actions.add(toggleButton).width(500).height(78).padRight(24);
+        actions.add(backButton).width(500).height(78);
+        root.add(actions).padTop(16);
         return root;
     }
 
     private static Table player(UiArt art, ArenaWorld world, ArenaWorld.Player player,
-        TextureRegion[] icons, float width) {
+        TextureRegion[] icons, TextureRegion[] itemIcons, boolean equipment, float width) {
         Color accent = player.slot == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO;
         int skills = skillCount(world, player.slot), ranks = 0;
         boolean detailed = skills <= 4;
-        float identityHeight = detailed ? 318 : 236;
+        float identityHeight = equipment ? 236 : detailed ? 318 : 236;
         for (PartyProgression.Upgrade upgrade : UPGRADES) ranks += world.progression.rank(player.slot, upgrade);
 
         Table column = new Table(); column.top();
@@ -79,17 +87,49 @@ public final class RunDetailsView {
         float statWidth = width - 254;
         Table record = new Table(); record.left();
         record.add(art.label(player.slot == 0 ? "PLAYER I" : "PLAYER II", art.small, accent)).left().padBottom(7).row();
-        record.add(scaled(art, player.hero.name(), art.heading, .76f, UiArt.IVORY)).left().padBottom(detailed ? 28 : 18).row();
+        record.add(scaled(art, player.hero.name(), art.heading, .76f, UiArt.IVORY)).left().padBottom(equipment ? 12 : detailed ? 28 : 18).row();
         Table numbers = new Table();
         float numberWidth = statWidth / 3f;
         numbers.add(stat(art, Integer.toString(player.kills), "SLAIN", accent, numberWidth));
         numbers.add(stat(art, Integer.toString((int) player.damageDealt), "DAMAGE", accent, numberWidth));
         numbers.add(stat(art, Integer.toString(player.revives), "REVIVES", accent, numberWidth));
-        record.add(numbers).left().padBottom(16).row();
+        record.add(numbers).left().padBottom(equipment ? 8 : 16).row();
         record.add(art.label((int) player.damageTaken + " DAMAGE TAKEN", art.small, UiArt.MUTED)).left();
         identity.add(record).width(statWidth).left();
         column.add(identity).width(width).height(identityHeight).row();
         column.add(rule(art, accent)).width(width).height(1).padTop(4).padBottom(14).row();
+
+        if (equipment) {
+            int equipped = 0;
+            for (int position = 0; position < RunEquipment.SLOT_COUNT; position++)
+                if (world.equipment.equipped(player.slot, position) != null) equipped++;
+            Table header = new Table();
+            header.add(art.label("YOUR EQUIPMENT", art.small, accent)).left();
+            header.add().expandX();
+            header.add(art.label(equipped + " / 7 SLOTS", art.small, UiArt.MUTED)).right();
+            column.add(header).width(width).padBottom(8).row();
+            for (int position = 0; position < RunEquipment.SLOT_COUNT; position++) {
+                ItemCatalog.Item item = world.equipment.equipped(player.slot, position);
+                Table entry = new Table(); entry.left();
+                if (item != null && itemIcons != null) {
+                    Image icon = new Image(itemIcons[ItemCatalog.artIndex(item)]);
+                    icon.setScaling(Scaling.fit); icon.setTouchable(Touchable.disabled);
+                    entry.add(icon).size(56).padRight(12);
+                } else entry.add().width(68);
+                Table copy = new Table(); copy.left();
+                Label title = scaled(art, RunEquipment.slotName(position) + "  /  "
+                    + (item == null ? "EMPTY" : item.title()), art.small, .88f, item == null ? UiArt.MUTED : UiArt.IVORY);
+                copy.add(title).left().row();
+                if (item != null) {
+                    Label description = scaled(art, item.description(), art.small, .72f, UiArt.MUTED);
+                    description.setWrap(true);
+                    copy.add(description).width(width - 68).left();
+                }
+                entry.add(copy).width(width - 68).left();
+                column.add(entry).width(width).height(64).left().row();
+            }
+            return column;
+        }
 
         Table buildHeader = new Table();
         buildHeader.add(art.label("YOUR BUILD", art.small, accent)).left();
@@ -103,7 +143,7 @@ public final class RunDetailsView {
         for (PartyProgression.Upgrade upgrade : UPGRADES) {
             int rank = world.progression.rank(player.slot, upgrade);
             if (rank <= 0) continue;
-            build.add(skill(art, player, upgrade, rank, icons, detailed, accent))
+            build.add(skill(art, world, player, upgrade, rank, icons, detailed, accent))
                 .width(cellWidth).height(detailed ? 78 : 54).padBottom(detailed ? 2 : 4);
             shown++;
             if (detailed) build.row();
@@ -116,7 +156,7 @@ public final class RunDetailsView {
         return column;
     }
 
-    private static Table skill(UiArt art, ArenaWorld.Player player, PartyProgression.Upgrade upgrade, int rank,
+    private static Table skill(UiArt art, ArenaWorld world, ArenaWorld.Player player, PartyProgression.Upgrade upgrade, int rank,
         TextureRegion[] icons, boolean detailed, Color accent) {
         Table entry = new Table(); entry.left();
         TextureRegion icon = icons != null && upgrade.ordinal() < icons.length ? icons[upgrade.ordinal()] : null;
@@ -126,7 +166,7 @@ public final class RunDetailsView {
         }
         Table copy = new Table(); copy.left();
         copy.add(art.label(upgrade.title, detailed ? art.body : art.small, UiArt.IVORY)).left().row();
-        if (detailed) copy.add(art.label(effect(player, upgrade), art.small, UiArt.MUTED)).left().padTop(4);
+        if (detailed) copy.add(art.label(effect(world, player, upgrade), art.small, UiArt.MUTED)).left().padTop(4);
         entry.add(copy).left().expandX();
         entry.add(art.label("RANK " + rank, art.small, accent)).right().padLeft(8).padRight(10);
         return entry;
@@ -142,23 +182,24 @@ public final class RunDetailsView {
         return new TextureRegion(source, x, 0, w, source.getRegionHeight());
     }
 
-    private static String effect(ArenaWorld.Player player, PartyProgression.Upgrade upgrade) {
+    private static String effect(ArenaWorld world, ArenaWorld.Player player, PartyProgression.Upgrade upgrade) {
         return switch (upgrade) {
-            case POWER -> "+" + percent(player.damageMultiplier - 1) + "% attack damage";
-            case HASTE -> "+" + percent(player.attackRateMultiplier - 1) + "% attack speed";
-            case FLEET -> "+" + percent(player.moveMultiplier - 1) + "% movement speed";
-            case VITALITY -> (int) player.maxHealth + " maximum health";
-            case EVASION -> "Dodge cooldown: " + tenths(player.hero.dodgeCooldown * player.dodgeCooldownMultiplier) + "s";
-            case SWEEP -> "+" + percent(player.cleaveMultiplier - 1) + "% sword reach";
-            case MULTISHOT -> player.projectileCount + " arrows per attack";
-            case PIERCE -> "Arrows pierce " + player.pierce + (player.pierce == 1 ? " extra target" : " extra targets");
+            case POWER -> signedPercent(world.equipment.damageMultiplier(player) - 1) + "% attack damage";
+            case HASTE -> signedPercent(world.equipment.attackRate(player) - 1) + "% attack speed";
+            case FLEET -> signedPercent(world.equipment.moveMultiplier(player) - 1) + "% movement speed";
+            case VITALITY -> (int) world.equipment.maxHealth(player) + " maximum health";
+            case EVASION -> "Dodge cooldown: " + tenths(world.equipment.dodgeCooldown(player)) + "s";
+            case SWEEP -> signedPercent(world.equipment.reachMultiplier(player) - 1) + "% sword reach";
+            case MULTISHOT -> world.equipment.projectileCount(player) + " arrows per attack";
+            case PIERCE -> "Arrows pierce " + world.equipment.pierce(player) + (world.equipment.pierce(player) == 1 ? " extra target" : " extra targets");
             case AURA -> "Damage pulses every 0.7s";
             case STORM -> "Chains across " + (player.stormLevel + 1) + " targets every 2s";
-            case MAGNET -> "+" + percent(player.pickupMultiplier - 1) + "% pickup attraction";
-            case CRITICAL -> "Critical chance: " + percent(player.critChance) + "%";
+            case MAGNET -> signedPercent(world.equipment.pickupMultiplier(player) - 1) + "% pickup attraction";
+            case CRITICAL -> "Critical chance: " + percent(world.equipment.critChance(player)) + "%";
         };
     }
 
+    private static String signedPercent(float value) { int n = percent(value); return (n >= 0 ? "+" : "") + n; }
     private static int percent(float value) { return Math.round(value * 100); }
     private static String tenths(float value) { int n = Math.round(value * 10); return n / 10 + "." + n % 10; }
 

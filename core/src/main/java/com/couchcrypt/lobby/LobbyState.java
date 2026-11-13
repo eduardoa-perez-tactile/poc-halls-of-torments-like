@@ -2,6 +2,7 @@ package com.couchcrypt.lobby;
 
 import java.util.UUID;
 import com.couchcrypt.game.PartyProgression;
+import com.couchcrypt.game.ItemCatalog;
 
 /** The only owner of player slots. Network callbacks and the render thread use snapshots. */
 public final class LobbyState {
@@ -21,10 +22,17 @@ public final class LobbyState {
         public int offerId, option;
         public long generation;
     }
+    public static final class EquipmentRequest {
+        public int offerId, option;
+        public long generation;
+    }
     public record UpgradeFeedback(int id, int level, float secondsLeft,
         PartyProgression.Upgrade first, PartyProgression.Upgrade second, PartyProgression.Upgrade third,
         PartyProgression.CardPreview firstCard, PartyProgression.CardPreview secondCard, PartyProgression.CardPreview thirdCard) {}
     public record ProgressionFeedback(int level, int xp, int xpToNext, UpgradeFeedback upgrade) {}
+    public record EquipmentFeedback(int id, float secondsLeft,
+        ItemCatalog.Item first, ItemCatalog.Item second, ItemCatalog.Item third,
+        PartyProgression.CardPreview firstCard, PartyProgression.CardPreview secondCard, PartyProgression.CardPreview thirdCard) {}
     public record Snapshot(Player first, Player second, int connected, boolean hostActive, Phase phase, long revision) {}
     public record Join(int slot, String token, String error) {
         static Join rejected(String reason) { return new Join(-1, null, reason); }
@@ -42,14 +50,29 @@ public final class LobbyState {
         final PartyProgression.CardPreview[] cards = new PartyProgression.CardPreview[3];
         boolean upgradeQueued;
         int upgradeOption;
+        int equipmentId, claimedEquipmentId, equipmentOption;
+        float equipmentSeconds;
+        boolean equipmentQueued;
+        final ItemCatalog.Item[] equipmentOptions = new ItemCatalog.Item[3];
+        final PartyProgression.CardPreview[] equipmentCards = new PartyProgression.CardPreview[3];
         void clearUpgradeRequest() {
             if (upgradeQueued) claimedOfferId = 0;
             upgradeQueued = false;
+        }
+        void clearEquipmentRequest() {
+            if (equipmentQueued) claimedEquipmentId = 0;
+            equipmentQueued = false;
+        }
+        void clearEquipment() {
+            equipmentId = claimedEquipmentId = equipmentOption = 0;
+            equipmentSeconds = 0; equipmentQueued = false;
+            for (int i = 0; i < 3; i++) { equipmentOptions[i] = null; equipmentCards[i] = null; }
         }
         void clearProgression() {
             level = 1; xp = 0; xpToNext = 6; offerId = offerLevel = claimedOfferId = 0;
             offerSeconds = 0; upgradeQueued = false;
             for (int i = 0; i < 3; i++) { options[i] = null; cards[i] = null; }
+            clearEquipment();
         }
         void clearInput() { x = 0; y = 0; pendingDodge = false; dodgeHeld = false; lastInput = 0; }
         void clear() {
@@ -96,7 +119,7 @@ public final class LobbyState {
         for (Slot slot : slots) {
             if (connection.equals(slot.connection)) {
                 slot.connection = null;
-                slot.clearInput(); slot.clearUpgradeRequest();
+                slot.clearInput(); slot.clearUpgradeRequest(); slot.clearEquipmentRequest();
                 slot.expires = now + RECONNECT_MILLIS;
                 revision++;
             }
@@ -187,6 +210,8 @@ public final class LobbyState {
         slot.offerId = nextId;
         slot.offerLevel = offered ? Math.max(2, Math.min(PartyProgression.MAX_LEVEL, offerLevel)) : 0;
         slot.offerSeconds = offered ? Math.min(PartyProgression.CHOICE_SECONDS, secondsLeft) : 0;
+        // A skill choice takes priority over gear; do not carry an unseen gear click behind it.
+        if (offered) slot.clearEquipmentRequest();
         for (int i = 0; i < 3; i++) {
             slot.options[i] = offered ? options[i] : null;
             slot.cards[i] = offered && cards != null && cards.length >= 3 ? cards[i] : null;
@@ -225,7 +250,59 @@ public final class LobbyState {
         return new ProgressionFeedback(slot.level, slot.xp, slot.xpToNext, upgrade);
     }
 
-    private void clearUpgradeRequests() { for (Slot slot : slots) slot.clearUpgradeRequest(); }
+    /** Equipment remains presented while paused or hidden behind a personal skill choice. */
+    public synchronized void publishEquipment(int index, int offerId, float secondsLeft,
+        ItemCatalog.Item[] options, PartyProgression.CardPreview[] cards) {
+        Slot slot = slots[index];
+        boolean offered = offerId > 0 && options != null && options.length >= 3
+            && options[0] != null && options[1] != null && options[2] != null
+            && cards != null && cards.length >= 3 && cards[0] != null && cards[1] != null && cards[2] != null
+            && Float.isFinite(secondsLeft) && secondsLeft > 0;
+        int nextId = offered ? offerId : 0;
+        if (slot.equipmentId != nextId || nextId == 0) {
+            slot.equipmentQueued = false; slot.claimedEquipmentId = 0;
+        }
+        slot.equipmentId = nextId;
+        slot.equipmentSeconds = offered ? Math.min(PartyProgression.CHOICE_SECONDS, secondsLeft) : 0;
+        for (int i = 0; i < 3; i++) {
+            slot.equipmentOptions[i] = offered ? options[i] : null;
+            slot.equipmentCards[i] = offered ? cards[i] : null;
+        }
+    }
+
+    public synchronized boolean chooseEquipment(String connection, int offerId, int option) {
+        if (!hostActive || phase != Phase.SESSION || offerId <= 0 || option < -1 || option >= 3) return false;
+        for (Slot slot : slots) {
+            if (!connection.equals(slot.connection)) continue;
+            if (slot.offerId > 0 || slot.equipmentId != offerId || slot.equipmentSeconds <= 0
+                || slot.claimedEquipmentId == offerId) return false;
+            slot.claimedEquipmentId = offerId;
+            slot.equipmentOption = option; slot.equipmentQueued = true;
+            return true;
+        }
+        return false;
+    }
+
+    public synchronized boolean pollEquipment(int index, EquipmentRequest out) {
+        Slot slot = slots[index];
+        if (!slot.equipmentQueued || slot.offerId > 0 || !hostActive || phase != Phase.SESSION || slot.connection == null) return false;
+        out.offerId = slot.equipmentId; out.option = slot.equipmentOption; out.generation = slot.generation;
+        slot.equipmentQueued = false;
+        return true;
+    }
+
+    /** Server-thread snapshot; no caller-owned offer array escapes. */
+    public synchronized EquipmentFeedback equipmentFeedback(int index) {
+        Slot slot = slots[index];
+        return slot.equipmentId > 0
+            ? new EquipmentFeedback(slot.equipmentId, slot.equipmentSeconds,
+                slot.equipmentOptions[0], slot.equipmentOptions[1], slot.equipmentOptions[2],
+                slot.equipmentCards[0], slot.equipmentCards[1], slot.equipmentCards[2]) : null;
+    }
+
+    private void clearUpgradeRequests() {
+        for (Slot slot : slots) { slot.clearUpgradeRequest(); slot.clearEquipmentRequest(); }
+    }
 
     private void clearInputs() { for (Slot slot : slots) slot.clearInput(); }
 

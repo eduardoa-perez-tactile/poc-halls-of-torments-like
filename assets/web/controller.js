@@ -12,7 +12,9 @@
   const upgradeChoices = byId('upgrade-choices'), upgradeLevel = byId('upgrade-level'), upgradeCountdown = byId('upgrade-countdown');
   const upgradeSecondsLabel = byId('upgrade-seconds'), upgradeTimerLabel = byId('upgrade-timer-label');
   const upgradeButtons = [0, 1, 2].map((index) => byId(`upgrade-option-${index}`));
+  const keepEquipment = byId('equipment-keep');
   let upgradeOffer = null, upgradeSeconds = 0, upgradeSampleTime = 0, upgradeTicker;
+  let choiceKind = 'upgrade';
   let upgradeSelected = -1, upgradePendingSince = 0;
   let phase = 'lobby', hostActive = false, alive = true, foreground = true, sender, sequence = 0;
   let axisX = 0, axisY = 0, dodgeEdge = false, stickPointer = null, dodgePointer = null, stickBounds;
@@ -45,7 +47,9 @@
     const wasVisible = !upgradeChoices.hidden;
     clearInterval(upgradeTicker); upgradeTicker = undefined;
     upgradeOffer = null; upgradeSelected = -1; upgradePendingSince = 0;
+    choiceKind = 'upgrade';
     upgradeChoices.hidden = true; document.body.classList.remove('has-upgrade', 'choice-urgent');
+    keepEquipment.hidden = true;
     if (wasVisible) releaseControls();
   }
   function canChooseUpgrade() {
@@ -76,6 +80,8 @@
       button.disabled = disabled;
       button.classList.toggle('selected', index === upgradeSelected);
     });
+    keepEquipment.hidden = choiceKind !== 'equipment';
+    keepEquipment.disabled = disabled;
     if (foreground && !document.hidden) {
       if (!upgradeTicker) upgradeTicker = setInterval(paintUpgrade, 100);
     } else { clearInterval(upgradeTicker); upgradeTicker = undefined; }
@@ -86,43 +92,51 @@
     aura: [8, 'OFFENSE'], storm: [9, 'OFFENSE'], magnet: [10, 'UTILITY'], critical: [11, 'OFFENSE']
   };
   const categoryGlyphs = { WEAPON: '⚔︎', OFFENSE: '✦', DEFENSE: '✚', MOBILITY: '➶', UTILITY: '◎' };
-  function paintSkillCard(button, option) {
+  function paintSkillCard(button, option, equipment = false) {
     const fallback = fallbackSkills[option.id];
     const category = Object.hasOwn(categoryGlyphs, option.category) ? option.category : fallback?.[1] || 'OFFENSE';
-    const icon = Number.isInteger(option.icon) && option.icon >= 0 && option.icon < 12 ? option.icon : fallback?.[0];
+    const icon = Number.isInteger(option.icon) && option.icon >= 0 && option.icon < (equipment ? 48 : 12)
+      ? option.icon : equipment ? undefined : fallback?.[0];
     const illustrated = Number.isInteger(icon);
     button.dataset.category = category;
     button.querySelector('.skill-art').hidden = !illustrated;
+    const illustration = button.querySelector('.skill-illustration');
+    illustration.style.backgroundImage = equipment ? "url('/art/item-icons.png')" : '';
+    illustration.style.backgroundSize = equipment ? '800% 600%' : '';
     if (illustrated) {
-      button.style.setProperty('--icon-x', `${icon % 4 / 3 * 100}%`);
-      button.style.setProperty('--icon-y', `${Math.floor(icon / 4) / 2 * 100}%`);
+      button.style.setProperty('--icon-x', `${icon % (equipment ? 8 : 4) / (equipment ? 7 : 3) * 100}%`);
+      button.style.setProperty('--icon-y', `${Math.floor(icon / (equipment ? 8 : 4)) / (equipment ? 5 : 2) * 100}%`);
     }
     button.querySelector('.skill-category').textContent = `${categoryGlyphs[category]} ${category}`;
-    button.querySelector('.skill-rank').textContent = Number.isSafeInteger(option.rank) && option.rank > 0 ? `RANK ${option.rank}` : '';
+    button.querySelector('.skill-rank').textContent = equipment && typeof option.slot === 'string'
+      ? option.slot.replaceAll('_', ' ') : Number.isSafeInteger(option.rank) && option.rank > 0 ? `RANK ${option.rank}` : '';
     button.querySelector('.skill-title').textContent = option.title.slice(0, 64);
     const hasPreview = typeof option.headline === 'string' && typeof option.before === 'string' && typeof option.after === 'string';
     button.classList.toggle('legacy', !hasPreview);
-    button.querySelector('.skill-headline').textContent = hasPreview ? option.headline.slice(0, 40) : option.description.slice(0, 128);
+    button.querySelector('.skill-headline').textContent = hasPreview ? option.headline.slice(0, equipment ? 128 : 40) : option.description.slice(0, 128);
     button.querySelector('.skill-preview').hidden = !hasPreview;
-    button.querySelector('.skill-before').textContent = hasPreview ? option.before.slice(0, 40) : '';
-    button.querySelector('.skill-after').textContent = hasPreview ? option.after.slice(0, 40) : '';
-    button.setAttribute('aria-label', `${option.title}. ${hasPreview ? `${option.headline}. ${option.before} to ${option.after}` : option.description}${Number.isSafeInteger(option.rank) && option.rank > 0 ? `. Rank ${option.rank}` : ''}`);
+    button.querySelector('.skill-before').textContent = hasPreview ? option.before.slice(0, equipment ? 128 : 40) : '';
+    button.querySelector('.skill-after').textContent = hasPreview ? option.after.slice(0, equipment ? 128 : 40) : '';
+    button.setAttribute('aria-label', `${option.title}. ${hasPreview ? `${option.headline}. ${option.before} to ${option.after}` : option.description}${equipment ? `. ${option.description}` : Number.isSafeInteger(option.rank) && option.rank > 0 ? `. Rank ${option.rank}` : ''}`);
   }
-  function setUpgradeOffer(progression) {
-    const next = progression?.upgrade;
+  function setUpgradeOffer(progression, equipment) {
+    const kind = progression?.upgrade ? 'upgrade' : 'equipment';
+    const next = kind === 'upgrade' ? progression.upgrade : equipment;
     if (!joined || !['session', 'paused', 'invite'].includes(phase) || !next
       || !Number.isSafeInteger(next.id) || next.id <= 0 || !Number.isFinite(next.secondsLeft)
       || !Array.isArray(next.options) || next.options.length !== 3
       || !next.options.every((option) => typeof option?.title === 'string' && typeof option.description === 'string')) {
       clearUpgrade(); return;
     }
-    if (upgradeOffer?.id !== next.id) {
+    if (upgradeOffer?.id !== next.id || choiceKind !== kind) {
       upgradeOffer = next; upgradeSelected = -1; upgradePendingSince = 0;
-      upgradeLevel.textContent = `LEVEL ${Number.isSafeInteger(next.level) ? next.level : ''}`;
-      upgradeButtons.forEach((button, index) => paintSkillCard(button, next.options[index]));
+      choiceKind = kind;
+      upgradeChoices.querySelector('.upgrade-kicker').textContent = kind === 'equipment' ? 'CHOOSE YOUR EQUIPMENT' : 'CHOOSE YOUR POWER';
+      upgradeLevel.textContent = kind === 'equipment' ? 'EQUIPMENT' : `LEVEL ${Number.isSafeInteger(next.level) ? next.level : ''}`;
+      upgradeButtons.forEach((button, index) => paintSkillCard(button, next.options[index], kind === 'equipment'));
       upgradeChoices.hidden = false; document.body.classList.add('has-upgrade');
       upgradeChoices.querySelector('.upgrade-options').scrollTop = 0;
-      // Combat continues, but choosing a skill is a neutral-input phone mode.
+      // Combat continues, but either personal choice is a neutral-input phone mode.
       releaseControls();
     }
     upgradeSeconds = Math.max(0, Math.min(30, next.secondsLeft));
@@ -132,16 +146,23 @@
   upgradeButtons.forEach((button, index) => button.addEventListener('click', () => {
     if (!upgradeOffer || !canChooseUpgrade() || upgradeSelected >= 0 || remainingUpgradeSeconds() <= 0) return;
     upgradeSelected = index; upgradePendingSince = performance.now();
-    socket.send(JSON.stringify({ type: 'upgrade', offerId: upgradeOffer.id, option: index }));
+    socket.send(JSON.stringify({ type: choiceKind, offerId: upgradeOffer.id, option: index }));
     paintUpgrade();
   }));
+  keepEquipment.addEventListener('click', () => {
+    if (!upgradeOffer || choiceKind !== 'equipment' || !canChooseUpgrade()
+      || upgradeSelected >= 0 || remainingUpgradeSeconds() <= 0) return;
+    upgradeSelected = 3; upgradePendingSince = performance.now();
+    socket.send(JSON.stringify({ type: 'equipment', offerId: upgradeOffer.id, option: -1 }));
+    paintUpgrade();
+  });
   function setControlScreen(data) {
     const wasSession = phase === 'session' && hostActive;
     phase = data.phase; hostActive = data.hostActive; alive = data.alive !== false;
     const activeSession = phase === 'session' && hostActive;
     title.textContent = data.phase === 'paused' || data.phase === 'invite' ? 'Paused' : data.phase === 'results' ? 'Round complete' : 'You have a place';
     if (wasSession !== activeSession) releaseControls();
-    setUpgradeOffer(data.progression);
+    setUpgradeOffer(data.progression, data.equipment);
     const show = activeSession || upgradeOffer !== null;
     controls.hidden = !show; document.body.classList.toggle('playing', show);
     document.querySelector('.touch-controls').inert = upgradeOffer !== null;
