@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Disposable;
 import com.couchcrypt.ui.UiArt;
+import com.couchcrypt.ui.BuildIcons;
 
 /** Bounded isometric renderer; all scene resources are owned by GameArt/UiArt. */
 public final class ArenaRenderer implements Disposable {
@@ -28,8 +29,8 @@ public final class ArenaRenderer implements Disposable {
     private int sortCount;
     public int drawCalls;
 
-    public ArenaRenderer(GameArt gameArt, UiArt uiArt) {
-        art = gameArt; gameHud = new GameHud(gameArt, uiArt);
+    public ArenaRenderer(GameArt gameArt, UiArt uiArt, BuildIcons buildIcons, HudArt hudArt) {
+        art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
         hud.setToOrtho(false, HUD_WIDTH, HUD_HEIGHT);
         for (int i = 0; i < 8; i++) {
             float x = -1080f + i * 300f;

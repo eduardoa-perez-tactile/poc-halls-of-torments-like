@@ -27,6 +27,8 @@ import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.couchcrypt.game.ArenaWorld;
 import com.couchcrypt.game.ArenaHudState;
 import com.couchcrypt.game.GameArt;
+import com.couchcrypt.game.HudArt;
+import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.GameAudio;
 import com.couchcrypt.game.ArenaRenderer;
 import com.couchcrypt.lobby.JoinServer;
@@ -72,6 +74,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private final boolean[] previouslyAlive = new boolean[2], lowHealthNotified = new boolean[2];
     private boolean finalWarning;
     private GameArt gameArt;
+    private HudArt hudArt;
     private ArenaRenderer arena;
     private GameAudio audio;
     private OutcomeArt outcomeArt;
@@ -117,7 +120,8 @@ public final class CryptLobby extends ApplicationAdapter {
         outcomeTitles = new OutcomeArt.Titles();
         outcomeLoader = new OutcomeArt.Loader();
         buildIcons = new BuildIcons();
-        arena = new ArenaRenderer(gameArt, art);
+        hudArt = new HudArt();
+        arena = new ArenaRenderer(gameArt, art, buildIcons, hudArt);
         audio = new GameAudio();
         if (residentArtBytes() > 32L * 1_048_576)
             throw new IllegalStateException("Combined art exceeds 32 MiB texture budget");
@@ -620,13 +624,14 @@ public final class CryptLobby extends ApplicationAdapter {
     private void backToResults() { showResults(); setFocus(2); }
 
     private long residentArtBytes() {
-        return art.textureBytes + gameArt.textureBytes + (outcomeTitles == null ? 0 : outcomeTitles.textureBytes)
+        return art.textureBytes + gameArt.textureBytes + (hudArt == null ? 0 : hudArt.textureBytes) + (outcomeTitles == null ? 0 : outcomeTitles.textureBytes)
             + (outcomeArt == null ? 0 : outcomeArt.textureBytes) + (buildIcons == null ? 0 : buildIcons.textureBytes)
             + (qr == null ? 0 : (long) qr.getWidth() * qr.getHeight() * 4);
     }
 
     private long residentPixmapBytes() {
         return art.retainedPixmapBytes + gameArt.retainedPixmapBytes
+            + (hudArt == null ? 0 : hudArt.retainedPixmapBytes)
             + (outcomeLoader == null ? 0 : outcomeLoader.preparedPixmapBytes())
             + (outcomeTitles == null ? 0 : outcomeTitles.retainedPixmapBytes)
             + (outcomeArt == null ? 0 : outcomeArt.retainedPixmapBytes)
@@ -742,7 +747,42 @@ public final class CryptLobby extends ApplicationAdapter {
         }
     }
 
+    /** Profile-only visual fixture: actual earned ranks and stats, without a survival playthrough. */
+    private void previewHud() {
+        while (world.progression.level < 12) {
+            world.progression.addXp(world.progression.xpToNext - world.progression.xp);
+            for (ArenaWorld.Player player : world.players) if (player.active) {
+                PartyProgression.Offer offer = world.progression.offers[player.slot];
+                for (int guard = 0; guard < PartyProgression.MAX_LEVEL && offer.pending; guard++) {
+                    int choice = 0, leastRank = Integer.MAX_VALUE;
+                    for (int i = 0; i < offer.options.length; i++) {
+                        int rank = world.progression.rank(player.slot, offer.options[i]);
+                        if (rank < leastRank) { choice = i; leastRank = rank; }
+                    }
+                    world.progression.choose(player.slot, offer.id, choice);
+                }
+            }
+        }
+        if (world.progression.xpToNext > 0) {
+            int target = Math.round(world.progression.xpToNext * .64f);
+            world.progression.addXp(Math.max(0, target - world.progression.xp));
+        }
+        for (ArenaWorld.Player player : world.players) if (player.active) {
+            player.alive = true; player.reviveProgress = 0; player.invulnerable = 999;
+            player.health = player.maxHealth * (player.slot == 0 ? .72f : .54f);
+            player.dodgeCooldown = player.slot == 0 ? 0 : player.hero.dodgeCooldown * player.dodgeCooldownMultiplier * .5f;
+        }
+        world.souls = world.progression.totalXp;
+        hudPreview = true; syncEncounterHud();
+        hudState.notify("THE PARTY GROWS STRONGER", "", ArenaHudState.Tone.INFO, 6f);
+        notifiedLevel = world.progression.level;
+        publishProgression();
+    }
+
     private boolean key(int key) {
+        if (key == Input.Keys.F10 && config.profile() && screen == Screen.SESSION && overlay == null) {
+            previewHud(); return true;
+        }
         if (key == Input.Keys.F9 && config.profile() && screen == Screen.SESSION && overlay == null
             && world.players[0].active && world.players[0].alive && world.players[1].active) {
             // Brief UI fixture: first press puts P2 out of view; second brings them into revival range.
@@ -985,6 +1025,7 @@ public final class CryptLobby extends ApplicationAdapter {
         if (outcomeArt != null) outcomeArt.dispose();
         if (buildIcons != null) buildIcons.dispose();
         if (outcomeTitles != null) outcomeTitles.dispose();
+        if (hudArt != null) hudArt.dispose();
         gameArt.dispose(); art.dispose();
     }
 }
