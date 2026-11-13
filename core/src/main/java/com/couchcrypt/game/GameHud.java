@@ -4,6 +4,7 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.math.MathUtils;
 import com.couchcrypt.ui.UiArt;
 
 /** Compact, unboxed combat information; the playfield remains visible beneath every element. */
@@ -14,6 +15,7 @@ public final class GameHud {
     private static final Color SOUL = Color.valueOf("9bc3bb");
     private final GameArt art;
     private final Text[] health = new Text[2], dodge = new Text[2], playerLabels = new Text[2], experience = new Text[2];
+    private final Text[] allyDown = new Text[2], revival = new Text[2];
     private final Text timer, slain, souls, bossName, bossPhase, noticeTitle, pause;
     private final StringBuilder builder = new StringBuilder(64);
     private final boolean[] wasActive = new boolean[2], wasAlive = new boolean[2];
@@ -28,6 +30,9 @@ public final class GameHud {
             experience[slot] = new Text(ui.small, 1f, 105f, accent);
             playerLabels[slot] = new Text(ui.small, 1f, 145f, accent);
             playerLabels[slot].set(slot == 0 ? "P1" : "P2");
+            allyDown[slot] = new Text(ui.small, 1f, 170f, WARNING);
+            allyDown[slot].set(slot == 0 ? "P2 DOWN" : "P1 DOWN");
+            revival[slot] = new Text(ui.small, 1f, 320f, accent);
         }
         timer = new Text(ui.section, .9f, 110f, UiArt.IVORY);
         slain = new Text(ui.small, 1f, 230f, UiArt.IVORY);
@@ -84,16 +89,28 @@ public final class GameHud {
             experience[slot].set(world.progression.xpToNext > 0
                 ? builder.append("XP ").append(world.progression.xp).append('/').append(world.progression.xpToNext).toString() : "MAX LEVEL");
             var offer = world.progression.offers[slot];
-            if (offer.pending) {
+            if (!player.alive) {
+                builder.setLength(0);
+                dodge[slot].set(player.reviveProgress > 0
+                    ? builder.append("REVIVING ").append(Math.min(100, (int) (player.reviveProgress * 50))).append('%').toString()
+                    : "AWAITING ALLY");
+            } else if (offer.pending) {
                 builder.setLength(0);
                 dodge[slot].set(builder.append("UPGRADE ").append((int) Math.ceil(offer.secondsLeft)).append('s').toString());
             }
-            else if (!player.alive) dodge[slot].set("DOWNED");
             else if (player.dodgeCooldown <= 0) dodge[slot].set("DODGE READY");
             else {
                 int tenths = (int) Math.ceil(player.dodgeCooldown * 10);
                 builder.setLength(0);
                 dodge[slot].set(builder.append("DODGE ").append(tenths / 10).append('.').append(tenths % 10).append('s').toString());
+            }
+            ArenaWorld.Player ally = world.players[1 - slot];
+            if (ally.active && !ally.alive) {
+                builder.setLength(0);
+                if (ally.reviveProgress > 0) builder.append("REVIVING P").append(ally.slot + 1).append("  ")
+                    .append(Math.min(100, (int) (ally.reviveProgress * 50))).append('%');
+                else builder.append("STAND NEAR P").append(ally.slot + 1).append(" TO REVIVE");
+                revival[slot].set(builder.toString());
             }
         }
     }
@@ -110,8 +127,40 @@ public final class GameHud {
         dodge[player.slot].draw(batch, x + 18f, 72f);
         experience[player.slot].right(batch, x + 280f, 72f);
         // Revival and dodge progress share a hairline, so no extra meter or frame is needed.
-        float ready = player.alive ? 1f - Math.min(1, player.dodgeCooldown / (2.4f * player.dodgeCooldownMultiplier)) : Math.min(1, player.reviveProgress / 2f);
-        if (ready < 1f || !player.alive) rect(batch, x + 18f, 48f, 262f * ready, 1f, accent, .9f);
+        float ready = player.alive ? 1f - Math.min(1, player.dodgeCooldown / (player.hero.dodgeCooldown * player.dodgeCooldownMultiplier)) : Math.min(1, player.reviveProgress / 2f);
+        if (ready < 1f || !player.alive) rect(batch, x + 18f, 48f, 262f * ready, player.alive ? 1f : 3f, accent, .9f);
+    }
+
+    /** Fallen-ally cues use projected positions supplied by the matching split camera. */
+    public void allyGuidance(SpriteBatch batch, ArenaWorld world, int viewer, float allyX, float allyY) {
+        ArenaWorld.Player self = world.players[viewer], ally = world.players[1 - viewer];
+        if (!self.active || !self.alive || !ally.active || ally.alive) return;
+        float paneLeft = viewer == 0 ? 0 : 960f;
+        Color accent = ally.slot == 0 ? UiArt.GOLD : SOUL;
+        if (allyX < 24f || allyX > 936f || allyY < 24f || allyY > 1056f) {
+            // Intersect a ray with a safe inner rectangle; leave the existing HUD lanes clear.
+            float dx = allyX - 480f, dy = allyY - 540f;
+            float factorX = Math.abs(dx) < .001f ? Float.MAX_VALUE : 424f / Math.abs(dx);
+            float factorY = Math.abs(dy) < .001f ? Float.MAX_VALUE : (dy > 0 ? 332f : 350f) / Math.abs(dy);
+            float factor = Math.min(factorX, factorY);
+            float x = 480f + dx * factor, y = 540f + dy * factor;
+            float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
+            arrowStroke(batch, paneLeft + x, y, angle + 145f, accent);
+            arrowStroke(batch, paneLeft + x, y, angle - 145f, accent);
+            float captionX = MathUtils.clamp(x, 110f, 850f);
+            allyDown[viewer].center(batch, paneLeft + captionX, y > 540f ? y - 24f : y + 39f);
+        } else {
+            float x = MathUtils.clamp(allyX, 190f, 770f), y = MathUtils.clamp(allyY + 180f, 220f, 870f);
+            revival[viewer].center(batch, paneLeft + x, y);
+            if (ally.reviveProgress > 0)
+                rail(batch, paneLeft + x - 80f, y - 32f, 160f, 4f, Math.min(1f, ally.reviveProgress / 2f), accent);
+        }
+        batch.setColor(Color.WHITE);
+    }
+
+    private void arrowStroke(SpriteBatch batch, float x, float y, float angle, Color color) {
+        batch.setColor(color);
+        batch.draw(art.pixel, x, y - 2f, 0, 2f, 21f, 4f, 1f, 1f, angle);
     }
 
     private void boss(SpriteBatch batch, ArenaHudState state) {

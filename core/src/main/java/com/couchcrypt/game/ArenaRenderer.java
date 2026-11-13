@@ -82,7 +82,16 @@ public final class ArenaRenderer implements Disposable {
         Gdx.gl.glViewport(0, 0, width, height);
         batch.setProjectionMatrix(hud.combined);
         batch.begin();
-        if (showHud) gameHud.render(batch, world, state, split, delta);
+        if (showHud) {
+            gameHud.render(batch, world, state, split, delta);
+            if (split) for (int slot = 0; slot < 2; slot++) {
+                ArenaWorld.Player ally = world.players[1 - slot];
+                OrthographicCamera camera = cameras[slot];
+                float allyX = 480f + (screenX(ally.x, ally.y) - camera.position.x) * 960f / camera.viewportWidth;
+                float allyY = 540f + (screenY(ally.x, ally.y) - camera.position.y) * 1080f / camera.viewportHeight;
+                gameHud.allyGuidance(batch, world, slot, allyX, allyY);
+            }
+        }
         batch.setColor(Color.WHITE);
         batch.end();
         drawCalls += batch.renderCalls;

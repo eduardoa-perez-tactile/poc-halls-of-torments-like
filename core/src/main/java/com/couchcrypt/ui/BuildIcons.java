@@ -13,6 +13,7 @@ public final class BuildIcons implements Disposable {
     private static final int WIDTH = 512, HEIGHT = 384, CELL = 128;
     public final TextureRegion[] regions = new TextureRegion[PartyProgression.Upgrade.values().length];
     public final long textureBytes = (long) WIDTH * HEIGHT * 4;
+    public final long retainedPixmapBytes = textureBytes;
     private final Texture texture;
     private final Pixmap pixels;
     private boolean disposed;

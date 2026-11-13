@@ -14,6 +14,7 @@ public final class GameArt implements Disposable {
     public final TextureRegion[] enemies = new TextureRegion[4], props = new TextureRegion[4];
     public final TextureRegion shadow, glow, pixel, soul;
     public final long textureBytes = (1024L * 512 + 512L * 512) * 4;
+    public final long retainedPixmapBytes = textureBytes;
     private final Pixmap atlasPixels, floorPixels;
 
     public GameArt() {
