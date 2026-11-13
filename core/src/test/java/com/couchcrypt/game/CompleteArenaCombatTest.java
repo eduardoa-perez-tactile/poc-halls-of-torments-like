@@ -86,6 +86,14 @@ class CompleteArenaCombatTest {
         assertTrue(world.bossSpawned); assertEquals(ArenaWorld.Outcome.RUNNING, world.outcome);
         world.boss.health = world.boss.maxHealth * .4f; world.players[0].attackCooldown = 10;
         world.update(ArenaWorld.STEP); assertEquals(2, world.bossPhase);
+        // The boundary jump also earns timed reliquaries. Resolve their legitimate
+        // combat pause before asking this fixture to perform the killing attack.
+        assertTrue(world.lootPending());
+        float pausedAt = world.elapsed;
+        world.update(ArenaWorld.STEP); assertEquals(pausedAt, world.elapsed);
+        for (int reward = 0; reward < RunEquipment.MAX_REWARDS && world.lootPending(); reward++)
+            assertTrue(world.equipment.choose(0, world.equipment.offers[0].id, -1));
+        assertFalse(world.choicePending());
         world.players[0].attackCooldown = 0; world.boss.health = 1;
         world.boss.x = 80; world.boss.y = 0;
         for (ArenaWorld.Enemy e : world.enemies) if (e != world.boss) e.active = false;

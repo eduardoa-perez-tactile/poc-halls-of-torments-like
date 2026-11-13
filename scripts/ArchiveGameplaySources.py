@@ -39,6 +39,9 @@ def main():
                 if path.stat().st_size > 2 * 1024 * 1024:
                     raise ValueError('Unexpected oversized text provenance: ' + str(path))
                 contents.setdefault(str(path.relative_to(EXPLORE)), path.read_bytes())
+    for relative in ('weekend/emitter-anchors.json', 'weekend/emitter-review.md'):
+        path = EXPLORE / relative
+        contents[relative] = path.read_bytes()
     index = {
         'version': 1, 'method': 'Built-in ImageGen painted masters; deterministic canonical PNG exports and lossless offline atlas packing.',
         'scope': 'Exact canonical pack inputs plus text provenance. Raw generated posters and review videos are retained locally, outside this archive.',

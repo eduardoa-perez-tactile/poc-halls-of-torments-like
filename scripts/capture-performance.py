@@ -90,7 +90,7 @@ def main():
     parser.add_argument('--serial', default='emulator-5554')
     parser.add_argument('--host', required=True, help='Existing relay LAN IPv4 used by the TV QR')
     parser.add_argument('--forward-port', type=int, required=True, help='Existing ADB localhost forward to TV8787')
-    parser.add_argument('--fixture', choices=['lobby', 'boss-solo', 'boss-coop', 'late-coop', 'items-coop', 'results'], default='boss-coop')
+    parser.add_argument('--fixture', choices=['lobby', 'boss-solo', 'boss-coop', 'late-coop', 'items-coop', 'art-solo', 'art-coop', 'results'], default='boss-coop')
     parser.add_argument('--seconds', type=int, default=20, choices=range(5, 31), metavar='5..30')
     parser.add_argument('--lifecycle', action='store_true', help='Add one brief results/lobby/background-resume observation')
     parser.add_argument('--switch-smoke', action='store_true', help='Results only: send rapid F7/F8/Back after measurement')
@@ -136,18 +136,28 @@ def main():
         logger = subprocess.Popen(target + ['logcat', '-v', 'threadtime', '-T', '1', 'FrameMetrics:I', 'LobbyPerf:I', 'OutcomeArt:I', 'AndroidRuntime:E', '*:S'], stdout=output, stderr=subprocess.STDOUT)
         if args.fixture != 'lobby':
             room = json.load(urllib.request.urlopen(f'http://127.0.0.1:{args.forward_port}/session', timeout=3))['room']
-            for _ in range(1 if args.fixture == 'boss-solo' else 2):
+            for _ in range(1 if args.fixture in ('boss-solo', 'art-solo') else 2):
                 phones.append(Phone(args.forward_port, room))
             wait(.3)
             for code in (20, 22, 23):  # Player I -> Back -> Start -> activate.
                 key(code)
             wait(.5)
-            key(137 if args.fixture == 'results' else 141 if args.fixture == 'late-coop' else 142 if args.fixture == 'items-coop' else 136)
-            # F7 sample victory / F11 late encounter / F12 equipped late encounter / F6 boss fixture.
+            if args.fixture in ('art-solo', 'art-coop'):
+                # Consume fixture rewards before the boss time jump, so timed loot
+                # does not turn a claimed combat measurement into a choice pause.
+                key(142)  # F12: equipped late encounter, real builds and temporary invulnerability.
+                wait(.2)
+                key(136)  # F6: add the real final boss and existing telegraphs.
+            else:
+                key(137 if args.fixture == 'results' else 141 if args.fixture == 'late-coop' else 142 if args.fixture == 'items-coop' else 136)
+                # F7 sample victory / F11 late encounter / F12 equipped late encounter / F6 boss fixture.
             wait(.5)
         start_memory = command('shell', 'dumpsys', 'meminfo', PACKAGE)
         prefix.with_suffix('.memory.txt').write_text('FIXTURE START\n' + start_memory)
         wait(args.seconds)
+        if args.fixture in ('art-solo', 'art-coop'):
+            with prefix.with_suffix('.scene.png').open('wb') as image:
+                subprocess.run(target + ['exec-out', 'screencap', '-p'], stdout=image, check=True, timeout=10)
         end_memory = command('shell', 'dumpsys', 'meminfo', PACKAGE)
         with prefix.with_suffix('.memory.txt').open('a') as memory_file:
             memory_file.write('\nFIXTURE END\n' + end_memory)

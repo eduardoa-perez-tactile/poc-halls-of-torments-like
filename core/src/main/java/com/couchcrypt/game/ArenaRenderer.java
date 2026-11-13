@@ -15,20 +15,38 @@ import com.couchcrypt.ui.BuildIcons;
 /** Bounded isometric renderer; all scene resources are owned by GameArt/UiArt. */
 public final class ArenaRenderer implements Disposable {
     private static final float ISO_X = .70710678f, ISO_Y = .35355339f, TILE = 120f;
+    // Eight cosmetic cells cover the TV cameras beyond every playable edge, including the +65 follow offset.
+    private static final int FLOOR_COLUMNS = 20, FLOOR_ROWS = 15, FLOOR_BORDER = 8;
+    private static final int FLOOR_QUADS = (FLOOR_COLUMNS + 2 * FLOOR_BORDER) * (FLOOR_ROWS + 2 * FLOOR_BORDER);
     private static final float HUD_WIDTH = 1920f, HUD_HEIGHT = 1080f;
+    private static final float REVIVE_BAR_Y = 122f, REVIVE_BAR_HEIGHT = 4f;
+    private static final float PROP_SHADOW_WIDTH = 62f, SHADOW_Y = -9f, SHADOW_HEIGHT = 20f;
+    // Fixed SE/SW/NE/NW release landmarks, in untrimmed source pixels relative to the ground root.
+    // Only the rendered origin moves; the simulation keeps its original projectile coordinates and trajectory.
+    private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
+    private static final float[] CULTIST_ORIGIN = {17, 38, -4, 27, 15, 46, -17, 35};
+    private static final float[] SOVEREIGN_ORIGIN = {37, 78, -12, 67, 18, 90, -35, 82};
     private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PROP_COUNT = 28;
     private final GameArt art;
     private final GameHud gameHud;
     private final SpriteBatch batch = new SpriteBatch(1800);
-    // One managed static mesh: 300 quads, 24,000 vertex bytes + 3,600 index bytes.
-    // It borrows the existing floor texture; no additional texture/pixmap storage.
-    private final SpriteCache floorCache = new SpriteCache(300, true);
+    // One managed static mesh: 1,116 quads, 89,280 vertex bytes + 13,392 index bytes.
+    // It borrows the environment page; no additional texture/pixmap storage.
+    private final SpriteCache floorCache = new SpriteCache(FLOOR_QUADS, true);
     private final int floorCacheId;
     private final OrthographicCamera[] cameras = { new OrthographicCamera(), new OrthographicCamera() };
     private final OrthographicCamera hud = new OrthographicCamera();
     private final boolean[] cameraReady = new boolean[2];
     private final float[] tileVertices = new float[20];
     private final float[] propX = new float[PROP_COUNT], propY = new float[PROP_COUNT];
+    private final GameplayAtlas.Region[] propArt = new GameplayAtlas.Region[PROP_COUNT];
+    private final float[] propScale = new float[PROP_COUNT];
+    private static final String[] PROP_REGIONS = {
+        "corner", "wall-ne", "pillar", "sarcophagus", "arch", "wall-ne", "rubble", "corner",
+        "corner", "urn", "wall-ne", "relic", "obelisk", "wall-ne", "shrine", "corner",
+        "wall-nw", "pillar", "wall-nw", "urn", "wall-nw", "orb",
+        "wall-nw", "rubble", "wall-nw", "sarcophagus", "wall-nw", "relic"
+    };
     private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + PROP_COUNT];
     private final int[] types = new int[depths.length], indices = new int[depths.length];
     private int sortCount;
@@ -47,6 +65,10 @@ public final class ArenaRenderer implements Disposable {
             float y = -650f + i * 260f;
             propX[i + 16] = -1140f; propY[i + 16] = y;
             propX[i + 22] = 1140f; propY[i + 22] = y;
+        }
+        for (int i = 0; i < PROP_COUNT; i++) {
+            propArt[i] = art.environment(PROP_REGIONS[i]);
+            propScale[i] = propArt[i].worldHeight() / art.metadata.frames[propArt[i].frame()].sourceHeight;
         }
     }
 
@@ -122,18 +144,19 @@ public final class ArenaRenderer implements Disposable {
 
     private int cacheFloor() {
         floorCache.beginCache();
-        for (int row = 0; row < 15; row++) {
+        for (int row = -FLOOR_BORDER; row < FLOOR_ROWS + FLOOR_BORDER; row++) {
             float y = -ArenaWorld.HALF_HEIGHT + row * TILE;
-            for (int col = 0; col < 20; col++) {
+            for (int col = -FLOOR_BORDER; col < FLOOR_COLUMNS + FLOOR_BORDER; col++) {
                 float x = -ArenaWorld.HALF_WIDTH + col * TILE;
                 float sx = screenX(x, y), sy = screenY(x, y);
                 float shade = .82f + ((col * 7 + row * 11) & 3) * .035f;
                 float color = Color.toFloatBits(shade, shade, shade, 1f);
-                vertex(0, sx, sy, color, 0f, 1f);
-                vertex(5, sx - TILE * ISO_X, sy + TILE * ISO_Y, color, 0f, 0f);
-                vertex(10, sx, sy + TILE * ISO_Y * 2f, color, 1f, 0f);
-                vertex(15, sx + TILE * ISO_X, sy + TILE * ISO_Y, color, 1f, 1f);
-                floorCache.add(art.floor, tileVertices, 0, 20);
+                TextureRegion floor = art.floors[Math.floorMod(col * 7 + row * 11, art.floors.length)];
+                vertex(0, sx, sy, color, floor.getU(), floor.getV2());
+                vertex(5, sx - TILE * ISO_X, sy + TILE * ISO_Y, color, floor.getU(), floor.getV());
+                vertex(10, sx, sy + TILE * ISO_Y * 2f, color, floor.getU2(), floor.getV());
+                vertex(15, sx + TILE * ISO_X, sy + TILE * ISO_Y, color, floor.getU2(), floor.getV2());
+                floorCache.add(floor.getTexture(), tileVertices, 0, 20);
             }
         }
         return floorCache.endCache();
@@ -157,14 +180,24 @@ public final class ArenaRenderer implements Disposable {
 
     private void gatherSprites(ArenaWorld world, OrthographicCamera camera) {
         sortCount = 0;
-        for (int i = 0; i < PROP_COUNT; i++) if (visible(camera, propX[i], propY[i], 150f)) add(PROP, i, propX[i], propY[i]);
+        for (int i = 0; i < PROP_COUNT; i++) {
+            GameplayAtlas.Frame frame = art.metadata.frames[propArt[i].frame()];
+            float scale = propScale[i];
+            if (visible(camera, propX[i], propY[i], Math.max(PROP_SHADOW_WIDTH * .5f, -frame.left * scale),
+                Math.max(PROP_SHADOW_WIDTH * .5f, (frame.left + frame.width) * scale),
+                Math.max(SHADOW_Y + SHADOW_HEIGHT, (frame.bottom + frame.height) * scale),
+                Math.max(-SHADOW_Y, -frame.bottom * scale)))
+                add(PROP, i, propX[i], propY[i]);
+        }
         for (int i = 0; i < world.enemies.length; i++) {
             ArenaWorld.Enemy enemy = world.enemies[i];
-            if (enemy.active && visible(camera, enemy.x, enemy.y, 230f)) add(ENEMY, i, enemy.x, enemy.y);
+            if (enemy.active && visibleActor(camera, enemy.x, enemy.y,
+                art.actor(ActorAnimation.actor(enemy.kind)), enemyScale(enemy))) add(ENEMY, i, enemy.x, enemy.y);
         }
         for (int i = 0; i < world.players.length; i++) {
             ArenaWorld.Player player = world.players[i];
-            if (player.active && visible(camera, player.x, player.y, 130f)) add(PLAYER, i, player.x, player.y);
+            if (player.active && visibleActor(camera, player.x, player.y,
+                art.actor(ActorAnimation.actor(player.hero)), 1f)) add(PLAYER, i, player.x, player.y);
         }
         // Small bounded insertion sort keeps anchors stable and avoids comparator allocation.
         for (int i = 1; i < sortCount; i++) {
@@ -189,8 +222,8 @@ public final class ArenaRenderer implements Disposable {
                 x = player.x; y = player.y; width = player.alive ? 62f : 72f;
             } else if (types[i] == ENEMY) {
                 x = world.enemies[index].x; y = world.enemies[index].y; width = 44f * enemyScale(world.enemies[index]);
-            } else { x = propX[index]; y = propY[index]; width = 62f; }
-            batch.draw(art.shadow, screenX(x, y) - width * .5f, screenY(x, y) - 9f, width, 20f);
+            } else { x = propX[index]; y = propY[index]; width = PROP_SHADOW_WIDTH; }
+            batch.draw(art.shadow, screenX(x, y) - width * .5f, screenY(x, y) + SHADOW_Y, width, SHADOW_HEIGHT);
         }
         batch.setColor(Color.WHITE);
     }
@@ -214,8 +247,13 @@ public final class ArenaRenderer implements Disposable {
 
     private void drawBolts(ArenaWorld world, OrthographicCamera camera) {
         for (ArenaWorld.Bolt bolt : world.bolts) {
-            if (!bolt.active || !visible(camera, bolt.x, bolt.y, 36f)) continue;
-            float x = screenX(bolt.x, bolt.y), y = screenY(bolt.x, bolt.y) + 24f;
+            if (!bolt.active) continue;
+            ActorAnimation.Facing facing = ActorAnimation.facing(bolt.launchFacingX, bolt.launchFacingY, ActorAnimation.Facing.SE);
+            int origin = facing.ordinal() * 2;
+            float scale = art.actor(ActorAnimation.Actor.RANGER).pixelScale;
+            float x = screenX(bolt.x, bolt.y) + BOLT_ORIGIN[origin] * scale;
+            float y = screenY(bolt.x, bolt.y) + BOLT_ORIGIN[origin + 1] * scale;
+            if (!visibleProjected(camera, x, y, 36f)) continue;
             float vx = screenX(bolt.vx, bolt.vy), vy = screenY(bolt.vx, bolt.vy);
             float length = Math.max(.001f, (float) Math.sqrt(vx * vx + vy * vy));
             float dx = vx / length, dy = vy / length;
@@ -230,9 +268,17 @@ public final class ArenaRenderer implements Disposable {
 
     private void drawShots(ArenaWorld world, OrthographicCamera camera) {
         for (ArenaWorld.Shot shot : world.shots) {
-            if (!shot.active || !visible(camera, shot.x, shot.y, 40f)) continue;
-            float x = screenX(shot.x, shot.y), y = screenY(shot.x, shot.y) + 18f;
+            if (!shot.active) continue;
+            boolean boss = shot.casterKind == ArenaWorld.EnemyKind.BOSS;
+            ActorAnimation.Facing facing = ActorAnimation.facing(shot.launchFacingX, shot.launchFacingY, ActorAnimation.Facing.SE);
+            int origin = facing.ordinal() * 2;
+            float[] point = boss ? SOVEREIGN_ORIGIN : CULTIST_ORIGIN;
+            float scale = art.actor(boss ? ActorAnimation.Actor.SOVEREIGN : ActorAnimation.Actor.CULTIST).pixelScale
+                * enemyScale(boss ? ArenaWorld.EnemyKind.BOSS : ArenaWorld.EnemyKind.CULTIST, shot.casterElite);
+            float x = screenX(shot.x, shot.y) + point[origin] * scale;
+            float y = screenY(shot.x, shot.y) + point[origin + 1] * scale;
             float radius = Math.max(8f, shot.radius * 1.5f);
+            if (!visibleProjected(camera, x, y, radius * 1.5f)) continue;
             batch.setColor(1f, .18f, .06f, .85f);
             batch.draw(art.glow, x - radius * 1.5f, y - radius * 1.5f, radius * 3f, radius * 3f);
             batch.setColor(1f, .68f, .24f, 1f);
@@ -295,13 +341,15 @@ public final class ArenaRenderer implements Disposable {
             float x = screenX(effect.x, effect.y), y = screenY(effect.x, effect.y);
             switch (effect.kind) {
                 case SLASH -> {
+                    // One consistent chest-height plane; this remains a reach cue rather than a painted blade rig.
+                    float lift = art.actor(ActorAnimation.Actor.WARDEN).worldHeight * .5f;
                     batch.setColor(1f, .9f, .64f, life * .85f);
                     float previousX = 0f, previousY = 0f;
                     for (int segment = 0; segment <= 13; segment++) {
                         float angle = effect.angle - effect.sweep * .5f + effect.sweep * segment / 13f;
                         float wx = effect.x + MathUtils.cos(angle) * effect.radius;
                         float wy = effect.y + MathUtils.sin(angle) * effect.radius;
-                        float sx = screenX(wx, wy), sy = screenY(wx, wy) + 22f;
+                        float sx = screenX(wx, wy), sy = screenY(wx, wy) + lift;
                         if (segment > 0) line(previousX, previousY, sx, sy, 2.5f * Math.max(.3f, life));
                         previousX = sx; previousY = sy;
                     }
@@ -309,7 +357,7 @@ public final class ArenaRenderer implements Disposable {
                     float wx = effect.x + MathUtils.cos(sweepAngle) * effect.radius;
                     float wy = effect.y + MathUtils.sin(sweepAngle) * effect.radius;
                     batch.setColor(1f, .97f, .84f, life);
-                    line(x, y + 22f, screenX(wx, wy), screenY(wx, wy) + 22f, 2f);
+                    line(x, y + lift, screenX(wx, wy), screenY(wx, wy) + lift, 2f);
                 }
                 case HIT -> {
                     float size = 10f * life + 3f;
@@ -372,30 +420,33 @@ public final class ArenaRenderer implements Disposable {
     }
 
     private static float enemyScale(ArenaWorld.Enemy enemy) {
-        float scale = enemy.kind == ArenaWorld.EnemyKind.BOSS ? 2.2f
-            : enemy.kind == ArenaWorld.EnemyKind.BRUTE ? 1.4f
-            : enemy.kind == ArenaWorld.EnemyKind.WRAITH ? .82f : 1f;
-        return scale * (enemy.elite ? 1.18f : 1f);
+        return enemyScale(enemy.kind, enemy.elite);
+    }
+
+    private static float enemyScale(ArenaWorld.EnemyKind kind, boolean elite) {
+        float scale = kind == ArenaWorld.EnemyKind.BOSS ? 2.2f
+            : kind == ArenaWorld.EnemyKind.BRUTE ? 1.4f
+            : kind == ArenaWorld.EnemyKind.WRAITH ? .82f : 1f;
+        return scale * (elite ? 1.18f : 1f);
     }
 
     private void drawSprites(ArenaWorld world) {
         for (int i = 0; i < sortCount; i++) {
             int index = indices[i];
             if (types[i] == PROP) {
-                drawAnchored(art.props[index % art.props.length], propX[index], propY[index], 80f, 120f, 5f, false);
+                drawFrame(propArt[index].frame(), propX[index], propY[index], propScale[index]);
             } else if (types[i] == ENEMY) {
                 ArenaWorld.Enemy enemy = world.enemies[index];
                 float scale = enemyScale(enemy);
-                if (enemy.kind == ArenaWorld.EnemyKind.WRAITH) batch.setColor(.54f, .94f, .92f, .72f);
-                else if (enemy.kind == ArenaWorld.EnemyKind.BRUTE) batch.setColor(.88f, .6f, .91f, 1f);
-                else if (enemy.kind == ArenaWorld.EnemyKind.CULTIST) batch.setColor(1f, .74f, .4f, 1f);
-                else if (enemy.kind == ArenaWorld.EnemyKind.BOSS) batch.setColor(1f, .48f, .37f, 1f);
-                else batch.setColor(Color.WHITE);
+                // Original painted identities retain their own colours. Damage feedback is transient.
                 if (enemy.hitFlash > 0f) batch.setColor(1f, .95f, .78f, 1f);
-                drawAnchored(art.enemies[(int) (enemy.animTime * 7f) % art.enemies.length], enemy.x, enemy.y,
-                    74f * scale, 84f * scale, 5.25f * scale, screenX(enemy.vx, enemy.vy) < 0f);
+                else batch.setColor(Color.WHITE);
+                GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(enemy.kind));
+                ActorAnimation.State state = ActorAnimation.state(enemy);
+                int frame = actor.clip(state, ActorAnimation.facing(enemy, state)).frame(ActorAnimation.phase(enemy, state));
+                drawFrame(frame, enemy.x, enemy.y, actor.pixelScale * scale);
                 if (enemy.elite && enemy.kind != ArenaWorld.EnemyKind.BOSS) {
-                    float x = screenX(enemy.x, enemy.y), y = screenY(enemy.x, enemy.y) + 84f * scale;
+                    float x = screenX(enemy.x, enemy.y), y = screenY(enemy.x, enemy.y) + actor.maxAbove * scale + 4f;
                     batch.setColor(.15f, .1f, .12f, .85f); batch.draw(art.pixel, x - 25f, y, 50f, 3f);
                     batch.setColor(.88f, .38f, .27f, .95f);
                     batch.draw(art.pixel, x - 25f, y, 50f * Math.max(0f, Math.min(1f, enemy.health / Math.max(1f, enemy.maxHealth))), 3f);
@@ -404,12 +455,15 @@ public final class ArenaRenderer implements Disposable {
             } else {
                 ArenaWorld.Player player = world.players[index];
                 float sx = screenX(player.x, player.y), sy = screenY(player.x, player.y);
-                int hero = player.hero == ArenaWorld.Hero.WARDEN ? 0 : 1;
+                GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(player.hero));
+                ActorAnimation.State state = ActorAnimation.state(player);
+                int frame = actor.clip(state, ActorAnimation.facing(player, state)).frame(ActorAnimation.phase(player, state));
                 if (!player.alive) {
-                    batch.setColor(.27f, .3f, .31f, .8f);
-                    drawAnchored(art.players[hero][0], player.x, player.y, 96f, 120f, 6f, false);
+                    batch.setColor(.65f, .65f, .65f, .8f);
+                    drawFrame(frame, player.x, player.y, actor.pixelScale);
                     batch.setColor(.9f, .68f, .33f, 1f);
-                    batch.draw(art.pixel, sx - 26f, sy + 122f, 52f * Math.min(1f, player.reviveProgress / 2f), 4f);
+                    batch.draw(art.pixel, sx - 26f, sy + REVIVE_BAR_Y,
+                        52f * Math.min(1f, player.reviveProgress / 2f), REVIVE_BAR_HEIGHT);
                     batch.setColor(Color.WHITE);
                     continue;
                 }
@@ -419,10 +473,7 @@ public final class ArenaRenderer implements Disposable {
                 }
                 float alpha = player.invulnerable > 0f && ((int) (world.elapsed * 16f) & 1) == 0 ? .58f : 1f;
                 batch.setColor(1f, 1f, 1f, alpha);
-                int frame = (int) (player.walkTime * 7f) % art.players[hero].length;
-                drawAnchored(art.players[hero][frame], player.x, player.y, 96f, 120f, 6f,
-                        screenX(player.facingX, player.facingY) < 0f);
-                batch.setColor(Color.WHITE);
+                drawFrame(frame, player.x, player.y, actor.pixelScale);
                 batch.setColor(index == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO);
                 batch.draw(art.pixel, sx - 10f, sy - 4f, 20f, 2f);
                 batch.setColor(Color.WHITE);
@@ -430,14 +481,36 @@ public final class ArenaRenderer implements Disposable {
         }
     }
 
-    private void drawAnchored(TextureRegion region, float x, float y, float width, float height, float bottom, boolean flip) {
-        float left = screenX(x, y) - width * .5f, base = screenY(x, y) - bottom;
-        batch.draw(region, flip ? left + width : left, base, flip ? -width : width, height);
+    private void drawFrame(int index, float x, float y, float scale) {
+        GameplayAtlas.Frame frame = art.metadata.frames[index];
+        batch.draw(art.frame(index), screenX(x, y) + frame.left * scale,
+            screenY(x, y) + frame.bottom * scale, frame.width * scale, frame.height * scale);
+    }
+
+    private static boolean visibleActor(OrthographicCamera camera, float x, float y,
+                                        GameplayAtlas.Actor actor, float scale) {
+        // Include a small shadow/elite-bar margin around the precomputed complete action envelope.
+        float above = actor.maxAbove * scale + 12f;
+        if (actor.id == ActorAnimation.Actor.WARDEN || actor.id == ActorAnimation.Actor.RANGER)
+            above = Math.max(above, REVIVE_BAR_Y + REVIVE_BAR_HEIGHT);
+        return visible(camera, x, y, Math.max(40f, actor.maxLeft * scale),
+            Math.max(40f, actor.maxRight * scale), above,
+            Math.max(12f, actor.maxBelow * scale));
+    }
+
+    private static boolean visible(OrthographicCamera camera, float x, float y,
+                                   float left, float right, float above, float below) {
+        float sx = screenX(x, y) - camera.position.x, sy = screenY(x, y) - camera.position.y;
+        return sx + right >= -camera.viewportWidth * .5f && sx - left <= camera.viewportWidth * .5f
+            && sy + above >= -camera.viewportHeight * .5f && sy - below <= camera.viewportHeight * .5f;
     }
 
     private static boolean visible(OrthographicCamera camera, float x, float y, float margin) {
-        return Math.abs(screenX(x, y) - camera.position.x) <= camera.viewportWidth * .5f + margin
-                && Math.abs(screenY(x, y) - camera.position.y) <= camera.viewportHeight * .5f + margin;
+        return visibleProjected(camera, screenX(x, y), screenY(x, y), margin);
+    }
+    private static boolean visibleProjected(OrthographicCamera camera, float x, float y, float margin) {
+        return Math.abs(x - camera.position.x) <= camera.viewportWidth * .5f + margin
+            && Math.abs(y - camera.position.y) <= camera.viewportHeight * .5f + margin;
     }
     private static float screenX(float x, float y) { return (x - y) * ISO_X; }
     private static float screenY(float x, float y) { return (x + y) * ISO_Y; }
