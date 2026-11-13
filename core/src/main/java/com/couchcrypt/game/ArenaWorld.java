@@ -253,8 +253,8 @@ public final class ArenaWorld {
         if (target == null) return;
         float dx = target.x - p.x, dy = target.y - p.y, length = length(dx, dy);
         p.facingX = dx / length; p.facingY = dy / length;
-        p.attackAge = 0; p.attackFacingX = p.facingX; p.attackFacingY = p.facingY;
         if (p.hero == Hero.WARDEN) {
+            beginAttackPresentation(p);
             float halfArcCos = .5735764f; // cos(55 degrees)
             Effect fx = effect(EffectKind.SLASH, p.x, p.y, p.slot, .18f);
             if (fx != null) { fx.angle = (float) Math.atan2(dy, dx); fx.radius = reach; fx.sweep = 1.9198622f; }
@@ -277,14 +277,21 @@ public final class ArenaWorld {
             float angle = (float) Math.atan2(dy, dx);
             for (int i = 0; i < count; i++) {
                 Bolt b = freeBolt(); if (b == null) break;
+                if (i == 0) beginAttackPresentation(p);
                 float direction = angle + (i - (count - 1) * .5f) * .13f;
                 b.active = true; b.x = p.x; b.y = p.y;
+                b.launchFacingX = p.attackFacingX; b.launchFacingY = p.attackFacingY;
                 b.vx = (float) Math.cos(direction) * 760; b.vy = (float) Math.sin(direction) * 760;
                 b.ttl = 1.2f; b.owner = p.slot; b.damage = critical(p, p.hero.baseDamage * equipment.damageMultiplier(p));
                 b.pierce = equipment.pierce(p); b.hitMask = 0; arrowsFired++;
             }
             p.attackCooldown = p.hero.attackInterval / equipment.attackRate(p);
         }
+    }
+
+    private static void beginAttackPresentation(Player player) {
+        player.attackAge = 0;
+        player.attackFacingX = player.facingX; player.attackFacingY = player.facingY;
     }
 
     private void aura(Player p) {
@@ -402,6 +409,7 @@ public final class ArenaWorld {
             float distance = length(dx, dy); shot.active = true; shot.x = caster.x; shot.y = caster.y;
             // Value snapshots survive caster death and enemy-pool reuse; only drawing reads them.
             shot.casterKind = caster.kind; shot.casterElite = caster.elite;
+            shot.launchFacingX = caster.castFacingX; shot.launchFacingY = caster.castFacingY;
             shot.vx = dx / distance * speed; shot.vy = dy / distance * speed;
             shot.ttl = 5; shot.damage = damage; shot.radius = 10; return;
         }
@@ -699,6 +707,7 @@ public final class ArenaWorld {
     public static final class Bolt {
         public boolean active;
         public float x, y, vx, vy, ttl, damage = 16;
+        public float launchFacingX, launchFacingY;
         public int owner, pierce;
         public long hitMask;
     }
@@ -706,7 +715,7 @@ public final class ArenaWorld {
     public static final class Shot {
         public boolean active, casterElite;
         public EnemyKind casterKind;
-        public float x, y, vx, vy, ttl, damage, radius;
+        public float x, y, vx, vy, ttl, damage, radius, launchFacingX, launchFacingY;
     }
     public static final class Hazard { public boolean active; public float x, y, radius, warning, ttl, damage; }
     public static final class Effect {

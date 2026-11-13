@@ -47,6 +47,31 @@ class ActorPresentationStateTest {
         assertTrue(world.bolts[0].x > player.x, "The bolt already travels in the action's first tick");
         assertTrue(player.attackFacingX > .9f);
         assertEquals(.55f, player.attackCooldown, EPSILON);
+        ArenaWorld.Bolt bolt = world.bolts[0];
+        float launchX = bolt.launchFacingX, launchY = bolt.launchFacingY;
+        assertEquals(player.attackFacingX, launchX); assertEquals(player.attackFacingY, launchY);
+        world.setInput(0, -1, 0, false); world.update(ArenaWorld.STEP);
+        assertEquals(launchX, bolt.launchFacingX); assertEquals(launchY, bolt.launchFacingY);
+        assertEquals(-1, player.facingX);
+    }
+
+    @Test void anExhaustedBoltPoolDoesNotInventAVisibleShotOrChangeTheExistingCooldown() {
+        ArenaWorld world = solo(ArenaWorld.Hero.RANGER);
+        ArenaWorld.Player player = world.players[0];
+        enemy(world, 0, ArenaWorld.EnemyKind.GHOUL, 400, 0);
+        for (ArenaWorld.Bolt bolt : world.bolts) {
+            bolt.active = true; bolt.x = -900; bolt.y = -600; bolt.ttl = 10;
+        }
+        world.update(ArenaWorld.STEP);
+        assertEquals(0, world.arrowsFired); assertEquals(1, player.attackAge);
+        assertEquals(ActorAnimation.State.IDLE, ActorAnimation.state(player));
+        assertEquals(.55f, player.attackCooldown, EPSILON);
+
+        world.bolts[0].active = false; player.attackCooldown = 0;
+        world.update(ArenaWorld.STEP);
+        assertEquals(1, world.arrowsFired); assertEquals(0, player.attackAge);
+        assertEquals(ActorAnimation.State.ATTACK, ActorAnimation.state(player));
+        assertEquals(.55f, player.attackCooldown, EPSILON);
     }
 
     @Test void actualMovementDistinguishesClampingAndStunFromInputOrStaleVelocity() {
@@ -214,18 +239,23 @@ class ActorPresentationStateTest {
         assertTrue(shot.active); assertEquals(ArenaWorld.EnemyKind.CULTIST, shot.casterKind);
         assertTrue(shot.casterElite); assertEquals(12, shot.damage);
         assertEquals(180, Math.hypot(shot.vx, shot.vy), .001);
+        float aimX = shot.launchFacingX, aimY = shot.launchFacingY;
+        assertEquals(cultist.castFacingX, aimX); assertEquals(cultist.castFacingY, aimY);
 
         cultist.active = false; world.activeEnemies--;
-        ArenaWorld.Enemy boss = enemy(world, 0, ArenaWorld.EnemyKind.BOSS, 350, 0);
+        ArenaWorld.Enemy boss = enemy(world, 0, ArenaWorld.EnemyKind.BOSS, 350, 200);
         boss.elite = false; boss.attackCooldown = 10;
         world.update(ArenaWorld.STEP);
         assertEquals(ArenaWorld.EnemyKind.CULTIST, shot.casterKind,
             "Reusing the caster's slot cannot change an already flying shot");
         assertTrue(shot.casterElite);
+        assertEquals(aimX, shot.launchFacingX); assertEquals(aimY, shot.launchFacingY);
 
         shot.active = false; boss.attackCooldown = 0; world.update(ArenaWorld.STEP);
         assertTrue(shot.active); assertEquals(ArenaWorld.EnemyKind.BOSS, shot.casterKind);
         assertFalse(shot.casterElite); assertEquals(15, shot.damage);
+        assertEquals(boss.castFacingX, shot.launchFacingX); assertEquals(boss.castFacingY, shot.launchFacingY);
+        assertNotEquals(aimY, shot.launchFacingY);
         assertEquals(145, Math.hypot(shot.vx, shot.vy), .001);
         assertEquals(5, activeShots(world));
     }
