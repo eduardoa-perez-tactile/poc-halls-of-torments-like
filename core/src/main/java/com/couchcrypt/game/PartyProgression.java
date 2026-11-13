@@ -4,6 +4,8 @@ package com.couchcrypt.game;
 public final class PartyProgression {
     public static final int MAX_LEVEL = 20;
     public static final float CHOICE_SECONDS = 30f;
+    public static final float CATCH_UP_SECONDS = 15f;
+    public static final int CATCH_UP_CHOICES = 3;
     // Nineteen earned choices: 116 / 516 / 1,166 / 1,991 cumulative XP at levels 5 / 10 / 15 / 20.
     // Rising costs leave time to play between the unchanged thirty-second phone choices.
     private static final int[] LONG_RUN_THRESHOLDS = {
@@ -43,17 +45,29 @@ public final class PartyProgression {
     public record CardPreview(int icon, int rank, String category, String headline, String before, String after) {}
 
     public static final class Offer {
-        public boolean pending;
+        public boolean pending, catchUp;
         public int id, level;
-        public float secondsLeft;
+        public float secondsLeft, durationSeconds = CHOICE_SECONDS;
         public final Upgrade[] options = new Upgrade[3];
         public final CardPreview[] cards = new CardPreview[3];
     }
 
     private static final Upgrade[] UPGRADES = Upgrade.values();
+    private static final Upgrade[] WARDEN_FOUNDATION = {
+        Upgrade.POWER, Upgrade.SWEEP, Upgrade.VITALITY, Upgrade.AURA, Upgrade.HASTE, Upgrade.STORM,
+        Upgrade.POWER, Upgrade.FLEET, Upgrade.SWEEP, Upgrade.VITALITY, Upgrade.HASTE, Upgrade.AURA,
+        Upgrade.EVASION, Upgrade.CRITICAL, Upgrade.POWER, Upgrade.MAGNET
+    };
+    private static final Upgrade[] RANGER_FOUNDATION = {
+        Upgrade.POWER, Upgrade.MULTISHOT, Upgrade.VITALITY, Upgrade.AURA, Upgrade.HASTE, Upgrade.STORM,
+        Upgrade.POWER, Upgrade.FLEET, Upgrade.PIERCE, Upgrade.VITALITY, Upgrade.HASTE, Upgrade.AURA,
+        Upgrade.EVASION, Upgrade.CRITICAL, Upgrade.POWER, Upgrade.MAGNET
+    };
     private final ArenaWorld world;
     private final boolean[] participants = new boolean[2];
     private final int[] applied = new int[2];
+    private final int[] catchUpUntil = new int[2], foundationCounts = new int[2];
+    private final String[] foundations = {"", ""};
     private final int[][] ranks = { new int[UPGRADES.length], new int[UPGRADES.length] };
     private int nextOfferId;
     public int level, xp, xpToNext, totalXp;
@@ -66,27 +80,33 @@ public final class PartyProgression {
         level = 1; xp = totalXp = 0; xpToNext = threshold(level);
         for (int slot = 0; slot < offers.length; slot++) {
             participants[slot] = false; applied[slot] = 0;
+            catchUpUntil[slot] = foundationCounts[slot] = 0; foundations[slot] = "";
             clearRanks(slot);
             Offer offer = offers[slot];
-            offer.pending = false; offer.id = offer.level = 0; offer.secondsLeft = 0f;
+            offer.pending = offer.catchUp = false; offer.id = offer.level = 0; offer.secondsLeft = 0f;
+            offer.durationSeconds = CHOICE_SECONDS;
             for (int i = 0; i < offer.options.length; i++) { offer.options[i] = UPGRADES[i]; offer.cards[i] = null; }
         }
     }
 
-    /** Joining at a later party level grants the same bounded number of upgrade entitlements. */
+    /** Older ranks form an immediate class foundation; at most three inherited decisions remain personal. */
     public void activatePlayer(int slot) {
         if (!validSlot(slot) || participants[slot]) return;
         participants[slot] = true; applied[slot] = 0;
         clearRanks(slot);
+        catchUpUntil[slot] = level - 1;
+        grantFoundation(slot, Math.max(0, catchUpUntil[slot] - CATCH_UP_CHOICES));
         startNextOffer(slot);
     }
 
     public void deactivatePlayer(int slot) {
         if (!validSlot(slot)) return;
         participants[slot] = false; applied[slot] = 0;
+        catchUpUntil[slot] = foundationCounts[slot] = 0; foundations[slot] = "";
         clearRanks(slot);
         Offer offer = offers[slot];
-        offer.pending = false; offer.id = offer.level = 0; offer.secondsLeft = 0;
+        offer.pending = offer.catchUp = false; offer.id = offer.level = 0; offer.secondsLeft = 0;
+        offer.durationSeconds = CHOICE_SECONDS;
         for (int i = 0; i < offer.cards.length; i++) offer.cards[i] = null;
     }
 
@@ -110,6 +130,7 @@ public final class PartyProgression {
         if (!Float.isFinite(delta) || delta <= 0) return;
         for (int slot = 0; slot < offers.length; slot++) {
             Offer offer = offers[slot];
+            if (!offer.pending) startNextOffer(slot);
             if (!offer.pending) continue;
             offer.secondsLeft = Math.max(0f, offer.secondsLeft - delta);
             if (offer.secondsLeft <= .0001f) choose(slot, offer.id, 0);
@@ -138,6 +159,34 @@ public final class PartyProgression {
 
     public int appliedUpgradeCount(int slot) { return validSlot(slot) ? applied[slot] : 0; }
     public int rank(int slot, Upgrade upgrade) { return validSlot(slot) && upgrade != null ? ranks[slot][upgrade.ordinal()] : 0; }
+    public boolean catchingUp(int slot) { return validSlot(slot) && participants[slot] && applied[slot] < catchUpUntil[slot]; }
+    public int catchUpRemaining(int slot) { return catchingUp(slot) ? catchUpUntil[slot] - applied[slot] : 0; }
+    public int foundationCount(int slot) { return validSlot(slot) ? foundationCounts[slot] : 0; }
+    public String foundationSummary(int slot) { return validSlot(slot) ? foundations[slot] : ""; }
+
+    private void grantFoundation(int slot, int count) {
+        ArenaWorld.Player player = world.players[slot];
+        Upgrade[] sequence = player.hero == ArenaWorld.Hero.WARDEN ? WARDEN_FOUNDATION : RANGER_FOUNDATION;
+        for (int i = 0; i < count && i < MAX_LEVEL - 1; i++) {
+            Upgrade upgrade = sequence[Math.min(i, sequence.length - 1)];
+            if (!available(player, upgrade)) {
+                upgrade = null;
+                for (Upgrade candidate : UPGRADES) if (available(player, candidate)) { upgrade = candidate; break; }
+            }
+            if (upgrade == null) break;
+            apply(player, upgrade); ranks[slot][upgrade.ordinal()]++; applied[slot]++;
+        }
+        foundationCounts[slot] = applied[slot];
+        if (applied[slot] == 0) { foundations[slot] = ""; return; }
+        StringBuilder summary = new StringBuilder(200);
+        for (Upgrade upgrade : UPGRADES) {
+            int rank = ranks[slot][upgrade.ordinal()];
+            if (rank == 0) continue;
+            if (summary.length() > 0) summary.append(" / ");
+            summary.append(upgrade.title).append(' ').append(rank);
+        }
+        foundations[slot] = summary.toString();
+    }
 
     /** Allocated only for the results screen; combat uses fixed rank arrays. */
     public String buildSummary(int slot) {
@@ -161,13 +210,17 @@ public final class PartyProgression {
     private void startNextOffer(int slot) {
         Offer offer = offers[slot];
         if (!participants[slot] || offer.pending || applied[slot] >= level - 1) return;
+        boolean inherited = catchingUp(slot);
+        if (!inherited && world.equipment != null && world.equipment.catchingUp(slot)) return;
         offer.level = applied[slot] + 2;
         if (!populateOptions(slot)) {
             // Normal nineteen-choice runs cannot exhaust this catalog. No invalid/duplicate cards if debug stats do.
             applied[slot] = level - 1;
             return;
         }
-        offer.pending = true; offer.id = newOfferId(); offer.secondsLeft = CHOICE_SECONDS;
+        offer.pending = true; offer.id = newOfferId(); offer.catchUp = inherited;
+        offer.durationSeconds = inherited ? CATCH_UP_SECONDS : CHOICE_SECONDS;
+        offer.secondsLeft = offer.durationSeconds;
     }
 
     private boolean populateOptions(int slot) {

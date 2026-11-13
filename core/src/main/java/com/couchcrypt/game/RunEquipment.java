@@ -7,12 +7,16 @@ import static com.couchcrypt.game.ItemCatalog.Stat.*;
 public final class RunEquipment {
     public static final int SLOT_COUNT = 7, MAX_REWARDS = 8;
     public static final float CHOICE_SECONDS = 30f;
+    public static final int CATCH_UP_CHOICES = 2;
+    public static final float CATCH_UP_SECONDS = 15f;
     private static final ItemCatalog.Stat[] STATS = ItemCatalog.Stat.values();
     private static final String[] SLOT_NAMES = {"HELMET", "AMULET", "RING I", "RING II", "CHEST", "BOOTS", "GLOVES"};
+    private static final String[] FOUNDATION_ITEMS = {"gatekeeper_helm", "pilgrims_stride", "swiftstitch_gloves",
+        "emberheart_pendant", "rustbound_signet", "cryptguard_plate"};
     public static final class Offer {
-        public boolean pending;
+        public boolean pending, catchUp;
         public int id;
-        public float secondsLeft;
+        public float secondsLeft, durationSeconds;
         public final ItemCatalog.Item[] options = new ItemCatalog.Item[3];
         public final PartyProgression.CardPreview[] cards = new PartyProgression.CardPreview[3];
         private final int[] targets = new int[3];
@@ -21,6 +25,8 @@ public final class RunEquipment {
     private final ItemCatalog.Item[][] worn = {new ItemCatalog.Item[SLOT_COUNT], new ItemCatalog.Item[SLOT_COUNT]};
     private final float[][] totals = {new float[STATS.length], new float[STATS.length]};
     private final int[] applied = new int[2], previewSkillCount = new int[2];
+    private final int[] catchUpTarget = new int[2], foundationCount = new int[2];
+    private final String[] foundationSummary = {"", ""};
     private final boolean[] participants = new boolean[2], moving = new boolean[2];
     private final float[] sustain = new float[2], xpRemainder = new float[2];
     private int earned, nextId, cacheIndex, eliteRewards;
@@ -33,18 +39,39 @@ public final class RunEquipment {
     }
     private void clearPlayer(int slot) {
         participants[slot] = moving[slot] = false; applied[slot] = 0;
+        catchUpTarget[slot] = foundationCount[slot] = 0; foundationSummary[slot] = "";
         sustain[slot] = 2f; xpRemainder[slot] = 0;
         Arrays.fill(worn[slot], null); Arrays.fill(totals[slot], 0);
-        Offer offer = offers[slot]; offer.pending = false; offer.id = 0; offer.secondsLeft = 0;
+        Offer offer = offers[slot]; offer.pending = offer.catchUp = false; offer.id = 0;
+        offer.secondsLeft = offer.durationSeconds = 0;
         Arrays.fill(offer.options, null); Arrays.fill(offer.cards, null);
     }
     public void activatePlayer(int slot) {
         if (!valid(slot) || participants[slot]) return;
-        participants[slot] = true; startNext(slot);
+        participants[slot] = true;
+        catchUpTarget[slot] = earned;
+        int automatic = Math.max(0, earned - CATCH_UP_CHOICES);
+        StringBuilder summary = new StringBuilder(160);
+        for (int i = 0; i < automatic; i++) {
+            ItemCatalog.Item item = ItemCatalog.byId(FOUNDATION_ITEMS[i]);
+            if (item == null || !item.supports(world.players[slot].hero))
+                throw new IllegalStateException("Invalid catch-up equipment foundation");
+            equip(slot, target(slot, item.slot()), item);
+            applied[slot]++;
+            if (summary.length() > 0) summary.append(", ");
+            summary.append(item.title());
+        }
+        foundationCount[slot] = automatic;
+        foundationSummary[slot] = summary.toString();
+        startNext(slot);
     }
     public void deactivatePlayer(int slot) { if (valid(slot)) clearPlayer(slot); }
     public int rewardsEarned() { return earned; }
     public int appliedCount(int slot) { return valid(slot) ? applied[slot] : 0; }
+    public boolean catchingUp(int slot) { return valid(slot) && participants[slot] && applied[slot] < catchUpTarget[slot]; }
+    public int catchUpRemaining(int slot) { return valid(slot) ? Math.max(0, catchUpTarget[slot] - applied[slot]) : 0; }
+    public int foundationCount(int slot) { return valid(slot) ? foundationCount[slot] : 0; }
+    public String foundationSummary(int slot) { return valid(slot) ? foundationSummary[slot] : ""; }
     public ItemCatalog.Item equipped(int slot, int position) {
         return valid(slot) && position >= 0 && position < SLOT_COUNT ? worn[slot][position] : null;
     }
@@ -66,6 +93,7 @@ public final class RunEquipment {
         for (int slot = 0; slot < 2; slot++) {
             sustain[slot] = Math.min(2f, sustain[slot] + delta * 2f);
             Offer offer = offers[slot];
+            if (!offer.pending) startNext(slot);
             if (!offer.pending || world.progression.offers[slot].pending) continue;
             if (previewSkillCount[slot] != world.progression.appliedUpgradeCount(slot)) refreshOffer(slot);
             if (!offer.pending) continue;
@@ -98,6 +126,7 @@ public final class RunEquipment {
     private void startNext(int slot) {
         Offer offer = offers[slot];
         if (!participants[slot] || offer.pending || applied[slot] >= earned) return;
+        if (!catchingUp(slot) && world.progression.catchingUp(slot)) return;
         int seed = world.runSeed ^ (applied[slot] + 1) * 0x45d9f3b ^ slot * 0x27d4eb2d;
         int first = Math.floorMod(seed ^ seed >>> 16, ItemCatalog.ALL.size());
         int count = 0;
@@ -121,7 +150,8 @@ public final class RunEquipment {
         }
         if (count < 3) return;
         if (++nextId <= 0) nextId = 1;
-        offer.id = nextId; offer.pending = true; offer.secondsLeft = CHOICE_SECONDS;
+        offer.id = nextId; offer.pending = true; offer.catchUp = catchingUp(slot);
+        offer.secondsLeft = offer.durationSeconds = offer.catchUp ? CATCH_UP_SECONDS : CHOICE_SECONDS;
         previewSkillCount[slot] = world.progression.appliedUpgradeCount(slot);
     }
     private boolean eligible(int slot, ItemCatalog.Item item) {

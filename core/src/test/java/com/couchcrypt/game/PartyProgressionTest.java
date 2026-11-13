@@ -31,23 +31,27 @@ class PartyProgressionTest {
         assertEquals(Integer.MAX_VALUE, progression.totalXp);
     }
 
-    @Test void lateJoinAtLongRunCapReceivesAllPersonalChoicesWithFreshTimersAndClassCards() {
+    @Test void lateJoinAtLongRunCapGetsFoundationAndThreePersonalChoicesWithFreshTimersAndClassCards() {
         ArenaWorld world = new ArenaWorld(ArenaTimeline.TWENTY_MINUTES);
         world.activatePlayer(0);
         world.progression.addXp(1991);
         world.setHero(1, ArenaWorld.Hero.RANGER);
         world.activatePlayer(1);
         PartyProgression progression = world.progression;
+        assertEquals(16, progression.foundationCount(1));
+        assertEquals(16, progression.appliedUpgradeCount(1));
+        assertEquals(3, progression.catchUpRemaining(1));
         int firstId = progression.offers[1].id;
         progression.update(PartyProgression.CHOICE_SECONDS + 90);
-        assertEquals(1, progression.appliedUpgradeCount(1), "A delayed update cannot skip catch-up decisions");
-        assertEquals(3, progression.offers[1].level);
-        assertEquals(PartyProgression.CHOICE_SECONDS, progression.offers[1].secondsLeft);
+        assertEquals(17, progression.appliedUpgradeCount(1), "A delayed update cannot skip catch-up decisions");
+        assertEquals(19, progression.offers[1].level);
+        assertEquals(PartyProgression.CATCH_UP_SECONDS, progression.offers[1].secondsLeft);
         assertFalse(progression.choose(1, firstId, 0));
         int hostApplied = progression.appliedUpgradeCount(0);
         while (progression.offers[1].pending) {
             PartyProgression.Offer offer = progression.offers[1];
-            assertEquals(PartyProgression.CHOICE_SECONDS, offer.secondsLeft);
+            assertEquals(PartyProgression.CATCH_UP_SECONDS, offer.secondsLeft);
+            assertTrue(offer.catchUp);
             Set<PartyProgression.Upgrade> distinct = new HashSet<>();
             for (int i = 0; i < offer.options.length; i++) {
                 assertTrue(distinct.add(offer.options[i]));
@@ -60,6 +64,90 @@ class PartyProgressionTest {
         assertEquals(0, progression.rank(1, PartyProgression.Upgrade.SWEEP));
         assertEquals(hostApplied, progression.appliedUpgradeCount(0), "The late joiner's choices do not consume the host's queue");
         assertTrue(progression.offers[0].pending);
+    }
+
+    @Test void eitherHeroReceivesABroadFoundationWithoutCopyingTheOtherPlayersBuild() {
+        for (ArenaWorld.Hero hero : ArenaWorld.Hero.values()) {
+            ArenaWorld world = new ArenaWorld(ArenaTimeline.TWENTY_MINUTES);
+            world.activatePlayer(0); world.progression.addXp(1991);
+            world.setHero(1, hero); world.activatePlayer(1);
+            PartyProgression progression = world.progression;
+            assertEquals(16, progression.appliedUpgradeCount(1));
+            assertEquals(3, progression.catchUpRemaining(1));
+            assertEquals(0, progression.appliedUpgradeCount(0));
+            assertEquals(3, progression.rank(1, PartyProgression.Upgrade.POWER));
+            assertEquals(2, progression.rank(1, PartyProgression.Upgrade.VITALITY));
+            assertEquals(2, progression.rank(1, PartyProgression.Upgrade.AURA));
+            assertEquals(1, progression.rank(1, PartyProgression.Upgrade.STORM));
+            assertTrue(progression.foundationSummary(1).contains("Soulfire 3"));
+            assertEquals(hero == ArenaWorld.Hero.WARDEN ? 2 : 0, progression.rank(1, PartyProgression.Upgrade.SWEEP));
+            assertEquals(hero == ArenaWorld.Hero.RANGER ? 1 : 0, progression.rank(1, PartyProgression.Upgrade.MULTISHOT));
+            assertEquals(hero == ArenaWorld.Hero.RANGER ? 1 : 0, progression.rank(1, PartyProgression.Upgrade.PIERCE));
+            PartyProgression.Offer offer = progression.offers[1];
+            PartyProgression.Upgrade personal = offer.options[2];
+            int previousRank = progression.rank(1, personal);
+            assertTrue(progression.choose(1, offer.id, 2));
+            assertEquals(previousRank + 1, progression.rank(1, personal));
+            assertEquals(2, progression.catchUpRemaining(1));
+        }
+    }
+
+    @Test void inheritedSkillSnapshotDoesNotGrowAndNewlyEarnedRewardsKeepThirtySeconds() {
+        ArenaWorld world = solo(); PartyProgression progression = world.progression;
+        progression.addXp(6 + 10 + 14 + 18 + 22 + 26); // Party level seven, six inherited ranks.
+        world.activatePlayer(1);
+        assertEquals(3, progression.foundationCount(1));
+        assertEquals(3, progression.catchUpRemaining(1));
+        progression.addXp(progression.xpToNext - progression.xp);
+        for (int i = 0; i < 3; i++) {
+            var offer = progression.offers[1];
+            assertTrue(offer.catchUp); assertEquals(15, offer.durationSeconds);
+            assertTrue(progression.choose(1, offer.id, 0));
+        }
+        assertFalse(progression.catchingUp(1));
+        assertEquals(0, progression.catchUpRemaining(1));
+        assertTrue(progression.offers[1].pending);
+        assertFalse(progression.offers[1].catchUp);
+        assertEquals(30, progression.offers[1].durationSeconds);
+        assertEquals(30, progression.offers[1].secondsLeft);
+    }
+
+    @Test void reconnectPreservesFoundationOfferAndClockWhileRemovalStartsFreshIdentity() {
+        ArenaWorld world = solo(); PartyProgression progression = world.progression;
+        progression.addXp(Integer.MAX_VALUE); world.activatePlayer(1);
+        int id = progression.offers[1].id;
+        String summary = progression.foundationSummary(1);
+        progression.update(5);
+        world.activatePlayer(1);
+        assertEquals(id, progression.offers[1].id);
+        assertEquals(10, progression.offers[1].secondsLeft);
+        assertSame(summary, progression.foundationSummary(1));
+        assertEquals(16, progression.foundationCount(1));
+        world.deactivatePlayer(1);
+        assertEquals(0, progression.foundationCount(1));
+        assertEquals("", progression.foundationSummary(1));
+        world.activatePlayer(1);
+        assertNotEquals(id, progression.offers[1].id);
+        assertFalse(progression.choose(1, id, 0));
+        assertEquals(16, progression.appliedUpgradeCount(1));
+        assertEquals(15, progression.offers[1].secondsLeft);
+    }
+
+    @Test void normalSkillRewardsWaitForInheritedGearInsteadOfExtendingTheCatchupBacklog() {
+        ArenaWorld world = solo(); PartyProgression progression = world.progression;
+        progression.addXp(48); // Level five: one foundation rank and three personal inherited skills.
+        for (int i = 0; i < 3; i++) world.equipment.grantReward();
+        world.activatePlayer(1);
+        progression.addXp(progression.xpToNext - progression.xp);
+        for (int i = 0; i < 3; i++) assertTrue(progression.choose(1, progression.offers[1].id, 0));
+        assertFalse(progression.catchingUp(1));
+        assertTrue(world.equipment.catchingUp(1));
+        assertFalse(progression.offers[1].pending);
+        for (int i = 0; i < 2; i++) assertTrue(world.equipment.choose(1, world.equipment.offers[1].id, 0));
+        progression.update(.01f);
+        assertTrue(progression.offers[1].pending);
+        assertFalse(progression.offers[1].catchUp);
+        assertEquals(30, progression.offers[1].durationSeconds);
     }
 
     @Test void eitherHeroCanSpendEveryLongRunEntitlementWithoutExhaustingDistinctEligibleChoices() {
