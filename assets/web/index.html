@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#11191c">
+  <title>Couch Crypt · Your controller</title>
+  <link rel="stylesheet" href="/controller.css">
+  <script src="/controller.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><img class="brand-logo" src="/art/home-logo.png" alt="Couch Crypt"><p class="subtitle">Two souls. One descent.</p></header>
+    <section class="card connection-card" aria-labelledby="title">
+      <p class="eyebrow" id="player">THE GATHERING</p>
+      <h1 id="title">Join your party</h1>
+      <p id="message" role="status" aria-live="polite">Keep your phone on the same Wi-Fi as the TV.</p>
+      <form id="join-form">
+        <button id="join" type="submit" disabled>Connecting…</button>
+      </form>
+      <div id="connected" hidden><div class="connection-mark" aria-hidden="true">✓</div><p id="party">Waiting for your companion</p><p class="hint">The TV remote controls the lobby.<br>Your phone controls your character when the adventure begins.</p></div>
+    </section>
+    <section id="game-controls" class="card" aria-label="Character controls" hidden>
+      <section id="upgrade-choices" aria-labelledby="upgrade-level" hidden>
+        <div class="upgrade-heading"><div><p class="upgrade-kicker">CHOOSE YOUR POWER</p><h2 id="upgrade-level">LEVEL UP</h2></div><div id="upgrade-countdown" role="status"><strong id="upgrade-seconds">30</strong><span id="upgrade-timer-label">SECONDS TO CHOOSE</span></div></div>
+        <div class="upgrade-clock" aria-hidden="true"><span></span></div>
+        <div class="upgrade-options">
+          <button class="upgrade-choice" id="upgrade-option-0" type="button"><span class="skill-art" aria-hidden="true"><span class="skill-illustration"></span></span><span class="skill-copy"><span class="skill-meta"><span class="skill-category"></span><span class="skill-rank"></span></span><strong class="skill-title"></strong><span class="skill-headline"></span><span class="skill-preview"><span class="skill-before"></span><span class="skill-arrow" aria-hidden="true">→</span><span class="skill-after"></span></span></span></button>
+          <button class="upgrade-choice" id="upgrade-option-1" type="button"><span class="skill-art" aria-hidden="true"><span class="skill-illustration"></span></span><span class="skill-copy"><span class="skill-meta"><span class="skill-category"></span><span class="skill-rank"></span></span><strong class="skill-title"></strong><span class="skill-headline"></span><span class="skill-preview"><span class="skill-before"></span><span class="skill-arrow" aria-hidden="true">→</span><span class="skill-after"></span></span></span></button>
+          <button class="upgrade-choice" id="upgrade-option-2" type="button"><span class="skill-art" aria-hidden="true"><span class="skill-illustration"></span></span><span class="skill-copy"><span class="skill-meta"><span class="skill-category"></span><span class="skill-rank"></span></span><strong class="skill-title"></strong><span class="skill-headline"></span><span class="skill-preview"><span class="skill-before"></span><span class="skill-arrow" aria-hidden="true">→</span><span class="skill-after"></span></span></span></button>
+        </div>
+        <button id="equipment-keep" type="button" hidden>KEEP CURRENT GEAR</button>
+      </section>
+      <p id="starter-build" class="hint" role="status" hidden>Starter build equipped—you’re ready</p>
+      <div class="touch-controls">
+        <div class="movement-control">
+          <div id="joystick" role="group" aria-label="Drag to move your character">
+            <span class="stick-cross" aria-hidden="true"></span><span id="stick" aria-hidden="true"></span>
+          </div>
+          <span class="control-label">MOVE</span>
+        </div>
+        <div class="dodge-control"><button id="dodge" type="button" aria-label="Dodge">DODGE</button><span id="dodge-status" class="control-label">READY</span></div>
+      </div>
+    </section>
+    <footer><span id="network-status">LOCAL NETWORK</span><br>Keep this page open while you play.</footer>
+  </main>
+</body>
+</html>
