@@ -9,7 +9,7 @@ import com.couchcrypt.game.RunEquipment;
 public final class LobbyState {
     public static final long RECONNECT_MILLIS = 45_000;
     public static final long INPUT_TIMEOUT_MILLIS = 300;
-    public enum Phase { LOBBY, SESSION, PAUSED, INVITE, RESULTS }
+    public enum Phase { LOBBY, SESSION, LEVEL_UP, PAUSED, INVITE, RESULTS }
     public record Player(int index, boolean connected, boolean reserved, int secondsLeft, long generation) {}
     public record Feedback(float health, float maxHealth, float dodgeCooldown, boolean alive) {}
     /** Reuse one instance per player on the render thread. Axes are screen right and up. */
@@ -152,7 +152,9 @@ public final class LobbyState {
 
     public synchronized void setPhase(Phase next) {
         if (phase != next) {
-            phase = next; clearInputs(); if (next != Phase.SESSION) clearUpgradeRequests();
+            phase = next; clearInputs();
+            if (next != Phase.SESSION && next != Phase.LEVEL_UP) clearUpgradeRequests();
+            else if (next == Phase.LEVEL_UP) for (Slot slot : slots) slot.clearEquipmentRequest();
             if (next == Phase.LOBBY || next == Phase.RESULTS)
                 for (Slot slot : slots) slot.participating = false;
             revision++;
@@ -239,9 +241,11 @@ public final class LobbyState {
         }
     }
 
+    private boolean skillChoicePhase() { return phase == Phase.SESSION || phase == Phase.LEVEL_UP; }
+
     /** The request can only select the caller's own currently published offer. */
     public synchronized boolean chooseUpgrade(String connection, int offerId, int option) {
-        if (!hostActive || phase != Phase.SESSION || offerId <= 0 || option < 0 || option >= 3) return false;
+        if (!hostActive || !skillChoicePhase() || offerId <= 0 || option < 0 || option >= 3) return false;
         for (Slot slot : slots) {
             if (!connection.equals(slot.connection)) continue;
             if (slot.offerId != offerId || slot.offerSeconds <= 0 || slot.claimedOfferId == offerId) return false;
@@ -256,7 +260,7 @@ public final class LobbyState {
     /** One render-thread delivery, carrying identity to reject remove/rejoin races. */
     public synchronized boolean pollUpgrade(int index, UpgradeRequest out) {
         Slot slot = slots[index];
-        if (!slot.upgradeQueued || !hostActive || phase != Phase.SESSION || slot.connection == null) return false;
+        if (!slot.upgradeQueued || !hostActive || !skillChoicePhase() || slot.connection == null) return false;
         out.offerId = slot.offerId; out.option = slot.upgradeOption; out.generation = slot.generation;
         slot.upgradeQueued = false;
         return true;

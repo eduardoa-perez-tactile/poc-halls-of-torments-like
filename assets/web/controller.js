@@ -54,11 +54,11 @@
     if (wasVisible) releaseControls();
   }
   function canChooseUpgrade() {
-    return joined && phase === 'session' && hostActive && foreground && !document.hidden && socket?.readyState === WebSocket.OPEN;
+    return joined && (phase === 'session' || phase === 'level_up' && choiceKind === 'upgrade') && hostActive && foreground && !document.hidden && socket?.readyState === WebSocket.OPEN;
   }
   function remainingUpgradeSeconds() {
     // Interpolation is display-only. Only the host resolves expiry or applies an upgrade.
-    const elapsed = phase === 'session' && hostActive ? (performance.now() - upgradeSampleTime) / 1000 : 0;
+    const elapsed = (phase === 'session' || phase === 'level_up' && choiceKind === 'upgrade') && hostActive ? (performance.now() - upgradeSampleTime) / 1000 : 0;
     return Math.max(0, upgradeSeconds - elapsed);
   }
   function paintUpgrade() {
@@ -71,11 +71,11 @@
     const seconds = Math.ceil(remaining);
     upgradeSecondsLabel.textContent = String(seconds);
     upgradeTimerLabel.textContent = upgradeSelected >= 0 ? 'Applying choice…'
-      : !hostActive || phase !== 'session' ? 'Paused'
+      : !hostActive || !['session', 'level_up'].includes(phase) ? 'Paused'
       : remaining <= 0 ? 'Applying auto-pick…' : 'Seconds to choose';
     upgradeCountdown.setAttribute('aria-label', `${seconds} seconds. ${upgradeTimerLabel.textContent}`);
     upgradeChoices.style.setProperty('--choice-progress', `${remaining / upgradeDuration * 100}%`);
-    document.body.classList.toggle('choice-urgent', seconds <= Math.min(10, upgradeDuration / 3) && hostActive && phase === 'session');
+    document.body.classList.toggle('choice-urgent', seconds <= Math.min(10, upgradeDuration / 3) && hostActive && ['session', 'level_up'].includes(phase));
     const disabled = !canChooseUpgrade() || remaining <= 0 || upgradeSelected >= 0;
     upgradeButtons.forEach((button, index) => {
       button.disabled = disabled;
@@ -122,8 +122,8 @@
   }
   function setUpgradeOffer(progression, equipment) {
     const kind = progression?.upgrade ? 'upgrade' : 'equipment';
-    const next = kind === 'upgrade' ? progression.upgrade : equipment;
-    if (!joined || !['session', 'paused', 'invite'].includes(phase) || !next
+    const next = kind === 'upgrade' ? progression.upgrade : phase === 'level_up' ? null : equipment;
+    if (!joined || !['session', 'level_up', 'paused', 'invite'].includes(phase) || !next
       || !Number.isSafeInteger(next.id) || next.id <= 0 || !Number.isFinite(next.secondsLeft)
       || !Array.isArray(next.options) || next.options.length !== 3
       || !next.options.every((option) => typeof option?.title === 'string' && typeof option.description === 'string')) {
@@ -135,7 +135,7 @@
       upgradeButtons.forEach((button, index) => paintSkillCard(button, next.options[index], kind === 'equipment'));
       upgradeChoices.hidden = false; document.body.classList.add('has-upgrade');
       upgradeChoices.querySelector('.upgrade-options').scrollTop = 0;
-      // Combat continues, but either personal choice is a neutral-input phone mode.
+      // Both personal choice views release movement; skill selection also pauses combat on the host.
       releaseControls();
     }
     upgradeChoices.querySelector('.upgrade-kicker').textContent = kind === 'equipment' ? 'CHOOSE YOUR EQUIPMENT' : 'CHOOSE YOUR POWER';
@@ -163,7 +163,7 @@
     const wasSession = phase === 'session' && hostActive;
     phase = data.phase; hostActive = data.hostActive; alive = data.alive !== false;
     const activeSession = phase === 'session' && hostActive;
-    title.textContent = data.phase === 'paused' || data.phase === 'invite' ? 'Paused' : data.phase === 'results' ? 'Round complete' : 'You have a place';
+    title.textContent = data.phase === 'level_up' ? 'Level up' : data.phase === 'paused' || data.phase === 'invite' ? 'Paused' : data.phase === 'results' ? 'Round complete' : 'You have a place';
     if (wasSession !== activeSession) releaseControls();
     setUpgradeOffer(data.progression, data.equipment);
     const granted = data.starterBuild;
@@ -175,7 +175,7 @@
     document.querySelector('.touch-controls').inert = upgradeOffer !== null;
     const cooldown = Number.isFinite(data.dodgeCooldown) ? Math.max(0, data.dodgeCooldown) : 0;
     dodgeStatus.textContent = alive ? (cooldown > 0.05 ? `${cooldown.toFixed(1)}s` : 'READY') : 'FALLEN';
-    dodgeButton.disabled = !!upgradeOffer || !alive || cooldown > 0.05;
+    dodgeButton.disabled = !activeSession || !!upgradeOffer || !alive || cooldown > 0.05;
     refreshSender();
   }
   function movePointer(event) {
@@ -287,14 +287,18 @@
         heartbeat = setInterval(() => { if (current.readyState === WebSocket.OPEN) current.send('{"type":"ping"}'); }, 2000);
       } else if (data.type === 'status') {
         setControlScreen(data);
-        party.textContent = data.connected === 2 ? 'Both souls are here' : data.phase === 'invite' ? 'Waiting for your companion' : 'Ready for a solo descent';
+        party.textContent = data.phase === 'level_up' ? 'Waiting for your companion' : data.connected === 2 ? 'Both souls are here' : data.phase === 'invite' ? 'Waiting for your companion' : 'Ready for a solo descent';
         const descriptions = {
           lobby: 'Connected. Your host can start solo or gather a companion.',
           session: '',
+          level_up: data.progression?.upgrade ? 'Combat is paused. Choose your upgrade below.' : 'Combat is paused. Your choice is complete.',
           results: 'Look at the TV.',
           paused: 'Look at the TV.',
           invite: 'Look at the TV.'
         };
+        connected.querySelector('.hint').textContent = data.phase === 'level_up'
+          ? 'The game resumes automatically when everyone has chosen. Check the TV for the countdown.'
+          : 'The TV remote controls shared menus. Your phone controls your character during play.';
         message.textContent = data.hostActive ? (descriptions[data.phase] ?? descriptions.lobby) : 'The host has stepped away. Stay here to keep your place.';
       } else if (data.type === 'removed' || data.type === 'error') {
         stopped = true; stopTimers();

@@ -7,6 +7,42 @@ import com.couchcrypt.game.RunEquipment;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LobbyStateTest {
+    @Test void levelUpPhaseAcceptsOnlyPersonalSkillsAndPreservesThemAcrossPauseAndReconnect() {
+        var state = new LobbyState(); var joined = state.join(null, "first", 1);
+        state.setPhase(LobbyState.Phase.SESSION);
+        state.publishProgression(0, 2, 0, 22, 10, 2, 24, PartyProgression.Upgrade.values());
+        var gear = equipmentOptions(); state.publishEquipment(0, 20, 26, gear, equipmentCards(gear));
+        assertTrue(state.input("first", 0, 1, 0, true, 2));
+        assertTrue(state.chooseUpgrade("first", 10, 1));
+        state.setPhase(LobbyState.Phase.LEVEL_UP);
+        var request = new LobbyState.UpgradeRequest();
+        assertTrue(state.pollUpgrade(0, request), "The entering phase transition cannot lose an in-flight skill choice");
+        assertEquals(10, request.offerId); assertEquals(1, request.option);
+        var controls = new LobbyState.Controls(); state.readControls(0, controls, 3);
+        assertEquals(0, controls.x); assertFalse(controls.dodge);
+        assertFalse(state.input("first", 1, 1, 0, true, 3));
+        assertFalse(state.chooseEquipment("first", 20, 0));
+        assertFalse(state.pollEquipment(0, new LobbyState.EquipmentRequest()));
+        state.publishProgression(0, 3, 0, 34, 11, 3, 19, PartyProgression.Upgrade.values());
+        assertTrue(state.chooseUpgrade("first", 11, 2));
+        state.setPhase(LobbyState.Phase.PAUSED);
+        assertFalse(state.pollUpgrade(0, request)); assertFalse(state.chooseUpgrade("first", 11, 0));
+        assertEquals(19, state.progressionFeedback(0).upgrade().secondsLeft());
+        state.disconnected("first", 4); state.join(joined.token(), "restored", 5);
+        assertEquals(11, state.progressionFeedback(0).upgrade().id());
+        assertEquals(19, state.progressionFeedback(0).upgrade().secondsLeft());
+        state.setPhase(LobbyState.Phase.LEVEL_UP); state.setHostActive(false);
+        assertFalse(state.chooseUpgrade("restored", 11, 0));
+        state.setHostActive(true);
+        assertTrue(state.chooseUpgrade("restored", 11, 0)); assertTrue(state.pollUpgrade(0, request));
+        assertEquals(0, request.option);
+        state.publishProgression(0, 3, 0, 34, 0, 0, 0, null);
+        assertFalse(state.chooseEquipment("restored", 20, 0), "A finished player cannot open gear while their companion still chooses");
+        state.setPhase(LobbyState.Phase.SESSION);
+        assertTrue(state.chooseEquipment("restored", 20, 0));
+        assertTrue(state.input("restored", 0, 1, 0, false, 6));
+    }
+
     @Test void participatingReconnectKeepsIdentityBuildFeedbackAndChoicesBeyondLobbyReservation() {
         var state = new LobbyState(); var joined = state.join(null, "a", 1);
         state.setPhase(LobbyState.Phase.SESSION);

@@ -20,6 +20,35 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JoinServerTest {
+    @Test void levelUpStatusKeepsSkillSelectionLiveWhileGameplayIsPaused() throws Exception {
+        var state = new LobbyState(); var server = new JoinServer(0, state, Map.of()); server.open();
+        try (var http = HttpClient.newHttpClient()) {
+            var listener = new Client();
+            var socket = http.newWebSocketBuilder().buildAsync(URI.create("ws://127.0.0.1:"
+                + server.getListeningPort() + "/socket?room=" + server.room()), listener).get(3, TimeUnit.SECONDS);
+            listener.expect("joined");
+            state.publishProgression(0, 2, 0, 22, 10, 2, 23.5f, PartyProgression.Upgrade.values());
+            state.setPhase(LobbyState.Phase.LEVEL_UP);
+            JsonValue status;
+            do { status = listener.expect("status"); } while (!status.getString("phase").equals("level_up"));
+            assertEquals(10, status.get("progression").get("upgrade").getInt("id"));
+            assertEquals(23.5f, status.get("progression").get("upgrade").getFloat("secondsLeft"));
+            socket.sendText("{\"type\":\"input\",\"x\":1,\"y\":0,\"dodge\":true,\"seq\":0}", true).get(3, TimeUnit.SECONDS);
+            socket.sendText("{\"type\":\"upgrade\",\"offerId\":10,\"option\":2}", true).get(3, TimeUnit.SECONDS);
+            var request = new LobbyState.UpgradeRequest();
+            long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+            boolean found;
+            do {
+                found = state.pollUpgrade(0, request);
+                if (!found) java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(5));
+            } while (!found && System.nanoTime() < until);
+            assertTrue(found); assertEquals(10, request.offerId); assertEquals(2, request.option);
+            var controls = new LobbyState.Controls(); state.readControls(0, controls, System.currentTimeMillis());
+            assertEquals(0, controls.x); assertFalse(controls.dodge);
+            socket.abort();
+        } finally { server.stop(); }
+    }
+
     @Test void defaultStarterBuildHasNoOffersAndReconnectRestoresFuturePersonalChoice() throws Exception {
         var state = new LobbyState(); state.join(null, "host", System.currentTimeMillis());
         var world = new com.couchcrypt.game.ArenaWorld(); world.activatePlayer(0);

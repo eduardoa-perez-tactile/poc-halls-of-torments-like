@@ -54,12 +54,14 @@ async function main() {
     receive(data) { this.onmessage({ data: JSON.stringify(data) }); }
   }
   let timerId = 0;
+  const intervals = new Map();
   const windowEvents = new Map();
   const context = {
     document, window: { addEventListener(name, handler) { windowEvents.set(name, handler); } }, location: { host: 'tv:8787', href: 'http://tv:8787/' },
     performance: { now: () => now }, Date, URL, AbortController, WebSocket: Socket,
     localStorage: { getItem: () => '', setItem() {} },
-    setInterval: () => ++timerId, clearInterval() {}, setTimeout: () => ++timerId, clearTimeout() {},
+    setInterval: (handler, delay) => { const id = ++timerId; intervals.set(id, { handler, delay }); return id; },
+    clearInterval: (id) => intervals.delete(id), setTimeout: () => ++timerId, clearTimeout() {},
     fetch: async () => ({ ok: true, json: async () => ({ room: 'ABC123' }) })
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../assets/web/controller.js'), 'utf8'), context);
@@ -174,6 +176,40 @@ async function main() {
   assert.equal(get('starter-build').hidden, false);
   keyboard('d');
   assert.equal(socket.sent.at(-1).x, 1, 'Controls return after the host clears the normal offer');
+  const levelUpSkill = { ...upgrade, id: 10, secondsLeft: 26, durationSeconds: 30 };
+  status({ phase: 'level_up', progression: { upgrade: levelUpSkill }, equipment });
+  assert.equal(first.disabled, false, 'Combat pause leaves personal skill choices enabled');
+  assert.equal(get('upgrade-timer-label').textContent, 'Seconds to choose');
+  assert.equal(get('.touch-controls').inert, true);
+  assert.equal(get('dodge').disabled, true);
+  now += 5000;
+  [...intervals.values()].filter((timer) => timer.delay === 100).forEach((timer) => timer.handler());
+  assert.equal(get('upgrade-seconds').textContent, '21', 'The choice countdown runs during level-up combat pause');
+  keyboard('d');
+  assert.equal(socket.sent.at(-1).x, 0, 'All movement remains neutral during level-up pause');
+  first.click();
+  assert.equal(socket.sent.at(-1).type, 'upgrade'); assert.equal(socket.sent.at(-1).offerId, 10);
+  assert.equal(choices.hidden, false, 'Submitted cards remain until host acknowledgment');
+  status({ phase: 'level_up', equipment, progression: { upgrade: null } });
+  assert.equal(choices.hidden, true, 'Unrelated equipment waits behind the party level-up');
+  assert.equal(get('game-controls').hidden, true, 'Finishing one player does not restore a controller before the companion');
+  assert.equal(get('party').textContent, 'Waiting for your companion');
+  assert.equal(get('message').textContent, 'Combat is paused. Your choice is complete.');
+  keyboard('d'); assert.equal(socket.sent.at(-1).x, 0);
+  status({ phase: 'level_up', equipment: null, progression: { upgrade: levelUpSkill } });
+  socket.close(); socket.onclose();
+  socket.readyState = Socket.OPEN; socket.receive({ type: 'joined', player: 1, token: 'test-token' });
+  status({ phase: 'level_up', equipment: null, progression: { upgrade: levelUpSkill } });
+  assert.equal(choices.hidden, false); assert.equal(first.disabled, false);
+  assert.equal(get('upgrade-seconds').textContent, '26', 'Reconnect restores the host countdown in the selection phase');
+  status({ phase: 'paused', equipment: null, progression: { upgrade: levelUpSkill } });
+  now += 5000;
+  [...intervals.values()].filter((timer) => timer.delay === 100).forEach((timer) => timer.handler());
+  assert.equal(get('upgrade-seconds').textContent, '26', 'Manual pause still freezes selection timers');
+  assert.equal(first.disabled, true);
+  status({ phase: 'session', equipment: null });
+  assert.equal(get('game-controls').hidden, false); assert.equal(choices.hidden, true);
+  keyboard('d'); assert.equal(socket.sent.at(-1).x, 1, 'The controller returns when the party finishes');
   for (const starterBuild of [null, {}, { skillsGranted: 0, equipmentGranted: 0 }, { skillsGranted: '19' }]) {
     status({ equipment: null, starterBuild });
     assert.equal(get('starter-build').hidden, true, 'Missing, zero or malformed default grants stay silent');
@@ -183,7 +219,7 @@ async function main() {
   assert.equal(get('starter-build').hidden, false, 'A gear-only default build is acknowledged');
   status({ equipment: null, starterBuild, phase: 'lobby' });
   assert.equal(get('game-controls').hidden, true); assert.equal(get('starter-build').hidden, true);
-  console.log('Controller immediate default-build play, future choices, acknowledgment, pause and reconnect checks passed.');
+  console.log('Controller level-up pause, party waiting, defaults, future choices, acknowledgment and reconnect checks passed.');
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -44,6 +44,7 @@ import com.couchcrypt.ui.BuildIcons;
 import com.couchcrypt.ui.ItemArt;
 import com.couchcrypt.ui.RunDetailsView;
 import com.couchcrypt.ui.CharacterInfoView;
+import com.couchcrypt.ui.LevelUpView;
 import com.couchcrypt.game.FrameMetrics;
 import com.badlogic.gdx.graphics.glutils.PixmapTextureData;
 import com.google.zxing.BarcodeFormat;
@@ -101,6 +102,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private boolean hostActive = true;
     private RemoteButton start, pauseResume;
     private Label modalMessage, pauseMessage;
+    private LevelUpView levelUpView;
     private int pauseTopology;
     private Image qrImage;
     private Label qrStatus;
@@ -139,6 +141,7 @@ public final class CryptLobby extends ApplicationAdapter {
         shade.setColor(0.025f, 0.035f, 0.04f, 0.34f); shade.setBounds(0, 0, 1920, 1080);
         shade.setTouchable(Touchable.disabled); stage.addActor(shade);
         content = new Table(); content.setFillParent(true); stage.addActor(content);
+        levelUpView = new LevelUpView(art); levelUpView.setVisible(false); stage.addActor(levelUpView);
         diagnostics = art.label("", art.small, UiArt.IVORY);
         diagnostics.setPosition(105, 22); diagnostics.setVisible(false); stage.addActor(diagnostics);
         host = config.advertisedHost();
@@ -627,6 +630,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private String profileMode() {
         if (screen == Screen.SESSION) {
             if (overlay != null) return "PAUSED";
+            if (world.levelUpPending()) return "LEVEL_UP";
             boolean coop = world.players[0].active && world.players[1].active;
             if (world.bossSpawned) return coop ? "COOP_BOSS" : "SOLO_BOSS";
             if (world.elapsed >= world.durationSeconds() * .75f) return coop ? "COOP_LATE" : "SOLO_LATE";
@@ -895,8 +899,19 @@ public final class CryptLobby extends ApplicationAdapter {
     private void announceLevelUp() {
         if (world.progression.level <= notifiedLevel) return;
         notifiedLevel = world.progression.level;
-        hudState.notify("LEVEL " + notifiedLevel + "  /  CHOOSE ON YOUR PHONE", "Combat continues. Choose within 30 seconds.",
+        hudState.notify("PARTY LEVEL " + notifiedLevel, "",
             ArenaHudState.Tone.SUCCESS, 4f);
+    }
+
+    private void syncLevelUp() {
+        boolean visible = screen == Screen.SESSION && overlay == null
+            && world.outcome == ArenaWorld.Outcome.RUNNING && world.levelUpPending();
+        boolean changed = levelUpView.isVisible() != visible;
+        levelUpView.setVisible(visible);
+        if (visible) { world.clearInputs(); levelUpView.update(world); }
+        if (changed) publishProgression();
+        if (screen == Screen.SESSION && overlay == null)
+            state.setPhase(visible ? LobbyState.Phase.LEVEL_UP : LobbyState.Phase.SESSION);
     }
 
     private void publishProgression() {
@@ -915,7 +930,7 @@ public final class CryptLobby extends ApplicationAdapter {
                 pending ? offer.options : null, pending ? offer.cards : null,
                 pending && offer.catchUp, pending ? offer.durationSeconds : PartyProgression.CHOICE_SECONDS);
             var itemOffer = world.equipment.offers[i];
-            boolean itemPending = participant && itemOffer.pending;
+            boolean itemPending = participant && !world.levelUpPending() && itemOffer.pending;
             state.publishEquipment(i, itemPending ? itemOffer.id : 0, itemPending ? itemOffer.secondsLeft : 0,
                 itemPending ? itemOffer.options : null, itemPending ? itemOffer.cards : null,
                 itemPending && itemOffer.catchUp, itemPending ? itemOffer.durationSeconds : 30f);
@@ -982,6 +997,7 @@ public final class CryptLobby extends ApplicationAdapter {
         refreshClock += delta; profileClock += delta;
         long now = System.currentTimeMillis();
         for (int i = 0; i < 2; i++) state.readControls(i, controls[i], now);
+        syncLevelUp();
         if (screen == Screen.SESSION && overlay == null && hostActive) {
             boolean disconnected = false;
             for (int i = 0; i < 2; i++) disconnected |= world.players[i].active && !controls[i].connected;
@@ -1022,6 +1038,7 @@ public final class CryptLobby extends ApplicationAdapter {
                 if (world.outcome != ArenaWorld.Outcome.RUNNING) showResults();
             }
         }
+        syncLevelUp();
         if (refreshClock >= 0.2f) {
             refreshClock = 0; updateStatus(); publishProgression();
             for (int i = 0; i < 2; i++) {
@@ -1040,7 +1057,8 @@ public final class CryptLobby extends ApplicationAdapter {
         }
         if (hostActive && background.isVisible()) art.menuScene.advance(delta);
         ScreenUtils.clear(0.025f, 0.035f, 0.04f, 1);
-        if (screen == Screen.SESSION) arena.render(world, hudState, delta, true);
+        if (screen == Screen.SESSION) arena.render(world, hudState,
+            overlay != null || world.levelUpPending() ? 0f : delta, !world.levelUpPending());
         stage.getViewport().apply(); stage.act(delta); stage.draw();
         if (frameMetrics != null) frameMetrics.endFrame(profileMode(), residentArtBytes(), residentPixmapBytes(),
             Gdx.app.getJavaHeap(), (screen == Screen.SESSION ? arena.drawCalls : 0) + ((SpriteBatch) stage.getBatch()).renderCalls);
