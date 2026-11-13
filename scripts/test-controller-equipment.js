@@ -210,6 +210,41 @@ async function main() {
   status({ phase: 'session', equipment: null });
   assert.equal(get('game-controls').hidden, false); assert.equal(choices.hidden, true);
   keyboard('d'); assert.equal(socket.sent.at(-1).x, 1, 'The controller returns when the party finishes');
+  const loot = { ...equipment, id: 33, secondsLeft: 20, durationSeconds: 30 };
+  status({ phase: 'loot', equipment: loot });
+  assert.equal(get('upgrade-level').textContent, 'EQUIPMENT');
+  assert.equal(first.disabled, false); assert.equal(get('equipment-keep').hidden, false);
+  assert.equal(get('dodge').disabled, true); assert.equal(get('.touch-controls').inert, true);
+  now += 5000;
+  [...intervals.values()].filter((timer) => timer.delay === 100).forEach((timer) => timer.handler());
+  assert.equal(get('upgrade-seconds').textContent, '15', 'Loot countdown runs while combat is paused');
+  keyboard('d'); assert.equal(socket.sent.at(-1).x, 0);
+  get('equipment-keep').click();
+  assert.equal(socket.sent.at(-1).type, 'equipment'); assert.equal(socket.sent.at(-1).option, -1);
+  assert.equal(choices.hidden, false, 'Loot decline stays visible until acknowledgment');
+  status({ phase: 'loot', equipment: null });
+  assert.equal(choices.hidden, true); assert.equal(get('game-controls').hidden, true);
+  assert.equal(get('title').textContent, 'Loot found');
+  assert.equal(get('party').textContent, 'Waiting for your companion');
+  assert.equal(get('message').textContent, 'Combat is paused. Your choice is complete.');
+  status({ phase: 'loot', equipment: loot });
+  socket.close(); socket.onclose();
+  socket.readyState = Socket.OPEN; socket.receive({ type: 'joined', player: 1, token: 'test-token' });
+  status({ phase: 'paused', equipment: loot });
+  now += 5000;
+  [...intervals.values()].filter((timer) => timer.delay === 100).forEach((timer) => timer.handler());
+  assert.equal(get('upgrade-seconds').textContent, '20', 'Paused reconnect retains the host loot timer');
+  assert.equal(first.disabled, true);
+  status({ phase: 'loot', equipment: loot });
+  assert.equal(first.disabled, false);
+  status({ phase: 'level_up', equipment: loot, progression: { upgrade: levelUpSkill } });
+  assert.equal(get('upgrade-level').textContent, 'LEVEL 2', 'Skills take priority over loot');
+  assert.equal(get('equipment-keep').hidden, true);
+  status({ phase: 'loot', equipment: loot });
+  first.click();
+  assert.equal(socket.sent.at(-1).type, 'equipment'); assert.equal(socket.sent.at(-1).offerId, 33);
+  status({ phase: 'session', equipment: null });
+  keyboard('d'); assert.equal(socket.sent.at(-1).x, 1, 'All-party completion restores movement');
   for (const starterBuild of [null, {}, { skillsGranted: 0, equipmentGranted: 0 }, { skillsGranted: '19' }]) {
     status({ equipment: null, starterBuild });
     assert.equal(get('starter-build').hidden, true, 'Missing, zero or malformed default grants stay silent');
@@ -219,7 +254,7 @@ async function main() {
   assert.equal(get('starter-build').hidden, false, 'A gear-only default build is acknowledged');
   status({ equipment: null, starterBuild, phase: 'lobby' });
   assert.equal(get('game-controls').hidden, true); assert.equal(get('starter-build').hidden, true);
-  console.log('Controller level-up pause, party waiting, defaults, future choices, acknowledgment and reconnect checks passed.');
+  console.log('Controller skill/loot pause, party waiting, defaults, acknowledgment and reconnect checks passed.');
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });

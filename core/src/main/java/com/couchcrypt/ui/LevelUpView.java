@@ -16,12 +16,13 @@ import com.couchcrypt.game.ArenaWorld;
 
 /** One shared choice clock in an art-led ceremony over the frozen arena. */
 public final class LevelUpView extends Table {
-    private final Label level, timer;
+    private final Label title, level, timer, instruction;
     private final Table players = new Table();
     private final Label[] statuses = new Label[2];
     private final int[] previousStatus = {-1, -1};
     private final Radiance radiance;
     private int previousLevel = -1, previousSeconds = -1;
+    private int previousMode = -1;
 
     public LevelUpView(UiArt art) {
         setFillParent(true);
@@ -30,7 +31,7 @@ public final class LevelUpView extends Table {
         setVisible(false);
         Table ceremony = new Table();
         ceremony.pad(24);
-        Label title = art.label("LEVEL UP", art.title, UiArt.GOLD);
+        title = art.label("LEVEL UP", art.title, UiArt.GOLD);
         ceremony.add(title).padBottom(8).row();
         Table levelRule = new Table();
         levelRule.add(rule(art)).width(250).height(1);
@@ -55,8 +56,8 @@ public final class LevelUpView extends Table {
         ceremony.add(seal).size(440).padBottom(8).row();
 
         ceremony.add(art.label("CHECK YOUR PHONE", art.heading, UiArt.IVORY)).padBottom(12).row();
-        ceremony.add(art.label("Choose your next power. Combat is paused.", art.body, UiArt.MUTED))
-            .padBottom(24).row();
+        instruction = art.label("", art.body, UiArt.MUTED);
+        ceremony.add(instruction).padBottom(24).row();
         for (int slot = 0; slot < statuses.length; slot++) {
             statuses[slot] = art.label("", art.body, slot == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO);
             statuses[slot].setAlignment(Align.center);
@@ -70,17 +71,25 @@ public final class LevelUpView extends Table {
 
     /** Unchanged frames allocate no strings and do not invalidate layout. */
     public void update(ArenaWorld world) {
-        if (previousLevel != world.progression.level) {
+        boolean loot = !world.levelUpPending() && world.lootPending();
+        int mode = loot ? 1 : 0;
+        if (previousMode != mode || previousLevel != world.progression.level) {
+            previousMode = mode;
             previousLevel = world.progression.level;
-            level.setText("PARTY LEVEL " + previousLevel);
+            title.setText(loot ? "LOOT FOUND" : "LEVEL UP");
+            level.setText(loot ? "EQUIPMENT REWARD" : "PARTY LEVEL " + previousLevel);
+            instruction.setText(loot ? "Choose equipment or keep your current gear. Combat is paused."
+                : "Choose your next power. Combat is paused.");
         }
-        int seconds = Math.max(0, Math.min(30, (int) Math.ceil(world.progression.choiceSecondsLeft())));
+        int seconds = Math.max(0, Math.min(30, (int) Math.ceil(loot
+            ? world.equipment.choiceSecondsLeft() : world.progression.choiceSecondsLeft())));
         if (previousSeconds != seconds) {
             previousSeconds = seconds;
             timer.setText(Integer.toString(seconds));
         }
         for (int slot = 0; slot < statuses.length; slot++) {
-            int status = !world.players[slot].active ? 0 : world.progression.offers[slot].pending ? 2 : 1;
+            boolean pending = loot ? world.equipment.offers[slot].pending : world.progression.offers[slot].pending;
+            int status = !world.players[slot].active ? 0 : pending ? 2 : 1;
             if (previousStatus[slot] == status) continue;
             previousStatus[slot] = status;
             boolean active = status != 0;

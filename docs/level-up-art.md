@@ -1,6 +1,6 @@
 # Level-up ceremony
 
-The TV uses one live party countdown inside an original hollow gold crest, with a large LEVEL UP title, phone instruction and compact player-ready labels. No avatars. A bounded halo, rays and eight motes borrow the existing ambience point; animation stops when the view is hidden. Existing phone cards remain functional, separate UI.
+Skill upgrades and equipment rewards share the TV ceremony: LEVEL UP or LOOT FOUND, one live party countdown inside the same original hollow gold crest, with a large LEVEL UP title, phone instruction and compact player-ready labels. No avatars. A bounded halo, rays and eight motes borrow the existing ambience point; animation stops when the view is hidden. Existing phone cards remain functional, separate UI.
 
 Built-in imagegen created `assets/art/level-up-crest.png` from this prompt:
 

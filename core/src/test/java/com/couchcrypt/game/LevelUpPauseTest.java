@@ -81,11 +81,12 @@ class LevelUpPauseTest {
         assertEquals(ArenaWorld.STEP, world.elapsed, .00001f);
     }
 
-    @Test void gearOnlyChoicesKeepExistingCombatAndTimerBehavior() {
+    @Test void gearOnlyChoicesAlsoPauseCombatWhileTheirClockContinues() {
         ArenaWorld world = solo(); world.equipment.grantReward();
         assertFalse(world.levelUpPending());
+        assertTrue(world.lootPending()); assertTrue(world.choicePending());
         world.update(ArenaWorld.STEP);
-        assertTrue(world.elapsed > 0); assertTrue(world.equipment.offers[0].pending);
+        assertEquals(0, world.elapsed); assertTrue(world.equipment.offers[0].pending);
         assertEquals(30 - ArenaWorld.STEP, world.equipment.offers[0].secondsLeft, .00001f);
     }
 

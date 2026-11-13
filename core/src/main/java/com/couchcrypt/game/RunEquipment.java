@@ -33,11 +33,14 @@ public final class RunEquipment {
     private final boolean[] participants = new boolean[2], moving = new boolean[2];
     private final float[] sustain = new float[2], xpRemainder = new float[2];
     private int earned, nextId, cacheIndex, eliteRewards;
+    private float choiceSecondsLeft;
+    private boolean resolvingTimeout;
     public final Offer[] offers = {new Offer(), new Offer()};
 
     public RunEquipment(ArenaWorld world) { this.world = world; }
     public void reset() {
         earned = cacheIndex = eliteRewards = 0;
+        choiceSecondsLeft = 0; resolvingTimeout = false;
         for (int slot = 0; slot < 2; slot++) clearPlayer(slot);
     }
     private void clearPlayer(int slot) {
@@ -74,9 +77,9 @@ public final class RunEquipment {
         }
         foundationSummary[slot] = summary.toString();
         foundationItems.set(slot, List.copyOf(items));
-        startNext(slot);
+        startNextRound();
     }
-    public void deactivatePlayer(int slot) { if (valid(slot)) clearPlayer(slot); }
+    public void deactivatePlayer(int slot) { if (valid(slot)) { clearPlayer(slot); startNextRound(); } }
     public int rewardsEarned() { return earned; }
     public int appliedCount(int slot) { return valid(slot) ? applied[slot] : 0; }
     public boolean catchingUp(int slot) { return valid(slot) && participants[slot] && applied[slot] < catchUpTarget[slot]; }
@@ -93,47 +96,74 @@ public final class RunEquipment {
     public void grantReward() {
         if (earned >= MAX_REWARDS) return;
         earned++;
-        for (int slot = 0; slot < 2; slot++) startNext(slot);
+        startNextRound();
     }
     public void rewardElite() { if (eliteRewards < 5) { eliteRewards++; grantReward(); } }
     public void update(float delta) {
-        if (!Float.isFinite(delta) || delta <= 0) return;
+        if (!Float.isFinite(delta) || delta <= 0 || world.levelUpPending()) return;
         float duration = world.durationSeconds();
         while (cacheIndex < 3 && world.elapsed >= duration * (cacheIndex == 0 ? .075f : cacheIndex == 1 ? .5f : .95f)) {
             cacheIndex++; grantReward();
         }
-        for (int slot = 0; slot < 2; slot++) {
+        for (int slot = 0; slot < 2; slot++)
             sustain[slot] = Math.min(2f, sustain[slot] + delta * 2f);
+        updateChoices(delta);
+    }
+
+    /** Choice-only pause clock. Zero prepares deferred offers without advancing combat or choice time. */
+    public void updateChoices(float delta) {
+        if (!Float.isFinite(delta) || delta < 0 || world.levelUpPending()) return;
+        startNextRound();
+        if (!hasPendingOffers()) return;
+        for (int slot = 0; slot < 2; slot++) {
             Offer offer = offers[slot];
-            if (!offer.pending) startNext(slot);
-            if (!offer.pending || world.progression.offers[slot].pending) continue;
-            if (previewSkillCount[slot] != world.progression.appliedUpgradeCount(slot)) refreshOffer(slot);
-            if (!offer.pending) continue;
-            offer.secondsLeft = Math.max(0, offer.secondsLeft - delta);
-            if (offer.secondsLeft <= .0001f) choose(slot, offer.id, 0);
+            if (offer.pending && previewSkillCount[slot] != world.progression.appliedUpgradeCount(slot)) refreshOffer(slot);
+        }
+        choiceSecondsLeft = Math.max(0, choiceSecondsLeft - delta);
+        for (Offer offer : offers) if (offer.pending) offer.secondsLeft = choiceSecondsLeft;
+        if (choiceSecondsLeft <= .0001f) {
+            resolvingTimeout = true;
+            for (int slot = 0; slot < 2; slot++) if (offers[slot].pending) {
+                // A refresh changes offer identity. Default the refreshed first option in this same round.
+                if (!choose(slot, offers[slot].id, 0) && offers[slot].pending)
+                    choose(slot, offers[slot].id, 0);
+            }
+            resolvingTimeout = false;
+            startNextRound();
         }
     }
+    public float choiceSecondsLeft() { return choiceSecondsLeft; }
     public boolean choosing(int slot) { return world.progression.offers[slot].pending || offers[slot].pending; }
     public boolean choose(int slot, int id, int option) {
-        if (!valid(slot) || !participants[slot] || !world.players[slot].active || world.progression.offers[slot].pending) return false;
+        if (!valid(slot) || !participants[slot] || !world.players[slot].active || world.levelUpPending()) return false;
         Offer offer = offers[slot];
         if (!offer.pending || offer.id != id || option < -1 || option >= 3) return false;
         if (option >= 0 && refreshOffer(slot)) return false;
         if (option >= 0) equip(slot, offer.targets[option], offer.options[option]);
         applied[slot]++; offer.pending = false; offer.secondsLeft = 0;
-        startNext(slot); return true;
+        startNextRound(); return true;
     }
     /** A level choice can cap an item hidden behind it. Refresh once after skill changes, not every tick. */
     private boolean refreshOffer(int slot) {
         previewSkillCount[slot] = world.progression.appliedUpgradeCount(slot);
         Offer offer = offers[slot];
         for (ItemCatalog.Item item : offer.options) if (!eligible(slot, item)) {
-            float remaining = offer.secondsLeft;
             offer.pending = false; startNext(slot);
-            offer.secondsLeft = remaining;
+            offer.secondsLeft = choiceSecondsLeft;
             return true;
         }
         return false;
+    }
+    private boolean hasPendingOffers() {
+        for (Offer offer : offers) if (offer.pending) return true;
+        return false;
+    }
+    private void startNextRound() {
+        if (resolvingTimeout || hasPendingOffers()) return;
+        choiceSecondsLeft = 0;
+        if (world.levelUpPending()) return;
+        for (int slot = 0; slot < 2; slot++) startNext(slot);
+        if (hasPendingOffers()) choiceSecondsLeft = CHOICE_SECONDS;
     }
     private void startNext(int slot) {
         Offer offer = offers[slot];

@@ -44,7 +44,8 @@ class FastLateJoinIntegrationTest {
         for (ArenaWorld.Hero hero : ArenaWorld.Hero.values()) {
             ArenaWorld world = party(hero, PartyProgression.MAX_LEVEL, RunEquipment.MAX_REWARDS);
             world.activatePlayer(1);
-            chooseAllHostSkills(world); // Another participant's pending level-up pauses the whole party.
+            chooseAllHostSkills(world); // Another participant's pending choices pause the whole party.
+            chooseAllHostGear(world);
             var player = world.players[1]; float start = player.x;
             world.setInput(1, 1, 0, true);
             world.update(ArenaWorld.STEP);
@@ -56,19 +57,23 @@ class FastLateJoinIntegrationTest {
     @Test void futureRewardsOfferNormalPersonalChoicesWithAccuratePreviewsAndRestoreControls() {
         ArenaWorld world = party(ArenaWorld.Hero.RANGER, 10, 4); world.activatePlayer(1);
         chooseAllHostSkills(world);
+        chooseAllHostGear(world);
         var skills = world.progression; var gear = world.equipment;
         var foundation = skills.foundationSkills(1); var items = gear.foundationItems(1);
         skills.addXp(skills.xpToNext - skills.xp); gear.grantReward();
-        assertTrue(skills.offers[1].pending); assertTrue(gear.offers[1].pending);
-        assertFalse(skills.offers[1].catchUp); assertFalse(gear.offers[1].catchUp);
-        assertEquals(30, skills.offers[1].durationSeconds); assertEquals(30, gear.offers[1].durationSeconds);
+        assertTrue(skills.offers[1].pending); assertFalse(gear.offers[1].pending);
+        assertFalse(skills.offers[1].catchUp);
+        assertEquals(30, skills.offers[1].durationSeconds);
         for (int i = 0; i < 3; i++)
             assertEquals(skills.preview(1, skills.offers[1].options[i]), skills.offers[1].cards[i]);
         gear.update(3);
-        assertEquals(30, gear.offers[1].secondsLeft, "Hidden gear timer freezes behind a normal skill choice");
+        assertEquals(0, gear.choiceSecondsLeft(), "Queued loot must not start behind a normal skill choice");
         assertTrue(skills.choose(1, skills.offers[1].id, 1));
         chooseAllHostSkills(world);
+        chooseAllHostGear(world);
         gear.update(ArenaWorld.STEP);
+        assertTrue(gear.offers[1].pending); assertFalse(gear.offers[1].catchUp);
+        assertEquals(30, gear.offers[1].durationSeconds);
         assertTrue(gear.choose(1, gear.offers[1].id, -1));
         assertEquals(10, skills.appliedUpgradeCount(1)); assertEquals(5, gear.appliedCount(1));
         assertSame(foundation, skills.foundationSkills(1)); assertSame(items, gear.foundationItems(1));
@@ -81,6 +86,7 @@ class FastLateJoinIntegrationTest {
     @Test void tokenReconnectKeepsGenerationAndRestoresExistingPersonalChoicesWithoutGrantingAgain() {
         ArenaWorld world = party(ArenaWorld.Hero.RANGER, 10, 4); world.activatePlayer(1);
         chooseAllHostSkills(world);
+        chooseAllHostGear(world);
         var state = new LobbyState();
         state.join(null, "first", 1); var joined = state.join(null, "second", 2);
         state.setPhase(LobbyState.Phase.SESSION);
@@ -89,6 +95,7 @@ class FastLateJoinIntegrationTest {
         skills.addXp(skills.xpToNext - skills.xp); gear.grantReward();
         assertTrue(skills.choose(1, skills.offers[1].id, 2));
         chooseAllHostSkills(world);
+        chooseAllHostGear(world);
         gear.update(4);
         int gearId = gear.offers[1].id; float gearSeconds = gear.offers[1].secondsLeft;
         skills.addXp(skills.xpToNext - skills.xp); skills.update(5);
@@ -120,15 +127,17 @@ class FastLateJoinIntegrationTest {
     @Test void removingThenRejoiningBuildsFreshDefaultsAndRejectsOldChoicesAcrossReset() {
         ArenaWorld world = party(ArenaWorld.Hero.WARDEN, 5, 2); world.activatePlayer(1);
         chooseAllHostSkills(world);
+        chooseAllHostGear(world);
         var skills = world.progression; var gear = world.equipment;
-        skills.addXp(skills.xpToNext - skills.xp); gear.grantReward();
+        gear.grantReward(); skills.addXp(skills.xpToNext - skills.xp);
         int staleSkill = skills.offers[1].id, staleGear = gear.offers[1].id;
         world.deactivatePlayer(1); world.activatePlayer(1);
         assertEquals(5, skills.foundationCount(1)); assertEquals(3, gear.foundationCount(1));
         assertFalse(gear.choosing(1));
         assertFalse(skills.choose(1, staleSkill, 0)); assertFalse(gear.choose(1, staleGear, 0));
         chooseAllHostSkills(world);
-        skills.addXp(skills.xpToNext - skills.xp); gear.grantReward();
+        chooseAllHostGear(world);
+        gear.grantReward(); skills.addXp(skills.xpToNext - skills.xp);
         assertTrue(skills.offers[1].id > staleSkill); assertTrue(gear.offers[1].id > staleGear);
         assertFalse(skills.choose(1, staleSkill, 0));
         assertTrue(skills.choose(1, skills.offers[1].id, 0));
@@ -136,7 +145,7 @@ class FastLateJoinIntegrationTest {
         world.reset(); world.activatePlayer(0); world.activatePlayer(1);
         assertEquals(0, skills.foundationCount(1)); assertEquals(0, gear.foundationCount(1));
         assertFalse(gear.choosing(1)); assertTrue(skills.foundationSkills(1).isEmpty()); assertTrue(gear.foundationItems(1).isEmpty());
-        skills.addXp(skills.xpToNext); gear.grantReward();
+        gear.grantReward(); skills.addXp(skills.xpToNext);
         assertTrue(skills.offers[1].id > staleSkill); assertTrue(gear.offers[1].id > staleGear);
         assertFalse(skills.choose(1, staleSkill, 0));
     }
@@ -148,6 +157,12 @@ class FastLateJoinIntegrationTest {
             world.progression.addXp(world.progression.xpToNext - world.progression.xp);
         for (int i = 0; i < rewards; i++) world.equipment.grantReward();
         return world;
+    }
+
+    private static void chooseAllHostGear(ArenaWorld world) {
+        world.equipment.updateChoices(0);
+        while (world.equipment.offers[0].pending)
+            assertTrue(world.equipment.choose(0, world.equipment.offers[0].id, -1));
     }
 
     private static void chooseAllHostSkills(ArenaWorld world) {

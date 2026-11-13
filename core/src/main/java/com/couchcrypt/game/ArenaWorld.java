@@ -147,6 +147,14 @@ public final class ArenaWorld {
         return false;
     }
 
+    public boolean lootPending() {
+        for (int slot = 0; slot < players.length; slot++)
+            if (players[slot].active && equipment.offers[slot].pending) return true;
+        return false;
+    }
+
+    public boolean choicePending() { return levelUpPending() || lootPending(); }
+
     public float durationSeconds() { return timeline.durationSeconds(); }
     public int waveCount() { return timeline.phaseCount(); }
     public float timeRemaining() { return Math.max(0, durationSeconds() - elapsed); }
@@ -155,6 +163,13 @@ public final class ArenaWorld {
         if (levelUpPending()) {
             clearInputs();
             progression.update(STEP);
+            return;
+        }
+        // A completed skill round can release queued loot; prepare it before advancing combat.
+        equipment.updateChoices(0);
+        if (lootPending()) {
+            clearInputs();
+            equipment.updateChoices(STEP);
             return;
         }
         // Preserve direct boundary/fixture jumps while avoiding float accumulation drift over twenty minutes.

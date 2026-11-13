@@ -53,12 +53,16 @@
     keepEquipment.hidden = true;
     if (wasVisible) releaseControls();
   }
+  function choicePhaseActive() {
+    return phase === 'session' || phase === 'level_up' && choiceKind === 'upgrade'
+      || phase === 'loot' && choiceKind === 'equipment';
+  }
   function canChooseUpgrade() {
-    return joined && (phase === 'session' || phase === 'level_up' && choiceKind === 'upgrade') && hostActive && foreground && !document.hidden && socket?.readyState === WebSocket.OPEN;
+    return joined && choicePhaseActive() && hostActive && foreground && !document.hidden && socket?.readyState === WebSocket.OPEN;
   }
   function remainingUpgradeSeconds() {
     // Interpolation is display-only. Only the host resolves expiry or applies an upgrade.
-    const elapsed = (phase === 'session' || phase === 'level_up' && choiceKind === 'upgrade') && hostActive ? (performance.now() - upgradeSampleTime) / 1000 : 0;
+    const elapsed = choicePhaseActive() && hostActive ? (performance.now() - upgradeSampleTime) / 1000 : 0;
     return Math.max(0, upgradeSeconds - elapsed);
   }
   function paintUpgrade() {
@@ -71,11 +75,11 @@
     const seconds = Math.ceil(remaining);
     upgradeSecondsLabel.textContent = String(seconds);
     upgradeTimerLabel.textContent = upgradeSelected >= 0 ? 'Applying choice…'
-      : !hostActive || !['session', 'level_up'].includes(phase) ? 'Paused'
+      : !hostActive || !choicePhaseActive() ? 'Paused'
       : remaining <= 0 ? 'Applying auto-pick…' : 'Seconds to choose';
     upgradeCountdown.setAttribute('aria-label', `${seconds} seconds. ${upgradeTimerLabel.textContent}`);
     upgradeChoices.style.setProperty('--choice-progress', `${remaining / upgradeDuration * 100}%`);
-    document.body.classList.toggle('choice-urgent', seconds <= Math.min(10, upgradeDuration / 3) && hostActive && ['session', 'level_up'].includes(phase));
+    document.body.classList.toggle('choice-urgent', seconds <= Math.min(10, upgradeDuration / 3) && hostActive && choicePhaseActive());
     const disabled = !canChooseUpgrade() || remaining <= 0 || upgradeSelected >= 0;
     upgradeButtons.forEach((button, index) => {
       button.disabled = disabled;
@@ -123,7 +127,7 @@
   function setUpgradeOffer(progression, equipment) {
     const kind = progression?.upgrade ? 'upgrade' : 'equipment';
     const next = kind === 'upgrade' ? progression.upgrade : phase === 'level_up' ? null : equipment;
-    if (!joined || !['session', 'level_up', 'paused', 'invite'].includes(phase) || !next
+    if (!joined || !['session', 'level_up', 'loot', 'paused', 'invite'].includes(phase) || !next
       || !Number.isSafeInteger(next.id) || next.id <= 0 || !Number.isFinite(next.secondsLeft)
       || !Array.isArray(next.options) || next.options.length !== 3
       || !next.options.every((option) => typeof option?.title === 'string' && typeof option.description === 'string')) {
@@ -135,7 +139,7 @@
       upgradeButtons.forEach((button, index) => paintSkillCard(button, next.options[index], kind === 'equipment'));
       upgradeChoices.hidden = false; document.body.classList.add('has-upgrade');
       upgradeChoices.querySelector('.upgrade-options').scrollTop = 0;
-      // Both personal choice views release movement; skill selection also pauses combat on the host.
+      // Both personal choice views release movement while the host pauses combat.
       releaseControls();
     }
     upgradeChoices.querySelector('.upgrade-kicker').textContent = kind === 'equipment' ? 'CHOOSE YOUR EQUIPMENT' : 'CHOOSE YOUR POWER';
@@ -163,7 +167,7 @@
     const wasSession = phase === 'session' && hostActive;
     phase = data.phase; hostActive = data.hostActive; alive = data.alive !== false;
     const activeSession = phase === 'session' && hostActive;
-    title.textContent = data.phase === 'level_up' ? 'Level up' : data.phase === 'paused' || data.phase === 'invite' ? 'Paused' : data.phase === 'results' ? 'Round complete' : 'You have a place';
+    title.textContent = data.phase === 'level_up' ? 'Level up' : data.phase === 'loot' ? 'Loot found' : data.phase === 'paused' || data.phase === 'invite' ? 'Paused' : data.phase === 'results' ? 'Round complete' : 'You have a place';
     if (wasSession !== activeSession) releaseControls();
     setUpgradeOffer(data.progression, data.equipment);
     const granted = data.starterBuild;
@@ -287,16 +291,17 @@
         heartbeat = setInterval(() => { if (current.readyState === WebSocket.OPEN) current.send('{"type":"ping"}'); }, 2000);
       } else if (data.type === 'status') {
         setControlScreen(data);
-        party.textContent = data.phase === 'level_up' ? 'Waiting for your companion' : data.connected === 2 ? 'Both souls are here' : data.phase === 'invite' ? 'Waiting for your companion' : 'Ready for a solo descent';
+        party.textContent = ['level_up', 'loot'].includes(data.phase) ? 'Waiting for your companion' : data.connected === 2 ? 'Both souls are here' : data.phase === 'invite' ? 'Waiting for your companion' : 'Ready for a solo descent';
         const descriptions = {
           lobby: 'Connected. Your host can start solo or gather a companion.',
           session: '',
           level_up: data.progression?.upgrade ? 'Combat is paused. Choose your upgrade below.' : 'Combat is paused. Your choice is complete.',
+          loot: data.equipment ? 'Combat is paused. Choose your equipment below.' : 'Combat is paused. Your choice is complete.',
           results: 'Look at the TV.',
           paused: 'Look at the TV.',
           invite: 'Look at the TV.'
         };
-        connected.querySelector('.hint').textContent = data.phase === 'level_up'
+        connected.querySelector('.hint').textContent = ['level_up', 'loot'].includes(data.phase)
           ? 'The game resumes automatically when everyone has chosen. Check the TV for the countdown.'
           : 'The TV remote controls shared menus. Your phone controls your character during play.';
         message.textContent = data.hostActive ? (descriptions[data.phase] ?? descriptions.lobby) : 'The host has stepped away. Stay here to keep your place.';
