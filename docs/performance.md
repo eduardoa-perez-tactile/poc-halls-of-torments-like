@@ -112,3 +112,24 @@ Two separate seven-second `late-coop` captures used the same API-33 Android 13 A
 CPU percentiles were lower in this sample; interval tails were worse. These short startup-adjacent emulator observations do not establish a statistically reliable speedup, isolate the remaining stall, prove long-run memory stability, or certify physical-TV 60 FPS. An earlier twelve-second boss baseline had a 57.30 ms interval / 56.36 ms submission maximum with no established cause. Its concurrent GC pause was only tens of microseconds and does not explain that stall. No speculative simulation or HUD refactor was made to attribute it. The texture total remains 26.81 MiB in-session; the previously accounted worst active-outcome total remains 31.87 MiB under the unchanged 32 MiB budget. Process PSS includes native, Java, shared and driver memory and is separate from texture/mesh accounting.
 
 Raw before/after logs and memory snapshots are ignored under `.run/performance-late-coop-before.*` and `.run/performance-late-coop.*`. Synthetic controllers and temporary trace/log processes were stopped, the device trace file removed, and the app returned to an empty lobby. The existing emulator, relay and ADB forward remain running for handoff. No attached physical phone was touched.
+
+## Shared layered menu crypt (2026-11-13)
+
+This menu-art milestone supersedes the earlier separate Home/outcome environment residency above. It retains the twenty-minute gameplay changes and does not repeat combat performance testing.
+
+MenuSceneArt bakes a 1536×864 base (5.0625 MiB) and a 512×1024 guardian/orb atlas (2 MiB) once at startup. Two source-canvas-aligned guardian regions and one shared orb region are reused by all menu screens. Only the two orb alpha/tint values change each frame; there are no frame-loop pixel scans, allocations, image uploads, particles, fog or framebuffer effects. Small managed pixmaps are retained for Android restoration; full-resolution decoded sources are freed. Phone backdrop encoding composites these layers to 640×360 once, and frees that temporary pixmap after PNG encoding.
+
+The current screen flow no longer creates the outcome loader or uploads Victory/Defeat backgrounds. Existing outcome titles and live controls remain. The earlier paintings and loader code/tests remain historical sources, not active menu background resources.
+
+Verified with JDK 21: `:core:compileJava :desktop:classes :android:assembleDebug`. A brief check on the existing Television_1080p Android 33 ARM64 emulator visually inspected Home, Lobby/QR, both profiling-only result previews, Run Details and return to Lobby. Two short-lived synthetic controller connections enabled the preview path; no combat playthrough was performed. The served phone PNG was fetched and visually checked as 640×360 with both orbs and guardians. No fatal Android runtime error appeared in the captured process log.
+
+| Accounted resource | Home without QR | Lobby/results/details with QR |
+| --- | --- | --- |
+| GPU texture bytes | 29,691,092 (28.32 MiB) | 30,209,492 (28.81 MiB) |
+| Retained CPU pixmap bytes | 22,872,652 (21.81 MiB) | 23,391,052 (22.31 MiB) |
+
+The same GPU total was observed in Lobby, Victory/Defeat, Run Details and return transitions; results allocate no additional scene texture. This is about 3.19 MiB below the 32 MiB combined budget. Compared with the previous accounting, in-session residency rises by 2 MiB for the reusable layer atlas, while active-outcome residency falls by about 3.06 MiB because no separate 5.0625 MiB outcome scene is loaded. One later fresh-Home process snapshot reported 75,678 KiB total PSS; it is not a leak or long-run stability test.
+
+One available settled Home window contained 301 frames: interval p95/p99/max 20.27/21.43/23.17 ms, CPU submission p95/p99/max 3.35/4.11/14.29 ms, with 144 intervals over 16.7 ms. The short mixed results window, which includes layout/fixture transitions and screenshot activity, reached 154.64 ms interval / 103.10 ms CPU submission. That observation does not isolate its cause or prove a transition speedup. The strict 16.7 ms target remains unverified and was exceeded in this emulator capture; physical-TV performance remains untested.
+
+Local evidence remains ignored under `.run/menu-layered-*.png`, `.run/menu-layered.log` and `.run/menu-layered-memory.txt`. Synthetic controllers were closed; the app was freshly restarted to Home without profiling. The existing emulator, relay and ADB forward remain running for the user. No physical device was modified.

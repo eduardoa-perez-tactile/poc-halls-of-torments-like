@@ -1,5 +1,7 @@
 # Approved home-menu artwork
 
+The original environment below is superseded at runtime by the [shared layered crypt](layered-menu-art.md), approved 2026-11-13. The logo, normal/focused buttons and panel revision remain unchanged.
+
 The user approved the centered Couch Crypt main-menu direction on 2026-11-12. These are original runtime components derived from that approved concept: a clean environment, a separate transparent wordmark, and one blank resizable stone button. The concept's buttons and labels are not flattened into the environment.
 
 Created on 2026-11-12 with the built-in image-generation tool. No CLI/API fallback was used. The approved concept was supplied as the visual reference in each of three independent calls. Existing lobby/launcher artwork was not overwritten.

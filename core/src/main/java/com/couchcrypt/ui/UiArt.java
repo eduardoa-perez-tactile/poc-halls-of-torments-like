@@ -31,7 +31,8 @@ public final class UiArt implements Disposable {
     public static final Color BUTTON_INK = Color.valueOf("1d1710");
     public static final Color BUTTON_DISABLED_INK = Color.valueOf("554b3e");
     public final Texture heroes = load("art/adventurers.png");
-    public final Texture homeBackdrop, homeLogo;
+    public final Texture homeLogo;
+    public final MenuSceneArt menuScene;
     public final TextureRegion knight = new TextureRegion(heroes, 0, 0, heroes.getWidth() / 2, heroes.getHeight());
     public final TextureRegion ranger = new TextureRegion(heroes, heroes.getWidth() / 2, 0, heroes.getWidth() / 2, heroes.getHeight());
     public final BitmapFont title, heading, section, body, small;
@@ -83,7 +84,7 @@ public final class UiArt implements Disposable {
         focused.disabled = disabledPanel;
         cardNormal = new Button.ButtonStyle(panel, focusPanel, panel);
         cardFocused = new Button.ButtonStyle(focusPanel, focusPanel, focusPanel);
-        homeBackdrop = baked("art/home-background.png", null, 1536, 864, false);
+        menuScene = new MenuSceneArt();
         homeLogo = baked("art/home-logo.png", null, 1536, 384, true);
         NinePatchDrawable homePlate = patch(buttonTexture, 144, 64, 72, 32);
         NinePatchDrawable homeFocus = patch(focusedButtonTexture, 144, 64, 72, 32);
@@ -93,10 +94,10 @@ public final class UiArt implements Disposable {
         NinePatchDrawable exitFocus = patch(focusedButtonTexture, 144, 64, 48, 20);
         exitNormal = new Button.ButtonStyle(exitPlate, exitFocus, exitPlate);
         exitFocused = new Button.ButtonStyle(exitFocus, exitFocus, exitFocus);
-        long bytes = (long) heroes.getWidth() * heroes.getHeight() * 4;
+        long bytes = (long) heroes.getWidth() * heroes.getHeight() * 4 + menuScene.textureBytes;
         for (Texture texture : generated) bytes += (long) texture.getWidth() * texture.getHeight() * 4;
         textureBytes = bytes;
-        long retained = 0;
+        long retained = menuScene.retainedPixmapBytes;
         for (Pixmap image : generatedPixmaps) retained += (long) image.getWidth() * image.getHeight() * 4;
         for (PixmapPacker.Page page : fontPacker.getPages()) {
             Pixmap image = page.getPixmap();
@@ -177,7 +178,11 @@ public final class UiArt implements Disposable {
     public byte[] controllerPanel() { return png(panelTexture, 512, 512); }
     public byte[] controllerButton(boolean selected) { return png(selected ? focusedButtonTexture : buttonTexture, 1024, 224); }
     public byte[] controllerLogo() { return png(homeLogo, 512, 128); }
-    public byte[] controllerBackdrop() { return png(homeBackdrop, 640, 360); }
+    public byte[] controllerBackdrop() {
+        Pixmap composed = menuScene.controllerPixmap();
+        try { return png(composed); }
+        finally { composed.dispose(); }
+    }
     private byte[] png(Texture texture, int width, int height) {
         Pixmap source = texture.getTextureData().consumePixmap();
         Pixmap outputImage = source;
@@ -187,23 +192,27 @@ public final class UiArt implements Disposable {
             outputImage.setFilter(Pixmap.Filter.BiLinear);
             outputImage.drawPixmap(source, 0, 0, source.getWidth(), source.getHeight(), 0, 0, width, height);
         }
+        try { return png(outputImage); }
+        finally { if (outputImage != source) outputImage.dispose(); }
+    }
+    private byte[] png(Pixmap image) {
         PixmapIO.PNG encoder = new PixmapIO.PNG(128 * 1024);
         encoder.setFlipY(false); encoder.setCompression(4);
         try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-            encoder.write(bytes, outputImage);
+            encoder.write(bytes, image);
             return bytes.toByteArray();
         } catch (IOException failure) {
             throw new GdxRuntimeException("Cannot encode controller artwork", failure);
         } finally {
             encoder.dispose();
-            if (outputImage != source) outputImage.dispose();
         }
     }
     public Label label(String text, BitmapFont font, Color color) { return new Label(text, new Label.LabelStyle(font, color)); }
     @Override public void dispose() {
         title.dispose(); heading.dispose(); section.dispose(); body.dispose(); small.dispose();
         heroes.dispose();
+        menuScene.dispose();
         for (Texture texture : generated) texture.dispose();
         fontPacker.dispose();
         for (Pixmap pixmap : generatedPixmaps) pixmap.dispose();

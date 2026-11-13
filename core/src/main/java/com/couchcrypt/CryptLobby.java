@@ -19,6 +19,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.Button;
 import com.badlogic.gdx.scenes.scene2d.utils.BaseDrawable;
+import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.ScreenUtils;
@@ -38,6 +39,7 @@ import com.couchcrypt.lobby.LobbyState;
 import com.couchcrypt.ui.RemoteButton;
 import com.couchcrypt.ui.UiArt;
 import com.couchcrypt.ui.OutcomeArt;
+import com.couchcrypt.ui.MenuSceneArt;
 import com.couchcrypt.ui.BuildIcons;
 import com.couchcrypt.ui.RunDetailsView;
 import com.couchcrypt.ui.CharacterInfoView;
@@ -59,7 +61,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private Stage stage;
     private UiArt art;
     private Image background, shade;
-    private TextureRegionDrawable homeBackground, partyBackground;
+    private Drawable homeBackground, partyBackground;
     private JoinServer server;
     private Table content, overlay;
     private final List<RemoteButton> buttons = new ArrayList<>();
@@ -78,11 +80,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private HudArt hudArt;
     private ArenaRenderer arena;
     private GameAudio audio;
-    private OutcomeArt outcomeArt;
     private OutcomeArt.Titles outcomeTitles;
-    private OutcomeArt.Loader outcomeLoader;
-    private long outcomeRequest;
-    private boolean requestedVictory;
     private BuildIcons buildIcons;
     private boolean resultDetails;
     private RemoteButton resultDetailsLink;
@@ -119,7 +117,6 @@ public final class CryptLobby extends ApplicationAdapter {
         art = new UiArt();
         gameArt = new GameArt();
         outcomeTitles = new OutcomeArt.Titles();
-        outcomeLoader = new OutcomeArt.Loader();
         buildIcons = new BuildIcons();
         hudArt = new HudArt();
         arena = new ArenaRenderer(gameArt, art, buildIcons, hudArt);
@@ -127,7 +124,7 @@ public final class CryptLobby extends ApplicationAdapter {
         if (residentArtBytes() > 32L * 1_048_576)
             throw new IllegalStateException("Combined art exceeds 32 MiB texture budget");
         Gdx.app.log("GameArt", "Combined resident textures: " + residentArtBytes() / 1_048_576f + " MiB");
-        homeBackground = new TextureRegionDrawable(art.homeBackdrop);
+        homeBackground = art.menuScene;
         partyBackground = homeBackground;
         background = new Image(partyBackground);
         background.setBounds(0, 0, 1920, 1080); stage.addActor(background);
@@ -175,10 +172,8 @@ public final class CryptLobby extends ApplicationAdapter {
         resultDetailsLink = null;
         if (next != Screen.RESULTS) {
             resultDetails = false;
-            if (outcomeLoader != null) outcomeLoader.cancel();
-            outcomeRequest = 0;
+            art.menuScene.setMood(MenuSceneArt.Mood.NEUTRAL);
             background.setDrawable(homeBackground);
-            if (outcomeArt != null) { outcomeArt.dispose(); outcomeArt = null; }
         }
         background.setDrawable(next == Screen.HOME ? homeBackground : partyBackground);
         boolean gameView = next == Screen.SESSION || next == Screen.RESULTS;
@@ -531,36 +526,10 @@ public final class CryptLobby extends ApplicationAdapter {
 
     private void prepareResults() {
         boolean victory = world.outcome == ArenaWorld.Outcome.VICTORY;
-        if (outcomeArt != null && outcomeArt.victory != victory) {
-            outcomeArt.dispose(); outcomeArt = null;
-        }
-        if (outcomeArt == null && (outcomeRequest == 0 || requestedVictory != victory)) {
-            requestedVictory = victory;
-            outcomeRequest = outcomeLoader.request(victory);
-        }
+        art.menuScene.setMood(victory ? MenuSceneArt.Mood.VICTORY : MenuSceneArt.Mood.DEFEAT);
         state.setPhase(LobbyState.Phase.RESULTS);
-        background.setDrawable(outcomeArt == null ? homeBackground : new TextureRegionDrawable(outcomeArt.backdrop));
+        background.setDrawable(homeBackground);
         background.setVisible(true); shade.setVisible(false);
-    }
-
-    private void pollOutcomeArt() {
-        if (screen != Screen.RESULTS || outcomeRequest == 0) return;
-        try {
-            OutcomeArt ready = outcomeLoader.poll(outcomeRequest, outcomeTitles);
-            if (ready == null) return;
-            outcomeRequest = 0;
-            outcomeArt = ready;
-            long bytes = residentArtBytes();
-            if (bytes > 32L * 1_048_576) {
-                outcomeArt.dispose(); outcomeArt = null;
-                throw new IllegalStateException("Outcome art exceeds combined texture budget");
-            }
-            background.setDrawable(new TextureRegionDrawable(outcomeArt.backdrop));
-            Gdx.app.log("OutcomeArt", "Combined GPU textures: " + bytes / 1_048_576f + " MiB (includes QR)");
-        } catch (RuntimeException failure) {
-            outcomeRequest = 0;
-            Gdx.app.error("OutcomeArt", "Could not prepare outcome scene; keeping the existing backdrop", failure);
-        }
     }
 
     private void showResults() {
@@ -626,16 +595,14 @@ public final class CryptLobby extends ApplicationAdapter {
 
     private long residentArtBytes() {
         return art.textureBytes + gameArt.textureBytes + (hudArt == null ? 0 : hudArt.textureBytes) + (outcomeTitles == null ? 0 : outcomeTitles.textureBytes)
-            + (outcomeArt == null ? 0 : outcomeArt.textureBytes) + (buildIcons == null ? 0 : buildIcons.textureBytes)
+            + (buildIcons == null ? 0 : buildIcons.textureBytes)
             + (qr == null ? 0 : (long) qr.getWidth() * qr.getHeight() * 4);
     }
 
     private long residentPixmapBytes() {
         return art.retainedPixmapBytes + gameArt.retainedPixmapBytes
             + (hudArt == null ? 0 : hudArt.retainedPixmapBytes)
-            + (outcomeLoader == null ? 0 : outcomeLoader.preparedPixmapBytes())
             + (outcomeTitles == null ? 0 : outcomeTitles.retainedPixmapBytes)
-            + (outcomeArt == null ? 0 : outcomeArt.retainedPixmapBytes)
             + (buildIcons == null ? 0 : buildIcons.retainedPixmapBytes)
             + (qrPixels == null ? 0 : (long) qrPixels.getWidth() * qrPixels.getHeight() * 4);
     }
@@ -1010,7 +977,7 @@ public final class CryptLobby extends ApplicationAdapter {
                 if (config.profile()) Gdx.app.log("LobbyPerf", stats);
             }
         }
-        pollOutcomeArt();
+        if (hostActive && background.isVisible()) art.menuScene.advance(delta);
         ScreenUtils.clear(0.025f, 0.035f, 0.04f, 1);
         if (screen == Screen.SESSION) arena.render(world, hudState, delta, true);
         stage.getViewport().apply(); stage.act(delta); stage.draw();
@@ -1033,8 +1000,6 @@ public final class CryptLobby extends ApplicationAdapter {
         if (server != null) server.stop();
         disposeQr();
         stage.dispose(); arena.dispose(); audio.dispose();
-        if (outcomeLoader != null) outcomeLoader.dispose();
-        if (outcomeArt != null) outcomeArt.dispose();
         if (buildIcons != null) buildIcons.dispose();
         if (outcomeTitles != null) outcomeTitles.dispose();
         if (hudArt != null) hudArt.dispose();
