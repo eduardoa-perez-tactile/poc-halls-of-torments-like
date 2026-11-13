@@ -35,7 +35,7 @@ public final class MenuSceneArt extends BaseDrawable implements Disposable {
         Pixmap room = null, sheet = null, light = null, roomSmall = null, packed = null;
         Texture roomTexture = null, packedTexture = null;
         try {
-            room = new Pixmap(Gdx.files.internal("art/menu-crypt-base.png"));
+            room = new Pixmap(Gdx.files.internal("art/menu-crypt-base-v2.png"));
             roomSmall = new Pixmap(WIDTH, HEIGHT, Pixmap.Format.RGBA8888);
             roomSmall.setBlending(Pixmap.Blending.None);
             roomSmall.setFilter(Pixmap.Filter.BiLinear);
@@ -45,7 +45,7 @@ public final class MenuSceneArt extends BaseDrawable implements Disposable {
             packed = new Pixmap(ATLAS_WIDTH, ATLAS_HEIGHT, Pixmap.Format.RGBA8888);
             packed.setBlending(Pixmap.Blending.None);
             packed.setFilter(Pixmap.Filter.BiLinear);
-            sheet = new Pixmap(Gdx.files.internal("art/menu-crypt-guardians.png"));
+            sheet = new Pixmap(Gdx.files.internal("art/menu-crypt-guardians-v2.png"));
             left = pack(sheet, packed, 0, sheet.getWidth() / 2, 2, 2, 252, 764, 64);
             right = pack(sheet, packed, sheet.getWidth() / 2, sheet.getWidth(), 258, 2, 252, 764, 64);
             sheet.dispose(); sheet = null;
