@@ -177,5 +177,17 @@ class LobbyStateTest {
         state.publishProgression(0, 2, 3, 8, 30, 2, 100, choices);
         assertEquals(30, state.progressionFeedback(0).upgrade().secondsLeft());
     }
+    @Test void publishedCardsCopyArrayEntriesAndDoNotExposeMutableOfferArrays() {
+        var world = new com.couchcrypt.game.ArenaWorld(); world.activatePlayer(0); world.progression.addXp(6);
+        var offer = world.progression.offers[0];
+        var state = new LobbyState(); state.join(null, "phone", 1);
+        var expected = offer.cards[0]; var option = offer.options[0];
+        state.publishProgression(0, 2, 0, 10, offer.id, 2, 30, offer.options, offer.cards);
+        offer.cards[0] = null; offer.options[0] = PartyProgression.Upgrade.CRITICAL;
+        var published = state.progressionFeedback(0).upgrade();
+        assertSame(expected, published.firstCard()); assertEquals(option, published.first());
+        state.publishProgression(0, 2, 0, 10, 0, 0, 0, null, null);
+        assertNull(state.progressionFeedback(0).upgrade());
+    }
 
 }

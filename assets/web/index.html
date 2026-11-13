@@ -22,11 +22,12 @@
     </section>
     <section id="game-controls" class="card" aria-label="Character controls" hidden>
       <section id="upgrade-choices" aria-labelledby="upgrade-level" hidden>
-        <div class="upgrade-heading"><h2 id="upgrade-level">LEVEL UP</h2><span id="upgrade-countdown" role="status">Auto-pick in 30s</span></div>
+        <div class="upgrade-heading"><div><p class="upgrade-kicker">CHOOSE YOUR POWER</p><h2 id="upgrade-level">LEVEL UP</h2></div><div id="upgrade-countdown" role="status"><strong id="upgrade-seconds">30</strong><span id="upgrade-timer-label">SECONDS TO CHOOSE</span></div></div>
+        <div class="upgrade-clock" aria-hidden="true"><span></span></div>
         <div class="upgrade-options">
-          <button class="upgrade-choice" id="upgrade-option-0" type="button"><strong></strong><span></span></button>
-          <button class="upgrade-choice" id="upgrade-option-1" type="button"><strong></strong><span></span></button>
-          <button class="upgrade-choice" id="upgrade-option-2" type="button"><strong></strong><span></span></button>
+          <button class="upgrade-choice" id="upgrade-option-0" type="button"><span class="skill-art" aria-hidden="true"><span class="skill-illustration"></span></span><span class="skill-copy"><span class="skill-meta"><span class="skill-category"></span><span class="skill-rank"></span></span><strong class="skill-title"></strong><span class="skill-headline"></span><span class="skill-preview"><span class="skill-before"></span><span class="skill-arrow" aria-hidden="true">→</span><span class="skill-after"></span></span></span></button>
+          <button class="upgrade-choice" id="upgrade-option-1" type="button"><span class="skill-art" aria-hidden="true"><span class="skill-illustration"></span></span><span class="skill-copy"><span class="skill-meta"><span class="skill-category"></span><span class="skill-rank"></span></span><strong class="skill-title"></strong><span class="skill-headline"></span><span class="skill-preview"><span class="skill-before"></span><span class="skill-arrow" aria-hidden="true">→</span><span class="skill-after"></span></span></span></button>
+          <button class="upgrade-choice" id="upgrade-option-2" type="button"><span class="skill-art" aria-hidden="true"><span class="skill-illustration"></span></span><span class="skill-copy"><span class="skill-meta"><span class="skill-category"></span><span class="skill-rank"></span></span><strong class="skill-title"></strong><span class="skill-headline"></span><span class="skill-preview"><span class="skill-before"></span><span class="skill-arrow" aria-hidden="true">→</span><span class="skill-after"></span></span></span></button>
         </div>
       </section>
       <div class="touch-controls">

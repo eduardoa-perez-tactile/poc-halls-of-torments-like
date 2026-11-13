@@ -34,11 +34,15 @@ public final class PartyProgression {
         }
     }
 
+    /** Immutable phone presentation, prepared only when an authoritative offer is created. */
+    public record CardPreview(int icon, int rank, String category, String headline, String before, String after) {}
+
     public static final class Offer {
         public boolean pending;
         public int id, level;
         public float secondsLeft;
         public final Upgrade[] options = new Upgrade[3];
+        public final CardPreview[] cards = new CardPreview[3];
     }
 
     private static final Upgrade[] UPGRADES = Upgrade.values();
@@ -60,7 +64,7 @@ public final class PartyProgression {
             clearRanks(slot);
             Offer offer = offers[slot];
             offer.pending = false; offer.id = offer.level = 0; offer.secondsLeft = 0f;
-            for (int i = 0; i < offer.options.length; i++) offer.options[i] = UPGRADES[i];
+            for (int i = 0; i < offer.options.length; i++) { offer.options[i] = UPGRADES[i]; offer.cards[i] = null; }
         }
     }
 
@@ -78,6 +82,7 @@ public final class PartyProgression {
         clearRanks(slot);
         Offer offer = offers[slot];
         offer.pending = false; offer.id = offer.level = 0; offer.secondsLeft = 0;
+        for (int i = 0; i < offer.cards.length; i++) offer.cards[i] = null;
     }
 
     /** Collected soul XP is counted once for the party, whoever picked it up. */
@@ -179,7 +184,110 @@ public final class PartyProgression {
             Upgrade candidate = UPGRADES[(first + i) % UPGRADES.length];
             if (available(player, candidate) && !contains(offer, count, candidate)) offer.options[count++] = candidate;
         }
-        return count == offer.options.length;
+        boolean complete = count == offer.options.length;
+        for (int i = 0; i < offer.cards.length; i++) offer.cards[i] = complete ? preview(slot, offer.options[i]) : null;
+        return complete;
+    }
+
+    /** Uses the same caps as apply(), without mutating simulation or depending on the phone. */
+    CardPreview preview(int slot, Upgrade upgrade) {
+        ArenaWorld.Player player = world.players[slot];
+        String category, headline, before, after;
+        float current, next;
+        switch (upgrade) {
+            case POWER -> {
+                category = "OFFENSE";
+                current = player.damageMultiplier * 100;
+                next = Math.min(4f, player.damageMultiplier + .25f) * 100;
+                headline = "+" + number(next - current) + "% BASE DAMAGE";
+                before = number(current) + "% DAMAGE"; after = number(next) + "% DAMAGE";
+            }
+            case HASTE -> {
+                category = "OFFENSE";
+                current = player.attackRateMultiplier * 100;
+                next = Math.min(3f, player.attackRateMultiplier + .15f) * 100;
+                headline = "+" + number(next - current) + "% BASE ATTACK SPEED";
+                before = number(current) + "% ATTACK SPEED"; after = number(next) + "% ATTACK SPEED";
+            }
+            case FLEET -> {
+                category = "MOBILITY";
+                current = player.moveMultiplier * 100;
+                next = Math.min(2.2f, player.moveMultiplier + .12f) * 100;
+                headline = "+" + number(next - current) + "% BASE MOVE SPEED";
+                before = number(current) + "% MOVE SPEED"; after = number(next) + "% MOVE SPEED";
+            }
+            case VITALITY -> {
+                category = "DEFENSE"; current = player.maxHealth; next = Math.min(300f, current + 20f);
+                headline = "+" + number(next - current) + " MAX HP · HEAL UP TO 20";
+                before = number(current) + " MAX HP"; after = number(next) + " MAX HP";
+            }
+            case EVASION -> {
+                category = "MOBILITY";
+                current = player.hero.dodgeCooldown * player.dodgeCooldownMultiplier;
+                next = player.hero.dodgeCooldown * Math.max(.25f, player.dodgeCooldownMultiplier - .15f);
+                headline = "-" + number(current - next) + "s DODGE COOLDOWN";
+                before = number(current) + "s"; after = number(next) + "s";
+            }
+            case SWEEP -> {
+                category = "WEAPON"; current = player.cleaveMultiplier * 100;
+                next = Math.min(1.8f, player.cleaveMultiplier + .2f) * 100;
+                headline = "+" + number(next - current) + "% BASE SWORD REACH";
+                before = number(current) + "% SWORD REACH"; after = number(next) + "% SWORD REACH";
+            }
+            case MULTISHOT -> {
+                category = "WEAPON"; int arrows = Math.min(5, player.projectileCount + 1);
+                headline = "+" + (arrows - player.projectileCount) + " ARROW";
+                before = player.projectileCount + (player.projectileCount == 1 ? " ARROW" : " ARROWS");
+                after = arrows + (arrows == 1 ? " ARROW" : " ARROWS");
+            }
+            case PIERCE -> {
+                category = "WEAPON"; int targets = Math.min(3, player.pierce + 1);
+                headline = "+" + (targets - player.pierce) + " PIERCE TARGET";
+                before = player.pierce + (player.pierce == 1 ? " EXTRA TARGET" : " EXTRA TARGETS");
+                after = targets + (targets == 1 ? " EXTRA TARGET" : " EXTRA TARGETS");
+            }
+            case AURA -> {
+                category = "OFFENSE"; int aura = Math.min(3, player.auraLevel + 1);
+                current = (4 + player.auraLevel * 3) * player.damageMultiplier;
+                next = (4 + aura * 3) * player.damageMultiplier;
+                headline = player.auraLevel == 0 ? "UNLOCK" : "+" + number(next - current) + " AURA DAMAGE";
+                before = player.auraLevel == 0 ? "NONE" : auraValues(current, player.auraLevel);
+                after = auraValues(next, aura);
+            }
+            case STORM -> {
+                category = "OFFENSE"; int storm = Math.min(3, player.stormLevel + 1);
+                current = (12 + player.stormLevel * 5) * player.damageMultiplier;
+                next = (12 + storm * 5) * player.damageMultiplier;
+                headline = player.stormLevel == 0 ? "UNLOCK" : "+" + (storm - player.stormLevel) + " CHAIN TARGET";
+                before = player.stormLevel == 0 ? "NONE" : stormValues(current, player.stormLevel);
+                after = stormValues(next, storm);
+            }
+            case MAGNET -> {
+                category = "UTILITY"; current = player.pickupMultiplier * 100; next = Math.min(2.5f, player.pickupMultiplier + .3f) * 100;
+                headline = "+" + number(next - current) + "% BASE PICKUP RANGE";
+                before = number(current) + "% PICKUP RANGE"; after = number(next) + "% PICKUP RANGE";
+            }
+            case CRITICAL -> {
+                category = "OFFENSE"; current = player.critChance * 100; next = Math.min(.5f, player.critChance + .1f) * 100;
+                headline = "+" + number(next - current) + " PTS CRIT CHANCE";
+                before = number(current) + "% CRIT"; after = number(next) + "% CRIT";
+            }
+            default -> throw new IllegalStateException("Unknown upgrade " + upgrade);
+        }
+        return new CardPreview(upgrade.ordinal(), rank(slot, upgrade) + 1, category, headline, before, after);
+    }
+
+    private static String auraValues(float damage, int level) {
+        return number(damage) + " DMG / 0.7s / " + (100 + level * 20) + " RANGE";
+    }
+    private static String stormValues(float damage, int level) {
+        return number(damage) + " DMG / " + (level + 1) + " TARGETS / 2s";
+    }
+    private static String number(float value) {
+        int hundredths = Math.round(value * 100);
+        int whole = hundredths / 100, fraction = Math.abs(hundredths % 100);
+        return fraction == 0 ? Integer.toString(whole) : whole + "." + (fraction < 10 ? "0" : "")
+            + (fraction % 10 == 0 ? fraction / 10 : fraction);
     }
 
     private static boolean contains(Offer offer, int count, Upgrade candidate) {
