@@ -1,4 +1,4 @@
-> Status: temporary gameplay art. On 2026-11-12 the user said these assets do not match the intended isometric direction. Keep them for functional development; revisit visuals separately. These assets are not approved final art.
+> Superseded on 2026-11-13 by the seven-actor, four-facing crypt kit described in [Gameplay art integration](gameplay-art-integration.md). The four original `game-*.png` masters now live in `art-source/legacy-gameplay/` and are excluded from runtime assets. The source-layout paths, inspections and exact prompts below are preserved as historical provenance; they describe the first temporary kit, not the current renderer.
 
 # First playable gameplay art
 

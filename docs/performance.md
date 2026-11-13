@@ -28,7 +28,7 @@ python3 scripts/capture-performance.py --serial emulator-5554 \
   --host 192.168.14.248 --forward-port 51849 --fixture boss-coop --seconds 20 --lifecycle
 ```
 
-Other fixtures are `boss-solo`, `late-coop`, `results` and `lobby`. Choose the directly relevant fixture; do not run all of them as a default regression suite. Duration defaults to 20 seconds and is bounded to 5–30 seconds; use a short results-only capture for a directly affected transition. Logging starts before entering the fixture so the first transition is included. Logs and beginning/end memory snapshots replace the same fixture's files under ignored `.run/`. The results fixture returns to the lobby once to observe resource release. Optional `--lifecycle` adds one sample victory/lobby transition and a brief Home/resume check, with a resume screenshot; it does not force GL-context loss. This is not a repeated leak test. The script closes synthetic clients, stops its logcat process, and restores a fresh empty lobby, leaving the existing emulator/relay/forward running.
+Other fixtures are `boss-solo`, `late-coop`, `items-coop`, `art-solo`, `art-coop`, `results` and `lobby`. The art fixtures combine F12 equipped late combat with F6 boss activation, consuming fixture gear before the time jump so a loot pause does not masquerade as combat measurement. They also save a `.scene.png` after the measured window. Choose the directly relevant fixture; do not run all of them as a default regression suite. Duration defaults to 20 seconds and is bounded to 5–30 seconds; use a short results-only capture for a directly affected transition. Logging starts before entering the fixture so the first transition is included. Logs and beginning/end memory snapshots replace the same fixture's files under ignored `.run/`. The results fixture returns to the lobby once to observe resource release. Optional `--lifecycle` adds one sample victory/lobby transition and a brief Home/resume check, with a resume screenshot; it does not force GL-context loss. This is not a repeated leak test. The script closes synthetic clients, stops its logcat process, and restores a fresh empty lobby, leaving the existing emulator/relay/forward running.
 
 For a context-restoration check, briefly background/resume the app and inspect the QR/art. QR now retains a managed pixmap and disposes both pixels and texture on replacement/shutdown. Android may retain the GL context on this brief transition, so this verifies lifecycle behavior without proving a forced GL-context loss.
 
@@ -158,3 +158,30 @@ The first emulator attempt caught `StringBuilder.isEmpty()` being unavailable on
 A connected browser was checked at 390×844 portrait and 844×390 landscape: all three original illustrations, item effects and Keep Current Gear were readable. Pausing kept the item timer at 30 seconds and disabled selections. After resuming, selecting Gatekeeper Helm kept cards visible until host acknowledgment, then restored the controller. Protocol tests cover decline, reconnect, ownership and typed offer IDs separately. A final brief remote-controlled equipment-details capture verified seven slots for both heroes, precise regeneration text and View Skills/Back controls; a small identity/divider overlap found in the first capture was fixed and only that view was rechecked. The final screenshot is `.run/items-run-details-final.png`.
 
 JDK 21 desktop compilation and Android debug packaging passed. Focused catalog, runtime/combat/progression, HUD and WebSocket checks plus the real-controller state harness were used; no full survival simulation or broad regression was run. Synthetic clients and temporary capture processes were stopped, temporary browser viewport overrides reset, and the test browser closed. The existing emulator/relay/forward remain for the user and the coordinated menu-art screenshot chat. Physical-TV performance and full-run item balance remain unverified.
+
+## Authored gameplay art — 13 November 2026
+
+The selected seven-actor bank replaces runtime master-image baking with three file-backed managed pages: 1024² main actors, 512² common actors and 512² environment. Actual complete packing is 208 actor frames plus 19 environment regions, with no rotated, mirrored, resized or dropped frames. The gameplay bank uses 6 MiB GPU data and retains no decoded gameplay Pixmaps. A runtime portrait export saves 4.002571 MiB; the original painting is preserved. Legacy gameplay masters remain outside packaged assets.
+
+A native solo edge check exposed black space beyond the original 300-quad floor. Eight cosmetic cells per side now cover both TV cameras with the existing floor atlas: 1,116 static quads / 102,672 vertex and index bytes, submitted from the same managed cache without per-frame rebuilding. Playable world limits stay unchanged. Culling also includes revival rails and shared prop-shadow overhangs.
+
+One final seven-second `art-coop` sample ran on the existing API-33 ARM64 Television_1080p emulator (1920×1080, 2 GiB RAM, automatic GPU). It used the real late-encounter/equipment and boss fixtures, two heartbeat-only synthetic controllers, and no survival playthrough. The final scene capture occurs after the measurement. A complete live COOP_BOSS window reported:
+
+| Metric | Observed |
+| --- | ---: |
+| Frames / interval samples | 301 / 301 |
+| Frame interval p95 / p99 / max | 19.10 / 20.99 / 22.56 ms |
+| CPU submission p95 / p99 / max | 5.71 / 9.99 / 12.93 ms |
+| Intervals over 16.7 / 33.4 ms | 159 / 0 |
+| Draws in the reported frame | 56 |
+| Accounted GPU textures including QR | 32,303,948 bytes / 30.8074455 MiB |
+| Retained decoded Pixmaps, whole app | 20,245,324 bytes / 19.3074455 MiB |
+| PSS at fixture start / end | 111,277 / 82,434 KiB |
+
+The texture margin is 1,250,484 bytes (1.1925545 MiB). CPU submission met 16.7 ms in this short window; displayed intervals exceeded that strict target. CPU timing excludes asynchronous GPU work, and emulator scheduling/presentation depends on host load. These observations do not prove physical-TV 60 FPS, thermal behavior, balance or long-run memory stability. The PSS decrease reflects collection/timing, not a leak test.
+
+Fifty-five focused metadata, presentation, combat, pause and late-join tests passed. Native checks also covered solo/co-op camera framing, movement/Dodge, floor/prop sampling, normal Home/resume, remote invitation, phone choices, and results/Run Details. During a skill choice, sampled arena-edge pixels in both panes stayed identical while the shared timer advanced; manual Pause froze that timer and preserved offer identities. Fresh late joining applied 17 skill ranks and eight gear rewards at 200/200 effective health without inherited offers. Forced GL-context loss and a full twenty-minute run were not tested.
+
+The pre-existing emulator/relay session ended once during the checks; no app fatal exception was recorded before that interruption. A cold boot of the already-installed image and restored relay recovered the environment. The remaining checks and final sample completed without a recorded fatal exception. No tools, SDKs or dependencies were installed or downloaded.
+
+Raw evidence stays ignored under `.run/performance-art-coop.*` and `.run/art-exploration/weekend/tv-verification/`; source archive reconstruction and viewer checks are under the adjacent QA folders. The tested rendering APK SHA-256 is `24a89f003b49286aa005f8e66567beb1cb166b87cbcd627d28b6882507be5611`.

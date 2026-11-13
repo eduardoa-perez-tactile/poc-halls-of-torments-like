@@ -30,7 +30,9 @@ public final class UiArt implements Disposable {
     public static final Color PLAYER_TWO = Color.valueOf("9bc3bb");
     public static final Color BUTTON_INK = Color.valueOf("1d1710");
     public static final Color BUTTON_DISABLED_INK = Color.valueOf("554b3e");
-    public final Texture heroes = load("art/adventurers.png");
+    // The unchanged illustration is exported above the largest portrait draw.
+    // Keep its full-size master out of GPU residency (roughly 4 MiB saved).
+    public final Texture heroes = load("art/adventurers-runtime.png");
     public final Texture homeLogo;
     public final MenuSceneArt menuScene;
     public final TextureRegion knight = new TextureRegion(heroes, 0, 0, heroes.getWidth() / 2, heroes.getHeight());
