@@ -23,3 +23,11 @@ With the portrait export, the current one-font-page allocation and a live 360×3
 New gameplay pages must be file-backed managed textures without retained decoded Pixmaps, use cached frame/trim/pivot metadata and separate shared ground shadows. Source masters and review boards are not runtime textures. Four authored facings preserve asymmetric equipment; both cameras read the same simulation-owned animation clocks, which freeze during skill/loot choices and all existing pause/disconnect gates.
 
 Use only installed tools and cached dependencies. Builds use the existing Gradle 8.14.3 distribution with `--offline` and `/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`; no toolchain or dependency installation is authorized.
+
+## Simulation-owned presentation state
+
+The world now records actual movement, committed player attack age/aim, damage-only hit time, enemy locomotion/cast phase and the exact Cultist/boss projectile-release event. These snapshots advance only in combat ticks, after both skill and loot pause gates. Fresh participants and reused enemy slots reset them; reconnecting participants retain them. Dodge travel direction is exposed read-only, so later phone input cannot rotate an existing dodge pose.
+
+`ActorAnimation` selects an actor, authored facing, action and phase without advancing any clock. Attacks retain their committed aim, including while dodging/moving. Boss bolts use an immediate release pose followed by the existing warning hold; Cultists use their existing windup and actual release. Retreating Cultists reverse the locomotion phase while keeping their aim toward the player; the frame sampler must support negative looping phases. Contact enemies retain their existing hit flash and death effects without acquiring a misleading attack windup.
+
+Fourteen focused event/selection tests pass, including damage/projectile timing, two-camera read safety, actual movement versus wall/stun, choice freezes, reset/reuse/reconnect and dodge/attack overlap. Android Java compilation also passes offline. The renderer still uses the temporary art until the complete new atlas is packed and connected; these checks do not establish final visual quality or TV performance.
