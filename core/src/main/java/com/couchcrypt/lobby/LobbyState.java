@@ -1,7 +1,6 @@
 package com.couchcrypt.lobby;
 
 import java.util.UUID;
-import java.util.List;
 import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.ItemCatalog;
 import com.couchcrypt.game.RunEquipment;
@@ -35,8 +34,7 @@ public final class LobbyState {
     public record EquipmentFeedback(int id, float secondsLeft, boolean catchUp, float durationSeconds,
         ItemCatalog.Item first, ItemCatalog.Item second, ItemCatalog.Item third,
         PartyProgression.CardPreview firstCard, PartyProgression.CardPreview secondCard, PartyProgression.CardPreview thirdCard) {}
-    public record CatchUpFeedback(int skillsRemaining, int equipmentRemaining, String skillFoundation, String equipmentFoundation,
-        List<PartyProgression.FoundationSkill> skills, List<RunEquipment.FoundationItem> equipment) {}
+    public record StarterBuild(int skillsGranted, int equipmentGranted) {}
     public record Snapshot(Player first, Player second, int connected, boolean hostActive, Phase phase, long revision) {}
     public record Join(int slot, String token, String error) {
         static Join rejected(String reason) { return new Join(-1, null, reason); }
@@ -58,10 +56,8 @@ public final class LobbyState {
         int equipmentId, claimedEquipmentId, equipmentOption;
         float equipmentSeconds, equipmentDuration = PartyProgression.CHOICE_SECONDS;
         boolean equipmentCatchUp;
-        int catchUpSkills, catchUpEquipment;
-        String skillFoundation = "", equipmentFoundation = "";
-        List<PartyProgression.FoundationSkill> foundationSkills = List.of();
-        List<RunEquipment.FoundationItem> foundationItems = List.of();
+        boolean participating;
+        StarterBuild starterBuild;
         boolean equipmentQueued;
         final ItemCatalog.Item[] equipmentOptions = new ItemCatalog.Item[3];
         final PartyProgression.CardPreview[] equipmentCards = new PartyProgression.CardPreview[3];
@@ -81,8 +77,7 @@ public final class LobbyState {
         void clearProgression() {
             level = 1; xp = 0; xpToNext = 6; offerId = offerLevel = claimedOfferId = 0;
             offerSeconds = 0; offerDuration = PartyProgression.CHOICE_SECONDS; offerCatchUp = false; upgradeQueued = false;
-            catchUpSkills = catchUpEquipment = 0; skillFoundation = equipmentFoundation = "";
-            foundationSkills = List.of(); foundationItems = List.of();
+            participating = false; starterBuild = null;
             for (int i = 0; i < 3; i++) { options[i] = null; cards[i] = null; }
             clearEquipment();
         }
@@ -156,7 +151,12 @@ public final class LobbyState {
     }
 
     public synchronized void setPhase(Phase next) {
-        if (phase != next) { phase = next; clearInputs(); if (next != Phase.SESSION) clearUpgradeRequests(); revision++; }
+        if (phase != next) {
+            phase = next; clearInputs(); if (next != Phase.SESSION) clearUpgradeRequests();
+            if (next == Phase.LOBBY || next == Phase.RESULTS)
+                for (Slot slot : slots) slot.participating = false;
+            revision++;
+        }
     }
 
     /** Only the server supplies connection identities; clients cannot choose a player index. */
@@ -328,42 +328,19 @@ public final class LobbyState {
                 slot.equipmentCards[0], slot.equipmentCards[1], slot.equipmentCards[2]) : null;
     }
 
-    /** Immutable foundation summaries are prepared once by simulation and borrowed by server snapshots. */
-    public synchronized void publishCatchUp(int index, int skillsRemaining, int equipmentRemaining,
-        String skillFoundation, String equipmentFoundation) {
-        publishCatchUp(index, skillsRemaining, equipmentRemaining, skillFoundation, equipmentFoundation, List.of(), List.of());
-    }
-
-    public synchronized void publishCatchUp(int index, int skillsRemaining, int equipmentRemaining,
-        String skillFoundation, String equipmentFoundation, List<PartyProgression.FoundationSkill> skills,
-        List<RunEquipment.FoundationItem> equipment) {
+    /** Publish current-run membership and a nonblocking confirmation, without per-frame snapshots. */
+    public synchronized void publishStarterBuild(int index, boolean participating, int skillsGranted, int equipmentGranted) {
         Slot slot = slots[index];
-        slot.catchUpSkills = Math.max(0, Math.min(3, skillsRemaining));
-        slot.catchUpEquipment = Math.max(0, Math.min(2, equipmentRemaining));
-        slot.skillFoundation = boundedSummary(skillFoundation);
-        slot.equipmentFoundation = boundedSummary(equipmentFoundation);
-        slot.foundationSkills = boundedFoundation(skills, slot.foundationSkills, 12);
-        slot.foundationItems = boundedFoundation(equipment, slot.foundationItems, RunEquipment.SLOT_COUNT);
+        slot.participating = participating;
+        int skills = participating ? Math.max(0, Math.min(PartyProgression.MAX_LEVEL - 1, skillsGranted)) : 0;
+        int equipment = participating ? Math.max(0, Math.min(RunEquipment.MAX_REWARDS, equipmentGranted)) : 0;
+        if (skills + equipment == 0) slot.starterBuild = null;
+        else if (slot.starterBuild == null || slot.starterBuild.skillsGranted() != skills
+            || slot.starterBuild.equipmentGranted() != equipment) slot.starterBuild = new StarterBuild(skills, equipment);
     }
 
-    public synchronized CatchUpFeedback catchUpFeedback(int index) {
-        Slot slot = slots[index];
-        return new CatchUpFeedback(slot.catchUpSkills, slot.catchUpEquipment, slot.skillFoundation, slot.equipmentFoundation,
-            slot.foundationSkills, slot.foundationItems);
-    }
+    public synchronized StarterBuild starterBuild(int index) { return slots[index].starterBuild; }
 
-    /** Copy on change only: the render publisher normally supplies the same immutable activation snapshots. */
-    private static <T> List<T> boundedFoundation(List<T> entries, List<T> previous, int maximum) {
-        if (entries == null || entries.isEmpty()) return List.of();
-        int count = Math.min(entries.size(), maximum);
-        boolean unchanged = previous.size() == count;
-        for (int i = 0; unchanged && i < count; i++) unchanged = previous.get(i).equals(entries.get(i));
-        return unchanged ? previous : List.copyOf(entries.subList(0, count));
-    }
-
-    private static String boundedSummary(String summary) {
-        return summary == null ? "" : summary.length() <= 2048 ? summary : summary.substring(0, 2048);
-    }
     private static float choiceDuration(boolean catchUp, float duration) {
         return Float.isFinite(duration) && duration > 0 ? Math.min(PartyProgression.CHOICE_SECONDS, duration)
             : catchUp ? 15f : PartyProgression.CHOICE_SECONDS;
@@ -385,12 +362,12 @@ public final class LobbyState {
     private Player player(int index, long now) {
         Slot slot = slots[index];
         return new Player(index, slot.connection != null, slot.token != null,
-            slot.expires == 0 ? 0 : (int) Math.max(0, (slot.expires - now + 999) / 1000), slot.generation);
+            slot.expires == 0 || slot.participating ? 0 : (int) Math.max(0, (slot.expires - now + 999) / 1000), slot.generation);
     }
 
     private void expire(long now) {
         for (Slot slot : slots) {
-            if (slot.token != null && slot.connection == null && now >= slot.expires) {
+            if (slot.token != null && slot.connection == null && !slot.participating && now >= slot.expires) {
                 slot.clear(); revision++;
             }
         }

@@ -4,8 +4,6 @@ import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
 import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.ItemCatalog;
-import com.couchcrypt.game.RunEquipment;
-import java.util.List;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -22,6 +20,56 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JoinServerTest {
+    @Test void defaultStarterBuildHasNoOffersAndReconnectRestoresFuturePersonalChoice() throws Exception {
+        var state = new LobbyState(); state.join(null, "host", System.currentTimeMillis());
+        var world = new com.couchcrypt.game.ArenaWorld(); world.activatePlayer(0);
+        while (world.progression.level < 10) world.progression.addXp(world.progression.xpToNext - world.progression.xp);
+        for (int i = 0; i < 4; i++) world.equipment.grantReward();
+        state.setPhase(LobbyState.Phase.INVITE);
+        var server = new JoinServer(0, state, Map.of()); server.open();
+        try (var http = HttpClient.newHttpClient()) {
+            String url = "ws://127.0.0.1:" + server.getListeningPort() + "/socket?room=" + server.room();
+            var listener = new Client();
+            var socket = http.newWebSocketBuilder().buildAsync(URI.create(url), listener).get(3, TimeUnit.SECONDS);
+            String token = listener.expect("joined").getString("token");
+            world.activatePlayer(1);
+            state.publishStarterBuild(1, true, world.progression.foundationCount(1), world.equipment.foundationCount(1));
+            state.publishProgression(1, 10, 0, world.progression.xpToNext, 0, 0, 0, null);
+            state.setPhase(LobbyState.Phase.SESSION);
+            JsonValue status;
+            do { status = listener.expect("status"); } while (status.get("starterBuild").isNull());
+            assertEquals(9, status.get("starterBuild").getInt("skillsGranted"));
+            assertEquals(4, status.get("starterBuild").getInt("equipmentGranted"));
+            assertTrue(status.get("progression").get("upgrade").isNull());
+            assertTrue(status.get("equipment").isNull()); assertTrue(status.get("catchUp").isNull());
+            world.progression.addXp(world.progression.xpToNext);
+            var offer = world.progression.offers[1]; world.progression.update(7);
+            state.publishProgression(1, 11, 0, world.progression.xpToNext,
+                offer.id, offer.level, offer.secondsLeft, offer.options, offer.cards);
+            state.setPhase(LobbyState.Phase.PAUSED);
+            do { status = listener.expect("status"); }
+            while (status.get("progression").get("upgrade").isNull());
+            var pending = status.get("progression").get("upgrade");
+            assertFalse(pending.getBoolean("catchUp")); assertEquals(30, pending.getFloat("durationSeconds"));
+            assertEquals(23, pending.getFloat("secondsLeft"));
+            socket.sendClose(WebSocket.NORMAL_CLOSURE, "reconnect fixture").get(3, TimeUnit.SECONDS);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+            while (state.snapshot(System.currentTimeMillis()).second().connected() && System.nanoTime() < deadline)
+                java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(5));
+            assertFalse(state.snapshot(System.currentTimeMillis()).second().connected());
+            assertTrue(state.snapshot(System.currentTimeMillis() + LobbyState.RECONNECT_MILLIS * 2).second().reserved());
+            var returning = new Client();
+            var restored = http.newWebSocketBuilder().buildAsync(URI.create(url + "&token=" + token), returning).get(3, TimeUnit.SECONDS);
+            assertEquals(2, returning.expect("joined").getInt("player"));
+            status = returning.expect("status");
+            pending = status.get("progression").get("upgrade");
+            assertEquals(offer.id, pending.getInt("id")); assertEquals(23, pending.getFloat("secondsLeft"));
+            assertEquals(9, status.get("starterBuild").getInt("skillsGranted"));
+            assertEquals(4, status.get("starterBuild").getInt("equipmentGranted"));
+            socket.abort(); restored.abort();
+        } finally { server.stop(); }
+    }
+
     private static final class Client implements WebSocket.Listener {
         private final BlockingQueue<String> messages = new LinkedBlockingQueue<>();
         private final StringBuilder partial = new StringBuilder();
@@ -91,54 +139,6 @@ class JoinServerTest {
             first.sendText("{\"type\":\"ping\"}", true).get(3, TimeUnit.SECONDS);
             do { status = one.expect("status"); } while (!status.get("equipment").isNull());
             assertEquals(2, status.getInt("connected"));
-            state.publishEquipment(0, 11, 14.5f, options, cards, true, 15);
-            var foundationItem = ItemCatalog.byId("emberheart_pendant");
-            state.publishCatchUp(0, 0, 2, "Soulfire 3 / Soul Circle 2", "Gatekeeper Helm / Emberheart Pendant",
-                List.of(new PartyProgression.FoundationSkill("power", "Soulfire", 0, 3),
-                    new PartyProgression.FoundationSkill("aura", "Soul Circle", 8, 2)),
-                List.of(new RunEquipment.FoundationItem(foundationItem.id(), foundationItem.title(),
-                    ItemCatalog.artIndex(foundationItem), foundationItem.slot().name())));
-            first.sendText("{\"type\":\"ping\"}", true).get(3, TimeUnit.SECONDS);
-            do { status = one.expect("status"); }
-            while (status.get("equipment").isNull() || status.get("equipment").getInt("id") != 11);
-            assertTrue(status.get("equipment").getBoolean("catchUp"));
-            assertEquals(15, status.get("equipment").getFloat("durationSeconds"));
-            assertEquals(14.5f, status.get("equipment").getFloat("secondsLeft"));
-            assertEquals(2, status.get("catchUp").getInt("equipmentRemaining"));
-            assertEquals("Soulfire 3 / Soul Circle 2", status.get("catchUp").getString("skillFoundation"));
-            var foundation = status.get("catchUp");
-            assertEquals(2, foundation.get("skills").size);
-            assertEquals("power", foundation.get("skills").get(0).getString("id"));
-            assertEquals("Soulfire", foundation.get("skills").get(0).getString("title"));
-            assertEquals(0, foundation.get("skills").get(0).getInt("icon"));
-            assertEquals(3, foundation.get("skills").get(0).getInt("rank"));
-            assertEquals(8, foundation.get("skills").get(1).getInt("icon"));
-            assertEquals(2, foundation.get("skills").get(1).getInt("rank"));
-            assertEquals(1, foundation.get("equipment").size);
-            var itemJson = foundation.get("equipment").get(0);
-            assertEquals(foundationItem.id(), itemJson.getString("id"));
-            assertEquals(foundationItem.title(), itemJson.getString("title"));
-            assertEquals(ItemCatalog.artIndex(foundationItem), itemJson.getInt("icon"));
-            assertEquals(foundationItem.slot().name(), itemJson.getString("slot"));
-            first.sendText("{\"type\":\"equipment\",\"offerId\":11,\"option\":-1}", true).get(3, TimeUnit.SECONDS);
-            until = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
-            do {
-                found = state.pollEquipment(0, request);
-                if (!found) java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(5));
-            } while (!found && System.nanoTime() < until);
-            assertTrue(found); assertEquals(-1, request.option);
-            state.publishEquipment(0, 0, 0, null, null);
-            state.publishProgression(0, 20, 0, 0, 30, 19, 12,
-                PartyProgression.Upgrade.values(), null, true, 15);
-            state.publishCatchUp(0, 1, 0, "Soulfire 3", "Gatekeeper Helm");
-            first.sendText("{\"type\":\"ping\"}", true).get(3, TimeUnit.SECONDS);
-            do { status = one.expect("status"); }
-            while (status.get("progression").get("upgrade").isNull());
-            assertTrue(status.get("progression").get("upgrade").getBoolean("catchUp"));
-            assertEquals(15, status.get("progression").get("upgrade").getFloat("durationSeconds"));
-            assertEquals(1, status.get("catchUp").getInt("skillsRemaining"));
-            assertEquals(0, status.get("catchUp").get("skills").size);
-            assertEquals(0, status.get("catchUp").get("equipment").size);
             first.abort(); second.abort();
         } finally { server.stop(); }
     }

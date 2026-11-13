@@ -75,7 +75,14 @@ public final class JoinServer extends NanoWSD {
             + snapshot.phase().name().toLowerCase(java.util.Locale.ROOT) + "\",\"health\":" + feedback.health()
             + ",\"maxHealth\":" + feedback.maxHealth() + ",\"dodgeCooldown\":" + feedback.dodgeCooldown()
             + ",\"alive\":" + feedback.alive() + ",\"progression\":" + progressionJson(slot)
-            + ",\"equipment\":" + equipmentJson(slot) + ",\"catchUp\":" + catchUpJson(slot) + "}";
+            + ",\"equipment\":" + equipmentJson(slot) + ",\"catchUp\":null"
+            + ",\"starterBuild\":" + starterBuildJson(slot) + "}";
+    }
+
+    private String starterBuildJson(int slot) {
+        var build = state.starterBuild(slot);
+        return build == null ? "null" : "{\"skillsGranted\":" + build.skillsGranted()
+            + ",\"equipmentGranted\":" + build.equipmentGranted() + "}";
     }
 
     private String progressionJson(int slot) {
@@ -119,34 +126,6 @@ public final class JoinServer extends NanoWSD {
         appendEquipment(result, offer.first(), offer.firstCard()); result.append(',');
         appendEquipment(result, offer.second(), offer.secondCard()); result.append(',');
         appendEquipment(result, offer.third(), offer.thirdCard());
-        return result.append("]}").toString();
-    }
-
-    private String catchUpJson(int slot) {
-        var feedback = state.catchUpFeedback(slot);
-        if (feedback.skillsRemaining() == 0 && feedback.equipmentRemaining() == 0) return "null";
-        StringBuilder result = new StringBuilder(384);
-        result.append("{\"skillsRemaining\":").append(feedback.skillsRemaining())
-            .append(",\"equipmentRemaining\":").append(feedback.equipmentRemaining())
-            .append(",\"skillFoundation\":"); quote(result, feedback.skillFoundation());
-        result.append(",\"equipmentFoundation\":"); quote(result, feedback.equipmentFoundation());
-        result.append(",\"skills\":[");
-        for (int i = 0; i < feedback.skills().size(); i++) {
-            if (i > 0) result.append(',');
-            var skill = feedback.skills().get(i);
-            result.append("{\"id\":"); quote(result, skill.id());
-            result.append(",\"title\":"); quote(result, skill.title());
-            result.append(",\"icon\":").append(skill.icon()).append(",\"rank\":").append(skill.rank()).append('}');
-        }
-        result.append("],\"equipment\":[");
-        for (int i = 0; i < feedback.equipment().size(); i++) {
-            if (i > 0) result.append(',');
-            var item = feedback.equipment().get(i);
-            result.append("{\"id\":"); quote(result, item.id());
-            result.append(",\"title\":"); quote(result, item.title());
-            result.append(",\"icon\":").append(item.icon()).append(",\"slot\":"); quote(result, item.slot());
-            result.append('}');
-        }
         return result.append("]}").toString();
     }
 

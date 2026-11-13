@@ -4,74 +4,65 @@ import org.junit.jupiter.api.Test;
 import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.ItemCatalog;
 import com.couchcrypt.game.RunEquipment;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LobbyStateTest {
-    @Test void structuredFoundationsAreBoundedImmutableSnapshotsReusedUntilChanged() {
-        var state = new LobbyState(); var joined = state.join(null, "a", 1);
-        state.setPhase(LobbyState.Phase.SESSION);
-        var skill = new PartyProgression.FoundationSkill("power", "Soulfire", 0, 3);
-        var item = new RunEquipment.FoundationItem("gatekeeper_helm", "Gatekeeper Helm", 0, "HELMET");
-        var skills = new ArrayList<>(Collections.nCopies(15, skill));
-        var items = new ArrayList<>(Collections.nCopies(10, item));
-        state.publishCatchUp(0, 3, 2, "Soulfire 3", "Gatekeeper Helm", skills, items);
-        var first = state.catchUpFeedback(0);
-        assertEquals(12, first.skills().size()); assertEquals(7, first.equipment().size());
-        assertThrows(UnsupportedOperationException.class, () -> first.skills().clear());
-        assertThrows(UnsupportedOperationException.class, () -> first.equipment().clear());
-        state.publishCatchUp(0, 2, 1, "Soulfire 3", "Gatekeeper Helm", skills, items);
-        assertSame(first.skills(), state.catchUpFeedback(0).skills());
-        assertSame(first.equipment(), state.catchUpFeedback(0).equipment());
-        skills.clear(); items.clear();
-        assertEquals(12, first.skills().size()); assertEquals(7, first.equipment().size());
-        state.disconnected("a", 2); state.join(joined.token(), "restored", 3);
-        assertSame(first.skills(), state.catchUpFeedback(0).skills());
-        assertSame(first.equipment(), state.catchUpFeedback(0).equipment());
-        state.publishCatchUp(0, 1, 1, "Soulfire 3", "Gatekeeper Helm", List.of(skill), List.of(item));
-        assertEquals(List.of(skill), state.catchUpFeedback(0).skills());
-        state.publishCatchUp(0, 1, 1, "Soulfire 3", "Gatekeeper Helm");
-        assertTrue(state.catchUpFeedback(0).skills().isEmpty());
-        assertTrue(state.catchUpFeedback(0).equipment().isEmpty());
-        state.publishCatchUp(0, 1, 1, "Soulfire 3", "Gatekeeper Helm", List.of(skill), List.of(item));
-        state.remove(0);
-        assertTrue(state.catchUpFeedback(0).skills().isEmpty());
-        assertTrue(state.catchUpFeedback(0).equipment().isEmpty());
-    }
-
-    @Test void catchUpMetadataUsesHostDurationAndSurvivesReservationButClearsOnReplacement() {
+    @Test void participatingReconnectKeepsIdentityBuildFeedbackAndChoicesBeyondLobbyReservation() {
         var state = new LobbyState(); var joined = state.join(null, "a", 1);
         state.setPhase(LobbyState.Phase.SESSION);
         var options = equipmentOptions(); var cards = equipmentCards(options);
-        state.publishProgression(0, 20, 0, 0, 31, 18, 15,
-            PartyProgression.Upgrade.values(), null, true, 15);
-        state.publishEquipment(0, 41, 15, options, cards, true, 15);
-        state.publishCatchUp(0, 3, 2, "Soulfire 3 / Soul Circle 2", "Gatekeeper Helm / Emberheart Pendant");
-        assertTrue(state.progressionFeedback(0).upgrade().catchUp());
-        assertEquals(15, state.progressionFeedback(0).upgrade().durationSeconds());
-        assertTrue(state.equipmentFeedback(0).catchUp());
-        assertEquals(15, state.equipmentFeedback(0).durationSeconds());
+        state.publishStarterBuild(0, true, 9, 4);
+        var build = state.starterBuild(0);
+        state.publishStarterBuild(0, true, 9, 4);
+        assertSame(build, state.starterBuild(0), "Render publication reuses unchanged confirmation");
+        state.setPlayerFeedback(0, 61, 150, 1.7f, true);
+        state.publishProgression(0, 11, 0, 120, 31, 11, 23,
+            PartyProgression.Upgrade.values());
+        state.publishEquipment(0, 41, 27, options, cards);
+        long generation = state.snapshot(1).first().generation();
         state.setPhase(LobbyState.Phase.PAUSED); state.setHostActive(false);
         state.disconnected("a", 2);
-        assertFalse(state.chooseUpgrade("a", 31, 0));
-        assertEquals(15, state.progressionFeedback(0).upgrade().secondsLeft());
-        assertEquals(3, state.catchUpFeedback(0).skillsRemaining());
-        assertEquals("Soulfire 3 / Soul Circle 2", state.catchUpFeedback(0).skillFoundation());
-        assertEquals(0, state.join(joined.token(), "restored", 3).slot());
-        assertEquals(41, state.equipmentFeedback(0).id());
+        long later = 2 + LobbyState.RECONNECT_MILLIS * 10;
+        assertTrue(state.snapshot(later).first().reserved());
+        assertEquals(0, state.snapshot(later).first().secondsLeft(), "In-run reservations have no expiry countdown");
+        state.setPhase(LobbyState.Phase.INVITE);
+        assertEquals("lobby_full", fullPartyReplacementAttempt(state, later));
+        assertEquals(0, state.join(joined.token(), "restored", later).slot());
+        assertEquals(generation, state.snapshot(later).first().generation());
+        assertSame(build, state.starterBuild(0));
+        assertEquals(61, state.feedback(0).health()); assertEquals(1.7f, state.feedback(0).dodgeCooldown());
+        assertEquals(31, state.progressionFeedback(0).upgrade().id());
+        assertEquals(23, state.progressionFeedback(0).upgrade().secondsLeft());
+        assertEquals(41, state.equipmentFeedback(0).id()); assertEquals(27, state.equipmentFeedback(0).secondsLeft());
         state.setHostActive(true); state.setPhase(LobbyState.Phase.SESSION);
-        assertTrue(state.chooseUpgrade("restored", 31, 0));
-        state.publishProgression(0, 20, 0, 0, 0, 0, 0, null);
+        assertTrue(state.chooseUpgrade("restored", 31, 1));
+        state.publishProgression(0, 11, 0, 120, 0, 0, 0, null);
         assertTrue(state.chooseEquipment("restored", 41, -1));
-        state.publishEquipment(0, 42, 30, options, cards);
-        assertFalse(state.equipmentFeedback(0).catchUp());
-        assertEquals(30, state.equipmentFeedback(0).durationSeconds());
         state.remove(0);
-        assertEquals(0, state.catchUpFeedback(0).skillsRemaining());
-        assertEquals(0, state.catchUpFeedback(0).equipmentRemaining());
-        assertEquals("", state.catchUpFeedback(0).skillFoundation());
+        assertNull(state.starterBuild(0)); assertNull(state.equipmentFeedback(0));
+        assertNull(state.progressionFeedback(0).upgrade());
+    }
+
+    private static String fullPartyReplacementAttempt(LobbyState state, long now) {
+        state.join(null, "companion", now);
+        return state.join(null, "replacement", now).error();
+    }
+
+    @Test void starterBuildCountsAreBoundedAndClearForFreshPlayersAndAfterRunEnds() {
+        var state = new LobbyState(); state.join(null, "a", 1);
+        state.setPhase(LobbyState.Phase.SESSION);
+        state.publishStarterBuild(0, true, 999, 999);
+        assertEquals(19, state.starterBuild(0).skillsGranted());
+        assertEquals(8, state.starterBuild(0).equipmentGranted());
+        state.publishStarterBuild(0, true, 0, 0);
+        assertNull(state.starterBuild(0));
+        state.publishStarterBuild(0, false, 9, 4);
+        assertNull(state.starterBuild(0), "Unactivated replacements cannot inherit a removed participant's confirmation");
+        state.publishStarterBuild(0, true, 5, 2);
+        state.disconnected("a", 2);
+        state.setPhase(LobbyState.Phase.LOBBY);
+        assertFalse(state.snapshot(2 + LobbyState.RECONNECT_MILLIS).first().reserved());
+        assertNull(state.starterBuild(0));
     }
 
     @Test void equipmentRequestsAreOwnSlotBoundAndSkillsTakePriorityEvenWithTheSameId() {

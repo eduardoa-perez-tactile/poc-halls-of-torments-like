@@ -478,7 +478,11 @@ public final class CryptLobby extends ApplicationAdapter {
             var player = slot == 0 ? snapshot.first() : snapshot.second();
             message.append(slot == 0 ? "PLAYER I" : "PLAYER II");
             if (player.connected()) message.append(" CONNECTED");
-            else if (player.reserved()) message.append(" DISCONNECTED - reconnect within ").append(player.secondsLeft()).append('s');
+            else if (player.reserved()) {
+                message.append(" DISCONNECTED - ");
+                if (player.secondsLeft() > 0) message.append("reconnect within ").append(player.secondsLeft()).append('s');
+                else message.append("reconnect or remove player");
+            }
             else message.append(" PLACE RELEASED");
             message.append('\n');
         }
@@ -899,25 +903,23 @@ public final class CryptLobby extends ApplicationAdapter {
         var progression = world.progression;
         boolean inRun = (screen == Screen.SESSION || screen == Screen.INVITE
             || screen == Screen.CHARACTER_INFO && characterInfoInvitation) && world.outcome == ArenaWorld.Outcome.RUNNING;
+        var snapshot = state.snapshot(System.currentTimeMillis());
         for (int i = 0; i < 2; i++) {
+            var player = i == 0 ? snapshot.first() : snapshot.second();
+            boolean participant = inRun && world.players[i].active && player.reserved()
+                && generations[i] == player.generation();
             var offer = progression.offers[i];
-            boolean pending = inRun && world.players[i].active && offer.pending;
+            boolean pending = participant && offer.pending;
             state.publishProgression(i, progression.level, progression.xp, progression.xpToNext,
                 pending ? offer.id : 0, pending ? offer.level : 0, pending ? offer.secondsLeft : 0,
                 pending ? offer.options : null, pending ? offer.cards : null,
                 pending && offer.catchUp, pending ? offer.durationSeconds : PartyProgression.CHOICE_SECONDS);
             var itemOffer = world.equipment.offers[i];
-            boolean itemPending = inRun && world.players[i].active && itemOffer.pending;
+            boolean itemPending = participant && itemOffer.pending;
             state.publishEquipment(i, itemPending ? itemOffer.id : 0, itemPending ? itemOffer.secondsLeft : 0,
                 itemPending ? itemOffer.options : null, itemPending ? itemOffer.cards : null,
                 itemPending && itemOffer.catchUp, itemPending ? itemOffer.durationSeconds : 30f);
-            boolean participant = inRun && world.players[i].active;
-            state.publishCatchUp(i, participant ? progression.catchUpRemaining(i) : 0,
-                participant ? world.equipment.catchUpRemaining(i) : 0,
-                participant ? progression.foundationSummary(i) : "",
-                participant ? world.equipment.foundationSummary(i) : "",
-                participant ? progression.foundationSkills(i) : List.of(),
-                participant ? world.equipment.foundationItems(i) : List.of());
+            state.publishStarterBuild(i, participant, progression.foundationCount(i), world.equipment.foundationCount(i));
         }
     }
 
