@@ -204,6 +204,32 @@ class ActorPresentationStateTest {
         assertEquals(100, bossWorld.players[0].health);
     }
 
+    @Test void projectilePresentationKeepsItsEmitterAfterDeathAndRefreshesOnShotPoolReuse() {
+        ArenaWorld world = solo(ArenaWorld.Hero.WARDEN); world.players[0].attackCooldown = 10;
+        ArenaWorld.Enemy cultist = enemy(world, 0, ArenaWorld.EnemyKind.CULTIST, 350, 0);
+        cultist.elite = true; cultist.attackCooldown = 0; cultist.damage = 12;
+        world.update(ArenaWorld.STEP);
+        for (int tick = 0; tick < 44 && cultist.windup > 0; tick++) world.update(ArenaWorld.STEP);
+        ArenaWorld.Shot shot = world.shots[0];
+        assertTrue(shot.active); assertEquals(ArenaWorld.EnemyKind.CULTIST, shot.casterKind);
+        assertTrue(shot.casterElite); assertEquals(12, shot.damage);
+        assertEquals(180, Math.hypot(shot.vx, shot.vy), .001);
+
+        cultist.active = false; world.activeEnemies--;
+        ArenaWorld.Enemy boss = enemy(world, 0, ArenaWorld.EnemyKind.BOSS, 350, 0);
+        boss.elite = false; boss.attackCooldown = 10;
+        world.update(ArenaWorld.STEP);
+        assertEquals(ArenaWorld.EnemyKind.CULTIST, shot.casterKind,
+            "Reusing the caster's slot cannot change an already flying shot");
+        assertTrue(shot.casterElite);
+
+        shot.active = false; boss.attackCooldown = 0; world.update(ArenaWorld.STEP);
+        assertTrue(shot.active); assertEquals(ArenaWorld.EnemyKind.BOSS, shot.casterKind);
+        assertFalse(shot.casterElite); assertEquals(15, shot.damage);
+        assertEquals(145, Math.hypot(shot.vx, shot.vy), .001);
+        assertEquals(5, activeShots(world));
+    }
+
     private static ArenaWorld solo(ArenaWorld.Hero hero) {
         ArenaWorld world = new ArenaWorld(); world.setHero(0, hero); world.activatePlayer(0); return world;
     }

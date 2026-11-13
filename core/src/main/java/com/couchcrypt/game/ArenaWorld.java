@@ -332,7 +332,7 @@ public final class ArenaWorld {
                     // Cultists still aim at the live target on release, not the earlier cast snapshot.
                     e.castFacingX = e.facingX; e.castFacingY = e.facingY;
                     e.releaseAge = 0;
-                    fireShot(e.x, e.y, target.x - e.x, target.y - e.y, 180, e.damage);
+                    fireShot(e, target.x - e.x, target.y - e.y, 180, e.damage);
                 }
             } else if (e.stunTime <= 0) moveEnemy(e, target);
             e.moving = e.x != previousX || e.y != previousY;
@@ -378,7 +378,7 @@ public final class ArenaWorld {
         int count = bossPhase == 2 ? 7 : 5;
         for (int i = 0; i < count; i++) {
             float a = angle + (i - (count - 1) * .5f) * .22f;
-            fireShot(e.x, e.y, (float) Math.cos(a), (float) Math.sin(a), bossPhase == 2 ? 165 : 145, 15);
+            fireShot(e, (float) Math.cos(a), (float) Math.sin(a), bossPhase == 2 ? 165 : 145, 15);
         }
     }
 
@@ -396,10 +396,12 @@ public final class ArenaWorld {
         }
     }
 
-    private void fireShot(float x, float y, float dx, float dy, float speed, float damage) {
+    private void fireShot(Enemy caster, float dx, float dy, float speed, float damage) {
         for (Shot shot : shots) {
             if (shot.active) continue;
-            float distance = length(dx, dy); shot.active = true; shot.x = x; shot.y = y;
+            float distance = length(dx, dy); shot.active = true; shot.x = caster.x; shot.y = caster.y;
+            // Value snapshots survive caster death and enemy-pool reuse; only drawing reads them.
+            shot.casterKind = caster.kind; shot.casterElite = caster.elite;
             shot.vx = dx / distance * speed; shot.vy = dy / distance * speed;
             shot.ttl = 5; shot.damage = damage; shot.radius = 10; return;
         }
@@ -701,7 +703,11 @@ public final class ArenaWorld {
         public long hitMask;
     }
     public static final class Pickup { public boolean active, healing; public float x, y; public int value; }
-    public static final class Shot { public boolean active; public float x, y, vx, vy, ttl, damage, radius; }
+    public static final class Shot {
+        public boolean active, casterElite;
+        public EnemyKind casterKind;
+        public float x, y, vx, vy, ttl, damage, radius;
+    }
     public static final class Hazard { public boolean active; public float x, y, radius, warning, ttl, damage; }
     public static final class Effect {
         public boolean active; public EffectKind kind;
