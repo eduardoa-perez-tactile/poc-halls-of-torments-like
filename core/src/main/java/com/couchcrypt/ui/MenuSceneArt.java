@@ -17,7 +17,7 @@ public final class MenuSceneArt extends BaseDrawable implements Disposable {
     private static final int WIDTH = 1536, HEIGHT = 864, ATLAS_WIDTH = 512, ATLAS_HEIGHT = 1024;
     // Normalized scene positions use a bottom-left origin, matching Scene2D.
     private static final float LEFT_ORB_X = 198f / 1672, RIGHT_ORB_X = 1473f / 1672, ORB_Y = 1f - 608f / 941;
-    private static final float ORB_WIDTH = .029f;
+    private static final float ORB_WIDTH = .036f;
 
     public enum Mood { NEUTRAL, VICTORY, DEFEAT }
 
@@ -49,7 +49,7 @@ public final class MenuSceneArt extends BaseDrawable implements Disposable {
             left = pack(sheet, packed, 0, sheet.getWidth() / 2, 2, 2, 252, 764, 64);
             right = pack(sheet, packed, sheet.getWidth() / 2, sheet.getWidth(), 258, 2, 252, 764, 64);
             sheet.dispose(); sheet = null;
-            light = new Pixmap(Gdx.files.internal("art/menu-crypt-orb.png"));
+            light = new Pixmap(Gdx.files.internal("art/menu-crypt-orb-v2.png"));
             orb = pack(light, packed, 0, light.getWidth(), 2, 770, 252, 252, 8);
             light.dispose(); light = null;
 
@@ -88,16 +88,16 @@ public final class MenuSceneArt extends BaseDrawable implements Disposable {
         drawLayer(batch, right, x, y, width, height);
         Color color = batch.getColor();
         float red = color.r, green = color.g, blue = color.b, alpha = color.a;
-        float strength = mood == Mood.VICTORY ? 1f : mood == Mood.DEFEAT ? .72f : .9f;
+        float strength = mood == Mood.DEFEAT ? .88f : 1f;
         float tintGreen = mood == Mood.DEFEAT ? .94f : 1f;
         float tintBlue = mood == Mood.VICTORY ? .94f : 1f;
         float haloHeight = ORB_WIDTH * WIDTH / HEIGHT * orb.atlasHeight / orb.atlasWidth;
         batch.setColor(red, green * tintGreen, blue * tintBlue,
-            alpha * strength * (.94f + .04f * MathUtils.sin(clock * MathUtils.PI2 / 8f)));
+            alpha * strength * (.97f + .03f * MathUtils.sin(clock * MathUtils.PI2 / 8f)));
         batch.draw(orb.region, x + (LEFT_ORB_X - ORB_WIDTH / 2) * width,
             y + (ORB_Y - haloHeight / 2) * height, ORB_WIDTH * width, haloHeight * height);
         batch.setColor(red, green * tintGreen, blue * tintBlue,
-            alpha * strength * (.94f + .04f * MathUtils.sin(clock * MathUtils.PI2 / 8f + 1.8f)));
+            alpha * strength * (.97f + .03f * MathUtils.sin(clock * MathUtils.PI2 / 8f + 1.8f)));
         batch.draw(orb.region, x + (RIGHT_ORB_X - ORB_WIDTH / 2) * width,
             y + (ORB_Y - haloHeight / 2) * height, ORB_WIDTH * width, haloHeight * height);
         batch.setColor(red, green, blue, alpha);
