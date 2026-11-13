@@ -5,6 +5,23 @@ import com.couchcrypt.game.PartyProgression;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LobbyStateTest {
+    @Test void longRunCapStillPublishesQueuedPersonalEntitlementsAndClearsXpRail() {
+        var state = new LobbyState(); state.join(null, "a", 1); state.setPhase(LobbyState.Phase.SESSION);
+        var choices = PartyProgression.Upgrade.values();
+        state.publishProgression(0, PartyProgression.MAX_LEVEL + 1, 100, 175,
+            50, PartyProgression.MAX_LEVEL, PartyProgression.CHOICE_SECONDS, choices);
+        var feedback = state.progressionFeedback(0);
+        assertEquals(PartyProgression.MAX_LEVEL, feedback.level());
+        assertEquals(0, feedback.xp()); assertEquals(0, feedback.xpToNext());
+        assertEquals(PartyProgression.MAX_LEVEL, feedback.upgrade().level());
+        assertEquals(PartyProgression.CHOICE_SECONDS, feedback.upgrade().secondsLeft());
+        assertTrue(state.chooseUpgrade("a", 50, 0), "Reaching the shared cap must not hide queued personal upgrades");
+        var request = new LobbyState.UpgradeRequest();
+        assertTrue(state.pollUpgrade(0, request)); assertEquals(50, request.offerId);
+        state.publishProgression(0, PartyProgression.MAX_LEVEL, 0, 0, 0, 0, 0, null);
+        assertNull(state.progressionFeedback(0).upgrade());
+    }
+
     @Test void newCompanionRequiresHostInviteButExistingPlayerCanReconnectDuringSession() {
         var state = new LobbyState();
         var first = state.join(null, "a", 1);

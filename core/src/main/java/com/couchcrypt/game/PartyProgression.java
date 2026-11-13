@@ -4,6 +4,11 @@ package com.couchcrypt.game;
 public final class PartyProgression {
     public static final int MAX_LEVEL = 20;
     public static final float CHOICE_SECONDS = 30f;
+    // Nineteen earned choices: 116 / 516 / 1,166 / 1,991 cumulative XP at levels 5 / 10 / 15 / 20.
+    // Rising costs leave time to play between the unchanged thirty-second phone choices.
+    private static final int[] LONG_RUN_THRESHOLDS = {
+        12, 22, 34, 48, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 155, 160, 165, 170, 175
+    };
 
     public enum Upgrade {
         POWER("power", "Soulfire", "Damage +25% of base."),
@@ -351,6 +356,10 @@ public final class PartyProgression {
         }
     }
 
-    private static int threshold(int level) { return 6 + (level - 1) * 4; }
+    private int threshold(int level) {
+        // Keep the fast three-minute arena and smaller boundary fixtures useful for development.
+        return world.durationSeconds() > ArenaTimeline.SHORT.durationSeconds()
+            ? LONG_RUN_THRESHOLDS[level - 1] : 6 + (level - 1) * 4;
+    }
     private static boolean validSlot(int slot) { return slot >= 0 && slot < 2; }
 }

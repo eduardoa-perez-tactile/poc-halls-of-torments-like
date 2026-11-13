@@ -173,8 +173,8 @@ public final class LobbyState {
         int offerId, int offerLevel, float secondsLeft, PartyProgression.Upgrade[] options,
         PartyProgression.CardPreview[] cards) {
         Slot slot = slots[index];
-        slot.level = Math.max(1, Math.min(20, level));
-        slot.xpToNext = slot.level == 20 ? 0 : Math.max(1, xpToNext);
+        slot.level = Math.max(1, Math.min(PartyProgression.MAX_LEVEL, level));
+        slot.xpToNext = slot.level == PartyProgression.MAX_LEVEL ? 0 : Math.max(1, xpToNext);
         slot.xp = Math.max(0, Math.min(slot.xpToNext, xp));
         boolean offered = offerId > 0 && options != null && options.length >= 3
             && options[0] != null && options[1] != null && options[2] != null
@@ -185,8 +185,8 @@ public final class LobbyState {
             slot.claimedOfferId = 0;
         }
         slot.offerId = nextId;
-        slot.offerLevel = offered ? Math.max(2, Math.min(20, offerLevel)) : 0;
-        slot.offerSeconds = offered ? Math.min(30, secondsLeft) : 0;
+        slot.offerLevel = offered ? Math.max(2, Math.min(PartyProgression.MAX_LEVEL, offerLevel)) : 0;
+        slot.offerSeconds = offered ? Math.min(PartyProgression.CHOICE_SECONDS, secondsLeft) : 0;
         for (int i = 0; i < 3; i++) {
             slot.options[i] = offered ? options[i] : null;
             slot.cards[i] = offered && cards != null && cards.length >= 3 ? cards[i] : null;
