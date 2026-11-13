@@ -103,9 +103,13 @@ class JoinServerTest {
             var first = http.newWebSocketBuilder().buildAsync(url, one).get(3, TimeUnit.SECONDS);
             var second = http.newWebSocketBuilder().buildAsync(url, two).get(3, TimeUnit.SECONDS);
             one.expect("joined"); two.expect("joined");
-            var options = PartyProgression.Upgrade.values();
-            state.publishProgression(0, 2, 3, 8, 10, 2, 27.5f, options);
-            state.publishProgression(1, 2, 3, 8, 20, 2, 27.5f, options);
+            var world = new com.couchcrypt.game.ArenaWorld(); world.activatePlayer(0); world.activatePlayer(1);
+            world.progression.addXp(6);
+            var options = world.progression.offers[0].options;
+            var cards = world.progression.offers[0].cards;
+            state.publishProgression(0, 2, 3, 8, 10, 2, 27.5f, options, cards);
+            state.publishProgression(1, 2, 3, 8, 20, 2, 27.5f,
+                world.progression.offers[1].options, world.progression.offers[1].cards);
             state.setPhase(LobbyState.Phase.SESSION);
             JsonValue status;
             do { status = one.expect("status"); } while (status.get("progression").get("upgrade").isNull());
@@ -116,6 +120,12 @@ class JoinServerTest {
             assertEquals(options[0].id, offer.get("options").get(0).getString("id"));
             assertEquals(options[0].title, offer.get("options").get(0).getString("title"));
             assertEquals(options[0].description, offer.get("options").get(0).getString("description"));
+            for (int index = 0; index < 3; index++) {
+                var json = offer.get("options").get(index); var card = cards[index];
+                assertEquals(card.icon(), json.getInt("icon")); assertEquals(card.rank(), json.getInt("rank"));
+                assertEquals(card.category(), json.getString("category")); assertEquals(card.headline(), json.getString("headline"));
+                assertEquals(card.before(), json.getString("before")); assertEquals(card.after(), json.getString("after"));
+            }
             first.sendText("{\"type\":\"upgrade\",\"offerId\":20,\"option\":0}", true).get(3, TimeUnit.SECONDS);
             first.sendText("{\"type\":\"upgrade\",\"offerId\":10,\"option\":-1}", true).get(3, TimeUnit.SECONDS);
             first.sendText("{\"type\":\"upgrade\",\"player\":2,\"offerId\":10,\"option\":1}", true).get(3, TimeUnit.SECONDS);

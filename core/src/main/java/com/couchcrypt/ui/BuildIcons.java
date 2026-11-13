@@ -2,11 +2,15 @@ package com.couchcrypt.ui;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.PixmapIO;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.PixmapTextureData;
 import com.badlogic.gdx.utils.Disposable;
+import com.badlogic.gdx.utils.GdxRuntimeException;
 import com.couchcrypt.game.PartyProgression;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 /** One small managed atlas for the twelve upgrade emblems shown in Run Details. */
 public final class BuildIcons implements Disposable {
@@ -16,6 +20,7 @@ public final class BuildIcons implements Disposable {
     public final long retainedPixmapBytes = textureBytes;
     private final Texture texture;
     private final Pixmap pixels;
+    private byte[] controllerPng;
     private boolean disposed;
 
     public BuildIcons() {
@@ -59,9 +64,26 @@ public final class BuildIcons implements Disposable {
         pixels = baked;
     }
 
+    /** Encode the existing normalized atlas once; HTTP responses share these bounded PNG bytes. */
+    public byte[] controllerIcons() {
+        if (disposed) throw new IllegalStateException("Skill icons have been disposed");
+        if (controllerPng != null) return controllerPng;
+        PixmapIO.PNG encoder = new PixmapIO.PNG(128 * 1024);
+        encoder.setFlipY(false); encoder.setCompression(4);
+        try {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream(128 * 1024);
+            encoder.write(bytes, pixels);
+            controllerPng = bytes.toByteArray();
+            return controllerPng;
+        } catch (IOException failure) {
+            throw new GdxRuntimeException("Cannot encode controller skill icons", failure);
+        } finally { encoder.dispose(); }
+    }
+
     @Override public void dispose() {
         if (disposed) return;
         disposed = true;
+        controllerPng = null;
         texture.dispose(); pixels.dispose();
     }
 }

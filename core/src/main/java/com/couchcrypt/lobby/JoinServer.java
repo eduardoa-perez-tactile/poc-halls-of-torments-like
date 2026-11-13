@@ -85,16 +85,24 @@ public final class JoinServer extends NanoWSD {
         if (upgrade == null) return result.append("null}").toString();
         result.append("{\"id\":").append(upgrade.id()).append(",\"level\":").append(upgrade.level())
             .append(",\"secondsLeft\":").append(upgrade.secondsLeft()).append(",\"options\":[");
-        appendUpgrade(result, upgrade.first()); result.append(',');
-        appendUpgrade(result, upgrade.second()); result.append(',');
-        appendUpgrade(result, upgrade.third());
+        appendUpgrade(result, upgrade.first(), upgrade.firstCard()); result.append(',');
+        appendUpgrade(result, upgrade.second(), upgrade.secondCard()); result.append(',');
+        appendUpgrade(result, upgrade.third(), upgrade.thirdCard());
         return result.append("]}}").toString();
     }
 
-    private static void appendUpgrade(StringBuilder target, PartyProgression.Upgrade upgrade) {
+    private static void appendUpgrade(StringBuilder target, PartyProgression.Upgrade upgrade, PartyProgression.CardPreview card) {
         target.append("{\"id\":"); quote(target, upgrade.id);
         target.append(",\"title\":"); quote(target, upgrade.title);
-        target.append(",\"description\":"); quote(target, upgrade.description); target.append('}');
+        target.append(",\"description\":"); quote(target, upgrade.description);
+        if (card != null) {
+            target.append(",\"icon\":").append(card.icon()).append(",\"rank\":").append(card.rank());
+            target.append(",\"category\":"); quote(target, card.category());
+            target.append(",\"headline\":"); quote(target, card.headline());
+            target.append(",\"before\":"); quote(target, card.before());
+            target.append(",\"after\":"); quote(target, card.after());
+        }
+        target.append('}');
     }
 
     private static void quote(StringBuilder target, String text) {

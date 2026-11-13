@@ -153,6 +153,7 @@ public final class CryptLobby extends ApplicationAdapter {
             assets.put("/art/home-button.png", new JoinServer.Asset(art.controllerButton(false), "image/png"));
             assets.put("/art/home-button-focused.png", new JoinServer.Asset(art.controllerButton(true), "image/png"));
             assets.put("/art/home-logo.png", new JoinServer.Asset(art.controllerLogo(), "image/png"));
+            assets.put("/art/skill-icons.png", new JoinServer.Asset(buildIcons.controllerIcons(), "image/png"));
             server = new JoinServer(config.port(), state, assets); server.open(); serverError = null;
             Gdx.app.log("Lobby", "Join URL: " + (host == null ? "No LAN address" : server.url(host)));
         } catch (Exception failure) {
@@ -854,7 +855,7 @@ public final class CryptLobby extends ApplicationAdapter {
             boolean pending = inRun && world.players[i].active && offer.pending;
             state.publishProgression(i, progression.level, progression.xp, progression.xpToNext,
                 pending ? offer.id : 0, pending ? offer.level : 0, pending ? offer.secondsLeft : 0,
-                pending ? offer.options : null);
+                pending ? offer.options : null, pending ? offer.cards : null);
         }
     }
 

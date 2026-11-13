@@ -10,6 +10,7 @@
   const controls = byId('game-controls'), joystick = byId('joystick'), stick = byId('stick'), dodgeButton = byId('dodge');
   const dodgeStatus = byId('dodge-status');
   const upgradeChoices = byId('upgrade-choices'), upgradeLevel = byId('upgrade-level'), upgradeCountdown = byId('upgrade-countdown');
+  const upgradeSecondsLabel = byId('upgrade-seconds'), upgradeTimerLabel = byId('upgrade-timer-label');
   const upgradeButtons = [0, 1, 2].map((index) => byId(`upgrade-option-${index}`));
   let upgradeOffer = null, upgradeSeconds = 0, upgradeSampleTime = 0, upgradeTicker;
   let upgradeSelected = -1, upgradePendingSince = 0;
@@ -17,12 +18,13 @@
   let axisX = 0, axisY = 0, dodgeEdge = false, stickPointer = null, dodgePointer = null, stickBounds;
   const keys = new Set();
 
-  function canControl() { return joined && phase === 'session' && hostActive && alive && foreground && !document.hidden && socket?.readyState === WebSocket.OPEN; }
+  function canControl() { return joined && !upgradeOffer && phase === 'session' && hostActive && alive && foreground && !document.hidden && socket?.readyState === WebSocket.OPEN; }
   function sendInput() {
     if (socket?.readyState !== WebSocket.OPEN || !joined) return;
     // Never queue movement behind a stalled network connection. The host expires it in 300ms.
     if (socket.bufferedAmount > 4096) { socket.close(); return; }
-    socket.send(JSON.stringify({ type: 'input', x: axisX, y: axisY, dodge: dodgeEdge, seq: sequence++ }));
+    const active = canControl();
+    socket.send(JSON.stringify({ type: 'input', x: active ? axisX : 0, y: active ? axisY : 0, dodge: active && dodgeEdge, seq: sequence++ }));
     dodgeEdge = false;
   }
   function paintStick(x, y, radius) { stick.style.transform = `translate(${x * radius}px, ${-y * radius}px)`; }
@@ -43,7 +45,7 @@
     const wasVisible = !upgradeChoices.hidden;
     clearInterval(upgradeTicker); upgradeTicker = undefined;
     upgradeOffer = null; upgradeSelected = -1; upgradePendingSince = 0;
-    upgradeChoices.hidden = true; document.body.classList.remove('has-upgrade');
+    upgradeChoices.hidden = true; document.body.classList.remove('has-upgrade', 'choice-urgent');
     if (wasVisible) releaseControls();
   }
   function canChooseUpgrade() {
@@ -61,9 +63,14 @@
     if (upgradeSelected >= 0 && performance.now() - upgradePendingSince >= 1200) {
       upgradeSelected = -1; upgradePendingSince = 0;
     }
-    upgradeCountdown.textContent = upgradeSelected >= 0 ? 'Applying choice…'
+    const seconds = Math.ceil(remaining);
+    upgradeSecondsLabel.textContent = String(seconds);
+    upgradeTimerLabel.textContent = upgradeSelected >= 0 ? 'Applying choice…'
       : !hostActive || phase !== 'session' ? 'Paused'
-      : remaining <= 0 ? 'Applying auto-pick…' : `Auto-pick in ${Math.ceil(remaining)}s`;
+      : remaining <= 0 ? 'Applying auto-pick…' : 'Seconds to choose';
+    upgradeCountdown.setAttribute('aria-label', `${seconds} seconds. ${upgradeTimerLabel.textContent}`);
+    upgradeChoices.style.setProperty('--choice-progress', `${remaining / 30 * 100}%`);
+    document.body.classList.toggle('choice-urgent', seconds <= 10 && hostActive && phase === 'session');
     const disabled = !canChooseUpgrade() || remaining <= 0 || upgradeSelected >= 0;
     upgradeButtons.forEach((button, index) => {
       button.disabled = disabled;
@@ -72,6 +79,34 @@
     if (foreground && !document.hidden) {
       if (!upgradeTicker) upgradeTicker = setInterval(paintUpgrade, 100);
     } else { clearInterval(upgradeTicker); upgradeTicker = undefined; }
+  }
+  const fallbackSkills = {
+    power: [0, 'OFFENSE'], haste: [1, 'OFFENSE'], fleet: [2, 'MOBILITY'], vitality: [3, 'DEFENSE'],
+    evasion: [4, 'MOBILITY'], sweep: [5, 'WEAPON'], multishot: [6, 'WEAPON'], pierce: [7, 'WEAPON'],
+    aura: [8, 'OFFENSE'], storm: [9, 'OFFENSE'], magnet: [10, 'UTILITY'], critical: [11, 'OFFENSE']
+  };
+  const categoryGlyphs = { WEAPON: '⚔︎', OFFENSE: '✦', DEFENSE: '✚', MOBILITY: '➶', UTILITY: '◎' };
+  function paintSkillCard(button, option) {
+    const fallback = fallbackSkills[option.id];
+    const category = Object.hasOwn(categoryGlyphs, option.category) ? option.category : fallback?.[1] || 'OFFENSE';
+    const icon = Number.isInteger(option.icon) && option.icon >= 0 && option.icon < 12 ? option.icon : fallback?.[0];
+    const illustrated = Number.isInteger(icon);
+    button.dataset.category = category;
+    button.querySelector('.skill-art').hidden = !illustrated;
+    if (illustrated) {
+      button.style.setProperty('--icon-x', `${icon % 4 / 3 * 100}%`);
+      button.style.setProperty('--icon-y', `${Math.floor(icon / 4) / 2 * 100}%`);
+    }
+    button.querySelector('.skill-category').textContent = `${categoryGlyphs[category]} ${category}`;
+    button.querySelector('.skill-rank').textContent = Number.isSafeInteger(option.rank) && option.rank > 0 ? `RANK ${option.rank}` : '';
+    button.querySelector('.skill-title').textContent = option.title.slice(0, 64);
+    const hasPreview = typeof option.headline === 'string' && typeof option.before === 'string' && typeof option.after === 'string';
+    button.classList.toggle('legacy', !hasPreview);
+    button.querySelector('.skill-headline').textContent = hasPreview ? option.headline.slice(0, 40) : option.description.slice(0, 128);
+    button.querySelector('.skill-preview').hidden = !hasPreview;
+    button.querySelector('.skill-before').textContent = hasPreview ? option.before.slice(0, 40) : '';
+    button.querySelector('.skill-after').textContent = hasPreview ? option.after.slice(0, 40) : '';
+    button.setAttribute('aria-label', `${option.title}. ${hasPreview ? `${option.headline}. ${option.before} to ${option.after}` : option.description}${Number.isSafeInteger(option.rank) && option.rank > 0 ? `. Rank ${option.rank}` : ''}`);
   }
   function setUpgradeOffer(progression) {
     const next = progression?.upgrade;
@@ -83,13 +118,11 @@
     }
     if (upgradeOffer?.id !== next.id) {
       upgradeOffer = next; upgradeSelected = -1; upgradePendingSince = 0;
-      upgradeLevel.textContent = `LEVEL ${Number.isSafeInteger(next.level) ? next.level : ''} · CHOOSE A SKILL`;
-      upgradeButtons.forEach((button, index) => {
-        button.querySelector('strong').textContent = next.options[index].title.slice(0, 64);
-        button.querySelector('span').textContent = next.options[index].description.slice(0, 128);
-      });
+      upgradeLevel.textContent = `LEVEL ${Number.isSafeInteger(next.level) ? next.level : ''}`;
+      upgradeButtons.forEach((button, index) => paintSkillCard(button, next.options[index]));
       upgradeChoices.hidden = false; document.body.classList.add('has-upgrade');
-      // The choice area changes controller geometry, so discard any captured old bounds.
+      upgradeChoices.querySelector('.upgrade-options').scrollTop = 0;
+      // Combat continues, but choosing a skill is a neutral-input phone mode.
       releaseControls();
     }
     upgradeSeconds = Math.max(0, Math.min(30, next.secondsLeft));
@@ -105,15 +138,17 @@
   function setControlScreen(data) {
     const wasSession = phase === 'session' && hostActive;
     phase = data.phase; hostActive = data.hostActive; alive = data.alive !== false;
-    const show = phase === 'session' && hostActive;
-    controls.hidden = !show; document.body.classList.toggle('playing', show);
+    const activeSession = phase === 'session' && hostActive;
     title.textContent = data.phase === 'paused' || data.phase === 'invite' ? 'Paused' : data.phase === 'results' ? 'Round complete' : 'You have a place';
-    if (wasSession !== show) releaseControls();
+    if (wasSession !== activeSession) releaseControls();
+    setUpgradeOffer(data.progression);
+    const show = activeSession || upgradeOffer !== null;
+    controls.hidden = !show; document.body.classList.toggle('playing', show);
+    document.querySelector('.touch-controls').inert = upgradeOffer !== null;
     const cooldown = Number.isFinite(data.dodgeCooldown) ? Math.max(0, data.dodgeCooldown) : 0;
     dodgeStatus.textContent = alive ? (cooldown > 0.05 ? `${cooldown.toFixed(1)}s` : 'READY') : 'FALLEN';
-    dodgeButton.disabled = !alive || cooldown > 0.05;
+    dodgeButton.disabled = !!upgradeOffer || !alive || cooldown > 0.05;
     refreshSender();
-    setUpgradeOffer(data.progression);
   }
   function movePointer(event) {
     if (event.pointerId !== stickPointer || !canControl()) return;

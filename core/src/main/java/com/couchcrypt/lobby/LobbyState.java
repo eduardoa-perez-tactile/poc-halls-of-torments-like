@@ -22,7 +22,8 @@ public final class LobbyState {
         public long generation;
     }
     public record UpgradeFeedback(int id, int level, float secondsLeft,
-        PartyProgression.Upgrade first, PartyProgression.Upgrade second, PartyProgression.Upgrade third) {}
+        PartyProgression.Upgrade first, PartyProgression.Upgrade second, PartyProgression.Upgrade third,
+        PartyProgression.CardPreview firstCard, PartyProgression.CardPreview secondCard, PartyProgression.CardPreview thirdCard) {}
     public record ProgressionFeedback(int level, int xp, int xpToNext, UpgradeFeedback upgrade) {}
     public record Snapshot(Player first, Player second, int connected, boolean hostActive, Phase phase, long revision) {}
     public record Join(int slot, String token, String error) {
@@ -38,6 +39,7 @@ public final class LobbyState {
         int level = 1, xp, xpToNext = 6, offerId, offerLevel, claimedOfferId;
         float offerSeconds;
         final PartyProgression.Upgrade[] options = new PartyProgression.Upgrade[3];
+        final PartyProgression.CardPreview[] cards = new PartyProgression.CardPreview[3];
         boolean upgradeQueued;
         int upgradeOption;
         void clearUpgradeRequest() {
@@ -47,7 +49,7 @@ public final class LobbyState {
         void clearProgression() {
             level = 1; xp = 0; xpToNext = 6; offerId = offerLevel = claimedOfferId = 0;
             offerSeconds = 0; upgradeQueued = false;
-            for (int i = 0; i < 3; i++) options[i] = null;
+            for (int i = 0; i < 3; i++) { options[i] = null; cards[i] = null; }
         }
         void clearInput() { x = 0; y = 0; pendingDodge = false; dodgeHeld = false; lastInput = 0; }
         void clear() {
@@ -160,9 +162,16 @@ public final class LobbyState {
         return new Feedback(slot.health, slot.maxHealth, slot.dodgeCooldown, slot.alive);
     }
 
-    /** Copies authoritative presentation data; this method does no network I/O or allocation. */
+    /** Compatibility path for callers without the new immutable card presentation. */
     public synchronized void publishProgression(int index, int level, int xp, int xpToNext,
         int offerId, int offerLevel, float secondsLeft, PartyProgression.Upgrade[] options) {
+        publishProgression(index, level, xp, xpToNext, offerId, offerLevel, secondsLeft, options, null);
+    }
+
+    /** Copies immutable records into private fixed storage; no caller-owned arrays escape. */
+    public synchronized void publishProgression(int index, int level, int xp, int xpToNext,
+        int offerId, int offerLevel, float secondsLeft, PartyProgression.Upgrade[] options,
+        PartyProgression.CardPreview[] cards) {
         Slot slot = slots[index];
         slot.level = Math.max(1, Math.min(20, level));
         slot.xpToNext = slot.level == 20 ? 0 : Math.max(1, xpToNext);
@@ -178,7 +187,10 @@ public final class LobbyState {
         slot.offerId = nextId;
         slot.offerLevel = offered ? Math.max(2, Math.min(20, offerLevel)) : 0;
         slot.offerSeconds = offered ? Math.min(30, secondsLeft) : 0;
-        for (int i = 0; i < 3; i++) slot.options[i] = offered ? options[i] : null;
+        for (int i = 0; i < 3; i++) {
+            slot.options[i] = offered ? options[i] : null;
+            slot.cards[i] = offered && cards != null && cards.length >= 3 ? cards[i] : null;
+        }
     }
 
     /** The request can only select the caller's own currently published offer. */
@@ -208,7 +220,8 @@ public final class LobbyState {
     public synchronized ProgressionFeedback progressionFeedback(int index) {
         Slot slot = slots[index];
         UpgradeFeedback upgrade = slot.offerId > 0
-            ? new UpgradeFeedback(slot.offerId, slot.offerLevel, slot.offerSeconds, slot.options[0], slot.options[1], slot.options[2]) : null;
+            ? new UpgradeFeedback(slot.offerId, slot.offerLevel, slot.offerSeconds, slot.options[0], slot.options[1], slot.options[2],
+                slot.cards[0], slot.cards[1], slot.cards[2]) : null;
         return new ProgressionFeedback(slot.level, slot.xp, slot.xpToNext, upgrade);
     }
 

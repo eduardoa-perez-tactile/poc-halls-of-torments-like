@@ -239,6 +239,103 @@ class PartyProgressionTest {
         assertEquals(2.4f * .85f, world.players[0].dodgeCooldown, .001f);
     }
 
+    @Test void cardPreviewsMatchActualAppliedTraitsForBothHeroesAndPartialCaps() {
+        for (ArenaWorld.Hero hero : ArenaWorld.Hero.values()) {
+            for (boolean capped : new boolean[]{false, true}) {
+                for (PartyProgression.Upgrade upgrade : PartyProgression.Upgrade.values()) {
+                    if (!upgrade.supports(hero)) continue;
+                    ArenaWorld world = new ArenaWorld(); world.setHero(0, hero); world.activatePlayer(0);
+                    ArenaWorld.Player player = world.players[0];
+                    if (capped) {
+                        player.damageMultiplier = 3.9f; player.attackRateMultiplier = 2.95f;
+                        player.moveMultiplier = 2.15f; player.maxHealth = 290; player.health = 83;
+                        player.dodgeCooldownMultiplier = .3f; player.cleaveMultiplier = 1.75f;
+                        player.projectileCount = 4; player.pierce = player.auraLevel = player.stormLevel = 2;
+                        player.pickupMultiplier = 2.4f; player.critChance = .45f;
+                    }
+                    float[] beforeState = previewState(player);
+                    PartyProgression.CardPreview card = world.progression.preview(0, upgrade);
+                    assertArrayEquals(beforeState, previewState(player), "Preview must not mutate " + upgrade);
+                    assertEquals(upgrade.ordinal(), card.icon()); assertEquals(1, card.rank());
+                    assertTrue(Set.of("WEAPON", "OFFENSE", "DEFENSE", "MOBILITY", "UTILITY").contains(card.category()));
+                    assertTrue(card.category().length() <= 16);
+                    assertTrue(card.headline().length() <= 40 && card.before().length() <= 40 && card.after().length() <= 40);
+                    assertPreviewValue(card.before(), player, upgrade);
+                    selectFixture(world.progression, 0, upgrade);
+                    assertPreviewValue(card.after(), player, upgrade);
+                    if (capped) {
+                        String expected = switch (upgrade) {
+                            case POWER -> "+10% BASE DAMAGE";
+                            case HASTE -> "+5% BASE ATTACK SPEED";
+                            case FLEET -> "+5% BASE MOVE SPEED";
+                            case VITALITY -> "+10 MAX HP · HEAL UP TO 20";
+                            case EVASION -> "-0.12s DODGE COOLDOWN";
+                            case SWEEP -> "+5% BASE SWORD REACH";
+                            case MAGNET -> "+10% BASE PICKUP RANGE";
+                            case CRITICAL -> "+5 PTS CRIT CHANCE";
+                            default -> card.headline();
+                        };
+                        assertEquals(expected, card.headline(), upgrade + " partial-cap delta");
+                    }
+                }
+            }
+        }
+    }
+
+    @Test void newOffersCacheImmutableCardsAndAdvancePersonalRanksWithoutRecomputingWhilePending() {
+        ArenaWorld world = solo(); PartyProgression progression = world.progression;
+        progression.addXp(6);
+        PartyProgression.Offer offer = progression.offers[0];
+        PartyProgression.CardPreview[] cards = offer.cards.clone();
+        for (int i = 0; i < 3; i++) {
+            assertEquals(offer.options[i].ordinal(), cards[i].icon()); assertEquals(1, cards[i].rank());
+        }
+        progression.update(1); progression.addXp(10);
+        for (int i = 0; i < 3; i++) assertSame(cards[i], offer.cards[i], "Pending cards must be cached");
+        assertEquals(PartyProgression.Upgrade.POWER, offer.options[0]);
+        assertTrue(progression.choose(0, offer.id, 0));
+        assertNotSame(cards[0], offer.cards[0]); assertEquals(2, offer.cards[0].rank());
+        assertEquals("125% DAMAGE", offer.cards[0].before()); assertEquals("150% DAMAGE", offer.cards[0].after());
+        world.deactivatePlayer(0);
+        for (PartyProgression.CardPreview card : offer.cards) assertNull(card);
+    }
+
+    private static float[] previewState(ArenaWorld.Player p) {
+        return new float[]{p.damageMultiplier, p.attackRateMultiplier, p.moveMultiplier, p.maxHealth, p.health,
+            p.dodgeCooldownMultiplier, p.cleaveMultiplier, p.projectileCount, p.pierce, p.auraLevel, p.stormLevel,
+            p.pickupMultiplier, p.critChance, p.attackCooldown, p.dodgeCooldown};
+    }
+
+    private static void assertPreviewValue(String text, ArenaWorld.Player p, PartyProgression.Upgrade upgrade) {
+        java.util.regex.Matcher numbers = java.util.regex.Pattern.compile("\\d+(?:\\.\\d+)?").matcher(text);
+        java.util.List<Float> values = new java.util.ArrayList<>();
+        while (numbers.find()) values.add(Float.parseFloat(numbers.group()));
+        if ((upgrade == PartyProgression.Upgrade.AURA && p.auraLevel == 0)
+            || (upgrade == PartyProgression.Upgrade.STORM && p.stormLevel == 0)) {
+            assertEquals("NONE", text); return;
+        }
+        float actual = switch (upgrade) {
+            case POWER -> p.damageMultiplier * 100;
+            case HASTE -> p.attackRateMultiplier * 100;
+            case FLEET -> p.moveMultiplier * 100;
+            case VITALITY -> p.maxHealth;
+            case EVASION -> p.hero.dodgeCooldown * p.dodgeCooldownMultiplier;
+            case SWEEP -> p.cleaveMultiplier * 100;
+            case MULTISHOT -> p.projectileCount;
+            case PIERCE -> p.pierce;
+            case AURA -> (4 + p.auraLevel * 3) * p.damageMultiplier;
+            case STORM -> (12 + p.stormLevel * 5) * p.damageMultiplier;
+            case MAGNET -> p.pickupMultiplier * 100;
+            case CRITICAL -> p.critChance * 100;
+        };
+        assertEquals(actual, values.get(0), .0051f, upgrade + " displayed value");
+        if (upgrade == PartyProgression.Upgrade.AURA) {
+            assertEquals(.7f, values.get(1)); assertEquals(100 + p.auraLevel * 20, values.get(2));
+        } else if (upgrade == PartyProgression.Upgrade.STORM) {
+            assertEquals(p.stormLevel + 1, values.get(1)); assertEquals(2f, values.get(2));
+        }
+    }
+
     private static void selectFixture(PartyProgression progression, int slot, PartyProgression.Upgrade upgrade) {
         if (!progression.offers[slot].pending) progression.addXp(progression.xpToNext - progression.xp);
         PartyProgression.Offer offer = progression.offers[slot];
