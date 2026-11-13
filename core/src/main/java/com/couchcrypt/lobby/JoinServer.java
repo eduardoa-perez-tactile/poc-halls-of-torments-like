@@ -163,7 +163,7 @@ public final class JoinServer extends NanoWSD {
             lastRevision = snapshot.revision();
             for (Phone phone : phones.values()) {
                 if (now - phone.lastSeen > 10_000) phone.end("timeout");
-                else if (changed || now - phone.lastStatus >= (snapshot.phase() == LobbyState.Phase.SESSION ? 200 : 3_000))
+                else if (changed || now - phone.lastStatus >= (snapshot.phase() == LobbyState.Phase.SESSION || snapshot.phase() == LobbyState.Phase.LEVEL_UP ? 200 : 3_000))
                     phone.deliver(status(phone.slot));
             }
         } catch (RuntimeException ignored) { /* A closed socket must not stop the heartbeat. */ }

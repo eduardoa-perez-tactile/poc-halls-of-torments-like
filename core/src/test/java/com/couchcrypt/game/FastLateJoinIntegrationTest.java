@@ -44,6 +44,7 @@ class FastLateJoinIntegrationTest {
         for (ArenaWorld.Hero hero : ArenaWorld.Hero.values()) {
             ArenaWorld world = party(hero, PartyProgression.MAX_LEVEL, RunEquipment.MAX_REWARDS);
             world.activatePlayer(1);
+            chooseAllHostSkills(world); // Another participant's pending level-up pauses the whole party.
             var player = world.players[1]; float start = player.x;
             world.setInput(1, 1, 0, true);
             world.update(ArenaWorld.STEP);
@@ -65,6 +66,7 @@ class FastLateJoinIntegrationTest {
         gear.update(3);
         assertEquals(30, gear.offers[1].secondsLeft, "Hidden gear timer freezes behind a normal skill choice");
         assertTrue(skills.choose(1, skills.offers[1].id, 1));
+        chooseAllHostSkills(world);
         gear.update(ArenaWorld.STEP);
         assertTrue(gear.choose(1, gear.offers[1].id, -1));
         assertEquals(10, skills.appliedUpgradeCount(1)); assertEquals(5, gear.appliedCount(1));
@@ -141,5 +143,10 @@ class FastLateJoinIntegrationTest {
             world.progression.addXp(world.progression.xpToNext - world.progression.xp);
         for (int i = 0; i < rewards; i++) world.equipment.grantReward();
         return world;
+    }
+
+    private static void chooseAllHostSkills(ArenaWorld world) {
+        while (world.progression.offers[0].pending)
+            assertTrue(world.progression.choose(0, world.progression.offers[0].id, 0));
     }
 }

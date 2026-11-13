@@ -140,11 +140,23 @@ public final class ArenaWorld {
         }
     }
 
+    /** A personal skill choice pauses combat for the whole party, including players already done. */
+    public boolean levelUpPending() {
+        for (int slot = 0; slot < players.length; slot++)
+            if (players[slot].active && progression.offers[slot].pending) return true;
+        return false;
+    }
+
     public float durationSeconds() { return timeline.durationSeconds(); }
     public int waveCount() { return timeline.phaseCount(); }
     public float timeRemaining() { return Math.max(0, durationSeconds() - elapsed); }
 
     private void tick() {
+        if (levelUpPending()) {
+            clearInputs();
+            progression.update(STEP);
+            return;
+        }
         // Preserve direct boundary/fixture jumps while avoiding float accumulation drift over twenty minutes.
         if (elapsed != (float) simulationElapsed) simulationElapsed = elapsed;
         simulationElapsed += 1.0 / 60.0;
