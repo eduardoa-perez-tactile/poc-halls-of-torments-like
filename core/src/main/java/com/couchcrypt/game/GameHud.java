@@ -83,7 +83,7 @@ public final class GameHud {
         }
         // Every component below shares HudArt's single texture.
         for (ArenaWorld.Player player : world.players) if (player.active)
-            playerArt(batch, player, world.progression, split && player.slot == 1);
+            playerArt(batch, player, world, split && player.slot == 1);
         if (state.bossVisible) forgedRail(batch, 660f, 948f, 600f, 8f,
             MathUtils.clamp(state.bossHealth / Math.max(1, state.bossMaxHealth), 0, 1), hudArt.healthFill, false);
         ArenaHudState.Notice notice = state.current();
@@ -127,7 +127,7 @@ public final class GameHud {
         for (ArenaWorld.Player player : world.players) {
             int slot = player.slot;
             builder.setLength(0); health[slot].set(builder.append((int) Math.ceil(player.health)).append(" / ")
-                .append((int) player.maxHealth).append(" HP").toString());
+                .append((int) world.equipment.maxHealth(player)).append(" HP").toString());
             builder.setLength(0); orbHealth[slot].set(builder.append((int) Math.ceil(player.health)).toString());
             builder.setLength(0); partyLevel[slot].set(builder.append("PARTY LV ").append(world.progression.level).toString());
             builder.setLength(0); experience[slot].set(world.progression.xpToNext > 0
@@ -160,10 +160,11 @@ public final class GameHud {
         }
     }
 
-    private void playerArt(SpriteBatch batch, ArenaWorld.Player player, PartyProgression progression, boolean mirror) {
+    private void playerArt(SpriteBatch batch, ArenaWorld.Player player, ArenaWorld world, boolean mirror) {
+        PartyProgression progression = world.progression;
         boolean teal = player.slot == 1;
         float orbX = mirror ? 1744f : 48f, statsX = mirror ? 1458f : 176f;
-        float ratio = MathUtils.clamp(player.health / Math.max(1, player.maxHealth), 0, 1);
+        float ratio = MathUtils.clamp(player.health / world.equipment.maxHealth(player), 0, 1);
         batch.setColor(Color.WHITE); batch.draw(hudArt.orbBack, orbX, 82f, 128f, 128f);
         if (ratio > 0) {
             TextureRegion blood = hudArt.orbBlood;
@@ -182,7 +183,7 @@ public final class GameHud {
         float dodgeX = mirror ? 1370f : 486f;
         batch.setColor(Color.WHITE); batch.draw(hudArt.dodgeBack, dodgeX, 137f, 64f, 64f);
         float ready = player.alive
-            ? 1f - MathUtils.clamp(player.dodgeCooldown / (player.hero.dodgeCooldown * player.dodgeCooldownMultiplier), 0, 1)
+            ? 1f - MathUtils.clamp(player.dodgeCooldown / world.equipment.dodgeCooldown(player), 0, 1)
             : MathUtils.clamp(player.reviveProgress / 2f, 0, 1);
         arc(batch, dodgeX + 32f, 169f, ready, teal ? SOUL : UiArt.GOLD);
         if (player.alive && player.dodgeCooldown <= .05f) {

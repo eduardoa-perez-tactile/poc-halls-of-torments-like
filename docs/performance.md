@@ -133,3 +133,28 @@ The same GPU total was observed in Lobby, Victory/Defeat, Run Details and return
 One available settled Home window contained 301 frames: interval p95/p99/max 20.27/21.43/23.17 ms, CPU submission p95/p99/max 3.35/4.11/14.29 ms, with 144 intervals over 16.7 ms. The short mixed results window, which includes layout/fixture transitions and screenshot activity, reached 154.64 ms interval / 103.10 ms CPU submission. That observation does not isolate its cause or prove a transition speedup. The strict 16.7 ms target remains unverified and was exceeded in this emulator capture; physical-TV performance remains untested.
 
 Local evidence remains ignored under `.run/menu-layered-*.png`, `.run/menu-layered.log` and `.run/menu-layered-memory.txt`. Synthetic controllers were closed; the app was freshly restarted to Home without profiling. The existing emulator, relay and ADB forward remain running for the user. No physical device was modified.
+
+
+## Run equipment and 48 item illustrations (2026-11-13)
+
+The file-backed managed item atlas is 1024×768 RGBA: exactly 3,145,728 GPU bytes, no retained decoded pixmap. All 48 individually generated illustrations are normalized offline; the APK ships the atlas and a small ID/cell manifest, rather than 48 full-resolution originals. Existing textures are reused unchanged by this item milestone. Startup now reserves the fixed 360×360 join QR when enforcing the combined 32 MiB ceiling.
+
+One seven-second `items-coop` fixture (F12) jumped directly to a bounded late encounter with real level-18 skill builds and equipment. It did not automate a full run or move/dodge. On the API-33 ARM64 Television_1080p emulator (1920×1080, 2 GiB RAM, automatic GPU), one full window contained 299 frames:
+
+| Observation | Measured value |
+| --- | --- |
+| Raw frame-start interval p95 / p99 / max | 18.63 / 20.58 / 50.98 ms |
+| Render CPU submission p95 / p99 / max | 2.34 / 6.75 / 50.44 ms |
+| Intervals above 16.7 / 33.4 ms | 141 / 1 |
+| Final draw calls | 8 |
+| Accounted GPU textures with QR | 33,355,220 bytes (31.81 MiB) |
+| Retained decoded CPU pixmaps | 23,391,052 bytes (22.31 MiB), unchanged from the menu baseline |
+| Process PSS at fixture start / end | 113,341 / 80,562 KiB |
+
+Texture residency remains 199,212 bytes below 32 MiB, so further textures require careful budgeting. CPU submission excludes asynchronous GPU execution and presentation. Process PSS includes native/Java/shared/driver allocations; the startup-to-end decrease reflects collection timing and is not proof of long-run stability. The observed interval spike remains unattributed, and this sample does not prove sustained 60 FPS or a speedup over a different build/fixture. Raw evidence is ignored under `.run/performance-items-coop.*`.
+
+The first emulator attempt caught `StringBuilder.isEmpty()` being unavailable on Android 33 when an equipment preview opened. Replacing it with a length check fixed that compatibility fault; the successful repeated fixture and live phone choice then completed without a fatal runtime error. JVM checks alone did not expose the Android API issue.
+
+A connected browser was checked at 390×844 portrait and 844×390 landscape: all three original illustrations, item effects and Keep Current Gear were readable. Pausing kept the item timer at 30 seconds and disabled selections. After resuming, selecting Gatekeeper Helm kept cards visible until host acknowledgment, then restored the controller. Protocol tests cover decline, reconnect, ownership and typed offer IDs separately. A final brief remote-controlled equipment-details capture verified seven slots for both heroes, precise regeneration text and View Skills/Back controls; a small identity/divider overlap found in the first capture was fixed and only that view was rechecked. The final screenshot is `.run/items-run-details-final.png`.
+
+JDK 21 desktop compilation and Android debug packaging passed. Focused catalog, runtime/combat/progression, HUD and WebSocket checks plus the real-controller state harness were used; no full survival simulation or broad regression was run. Synthetic clients and temporary capture processes were stopped, temporary browser viewport overrides reset, and the test browser closed. The existing emulator/relay/forward remain for the user and the coordinated menu-art screenshot chat. Physical-TV performance and full-run item balance remain unverified.
