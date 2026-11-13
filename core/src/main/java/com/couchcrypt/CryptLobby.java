@@ -915,7 +915,9 @@ public final class CryptLobby extends ApplicationAdapter {
             state.publishCatchUp(i, participant ? progression.catchUpRemaining(i) : 0,
                 participant ? world.equipment.catchUpRemaining(i) : 0,
                 participant ? progression.foundationSummary(i) : "",
-                participant ? world.equipment.foundationSummary(i) : "");
+                participant ? world.equipment.foundationSummary(i) : "",
+                participant ? progression.foundationSkills(i) : List.of(),
+                participant ? world.equipment.foundationItems(i) : List.of());
         }
     }
 

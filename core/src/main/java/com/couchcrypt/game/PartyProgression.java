@@ -1,5 +1,9 @@
 package com.couchcrypt.game;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 /** Shared party XP with independent, timed build choices owned by the simulation thread. */
 public final class PartyProgression {
     public static final int MAX_LEVEL = 20;
@@ -43,6 +47,8 @@ public final class PartyProgression {
 
     /** Immutable phone presentation, prepared only when an authoritative offer is created. */
     public record CardPreview(int icon, int rank, String category, String headline, String before, String after) {}
+    /** Snapshot of an automatically granted rank, independent of later personal choices. */
+    public record FoundationSkill(String id, String title, int icon, int rank) {}
 
     public static final class Offer {
         public boolean pending, catchUp;
@@ -68,6 +74,7 @@ public final class PartyProgression {
     private final int[] applied = new int[2];
     private final int[] catchUpUntil = new int[2], foundationCounts = new int[2];
     private final String[] foundations = {"", ""};
+    private final List<List<FoundationSkill>> foundationSkills = Arrays.asList(List.of(), List.of());
     private final int[][] ranks = { new int[UPGRADES.length], new int[UPGRADES.length] };
     private int nextOfferId;
     public int level, xp, xpToNext, totalXp;
@@ -81,6 +88,7 @@ public final class PartyProgression {
         for (int slot = 0; slot < offers.length; slot++) {
             participants[slot] = false; applied[slot] = 0;
             catchUpUntil[slot] = foundationCounts[slot] = 0; foundations[slot] = "";
+            foundationSkills.set(slot, List.of());
             clearRanks(slot);
             Offer offer = offers[slot];
             offer.pending = offer.catchUp = false; offer.id = offer.level = 0; offer.secondsLeft = 0f;
@@ -103,6 +111,7 @@ public final class PartyProgression {
         if (!validSlot(slot)) return;
         participants[slot] = false; applied[slot] = 0;
         catchUpUntil[slot] = foundationCounts[slot] = 0; foundations[slot] = "";
+        foundationSkills.set(slot, List.of());
         clearRanks(slot);
         Offer offer = offers[slot];
         offer.pending = offer.catchUp = false; offer.id = offer.level = 0; offer.secondsLeft = 0;
@@ -163,6 +172,7 @@ public final class PartyProgression {
     public int catchUpRemaining(int slot) { return catchingUp(slot) ? catchUpUntil[slot] - applied[slot] : 0; }
     public int foundationCount(int slot) { return validSlot(slot) ? foundationCounts[slot] : 0; }
     public String foundationSummary(int slot) { return validSlot(slot) ? foundations[slot] : ""; }
+    public List<FoundationSkill> foundationSkills(int slot) { return validSlot(slot) ? foundationSkills.get(slot) : List.of(); }
 
     private void grantFoundation(int slot, int count) {
         ArenaWorld.Player player = world.players[slot];
@@ -177,15 +187,18 @@ public final class PartyProgression {
             apply(player, upgrade); ranks[slot][upgrade.ordinal()]++; applied[slot]++;
         }
         foundationCounts[slot] = applied[slot];
-        if (applied[slot] == 0) { foundations[slot] = ""; return; }
+        if (applied[slot] == 0) { foundations[slot] = ""; foundationSkills.set(slot, List.of()); return; }
         StringBuilder summary = new StringBuilder(200);
+        List<FoundationSkill> skills = new ArrayList<>(UPGRADES.length);
         for (Upgrade upgrade : UPGRADES) {
             int rank = ranks[slot][upgrade.ordinal()];
             if (rank == 0) continue;
             if (summary.length() > 0) summary.append(" / ");
             summary.append(upgrade.title).append(' ').append(rank);
+            skills.add(new FoundationSkill(upgrade.id, upgrade.title, upgrade.ordinal(), rank));
         }
         foundations[slot] = summary.toString();
+        foundationSkills.set(slot, List.copyOf(skills));
     }
 
     /** Allocated only for the results screen; combat uses fixed rank arrays. */
