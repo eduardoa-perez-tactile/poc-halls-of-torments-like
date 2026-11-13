@@ -26,13 +26,14 @@ public final class LobbyState {
         public int offerId, option;
         public long generation;
     }
-    public record UpgradeFeedback(int id, int level, float secondsLeft,
+    public record UpgradeFeedback(int id, int level, float secondsLeft, boolean catchUp, float durationSeconds,
         PartyProgression.Upgrade first, PartyProgression.Upgrade second, PartyProgression.Upgrade third,
         PartyProgression.CardPreview firstCard, PartyProgression.CardPreview secondCard, PartyProgression.CardPreview thirdCard) {}
     public record ProgressionFeedback(int level, int xp, int xpToNext, UpgradeFeedback upgrade) {}
-    public record EquipmentFeedback(int id, float secondsLeft,
+    public record EquipmentFeedback(int id, float secondsLeft, boolean catchUp, float durationSeconds,
         ItemCatalog.Item first, ItemCatalog.Item second, ItemCatalog.Item third,
         PartyProgression.CardPreview firstCard, PartyProgression.CardPreview secondCard, PartyProgression.CardPreview thirdCard) {}
+    public record CatchUpFeedback(int skillsRemaining, int equipmentRemaining, String skillFoundation, String equipmentFoundation) {}
     public record Snapshot(Player first, Player second, int connected, boolean hostActive, Phase phase, long revision) {}
     public record Join(int slot, String token, String error) {
         static Join rejected(String reason) { return new Join(-1, null, reason); }
@@ -45,13 +46,17 @@ public final class LobbyState {
         float x, y, health = 100, maxHealth = 100, dodgeCooldown;
         boolean pendingDodge, dodgeHeld, alive = true;
         int level = 1, xp, xpToNext = 6, offerId, offerLevel, claimedOfferId;
-        float offerSeconds;
+        float offerSeconds, offerDuration = PartyProgression.CHOICE_SECONDS;
+        boolean offerCatchUp;
         final PartyProgression.Upgrade[] options = new PartyProgression.Upgrade[3];
         final PartyProgression.CardPreview[] cards = new PartyProgression.CardPreview[3];
         boolean upgradeQueued;
         int upgradeOption;
         int equipmentId, claimedEquipmentId, equipmentOption;
-        float equipmentSeconds;
+        float equipmentSeconds, equipmentDuration = PartyProgression.CHOICE_SECONDS;
+        boolean equipmentCatchUp;
+        int catchUpSkills, catchUpEquipment;
+        String skillFoundation = "", equipmentFoundation = "";
         boolean equipmentQueued;
         final ItemCatalog.Item[] equipmentOptions = new ItemCatalog.Item[3];
         final PartyProgression.CardPreview[] equipmentCards = new PartyProgression.CardPreview[3];
@@ -65,12 +70,13 @@ public final class LobbyState {
         }
         void clearEquipment() {
             equipmentId = claimedEquipmentId = equipmentOption = 0;
-            equipmentSeconds = 0; equipmentQueued = false;
+            equipmentSeconds = 0; equipmentDuration = PartyProgression.CHOICE_SECONDS; equipmentCatchUp = false; equipmentQueued = false;
             for (int i = 0; i < 3; i++) { equipmentOptions[i] = null; equipmentCards[i] = null; }
         }
         void clearProgression() {
             level = 1; xp = 0; xpToNext = 6; offerId = offerLevel = claimedOfferId = 0;
-            offerSeconds = 0; upgradeQueued = false;
+            offerSeconds = 0; offerDuration = PartyProgression.CHOICE_SECONDS; offerCatchUp = false; upgradeQueued = false;
+            catchUpSkills = catchUpEquipment = 0; skillFoundation = equipmentFoundation = "";
             for (int i = 0; i < 3; i++) { options[i] = null; cards[i] = null; }
             clearEquipment();
         }
@@ -195,6 +201,13 @@ public final class LobbyState {
     public synchronized void publishProgression(int index, int level, int xp, int xpToNext,
         int offerId, int offerLevel, float secondsLeft, PartyProgression.Upgrade[] options,
         PartyProgression.CardPreview[] cards) {
+        publishProgression(index, level, xp, xpToNext, offerId, offerLevel, secondsLeft, options, cards,
+            false, PartyProgression.CHOICE_SECONDS);
+    }
+
+    public synchronized void publishProgression(int index, int level, int xp, int xpToNext,
+        int offerId, int offerLevel, float secondsLeft, PartyProgression.Upgrade[] options,
+        PartyProgression.CardPreview[] cards, boolean catchUp, float durationSeconds) {
         Slot slot = slots[index];
         slot.level = Math.max(1, Math.min(PartyProgression.MAX_LEVEL, level));
         slot.xpToNext = slot.level == PartyProgression.MAX_LEVEL ? 0 : Math.max(1, xpToNext);
@@ -209,7 +222,9 @@ public final class LobbyState {
         }
         slot.offerId = nextId;
         slot.offerLevel = offered ? Math.max(2, Math.min(PartyProgression.MAX_LEVEL, offerLevel)) : 0;
-        slot.offerSeconds = offered ? Math.min(PartyProgression.CHOICE_SECONDS, secondsLeft) : 0;
+        slot.offerCatchUp = offered && catchUp;
+        slot.offerDuration = choiceDuration(catchUp, durationSeconds);
+        slot.offerSeconds = offered ? Math.min(slot.offerDuration, secondsLeft) : 0;
         // A skill choice takes priority over gear; do not carry an unseen gear click behind it.
         if (offered) slot.clearEquipmentRequest();
         for (int i = 0; i < 3; i++) {
@@ -245,7 +260,7 @@ public final class LobbyState {
     public synchronized ProgressionFeedback progressionFeedback(int index) {
         Slot slot = slots[index];
         UpgradeFeedback upgrade = slot.offerId > 0
-            ? new UpgradeFeedback(slot.offerId, slot.offerLevel, slot.offerSeconds, slot.options[0], slot.options[1], slot.options[2],
+            ? new UpgradeFeedback(slot.offerId, slot.offerLevel, slot.offerSeconds, slot.offerCatchUp, slot.offerDuration, slot.options[0], slot.options[1], slot.options[2],
                 slot.cards[0], slot.cards[1], slot.cards[2]) : null;
         return new ProgressionFeedback(slot.level, slot.xp, slot.xpToNext, upgrade);
     }
@@ -253,6 +268,11 @@ public final class LobbyState {
     /** Equipment remains presented while paused or hidden behind a personal skill choice. */
     public synchronized void publishEquipment(int index, int offerId, float secondsLeft,
         ItemCatalog.Item[] options, PartyProgression.CardPreview[] cards) {
+        publishEquipment(index, offerId, secondsLeft, options, cards, false, PartyProgression.CHOICE_SECONDS);
+    }
+
+    public synchronized void publishEquipment(int index, int offerId, float secondsLeft,
+        ItemCatalog.Item[] options, PartyProgression.CardPreview[] cards, boolean catchUp, float durationSeconds) {
         Slot slot = slots[index];
         boolean offered = offerId > 0 && options != null && options.length >= 3
             && options[0] != null && options[1] != null && options[2] != null
@@ -263,7 +283,9 @@ public final class LobbyState {
             slot.equipmentQueued = false; slot.claimedEquipmentId = 0;
         }
         slot.equipmentId = nextId;
-        slot.equipmentSeconds = offered ? Math.min(PartyProgression.CHOICE_SECONDS, secondsLeft) : 0;
+        slot.equipmentCatchUp = offered && catchUp;
+        slot.equipmentDuration = choiceDuration(catchUp, durationSeconds);
+        slot.equipmentSeconds = offered ? Math.min(slot.equipmentDuration, secondsLeft) : 0;
         for (int i = 0; i < 3; i++) {
             slot.equipmentOptions[i] = offered ? options[i] : null;
             slot.equipmentCards[i] = offered ? cards[i] : null;
@@ -295,9 +317,32 @@ public final class LobbyState {
     public synchronized EquipmentFeedback equipmentFeedback(int index) {
         Slot slot = slots[index];
         return slot.equipmentId > 0
-            ? new EquipmentFeedback(slot.equipmentId, slot.equipmentSeconds,
+            ? new EquipmentFeedback(slot.equipmentId, slot.equipmentSeconds, slot.equipmentCatchUp, slot.equipmentDuration,
                 slot.equipmentOptions[0], slot.equipmentOptions[1], slot.equipmentOptions[2],
                 slot.equipmentCards[0], slot.equipmentCards[1], slot.equipmentCards[2]) : null;
+    }
+
+    /** Immutable foundation summaries are prepared once by simulation and borrowed by server snapshots. */
+    public synchronized void publishCatchUp(int index, int skillsRemaining, int equipmentRemaining,
+        String skillFoundation, String equipmentFoundation) {
+        Slot slot = slots[index];
+        slot.catchUpSkills = Math.max(0, Math.min(3, skillsRemaining));
+        slot.catchUpEquipment = Math.max(0, Math.min(2, equipmentRemaining));
+        slot.skillFoundation = boundedSummary(skillFoundation);
+        slot.equipmentFoundation = boundedSummary(equipmentFoundation);
+    }
+
+    public synchronized CatchUpFeedback catchUpFeedback(int index) {
+        Slot slot = slots[index];
+        return new CatchUpFeedback(slot.catchUpSkills, slot.catchUpEquipment, slot.skillFoundation, slot.equipmentFoundation);
+    }
+
+    private static String boundedSummary(String summary) {
+        return summary == null ? "" : summary.length() <= 2048 ? summary : summary.substring(0, 2048);
+    }
+    private static float choiceDuration(boolean catchUp, float duration) {
+        return Float.isFinite(duration) && duration > 0 ? Math.min(PartyProgression.CHOICE_SECONDS, duration)
+            : catchUp ? 15f : PartyProgression.CHOICE_SECONDS;
     }
 
     private void clearUpgradeRequests() {

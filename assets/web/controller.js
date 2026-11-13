@@ -13,7 +13,8 @@
   const upgradeSecondsLabel = byId('upgrade-seconds'), upgradeTimerLabel = byId('upgrade-timer-label');
   const upgradeButtons = [0, 1, 2].map((index) => byId(`upgrade-option-${index}`));
   const keepEquipment = byId('equipment-keep');
-  let upgradeOffer = null, upgradeSeconds = 0, upgradeSampleTime = 0, upgradeTicker;
+  const catchUpBuild = byId('catch-up-build'), catchUpSkills = byId('catch-up-skills'), catchUpGear = byId('catch-up-gear');
+  let upgradeOffer = null, upgradeSeconds = 0, upgradeDuration = 30, upgradeSampleTime = 0, upgradeTicker;
   let choiceKind = 'upgrade';
   let upgradeSelected = -1, upgradePendingSince = 0;
   let phase = 'lobby', hostActive = false, alive = true, foreground = true, sender, sequence = 0;
@@ -50,6 +51,7 @@
     choiceKind = 'upgrade';
     upgradeChoices.hidden = true; document.body.classList.remove('has-upgrade', 'choice-urgent');
     keepEquipment.hidden = true;
+    catchUpBuild.hidden = true; catchUpBuild.open = false;
     if (wasVisible) releaseControls();
   }
   function canChooseUpgrade() {
@@ -73,8 +75,8 @@
       : !hostActive || phase !== 'session' ? 'Paused'
       : remaining <= 0 ? 'Applying auto-pick…' : 'Seconds to choose';
     upgradeCountdown.setAttribute('aria-label', `${seconds} seconds. ${upgradeTimerLabel.textContent}`);
-    upgradeChoices.style.setProperty('--choice-progress', `${remaining / 30 * 100}%`);
-    document.body.classList.toggle('choice-urgent', seconds <= 10 && hostActive && phase === 'session');
+    upgradeChoices.style.setProperty('--choice-progress', `${remaining / upgradeDuration * 100}%`);
+    document.body.classList.toggle('choice-urgent', seconds <= Math.min(10, upgradeDuration / 3) && hostActive && phase === 'session');
     const disabled = !canChooseUpgrade() || remaining <= 0 || upgradeSelected >= 0;
     upgradeButtons.forEach((button, index) => {
       button.disabled = disabled;
@@ -119,7 +121,7 @@
     button.querySelector('.skill-after').textContent = hasPreview ? option.after.slice(0, equipment ? 128 : 40) : '';
     button.setAttribute('aria-label', `${option.title}. ${hasPreview ? `${option.headline}. ${option.before} to ${option.after}` : option.description}${equipment ? `. ${option.description}` : Number.isSafeInteger(option.rank) && option.rank > 0 ? `. Rank ${option.rank}` : ''}`);
   }
-  function setUpgradeOffer(progression, equipment) {
+  function setUpgradeOffer(progression, equipment, catchUp) {
     const kind = progression?.upgrade ? 'upgrade' : 'equipment';
     const next = kind === 'upgrade' ? progression.upgrade : equipment;
     if (!joined || !['session', 'paused', 'invite'].includes(phase) || !next
@@ -131,15 +133,31 @@
     if (upgradeOffer?.id !== next.id || choiceKind !== kind) {
       upgradeOffer = next; upgradeSelected = -1; upgradePendingSince = 0;
       choiceKind = kind;
-      upgradeChoices.querySelector('.upgrade-kicker').textContent = kind === 'equipment' ? 'CHOOSE YOUR EQUIPMENT' : 'CHOOSE YOUR POWER';
-      upgradeLevel.textContent = kind === 'equipment' ? 'EQUIPMENT' : `LEVEL ${Number.isSafeInteger(next.level) ? next.level : ''}`;
       upgradeButtons.forEach((button, index) => paintSkillCard(button, next.options[index], kind === 'equipment'));
       upgradeChoices.hidden = false; document.body.classList.add('has-upgrade');
       upgradeChoices.querySelector('.upgrade-options').scrollTop = 0;
       // Combat continues, but either personal choice is a neutral-input phone mode.
       releaseControls();
     }
-    upgradeSeconds = Math.max(0, Math.min(30, next.secondsLeft));
+    const fast = next.catchUp === true;
+    const skillsLeft = Number.isSafeInteger(catchUp?.skillsRemaining) ? Math.max(0, Math.min(3, catchUp.skillsRemaining)) : kind === 'upgrade' ? 1 : 0;
+    const gearLeft = Number.isSafeInteger(catchUp?.equipmentRemaining) ? Math.max(0, Math.min(2, catchUp.equipmentRemaining)) : kind === 'equipment' ? 1 : 0;
+    upgradeChoices.querySelector('.upgrade-kicker').textContent = fast
+      ? `${skillsLeft} SKILL / ${gearLeft} GEAR LEFT` : kind === 'equipment' ? 'CHOOSE YOUR EQUIPMENT' : 'CHOOSE YOUR POWER';
+    upgradeLevel.textContent = fast ? kind === 'equipment' ? 'CATCH-UP GEAR' : 'CATCH-UP SKILL'
+      : kind === 'equipment' ? 'EQUIPMENT' : `LEVEL ${Number.isSafeInteger(next.level) ? next.level : ''}`;
+    const skillFoundation = typeof catchUp?.skillFoundation === 'string' ? catchUp.skillFoundation.slice(0, 2048) : '';
+    const gearFoundation = typeof catchUp?.equipmentFoundation === 'string' ? catchUp.equipmentFoundation.slice(0, 2048) : '';
+    catchUpBuild.hidden = !fast || (!skillFoundation && !gearFoundation);
+    if (!catchUpBuild.hidden) {
+      const skills = skillFoundation ? `Skills: ${skillFoundation}` : 'Skills: no automatic grants';
+      const gear = gearFoundation ? `Gear: ${gearFoundation}` : 'Gear: no automatic grants';
+      if (catchUpSkills.textContent !== skills) catchUpSkills.textContent = skills;
+      if (catchUpGear.textContent !== gear) catchUpGear.textContent = gear;
+    }
+    upgradeDuration = Number.isFinite(next.durationSeconds) && next.durationSeconds > 0
+      ? Math.min(30, next.durationSeconds) : fast ? 15 : 30;
+    upgradeSeconds = Math.max(0, Math.min(upgradeDuration, next.secondsLeft));
     upgradeSampleTime = performance.now();
     paintUpgrade();
   }
@@ -162,7 +180,7 @@
     const activeSession = phase === 'session' && hostActive;
     title.textContent = data.phase === 'paused' || data.phase === 'invite' ? 'Paused' : data.phase === 'results' ? 'Round complete' : 'You have a place';
     if (wasSession !== activeSession) releaseControls();
-    setUpgradeOffer(data.progression, data.equipment);
+    setUpgradeOffer(data.progression, data.equipment, data.catchUp);
     const show = activeSession || upgradeOffer !== null;
     controls.hidden = !show; document.body.classList.toggle('playing', show);
     document.querySelector('.touch-controls').inert = upgradeOffer !== null;

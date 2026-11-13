@@ -904,11 +904,18 @@ public final class CryptLobby extends ApplicationAdapter {
             boolean pending = inRun && world.players[i].active && offer.pending;
             state.publishProgression(i, progression.level, progression.xp, progression.xpToNext,
                 pending ? offer.id : 0, pending ? offer.level : 0, pending ? offer.secondsLeft : 0,
-                pending ? offer.options : null, pending ? offer.cards : null);
+                pending ? offer.options : null, pending ? offer.cards : null,
+                pending && offer.catchUp, pending ? offer.durationSeconds : PartyProgression.CHOICE_SECONDS);
             var itemOffer = world.equipment.offers[i];
             boolean itemPending = inRun && world.players[i].active && itemOffer.pending;
             state.publishEquipment(i, itemPending ? itemOffer.id : 0, itemPending ? itemOffer.secondsLeft : 0,
-                itemPending ? itemOffer.options : null, itemPending ? itemOffer.cards : null);
+                itemPending ? itemOffer.options : null, itemPending ? itemOffer.cards : null,
+                itemPending && itemOffer.catchUp, itemPending ? itemOffer.durationSeconds : 30f);
+            boolean participant = inRun && world.players[i].active;
+            state.publishCatchUp(i, participant ? progression.catchUpRemaining(i) : 0,
+                participant ? world.equipment.catchUpRemaining(i) : 0,
+                participant ? progression.foundationSummary(i) : "",
+                participant ? world.equipment.foundationSummary(i) : "");
         }
     }
 

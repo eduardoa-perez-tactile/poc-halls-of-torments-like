@@ -89,7 +89,16 @@ class JoinServerTest {
             first.sendText("{\"type\":\"ping\"}", true).get(3, TimeUnit.SECONDS);
             do { status = one.expect("status"); } while (!status.get("equipment").isNull());
             assertEquals(2, status.getInt("connected"));
-            state.publishEquipment(0, 11, 30, options, cards);
+            state.publishEquipment(0, 11, 14.5f, options, cards, true, 15);
+            state.publishCatchUp(0, 0, 2, "Soulfire 3 / Soul Circle 2", "Gatekeeper Helm / Emberheart Pendant");
+            first.sendText("{\"type\":\"ping\"}", true).get(3, TimeUnit.SECONDS);
+            do { status = one.expect("status"); }
+            while (status.get("equipment").isNull() || status.get("equipment").getInt("id") != 11);
+            assertTrue(status.get("equipment").getBoolean("catchUp"));
+            assertEquals(15, status.get("equipment").getFloat("durationSeconds"));
+            assertEquals(14.5f, status.get("equipment").getFloat("secondsLeft"));
+            assertEquals(2, status.get("catchUp").getInt("equipmentRemaining"));
+            assertEquals("Soulfire 3 / Soul Circle 2", status.get("catchUp").getString("skillFoundation"));
             first.sendText("{\"type\":\"equipment\",\"offerId\":11,\"option\":-1}", true).get(3, TimeUnit.SECONDS);
             until = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
             do {
@@ -97,6 +106,16 @@ class JoinServerTest {
                 if (!found) java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(5));
             } while (!found && System.nanoTime() < until);
             assertTrue(found); assertEquals(-1, request.option);
+            state.publishEquipment(0, 0, 0, null, null);
+            state.publishProgression(0, 20, 0, 0, 30, 19, 12,
+                PartyProgression.Upgrade.values(), null, true, 15);
+            state.publishCatchUp(0, 1, 0, "Soulfire 3", "Gatekeeper Helm");
+            first.sendText("{\"type\":\"ping\"}", true).get(3, TimeUnit.SECONDS);
+            do { status = one.expect("status"); }
+            while (status.get("progression").get("upgrade").isNull());
+            assertTrue(status.get("progression").get("upgrade").getBoolean("catchUp"));
+            assertEquals(15, status.get("progression").get("upgrade").getFloat("durationSeconds"));
+            assertEquals(1, status.get("catchUp").getInt("skillsRemaining"));
             first.abort(); second.abort();
         } finally { server.stop(); }
     }
