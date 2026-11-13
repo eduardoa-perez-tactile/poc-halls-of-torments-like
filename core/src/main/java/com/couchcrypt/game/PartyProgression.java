@@ -23,6 +23,15 @@ public final class PartyProgression {
         Upgrade(String id, String title, String description) {
             this.id = id; this.title = title; this.description = description;
         }
+
+        /** Class eligibility is independent of the current run's upgrade caps. */
+        public boolean supports(ArenaWorld.Hero hero) {
+            return switch (this) {
+                case SWEEP -> hero == ArenaWorld.Hero.WARDEN;
+                case MULTISHOT, PIERCE -> hero == ArenaWorld.Hero.RANGER;
+                default -> true;
+            };
+        }
     }
 
     public static final class Offer {
@@ -189,15 +198,16 @@ public final class PartyProgression {
     }
 
     private static boolean available(ArenaWorld.Player player, Upgrade upgrade) {
+        if (!upgrade.supports(player.hero)) return false;
         return switch (upgrade) {
             case POWER -> player.damageMultiplier < 4f - .00001f;
             case HASTE -> player.attackRateMultiplier < 3f - .00001f;
             case FLEET -> player.moveMultiplier < 2.2f - .00001f;
             case VITALITY -> player.maxHealth < 300f;
             case EVASION -> player.dodgeCooldownMultiplier > .25f + .00001f;
-            case SWEEP -> player.hero == ArenaWorld.Hero.WARDEN && player.cleaveMultiplier < 1.8f - .00001f;
-            case MULTISHOT -> player.hero == ArenaWorld.Hero.RANGER && player.projectileCount < 5;
-            case PIERCE -> player.hero == ArenaWorld.Hero.RANGER && player.pierce < 3;
+            case SWEEP -> player.cleaveMultiplier < 1.8f - .00001f;
+            case MULTISHOT -> player.projectileCount < 5;
+            case PIERCE -> player.pierce < 3;
             case AURA -> player.auraLevel < 3;
             case STORM -> player.stormLevel < 3;
             case MAGNET -> player.pickupMultiplier < 2.5f - .00001f;

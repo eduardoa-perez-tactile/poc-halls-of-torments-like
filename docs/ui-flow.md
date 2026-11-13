@@ -12,6 +12,8 @@ flowchart TD
     Lobby -->|Back| Home
     Lobby -->|Select player| Manage[Remove controller or return]
     Manage --> Lobby
+    Manage -->|Info| HeroInfo[Hero summary, bio, base stats and all learnable skills]
+    HeroInfo -->|Back: restore selection and focus| Manage
     Lobby -->|Remote| Network
     QR[Phone scans QR] --> Assign[Assign or reclaim slot]
     Lobby -.-> QR
@@ -44,6 +46,8 @@ flowchart TD
 The approved Home design centers the forged-gold logo and carved stone controls: **Play**, **How to Join**, **Settings**, and a separate **Exit**. Play is focused initially. Settings opens the functional local-network controls, and Back from those controls returns to Settings. Exit and Back from Home require confirmation.
 
 The lobby shows **Scan to Join**, the QR, and **Same Wi-Fi**. The TV has one party; players do not enter or see room codes. Network addresses and connection troubleshooting belong in the advanced Network panel. The QR area displays an explicit offline/network error instead of an empty frame if hosting is unavailable.
+
+Character selection offers **Info** for the selected hero: a short summary and bio, base combat stats, and the complete class-eligible skill list with effects. This reference uses the same stats and class rules as combat and includes skills regardless of current run ranks. Back preserves the character choice and restores focus.
 
 One connected phone enables **Start Solo**; two enable **Start Co-op**. Player 2 is optional and can join before starting or through **Pause -> Invite Player 2**. The invite screen preserves the active session and player slots. Back returns to the pause menu; Resume returns to the session. Returning to the lobby requires confirmation and keeps connected phones. If any participating phone disconnects, the session pauses. Reconnect it, or remove its slot under Invite Player 2 before resuming.
 
