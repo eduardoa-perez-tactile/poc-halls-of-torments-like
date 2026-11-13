@@ -55,6 +55,7 @@ class FastLateJoinIntegrationTest {
 
     @Test void futureRewardsOfferNormalPersonalChoicesWithAccuratePreviewsAndRestoreControls() {
         ArenaWorld world = party(ArenaWorld.Hero.RANGER, 10, 4); world.activatePlayer(1);
+        chooseAllHostSkills(world);
         var skills = world.progression; var gear = world.equipment;
         var foundation = skills.foundationSkills(1); var items = gear.foundationItems(1);
         skills.addXp(skills.xpToNext - skills.xp); gear.grantReward();
@@ -79,6 +80,7 @@ class FastLateJoinIntegrationTest {
 
     @Test void tokenReconnectKeepsGenerationAndRestoresExistingPersonalChoicesWithoutGrantingAgain() {
         ArenaWorld world = party(ArenaWorld.Hero.RANGER, 10, 4); world.activatePlayer(1);
+        chooseAllHostSkills(world);
         var state = new LobbyState();
         state.join(null, "first", 1); var joined = state.join(null, "second", 2);
         state.setPhase(LobbyState.Phase.SESSION);
@@ -86,6 +88,7 @@ class FastLateJoinIntegrationTest {
         var player = world.players[1]; var skills = world.progression; var gear = world.equipment;
         skills.addXp(skills.xpToNext - skills.xp); gear.grantReward();
         assertTrue(skills.choose(1, skills.offers[1].id, 2));
+        chooseAllHostSkills(world);
         gear.update(4);
         int gearId = gear.offers[1].id; float gearSeconds = gear.offers[1].secondsLeft;
         skills.addXp(skills.xpToNext - skills.xp); skills.update(5);
@@ -116,6 +119,7 @@ class FastLateJoinIntegrationTest {
 
     @Test void removingThenRejoiningBuildsFreshDefaultsAndRejectsOldChoicesAcrossReset() {
         ArenaWorld world = party(ArenaWorld.Hero.WARDEN, 5, 2); world.activatePlayer(1);
+        chooseAllHostSkills(world);
         var skills = world.progression; var gear = world.equipment;
         skills.addXp(skills.xpToNext - skills.xp); gear.grantReward();
         int staleSkill = skills.offers[1].id, staleGear = gear.offers[1].id;
@@ -123,6 +127,7 @@ class FastLateJoinIntegrationTest {
         assertEquals(5, skills.foundationCount(1)); assertEquals(3, gear.foundationCount(1));
         assertFalse(gear.choosing(1));
         assertFalse(skills.choose(1, staleSkill, 0)); assertFalse(gear.choose(1, staleGear, 0));
+        chooseAllHostSkills(world);
         skills.addXp(skills.xpToNext - skills.xp); gear.grantReward();
         assertTrue(skills.offers[1].id > staleSkill); assertTrue(gear.offers[1].id > staleGear);
         assertFalse(skills.choose(1, staleSkill, 0));

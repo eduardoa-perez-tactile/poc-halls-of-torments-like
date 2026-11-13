@@ -53,6 +53,8 @@ class JoinServerTest {
         var state = new LobbyState(); state.join(null, "host", System.currentTimeMillis());
         var world = new com.couchcrypt.game.ArenaWorld(); world.activatePlayer(0);
         while (world.progression.level < 10) world.progression.addXp(world.progression.xpToNext - world.progression.xp);
+        while (world.progression.offers[0].pending)
+            assertTrue(world.progression.choose(0, world.progression.offers[0].id, 0));
         for (int i = 0; i < 4; i++) world.equipment.grantReward();
         state.setPhase(LobbyState.Phase.INVITE);
         var server = new JoinServer(0, state, Map.of()); server.open();
