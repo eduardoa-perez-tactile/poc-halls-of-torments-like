@@ -25,6 +25,7 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.Scaling;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.couchcrypt.game.ArenaWorld;
+import com.couchcrypt.game.ArenaTimeline;
 import com.couchcrypt.game.ArenaHudState;
 import com.couchcrypt.game.GameArt;
 import com.couchcrypt.game.HudArt;
@@ -69,7 +70,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private boolean debug;
     private String host, serverError;
     private Label firstStatus, secondStatus, partyStatus, startLabel, connectionLabel, diagnostics;
-    private final ArenaWorld world = new ArenaWorld();
+    private final ArenaWorld world = new ArenaWorld(ArenaTimeline.TWENTY_MINUTES);
     private final ArenaHudState hudState = new ArenaHudState();
     private final boolean[] previouslyAlive = new boolean[2], lowHealthNotified = new boolean[2];
     private boolean finalWarning;
@@ -643,7 +644,9 @@ public final class CryptLobby extends ApplicationAdapter {
         if (screen == Screen.SESSION) {
             if (overlay != null) return "PAUSED";
             boolean coop = world.players[0].active && world.players[1].active;
-            return world.bossSpawned ? (coop ? "COOP_BOSS" : "SOLO_BOSS") : (coop ? "COOP" : "SOLO");
+            if (world.bossSpawned) return coop ? "COOP_BOSS" : "SOLO_BOSS";
+            if (world.elapsed >= world.durationSeconds() * .75f) return coop ? "COOP_LATE" : "SOLO_LATE";
+            return coop ? "COOP" : "SOLO";
         }
         if (screen == Screen.RESULTS && resultDetails) return "RESULT_DETAILS";
         return screen.name();
@@ -748,8 +751,8 @@ public final class CryptLobby extends ApplicationAdapter {
     }
 
     /** Profile-only visual fixture: actual earned ranks and stats, without a survival playthrough. */
-    private void previewHud() {
-        while (world.progression.level < 12) {
+    private void previewHud(int targetLevel) {
+        while (world.progression.level < targetLevel) {
             world.progression.addXp(world.progression.xpToNext - world.progression.xp);
             for (ArenaWorld.Player player : world.players) if (player.active) {
                 PartyProgression.Offer offer = world.progression.offers[player.slot];
@@ -780,8 +783,16 @@ public final class CryptLobby extends ApplicationAdapter {
     }
 
     private boolean key(int key) {
+        if (key == Input.Keys.F11 && config.profile() && screen == Screen.SESSION && overlay == null) {
+            world.debugStartLateEncounter();
+            previewHud(18);
+            hudPreview = false;
+            notifiedWave = world.wave;
+            syncEncounterHud();
+            return true;
+        }
         if (key == Input.Keys.F10 && config.profile() && screen == Screen.SESSION && overlay == null) {
-            previewHud(); return true;
+            previewHud(12); return true;
         }
         if (key == Input.Keys.F9 && config.profile() && screen == Screen.SESSION && overlay == null
             && world.players[0].active && world.players[0].alive && world.players[1].active) {
@@ -910,7 +921,8 @@ public final class CryptLobby extends ApplicationAdapter {
         syncEncounterHud();
         if (world.wave > notifiedWave && !world.bossSpawned) {
             notifiedWave = world.wave;
-            hudState.notify("WAVE " + world.wave + " / " + world.waveCount(), "", ArenaHudState.Tone.WARNING, 3f);
+            hudState.notify("WAVE " + world.wave + " / " + world.waveCount() + "  /  "
+                + world.timeline.phase(world.wave - 1).name(), "", ArenaHudState.Tone.WARNING, 3f);
         }
         if (world.elitesKilled > notifiedEliteKills) {
             notifiedEliteKills = world.elitesKilled;

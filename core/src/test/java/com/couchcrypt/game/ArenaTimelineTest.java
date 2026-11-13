@@ -7,10 +7,10 @@ class ArenaTimelineTest {
     @Test void timelineBoundariesAndBossUseConfiguredDuration() {
         ArenaTimeline timeline = ArenaTimeline.TWENTY_MINUTES;
         assertEquals(1200, timeline.durationSeconds());
-        assertEquals(6, timeline.phaseCount());
-        assertEquals(0, timeline.phaseIndex(199.9f));
-        assertEquals(1, timeline.phaseIndex(200));
-        assertEquals(5, timeline.phaseIndex(1200));
+        assertEquals(12, timeline.phaseCount());
+        assertEquals(0, timeline.phaseIndex(89.9f));
+        assertEquals(1, timeline.phaseIndex(90));
+        assertEquals(11, timeline.phaseIndex(1200));
         ArenaWorld world = solo(timeline);
         world.elapsed = 180;
         world.update(ArenaWorld.STEP);
@@ -19,24 +19,24 @@ class ArenaTimelineTest {
         world.elapsed = timeline.durationSeconds() - ArenaWorld.STEP;
         world.update(ArenaWorld.STEP);
         assertTrue(world.bossSpawned);
-        assertEquals(6, world.wave);
+        assertEquals(12, world.wave);
         assertEquals(0, world.timeRemaining());
         assertEquals(ArenaWorld.Outcome.RUNNING, world.outcome);
     }
 
     @Test void checkpointsBeyondThirdPhaseAreSingleUseAndResetWithRun() {
         ArenaWorld world = solo(ArenaTimeline.TWENTY_MINUTES);
-        world.elapsed = 600; world.update(ArenaWorld.STEP);
-        assertEquals(4, world.wave);
-        assertEquals(2, elites(world));
-        world.update(ArenaWorld.STEP);
-        assertEquals(2, elites(world));
-        world.elapsed = 1000; world.update(ArenaWorld.STEP);
-        assertEquals(6, world.wave);
+        world.elapsed = 660; world.update(ArenaWorld.STEP);
+        assertEquals(7, world.wave);
         assertEquals(3, elites(world));
+        world.update(ArenaWorld.STEP);
+        assertEquals(3, elites(world));
+        world.elapsed = 1080; world.update(ArenaWorld.STEP);
+        assertEquals(11, world.wave);
+        assertEquals(5, elites(world));
         world.reset(); world.activatePlayer(0);
-        world.elapsed = 600; world.update(ArenaWorld.STEP);
-        assertEquals(2, elites(world));
+        world.elapsed = 660; world.update(ArenaWorld.STEP);
+        assertEquals(3, elites(world));
     }
 
     @Test void authoredPacksHaveDistinctCompositionsAndKeepEliteSlotsFree() {
@@ -79,6 +79,83 @@ class ArenaTimelineTest {
                 assertTrue(Math.abs(enemy.y) <= ArenaWorld.HALF_HEIGHT - enemy.radius);
             }
         }
+    }
+
+    @Test void authoredFullRunHasEarlyMiddleLateEscalationAndFiveCheckpoints() {
+        ArenaTimeline timeline = ArenaTimeline.TWENTY_MINUTES;
+        int checkpoints = 0;
+        for (int i = 0; i < timeline.phaseCount(); i++) {
+            ArenaTimeline.Phase phase = timeline.phase(i);
+            assertFalse(phase.name().isBlank());
+            assertTrue(phase.breatherSeconds() >= 3 && phase.breatherSeconds() <= 5);
+            assertTrue(phase.soloEnemyLimit() <= ArenaWorld.MAX_ENEMIES - 2);
+            if (phase.eliteKind() != null) checkpoints++;
+        }
+        assertEquals(5, checkpoints);
+        assertTrue(timeline.phase(0).healthMultiplier() < timeline.phase(6).healthMultiplier());
+        assertTrue(timeline.phase(6).healthMultiplier() < timeline.phase(11).healthMultiplier());
+        assertEquals(180, ArenaTimeline.SHORT.durationSeconds());
+    }
+
+    @Test void blockedCheckpointRetriesOnceRoomIsAvailable() {
+        ArenaWorld world = solo(ArenaTimeline.TWENTY_MINUTES);
+        for (ArenaWorld.Enemy enemy : world.enemies) {
+            enemy.active = true; enemy.health = enemy.maxHealth = 1000;
+            enemy.x = 900; enemy.y = 800;
+        }
+        world.activeEnemies = ArenaWorld.MAX_ENEMIES;
+        world.elapsed = 180; world.update(ArenaWorld.STEP);
+        assertEquals(0, elites(world));
+        world.enemies[0].active = false; world.activeEnemies--;
+        world.update(ArenaWorld.STEP);
+        assertEquals(1, elites(world));
+        world.update(ArenaWorld.STEP);
+        assertEquals(1, elites(world));
+        assertEquals(ArenaWorld.MAX_ENEMIES, world.activeEnemies);
+    }
+
+    @Test void lateFixtureHasBoundedSoloCoopPressureAndSnapshotStats() {
+        ArenaWorld solo = solo(ArenaTimeline.TWENTY_MINUTES);
+        solo.debugStartLateEncounter();
+        assertEquals(46, solo.activeEnemies);
+        ArenaWorld coop = solo(ArenaTimeline.TWENTY_MINUTES);
+        coop.activatePlayer(1); coop.players[1].attackCooldown = 1000;
+        coop.debugStartLateEncounter();
+        assertEquals(58, coop.activeEnemies);
+        assertEquals(1, elites(coop));
+        assertEquals(solo.enemies[1].health * 1.2f, coop.enemies[1].health, .001f);
+        assertEquals(100, solo.enemies[1].soulPercent);
+        assertEquals(82, coop.enemies[1].soulPercent);
+        coop.players[1].alive = false;
+        assertEquals(46, coop.reinforcementLimit());
+        assertEquals(82, coop.enemies[1].soulPercent);
+        assertFalse(coop.bossSpawned);
+        assertTrue(coop.elapsed < 1200);
+    }
+
+    @Test void coopSoulRoundingIsConservativeAndExactAcrossManySmallRewards() {
+        ArenaWorld world = solo(ArenaTimeline.TWENTY_MINUTES);
+        world.activatePlayer(1); world.players[1].attackCooldown = 1000;
+        world.elapsed = 20; // A short reinforcement breather, not a survival playthrough.
+        for (int i = 0; i < 100; i++) {
+            ArenaWorld.Enemy enemy = world.enemies[0];
+            enemy.active = true; enemy.health = 1; enemy.x = 30; enemy.y = 0;
+            enemy.kind = ArenaWorld.EnemyKind.GHOUL; enemy.soulPercent = 82;
+            world.activeEnemies = 1; world.players[0].attackCooldown = 0;
+            world.update(ArenaWorld.STEP);
+        }
+        assertEquals(82, world.souls);
+        assertEquals(82, world.progression.totalXp);
+    }
+
+    @Test void lateJoiningDoesNotRevalueExistingSouls() {
+        ArenaWorld world = solo(ArenaTimeline.TWENTY_MINUTES);
+        ArenaWorld.Pickup soul = world.pickups[0];
+        soul.active = true; soul.value = 9; soul.x = 0; soul.y = 0;
+        world.activatePlayer(1);
+        world.update(ArenaWorld.STEP);
+        assertEquals(9, world.souls);
+        assertEquals(9, world.progression.totalXp);
     }
 
     private static ArenaWorld solo(ArenaTimeline timeline) {
