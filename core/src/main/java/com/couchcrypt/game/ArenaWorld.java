@@ -39,6 +39,8 @@ public final class ArenaWorld {
     private final float[] inputX = new float[2], inputY = new float[2];
     private final boolean[] pendingDodge = new boolean[2];
     private float accumulator, spawnCountdown;
+    private double simulationElapsed;
+    private int sharedXpRemainder;
     private int randomState, runNumber, nextCheckpoint, encounterPhase;
 
     public ArenaWorld() { this(ArenaTimeline.SHORT); }
@@ -56,7 +58,7 @@ public final class ArenaWorld {
     }
 
     public void reset() {
-        outcome = Outcome.RUNNING; elapsed = accumulator = 0;
+        outcome = Outcome.RUNNING; elapsed = accumulator = 0; simulationElapsed = 0; sharedXpRemainder = 0;
         kills = souls = activeEnemies = elitesKilled = nextCheckpoint = encounterPhase = 0;
         wave = bossPhase = 1; bossSpawned = bossDefeated = false; boss = null;
         swordSwings = arrowsFired = enemyDeaths = pickupsCollected = heroHits = 0;
@@ -137,7 +139,11 @@ public final class ArenaWorld {
     public float timeRemaining() { return Math.max(0, durationSeconds() - elapsed); }
 
     private void tick() {
-        elapsed += STEP; wave = timeline.phaseIndex(elapsed) + 1;
+        // Preserve direct boundary/fixture jumps while avoiding float accumulation drift over twenty minutes.
+        if (elapsed != (float) simulationElapsed) simulationElapsed = elapsed;
+        simulationElapsed += 1.0 / 60.0;
+        elapsed = (float) simulationElapsed;
+        wave = timeline.phaseIndex(elapsed) + 1;
         for (Effect e : effects) if (e.active) { e.ttl -= STEP; if (e.ttl <= 0) e.active = false; }
         for (Player p : players) updatePlayer(p);
         updateEnemies(); updateBolts(); updateShots(); updateHazards(); updatePickups(); updateRevival();
@@ -148,8 +154,9 @@ public final class ArenaWorld {
         if (elapsed >= durationSeconds() - .0001f && !bossSpawned) debugStartBoss();
         if (!bossSpawned) {
             while (nextCheckpoint < timeline.phaseCount() && elapsed >= timeline.phaseStart(nextCheckpoint)) {
-                EnemyKind elite = timeline.phase(nextCheckpoint++).eliteKind();
-                if (elite != null) spawn(elite, true);
+                EnemyKind elite = timeline.phase(nextCheckpoint).eliteKind();
+                if (elite != null && spawn(elite, true) == null) break; // Retry a temporarily full/unsafe checkpoint.
+                nextCheckpoint++;
             }
         }
         updateEncounters();
@@ -270,6 +277,7 @@ public final class ArenaWorld {
         float speed = switch (e.kind) {
             case WRAITH -> 112; case BRUTE -> 37; case CULTIST -> 48; case BOSS -> bossPhase == 2 ? 56 : 44; default -> 57;
         };
+        speed *= e.speedMultiplier;
         if (e.elite) speed *= 1.15f;
         float desired = e.kind == EnemyKind.CULTIST ? 300 : e.radius + 18;
         float direction = distance < desired - 30 && e.kind == EnemyKind.CULTIST ? -1 : distance > desired ? 1 : 0;
@@ -358,7 +366,10 @@ public final class ArenaWorld {
         enemy.active = false; activeEnemies = Math.max(0, activeEnemies - 1); kills++; enemyDeaths++; players[owner].kills++;
         fx = effect(EffectKind.DEATH, enemy.x, enemy.y, owner, .35f); if (fx != null) fx.radius = enemy.radius;
         int reward = enemy.kind == EnemyKind.BOSS ? 20 : enemy.elite ? 8 : enemy.kind == EnemyKind.BRUTE ? 3 : enemy.kind == EnemyKind.CULTIST ? 2 : 1;
-        drop(enemy.x, enemy.y, false, reward);
+        // Snapshot party scaling at spawn; late joining cannot alter souls already on the floor.
+        int rewardHundredths = reward * enemy.soulPercent + sharedXpRemainder;
+        int soulReward = rewardHundredths / 100; sharedXpRemainder = rewardHundredths % 100;
+        if (soulReward > 0) drop(enemy.x, enemy.y, false, soulReward);
         if (enemy.elite) { elitesKilled++; drop(enemy.x + 14, enemy.y, true, 40); }
         else if (kills % 7 == 0) drop(enemy.x + 14, enemy.y, true, 24);
         if (enemy == boss) bossDefeated = true;
@@ -418,19 +429,20 @@ public final class ArenaWorld {
         spawnCountdown -= STEP;
         if (spawnCountdown > 0) return;
         if (bossSpawned) {
-            if (activeEnemies < MAX_ENEMIES - 2)
+            if (activeEnemies < (timeline.isFullRun() ? 12 + 6 * (livingPlayerCount() - 1) : MAX_ENEMIES - 2))
                 spawn(phase.pattern().member((int) (random() * phase.pattern().size())), false);
-            spawnCountdown = 2.5f;
+            spawnCountdown = timeline.isFullRun() ? 3.5f : 2.5f;
             return;
         }
         Player anchor = livingAnchor();
         float angle = random() * (float) (Math.PI * 2);
         ArenaTimeline.Pattern pattern = phase.pattern();
-        for (int member = 0; member < pattern.size() && activeEnemies < MAX_ENEMIES - 2; member++) {
+        for (int member = 0; member < pattern.size() && activeEnemies < reinforcementLimit(); member++) {
             float offset = (member - (pattern.size() - 1) * .5f) * .3f;
             spawn(pattern.member(member), false, anchor, angle + offset);
         }
-        spawnCountdown = phase.encounterInterval();
+        spawnCountdown = phase.encounterInterval()
+            * (timeline.isFullRun() && livingPlayerCount() > 1 ? .82f : 1);
     }
 
     private Enemy spawn(EnemyKind kind, boolean elite) {
@@ -454,11 +466,20 @@ public final class ArenaWorld {
             }
             if (!safe) return null; // Skip a reinforcement rather than materializing on either player.
             e.kind = kind; e.elite = elite;
+            e.soulPercent = timeline.isFullRun() && livingPlayerCount() > 1 ? 82 : 100;
             float health = switch (kind) { case WRAITH -> 18; case BRUTE -> 95; case CULTIST -> 35; case BOSS -> 1100; default -> 32; };
-            if (kind == EnemyKind.BOSS) health *= 1 + .6f * (activePlayerCount() - 1);
-            else health *= 1 + Math.min(elapsed / durationSeconds(), 1) * .2f;
+            ArenaTimeline.Phase phase = timeline.phase(timeline.phaseIndex(elapsed));
+            if (kind == EnemyKind.BOSS) {
+                if (timeline.isFullRun()) health = 6200;
+                health *= 1 + .6f * (activePlayerCount() - 1);
+            } else if (timeline.isFullRun()) {
+                health *= phase.healthMultiplier() * (1 + .2f * (livingPlayerCount() - 1));
+            } else health *= 1 + Math.min(elapsed / durationSeconds(), 1) * .2f;
             e.maxHealth = e.health = health * (elite ? 4 : 1);
             e.damage = kind == EnemyKind.BOSS ? 20 : kind == EnemyKind.BRUTE ? 18 : kind == EnemyKind.WRAITH ? 8 : 12;
+            if (timeline.isFullRun() && kind != EnemyKind.BOSS) e.damage *= phase.damageMultiplier();
+            e.speedMultiplier = timeline.isFullRun() && kind != EnemyKind.BOSS
+                ? 1 + .2f * Math.min(elapsed / durationSeconds(), 1) : 1;
             e.animTime = random(); e.hitFlash = e.vx = e.vy = e.stunTime = e.windup = 0; e.attackCooldown = kind == EnemyKind.BOSS ? 1.5f : 1;
             e.active = true; activeEnemies++; return e;
         }
@@ -471,6 +492,37 @@ public final class ArenaWorld {
         elapsed = Math.max(elapsed, durationSeconds()); wave = timeline.phaseCount();
         if (activeEnemies >= MAX_ENEMIES) for (Enemy e : enemies) if (e.active) { e.active = false; activeEnemies--; break; }
         boss = spawn(EnemyKind.BOSS, false); bossSpawned = boss != null; bossPhase = 1;
+    }
+
+    /** Profile fixture: bounded late-run density, with no survival fast-forward or historical elites. */
+    public void debugStartLateEncounter() {
+        if (outcome != Outcome.RUNNING || activePlayerCount() == 0) return;
+        elapsed = durationSeconds() * .925f; simulationElapsed = elapsed;
+        wave = timeline.phaseIndex(elapsed) + 1; encounterPhase = wave - 1;
+        nextCheckpoint = wave; spawnCountdown = 1.4f;
+        bossSpawned = bossDefeated = false; boss = null; bossPhase = 1;
+        for (Enemy enemy : enemies) enemy.active = false;
+        for (Shot shot : shots) shot.active = false;
+        for (Bolt bolt : bolts) bolt.active = false;
+        for (Hazard hazard : hazards) hazard.active = false;
+        for (Pickup pickup : pickups) pickup.active = false;
+        for (Effect effect : effects) effect.active = false;
+        activeEnemies = 0;
+        ArenaTimeline.Phase phase = timeline.phase(encounterPhase);
+        spawn(phase.eliteKind() == null ? EnemyKind.BRUTE : phase.eliteKind(), true);
+        for (int i = 1, limit = reinforcementLimit(); i < limit; i++)
+            spawn(phase.pattern().member(i % phase.pattern().size()), false);
+    }
+
+    /** Soft pressure cap reserves hard-pool room for checkpoint elites and the boss. */
+    public int reinforcementLimit() {
+        ArenaTimeline.Phase phase = timeline.phase(timeline.phaseIndex(elapsed));
+        return Math.min(MAX_ENEMIES - 2, phase.soloEnemyLimit()
+            + (timeline.isFullRun() ? 12 * Math.max(0, livingPlayerCount() - 1) : 0));
+    }
+
+    private int livingPlayerCount() {
+        int count = 0; for (Player player : players) if (player.active && player.alive) count++; return count;
     }
 
     private Enemy nearest(float x, float y, float range, long excluded) {
@@ -535,8 +587,9 @@ public final class ArenaWorld {
     public static final class Enemy {
         public boolean active, elite;
         public EnemyKind kind = EnemyKind.GHOUL;
+        public int soulPercent = 100;
         public float x, y, health, maxHealth, animTime, hitFlash, vx, vy;
-        public float radius = 20, stunTime, attackCooldown, windup, damage = 12;
+        public float radius = 20, stunTime, attackCooldown, windup, damage = 12, speedMultiplier = 1;
     }
     public static final class Bolt {
         public boolean active;

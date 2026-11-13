@@ -28,7 +28,7 @@ python3 scripts/capture-performance.py --serial emulator-5554 \
   --host 192.168.14.248 --forward-port 51849 --fixture boss-coop --seconds 20 --lifecycle
 ```
 
-Other fixtures are `boss-solo`, `results` and `lobby`. Choose the directly relevant fixture; do not run all of them as a default regression suite. Duration defaults to 20 seconds and is bounded to 5–30 seconds; use a short results-only capture for a directly affected transition. Logging starts before entering the fixture so the first transition is included. Logs and beginning/end memory snapshots replace the same fixture's files under ignored `.run/`. The results fixture returns to the lobby once to observe resource release. Optional `--lifecycle` adds one sample victory/lobby transition and a brief Home/resume check, with a resume screenshot; it does not force GL-context loss. This is not a repeated leak test. The script closes synthetic clients, stops its logcat process, and restores a fresh empty lobby, leaving the existing emulator/relay/forward running.
+Other fixtures are `boss-solo`, `late-coop`, `results` and `lobby`. Choose the directly relevant fixture; do not run all of them as a default regression suite. Duration defaults to 20 seconds and is bounded to 5–30 seconds; use a short results-only capture for a directly affected transition. Logging starts before entering the fixture so the first transition is included. Logs and beginning/end memory snapshots replace the same fixture's files under ignored `.run/`. The results fixture returns to the lobby once to observe resource release. Optional `--lifecycle` adds one sample victory/lobby transition and a brief Home/resume check, with a resume screenshot; it does not force GL-context loss. This is not a repeated leak test. The script closes synthetic clients, stops its logcat process, and restores a fresh empty lobby, leaving the existing emulator/relay/forward running.
 
 For a context-restoration check, briefly background/resume the app and inspect the QR/art. QR now retains a managed pixmap and disposes both pixels and texture on replacement/shutdown. Android may retain the GL context on this brief transition, so this verifies lifecycle behavior without proving a forced GL-context loss.
 
@@ -87,3 +87,28 @@ The approved orb/rail/skill/Dodge artwork is baked offline into `assets/art/hud-
 A brief fresh solo/co-op F10 fixture applied actual progression choices to party level 12, partial shared XP and health, then rendered the acquired skill ranks and overflow. Local screenshots are `.run/orb-hud-coop.png` and `.run/orb-hud-solo.png`. Exactly one short co-op profiling window was collected: 297 frames, raw interval p95/p99/max 19.62/25.20/47.99 ms; render CPU submission p95/p99/max 5.79/21.19/43.69 ms; 136 intervals over 16.7 ms and 2 over 33.4 ms. The sample reported 8 draw calls, 26.81 MiB GPU texture data and 20.31 MiB retained pixmaps. Thus the atlas adds the expected 0.5 MiB GPU cost without raising the retained CPU baseline. This startup-adjacent emulator window is not a sustained physical-TV or worst-combat performance guarantee. It still exceeds the strict frame budget.
 
 The screenshot review identified a small acquired-skill overflow/Dodge-status spacing issue. Moving its label down 10 logical pixels resolved the overlap; one final co-op capture (`.run/orb-hud-final.png`) confirmed readable orb numbers and clear overflow/READY spacing without repeating metrics or solo checks. Synthetic controllers were stopped, temporary capture processes exited, and the app returned to an empty lobby. The emulator and existing relay remain running for user handoff.
+
+
+## Twenty-minute run: short late-encounter check
+
+The normal run now uses the twenty-minute timeline. Profile-only F11 starts directly at 18:30 with 58 bounded co-op enemies (46 solo), one elite, earned level-18 mixed builds and temporary fixture invulnerability. This avoids a survival playthrough. The `late-coop` capture fixture invokes F11; it does not choose upgrades, move or dodge. A screenshot of this live encounter is retained locally at `.run/twenty-minute-performance.png`.
+
+A six-second Android method-sampling trace (1 ms sampling) of the existing acquired-build co-op fixture found roughly 361 ms of render-callback thread CPU, including 303 ms in the arena renderer and 195 ms in `glBufferData`. These are approximate sampled CPU costs, affected by tracing, and exclude GPU execution. Floor quads were rebuilt and submitted through the dynamic sprite buffer for each camera. The first subsequent ring changed textures and flushed that floor data, so an inclusive ring cost alone would misleadingly identify telegraphs as the cause.
+
+The existing 300 unchanged floor quads now live in one managed static `SpriteCache` mesh: 24,000 vertex bytes plus 3,600 index bytes, with bounded CPU restoration storage of the same geometry. It borrows the existing texture, preserves tile positions, UVs, tint, blend mode and floor-before-actors ordering, and is disposed with the renderer. Camera projection/scissor clips the fixed geometry. This removes recurring CPU floor generation and two dynamic floor-buffer uploads per co-op frame. Draw-call count stays the same; no artwork, texture or atlas was changed. The screenshot confirmed both camera panes and the approved HUD render correctly.
+
+Two separate seven-second `late-coop` captures used the same API-33 Android 13 ARM64 `Television_1080p` / `emulator-5554` setup (1920x1080, 2 GiB emulator RAM, automatic GPU mode). Each yielded one full five-second window:
+
+| Measurement | Dynamic floor before | Static floor after |
+| --- | --- | --- |
+| Frames in full window | 300 | 296 |
+| Raw interval p95 / p99 / max | 19.15 / 20.24 / 46.67 ms | 18.77 / 35.51 / 63.23 ms |
+| Render CPU submission p95 / p99 / max | 3.99 / 10.85 / 45.76 ms | 3.47 / 7.54 / 46.67 ms |
+| Intervals above 16.7 / 33.4 ms | 147 / 1 | 149 / 3 |
+| Final draw calls | 8 | 8 |
+| GPU texture / retained pixmap bytes | 28,112,340 / 21,293,900 | 28,112,340 / 21,293,900 |
+| End process PSS / native-heap PSS | 77,531 / 43,013 KiB | 77,549 / 42,942 KiB |
+
+CPU percentiles were lower in this sample; interval tails were worse. These short startup-adjacent emulator observations do not establish a statistically reliable speedup, isolate the remaining stall, prove long-run memory stability, or certify physical-TV 60 FPS. An earlier twelve-second boss baseline had a 57.30 ms interval / 56.36 ms submission maximum with no established cause. Its concurrent GC pause was only tens of microseconds and does not explain that stall. No speculative simulation or HUD refactor was made to attribute it. The texture total remains 26.81 MiB in-session; the previously accounted worst active-outcome total remains 31.87 MiB under the unchanged 32 MiB budget. Process PSS includes native, Java, shared and driver memory and is separate from texture/mesh accounting.
+
+Raw before/after logs and memory snapshots are ignored under `.run/performance-late-coop-before.*` and `.run/performance-late-coop.*`. Synthetic controllers and temporary trace/log processes were stopped, the device trace file removed, and the app returned to an empty lobby. The existing emulator, relay and ADB forward remain running for handoff. No attached physical phone was touched.

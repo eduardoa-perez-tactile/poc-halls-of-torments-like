@@ -90,7 +90,7 @@ def main():
     parser.add_argument('--serial', default='emulator-5554')
     parser.add_argument('--host', required=True, help='Existing relay LAN IPv4 used by the TV QR')
     parser.add_argument('--forward-port', type=int, required=True, help='Existing ADB localhost forward to TV8787')
-    parser.add_argument('--fixture', choices=['lobby', 'boss-solo', 'boss-coop', 'results'], default='boss-coop')
+    parser.add_argument('--fixture', choices=['lobby', 'boss-solo', 'boss-coop', 'late-coop', 'results'], default='boss-coop')
     parser.add_argument('--seconds', type=int, default=20, choices=range(5, 31), metavar='5..30')
     parser.add_argument('--lifecycle', action='store_true', help='Add one brief results/lobby/background-resume observation')
     parser.add_argument('--switch-smoke', action='store_true', help='Results only: send rapid F7/F8/Back after measurement')
@@ -142,7 +142,8 @@ def main():
             for code in (20, 22, 23):  # Player I -> Back -> Start -> activate.
                 key(code)
             wait(.5)
-            key(137 if args.fixture == 'results' else 136)  # F7 sample victory / F6 boss fixture.
+            key(137 if args.fixture == 'results' else 141 if args.fixture == 'late-coop' else 136)
+            # F7 sample victory / F11 bounded late encounter / F6 boss fixture.
             wait(.5)
         start_memory = command('shell', 'dumpsys', 'meminfo', PACKAGE)
         prefix.with_suffix('.memory.txt').write_text('FIXTURE START\n' + start_memory)

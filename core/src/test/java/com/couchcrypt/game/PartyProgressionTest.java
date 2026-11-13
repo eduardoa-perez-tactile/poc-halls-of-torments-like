@@ -6,6 +6,85 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PartyProgressionTest {
+    @Test void longRunMilestonesLeaveLateUpgradesAndCapAtNineteenChoices() {
+        ArenaWorld world = new ArenaWorld(ArenaTimeline.TWENTY_MINUTES);
+        world.activatePlayer(0);
+        PartyProgression progression = world.progression;
+        assertEquals(12, progression.xpToNext);
+        progression.addXp(11);
+        assertEquals(1, progression.level);
+        assertFalse(progression.offers[0].pending);
+        progression.addXp(1);
+        assertEquals(2, progression.level);
+        int firstOffer = progression.offers[0].id;
+        int[] cumulativeXp = {116, 516, 1166, 1646, 1990, 1991};
+        int[] levels = {5, 10, 15, 18, 19, 20};
+        for (int i = 0; i < cumulativeXp.length; i++) {
+            progression.addXp(cumulativeXp[i] - progression.totalXp);
+            assertEquals(levels[i], progression.level, "Long-run collected XP milestone " + cumulativeXp[i]);
+            assertEquals(firstOffer, progression.offers[0].id, "Level bursts must retain the pending personal choice");
+        }
+        assertEquals(0, progression.xp);
+        assertEquals(0, progression.xpToNext);
+        progression.addXp(Integer.MAX_VALUE);
+        assertEquals(PartyProgression.MAX_LEVEL, progression.level);
+        assertEquals(Integer.MAX_VALUE, progression.totalXp);
+    }
+
+    @Test void lateJoinAtLongRunCapReceivesAllPersonalChoicesWithFreshTimersAndClassCards() {
+        ArenaWorld world = new ArenaWorld(ArenaTimeline.TWENTY_MINUTES);
+        world.activatePlayer(0);
+        world.progression.addXp(1991);
+        world.setHero(1, ArenaWorld.Hero.RANGER);
+        world.activatePlayer(1);
+        PartyProgression progression = world.progression;
+        int firstId = progression.offers[1].id;
+        progression.update(PartyProgression.CHOICE_SECONDS + 90);
+        assertEquals(1, progression.appliedUpgradeCount(1), "A delayed update cannot skip catch-up decisions");
+        assertEquals(3, progression.offers[1].level);
+        assertEquals(PartyProgression.CHOICE_SECONDS, progression.offers[1].secondsLeft);
+        assertFalse(progression.choose(1, firstId, 0));
+        int hostApplied = progression.appliedUpgradeCount(0);
+        while (progression.offers[1].pending) {
+            PartyProgression.Offer offer = progression.offers[1];
+            assertEquals(PartyProgression.CHOICE_SECONDS, offer.secondsLeft);
+            Set<PartyProgression.Upgrade> distinct = new HashSet<>();
+            for (int i = 0; i < offer.options.length; i++) {
+                assertTrue(distinct.add(offer.options[i]));
+                assertTrue(offer.options[i].supports(world.players[1].hero));
+                assertEquals(progression.rank(1, offer.options[i]) + 1, offer.cards[i].rank());
+            }
+            assertTrue(progression.choose(1, offer.id, 0));
+        }
+        assertEquals(19, progression.appliedUpgradeCount(1));
+        assertEquals(0, progression.rank(1, PartyProgression.Upgrade.SWEEP));
+        assertEquals(hostApplied, progression.appliedUpgradeCount(0), "The late joiner's choices do not consume the host's queue");
+        assertTrue(progression.offers[0].pending);
+    }
+
+    @Test void eitherHeroCanSpendEveryLongRunEntitlementWithoutExhaustingDistinctEligibleChoices() {
+        for (ArenaWorld.Hero hero : ArenaWorld.Hero.values()) {
+            ArenaWorld world = new ArenaWorld(ArenaTimeline.TWENTY_MINUTES);
+            world.setHero(0, hero); world.activatePlayer(0);
+            PartyProgression progression = world.progression;
+            progression.addXp(1991);
+            for (int entitlement = 0; entitlement < 19; entitlement++) {
+                PartyProgression.Offer offer = progression.offers[0];
+                assertTrue(offer.pending, hero + " choice " + entitlement);
+                Set<PartyProgression.Upgrade> distinct = new HashSet<>();
+                int leastRank = 0;
+                for (int i = 0; i < offer.options.length; i++) {
+                    assertTrue(distinct.add(offer.options[i]));
+                    assertTrue(offer.options[i].supports(hero));
+                    if (progression.rank(0, offer.options[i]) < progression.rank(0, offer.options[leastRank])) leastRank = i;
+                }
+                assertTrue(progression.choose(0, offer.id, leastRank));
+            }
+            assertEquals(19, progression.appliedUpgradeCount(0));
+            assertFalse(progression.offers[0].pending);
+        }
+    }
+
     @Test void collectedSoulXpLevelsBothPlayersTogether() {
         ArenaWorld world = duo();
         ArenaWorld.Pickup reward = world.pickups[0];

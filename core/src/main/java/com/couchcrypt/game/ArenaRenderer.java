@@ -5,6 +5,7 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.SpriteCache;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Disposable;
@@ -19,6 +20,10 @@ public final class ArenaRenderer implements Disposable {
     private final GameArt art;
     private final GameHud gameHud;
     private final SpriteBatch batch = new SpriteBatch(1800);
+    // One managed static mesh: 300 quads, 24,000 vertex bytes + 3,600 index bytes.
+    // It borrows the existing floor texture; no additional texture/pixmap storage.
+    private final SpriteCache floorCache = new SpriteCache(300, true);
+    private final int floorCacheId;
     private final OrthographicCamera[] cameras = { new OrthographicCamera(), new OrthographicCamera() };
     private final OrthographicCamera hud = new OrthographicCamera();
     private final boolean[] cameraReady = new boolean[2];
@@ -31,6 +36,7 @@ public final class ArenaRenderer implements Disposable {
 
     public ArenaRenderer(GameArt gameArt, UiArt uiArt, BuildIcons buildIcons, HudArt hudArt) {
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
+        floorCacheId = cacheFloor();
         hud.setToOrtho(false, HUD_WIDTH, HUD_HEIGHT);
         for (int i = 0; i < 8; i++) {
             float x = -1080f + i * 300f;
@@ -64,9 +70,9 @@ public final class ArenaRenderer implements Disposable {
             Gdx.gl.glScissor(paneX, 0, paneWidth, height);
             OrthographicCamera camera = cameras[slot];
             updateCamera(camera, world.players[slot], slot, split, paneWidth, height, delta);
+            drawFloor(camera);
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
-            drawFloor(camera);
             drawHazards(world, camera);
             drawGroundMarks(world, camera);
             drawPickups(world, camera);
@@ -114,27 +120,34 @@ public final class ArenaRenderer implements Disposable {
         camera.update();
     }
 
-    private void drawFloor(OrthographicCamera camera) {
-        float minX = camera.position.x - camera.viewportWidth * .5f - 90f;
-        float maxX = camera.position.x + camera.viewportWidth * .5f + 90f;
-        float minY = camera.position.y - camera.viewportHeight * .5f - 45f;
-        float maxY = camera.position.y + camera.viewportHeight * .5f + 45f;
+    private int cacheFloor() {
+        floorCache.beginCache();
         for (int row = 0; row < 15; row++) {
             float y = -ArenaWorld.HALF_HEIGHT + row * TILE;
             for (int col = 0; col < 20; col++) {
                 float x = -ArenaWorld.HALF_WIDTH + col * TILE;
                 float sx = screenX(x, y), sy = screenY(x, y);
-                if (sx + 85f < minX || sx - 85f > maxX || sy + 85f < minY || sy > maxY) continue;
                 float shade = .82f + ((col * 7 + row * 11) & 3) * .035f;
                 float color = Color.toFloatBits(shade, shade, shade, 1f);
                 vertex(0, sx, sy, color, 0f, 1f);
                 vertex(5, sx - TILE * ISO_X, sy + TILE * ISO_Y, color, 0f, 0f);
                 vertex(10, sx, sy + TILE * ISO_Y * 2f, color, 1f, 0f);
                 vertex(15, sx + TILE * ISO_X, sy + TILE * ISO_Y, color, 1f, 1f);
-                batch.draw(art.floor, tileVertices, 0, 20);
+                floorCache.add(art.floor, tileVertices, 0, 20);
             }
         }
-        batch.setColor(Color.WHITE);
+        return floorCache.endCache();
+    }
+
+    private void drawFloor(OrthographicCamera camera) {
+        // Projection/scissor clip the unchanged static tiles independently for each pane.
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        floorCache.setProjectionMatrix(camera.combined);
+        floorCache.begin();
+        floorCache.draw(floorCacheId);
+        floorCache.end();
+        drawCalls += floorCache.renderCalls;
     }
 
     private void vertex(int offset, float x, float y, float color, float u, float v) {
@@ -428,5 +441,5 @@ public final class ArenaRenderer implements Disposable {
     }
     private static float screenX(float x, float y) { return (x - y) * ISO_X; }
     private static float screenY(float x, float y) { return (x + y) * ISO_Y; }
-    @Override public void dispose() { batch.dispose(); }
+    @Override public void dispose() { floorCache.dispose(); batch.dispose(); }
 }
