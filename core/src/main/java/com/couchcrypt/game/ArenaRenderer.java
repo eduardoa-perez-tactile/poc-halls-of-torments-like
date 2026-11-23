@@ -6,7 +6,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.SpriteCache;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Disposable;
 import com.couchcrypt.ui.UiArt;
@@ -14,10 +14,7 @@ import com.couchcrypt.ui.BuildIcons;
 
 /** Bounded isometric renderer; all scene resources are owned by GameArt/UiArt. */
 public final class ArenaRenderer implements Disposable {
-    private static final float ISO_X = .70710678f, ISO_Y = .35355339f, TILE = 120f;
-    // Eight cosmetic cells cover the TV cameras beyond every playable edge, including the +65 follow offset.
-    private static final int FLOOR_COLUMNS = 20, FLOOR_ROWS = 15, FLOOR_BORDER = 8;
-    private static final int FLOOR_QUADS = (FLOOR_COLUMNS + 2 * FLOOR_BORDER) * (FLOOR_ROWS + 2 * FLOOR_BORDER);
+    private static final float ISO_X = .70710678f, ISO_Y = .35355339f;
     private static final float HUD_WIDTH = 1920f, HUD_HEIGHT = 1080f;
     private static final float REVIVE_BAR_Y = 122f, REVIVE_BAR_HEIGHT = 4f;
     private static final float PROP_SHADOW_WIDTH = 62f, SHADOW_Y = -9f, SHADOW_HEIGHT = 20f;
@@ -27,26 +24,30 @@ public final class ArenaRenderer implements Disposable {
     private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
     private static final float[] CULTIST_ORIGIN = {17, 38, -4, 27, 15, 46, -17, 35};
     private static final float[] SOVEREIGN_ORIGIN = {37, 78, -12, 67, 18, 90, -35, 82};
-    private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PROP_COUNT = 28;
+    private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PROP_COUNT = 14;
     private final GameArt art;
     private final GameHud gameHud;
     private final SpriteBatch batch = new SpriteBatch(1800);
     // One managed static mesh: 1,116 quads, 89,280 vertex bytes + 13,392 index bytes.
-    // It borrows the environment page; no additional texture/pixmap storage.
-    private final SpriteCache floorCache = new SpriteCache(FLOOR_QUADS, true);
+    // It borrows the bounded border page; both player cameras reuse this mesh.
+    private final SpriteCache floorCache = createFloorCache();
     private final int floorCacheId;
     private final OrthographicCamera[] cameras = { new OrthographicCamera(), new OrthographicCamera() };
     private final OrthographicCamera hud = new OrthographicCamera();
     private final boolean[] cameraReady = new boolean[2];
-    private final float[] tileVertices = new float[20];
     private final float[] propX = new float[PROP_COUNT], propY = new float[PROP_COUNT];
     private final GameplayAtlas.Region[] propArt = new GameplayAtlas.Region[PROP_COUNT];
     private final float[] propScale = new float[PROP_COUNT];
+    // Existing nonstructural landmarks retain their original world positions.
     private static final String[] PROP_REGIONS = {
-        "corner", "wall-ne", "pillar", "sarcophagus", "arch", "wall-ne", "rubble", "corner",
-        "corner", "urn", "wall-ne", "relic", "obelisk", "wall-ne", "shrine", "corner",
-        "wall-nw", "pillar", "wall-nw", "urn", "wall-nw", "orb",
-        "wall-nw", "rubble", "wall-nw", "sarcophagus", "wall-nw", "relic"
+        "pillar", "sarcophagus", "arch", "rubble", "urn", "relic", "obelisk", "shrine",
+        "pillar", "urn", "orb", "rubble", "sarcophagus", "relic"
+    };
+    private static final float[] PROP_X = {
+        -480, -180, 120, 720, -780, -180, 120, 720, -1140, -1140, -1140, 1140, 1140, 1140
+    };
+    private static final float[] PROP_Y = {
+        -840, -840, -840, -840, 840, 840, 840, 840, -390, 130, 650, -390, 130, 650
     };
     private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + PROP_COUNT];
     private final int[] types = new int[depths.length], indices = new int[depths.length];
@@ -57,17 +58,8 @@ public final class ArenaRenderer implements Disposable {
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
         floorCacheId = cacheFloor();
         hud.setToOrtho(false, HUD_WIDTH, HUD_HEIGHT);
-        for (int i = 0; i < 8; i++) {
-            float x = -1080f + i * 300f;
-            propX[i] = x; propY[i] = -840f;
-            propX[i + 8] = x; propY[i + 8] = 840f;
-        }
-        for (int i = 0; i < 6; i++) {
-            float y = -650f + i * 260f;
-            propX[i + 16] = -1140f; propY[i + 16] = y;
-            propX[i + 22] = 1140f; propY[i + 22] = y;
-        }
         for (int i = 0; i < PROP_COUNT; i++) {
+            propX[i] = PROP_X[i]; propY[i] = PROP_Y[i];
             propArt[i] = art.environment(PROP_REGIONS[i]);
             propScale[i] = propArt[i].worldHeight() / art.metadata.frames[propArt[i].frame()].sourceHeight;
         }
@@ -146,22 +138,78 @@ public final class ArenaRenderer implements Disposable {
 
     private int cacheFloor() {
         floorCache.beginCache();
-        for (int row = -FLOOR_BORDER; row < FLOOR_ROWS + FLOOR_BORDER; row++) {
-            float y = -ArenaWorld.HALF_HEIGHT + row * TILE;
-            for (int col = -FLOOR_BORDER; col < FLOOR_COLUMNS + FLOOR_BORDER; col++) {
-                float x = -ArenaWorld.HALF_WIDTH + col * TILE;
-                float sx = screenX(x, y), sy = screenY(x, y);
-                float shade = .82f + ((col * 7 + row * 11) & 3) * .035f;
-                float color = Color.toFloatBits(shade, shade, shade, 1f);
-                TextureRegion floor = art.floors[Math.floorMod(col * 7 + row * 11, art.floors.length)];
-                vertex(0, sx, sy, color, floor.getU(), floor.getV2());
-                vertex(5, sx - TILE * ISO_X, sy + TILE * ISO_Y, color, floor.getU(), floor.getV());
-                vertex(10, sx, sy + TILE * ISO_Y * 2f, color, floor.getU2(), floor.getV());
-                vertex(15, sx + TILE * ISO_X, sy + TILE * ISO_Y, color, floor.getU2(), floor.getV2());
-                floorCache.add(floor.getTexture(), tileVertices, 0, 20);
+        float scale = ArenaTileLayout.CELL * 2f * ISO_X / art.borders.tileWidth;
+        int minColumn = -ArenaTileLayout.PADDING, maxColumn = ArenaTileLayout.COLUMNS + ArenaTileLayout.PADDING - 1;
+        int minRow = -ArenaTileLayout.PADDING, maxRow = ArenaTileLayout.ROWS + ArenaTileLayout.PADDING - 1;
+        // The exterior is a backdrop: it must not cover the foreground foundation skirts.
+        for (int pass = 0; pass < 2; pass++) {
+            // Match the export's far-to-near order, including the i tie-break.
+            for (int depth = maxColumn + maxRow; depth >= minColumn + minRow; depth--) {
+                for (int column = minColumn; column <= maxColumn; column++) {
+                    int row = depth - column;
+                    if (row < minRow || row > maxRow) continue;
+                    boolean exterior = ArenaTileLayout.exterior(column, row);
+                    if (exterior != (pass == 0)) continue;
+                    float x = ArenaTileLayout.farX(column), y = ArenaTileLayout.farY(row);
+                    float shade = exterior ? .10f : 1f;
+                    floorCache.setColor(shade, shade, shade, 1f);
+                    BorderTileArt.Region tile = art.borders.region(ArenaTileLayout.tile(column, row));
+                    floorCache.add(tile.texture(), screenX(x, y) + tile.left() * scale,
+                        screenY(x, y) + tile.bottom() * scale, tile.width() * scale, tile.height() * scale);
+                }
             }
         }
+        floorCache.setColor(Color.WHITE);
         return floorCache.endCache();
+    }
+
+    private static SpriteCache createFloorCache() {
+        String vertex = """
+            attribute vec4 a_position;
+            attribute vec4 a_color;
+            attribute vec2 a_texCoord0;
+            uniform mat4 u_projectionViewMatrix;
+            varying vec4 v_color;
+            varying vec2 v_texCoords;
+            void main() {
+                v_color = a_color;
+                v_color.a *= 255.0 / 254.0;
+                v_texCoords = a_texCoord0;
+                gl_Position = u_projectionViewMatrix * a_position;
+            }
+            """;
+        // These tiles own opaque cells, rather than translucent sprite edges.
+        // Linear filtering interpolates their zero-RGB transparent pixels and
+        // would darken shared diagonals twice through ordinary alpha blending.
+        // Unpremultiply that sampled coverage, then draw the owning cell opaque.
+        // A four-cell junction can distribute coverage across four samples, so
+        // retain samples below one quarter instead of using a 0.5 alpha test.
+        String fragment = """
+            #ifdef GL_ES
+            precision mediump float;
+            #endif
+            varying vec4 v_color;
+            varying vec2 v_texCoords;
+            uniform sampler2D u_texture;
+            void main() {
+                vec4 sampleColor = texture2D(u_texture, v_texCoords);
+                if (sampleColor.a < 0.2) discard;
+                gl_FragColor = vec4(sampleColor.rgb / sampleColor.a, 1.0) * v_color;
+            }
+            """;
+        ShaderProgram shader = new ShaderProgram(vertex, fragment);
+        if (!shader.isCompiled()) {
+            String log = shader.getLog();
+            shader.dispose();
+            throw new IllegalStateException("Cannot compile arena tile coverage shader: " + log);
+        }
+        try {
+            // SpriteCache owns and disposes its constructor-supplied base shader.
+            return new SpriteCache(ArenaTileLayout.QUADS, shader, true);
+        } catch (RuntimeException | Error failure) {
+            shader.dispose();
+            throw failure;
+        }
     }
 
     private void drawFloor(OrthographicCamera camera) {
@@ -173,11 +221,6 @@ public final class ArenaRenderer implements Disposable {
         floorCache.draw(floorCacheId);
         floorCache.end();
         drawCalls += floorCache.renderCalls;
-    }
-
-    private void vertex(int offset, float x, float y, float color, float u, float v) {
-        tileVertices[offset] = x; tileVertices[offset + 1] = y; tileVertices[offset + 2] = color;
-        tileVertices[offset + 3] = u; tileVertices[offset + 4] = v;
     }
 
     private void gatherSprites(ArenaWorld world, OrthographicCamera camera) {
