@@ -72,6 +72,9 @@ public final class LevelUpView extends Table {
     /** Unchanged frames allocate no strings and do not invalidate layout. */
     public void update(ArenaWorld world) {
         boolean loot = !world.levelUpPending() && world.lootPending();
+        // A brief sprite burst remains readable before the existing crest ceremony settles in.
+        // The phone offers and authoritative choice clock start immediately.
+        setColor(1, 1, 1, loot ? 1 : MathUtils.clamp((world.levelUpFxAge - .15f) / .3f, 0, 1));
         int mode = loot ? 1 : 0;
         if (previousMode != mode || previousLevel != world.progression.level) {
             previousMode = mode;
