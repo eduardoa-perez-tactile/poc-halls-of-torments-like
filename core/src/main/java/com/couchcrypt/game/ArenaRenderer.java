@@ -10,8 +10,11 @@ import com.badlogic.gdx.graphics.g2d.SpriteCache;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Disposable;
+import com.badlogic.gdx.utils.JsonReader;
 import com.couchcrypt.ui.UiArt;
 import com.couchcrypt.ui.BuildIcons;
+import java.util.ArrayList;
+import java.util.Comparator;
 
 /** Bounded isometric renderer; all scene resources are owned by GameArt/UiArt. */
 public final class ArenaRenderer implements Disposable {
@@ -29,10 +32,11 @@ public final class ArenaRenderer implements Disposable {
     private final GameArt art;
     private final GameHud gameHud;
     private final SpriteBatch batch = new SpriteBatch(1800);
-    // One managed static mesh: 1,116 quads, 89,280 vertex bytes + 13,392 index bytes.
-    // It borrows the bounded border page; both player cameras reuse this mesh.
+    // One bounded static mesh; both cameras reuse the same floor, paths and wear colours.
     private final SpriteCache floorCache = createFloorCache();
     private final int floorCacheId;
+    private final ArenaFloorLayout floorLayout;
+    private final EngravedFloorArt.Quad[] medallion;
     private final OrthographicCamera[] cameras = { new OrthographicCamera(), new OrthographicCamera() };
     private final OrthographicCamera hud = new OrthographicCamera();
     private final boolean[] cameraReady = new boolean[2];
@@ -44,9 +48,23 @@ public final class ArenaRenderer implements Disposable {
     private final int[] types = new int[depths.length], indices = new int[depths.length];
     private int sortCount;
     public int drawCalls;
+    /** Startup inventory; shared by both cameras and never rebuilt while playing. */
+    public int cachedFloorQuads;
+    public int medallionQuads() { return medallion.length; }
 
     public ArenaRenderer(GameArt gameArt, UiArt uiArt, BuildIcons buildIcons, HudArt hudArt) {
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
+        floorLayout = new ArenaFloorLayout(new JsonReader().parse(Gdx.files.internal("arena/crypt-floor.json")));
+        float radius = floorLayout.medallionDiameter * .5f;
+        float[] engraving = EngravedFloorArt.rectangle(floorLayout.centerX - radius, floorLayout.centerY - radius,
+            floorLayout.centerX + radius, floorLayout.centerY + radius);
+        // The approved flourish faces screen up/right; its stone joints align with the other paving.
+        for (int i = 0; i < engraving.length; i += 4) {
+            float x = engraving[i] - floorLayout.centerX, y = engraving[i + 1] - floorLayout.centerY;
+            engraving[i] = floorLayout.centerX + (x + y) * ISO_X;
+            engraving[i + 1] = floorLayout.centerY + (y - x) * ISO_X;
+        }
+        medallion = art.engravedFloor.geometry(art.engravedFloor.medallion, engraving, 1f);
         floorCacheId = cacheFloor();
         hud.setToOrtho(false, HUD_WIDTH, HUD_HEIGHT);
         layout = ArenaLayout.load(art.metadata);
@@ -79,6 +97,7 @@ public final class ArenaRenderer implements Disposable {
             drawFloor(camera);
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
+            art.engravedFloor.draw(batch, medallion);
             drawHazards(world, camera);
             drawAttackRanges(world, camera);
             drawGroundMarks(world, camera);
@@ -130,6 +149,7 @@ public final class ArenaRenderer implements Disposable {
 
     private int cacheFloor() {
         floorCache.beginCache();
+        int quads = 0;
         float scale = ArenaTileLayout.CELL * 2f * ISO_X / art.borders.tileWidth;
         int minColumn = -ArenaTileLayout.PADDING, maxColumn = ArenaTileLayout.COLUMNS + ArenaTileLayout.PADDING - 1;
         int minRow = -ArenaTileLayout.PADDING, maxRow = ArenaTileLayout.ROWS + ArenaTileLayout.PADDING - 1;
@@ -142,17 +162,54 @@ public final class ArenaRenderer implements Disposable {
                     if (row < minRow || row > maxRow) continue;
                     boolean exterior = ArenaTileLayout.exterior(column, row);
                     if (exterior != (pass == 0)) continue;
+                    if (column >= 0 && column < ArenaTileLayout.COLUMNS && row >= 0 && row < ArenaTileLayout.ROWS) continue;
                     float x = ArenaTileLayout.farX(column), y = ArenaTileLayout.farY(row);
                     float shade = exterior ? .10f : 1f;
                     floorCache.setColor(shade, shade, shade, 1f);
                     BorderTileArt.Region tile = art.borders.region(ArenaTileLayout.tile(column, row));
                     floorCache.add(tile.texture(), screenX(x, y) + tile.left() * scale,
                         screenY(x, y) + tile.bottom() * scale, tile.width() * scale, tile.height() * scale);
+                    quads++;
                 }
             }
         }
+        // Materials retain their own world repeat size rather than shrinking to the foundation grid.
+        ArrayList<EngravedFloorArt.Quad> field = new ArrayList<>();
+        float repeat = 240f;
+        for (float x = -ArenaWorld.HALF_WIDTH; x < ArenaWorld.HALF_WIDTH; x += repeat)
+            for (float y = -ArenaWorld.HALF_HEIGHT; y < ArenaWorld.HALF_HEIGHT; y += repeat) {
+                float right = Math.min(x + repeat, ArenaWorld.HALF_WIDTH), top = Math.min(y + repeat, ArenaWorld.HALF_HEIGHT);
+                float[] polygon = EngravedFloorArt.rectangle(x, y, right, top);
+                // Partial boundary cells crop the material instead of stretching its slabs.
+                polygon[2] = polygon[6] = 0; polygon[10] = polygon[14] = (right - x) / repeat;
+                polygon[3] = polygon[15] = 1 - (top - y) / repeat; polygon[7] = polygon[11] = 1;
+                java.util.Collections.addAll(field, art.engravedFloor.geometry(art.engravedFloor.field, polygon, 1f));
+            }
+        quads += cacheGround(field);
+        ArrayList<EngravedFloorArt.Quad> paths = new ArrayList<>();
+        for (var cell : floorLayout.pathCells)
+            java.util.Collections.addAll(paths, art.engravedFloor.geometry(art.engravedFloor.path, cell.vertices, 1f));
+        quads += cacheGround(paths);
+        if (quads > EngravedFloorArt.MAX_FLOOR_QUADS) throw new IllegalStateException("Floor cache capacity exceeded");
+        cachedFloorQuads = quads;
+        Gdx.app.log("FloorArt", "Cached ground quads=" + quads + ", medallion quads=" + medallion.length);
         floorCache.setColor(Color.WHITE);
         return floorCache.endCache();
+    }
+
+    private int cacheGround(ArrayList<EngravedFloorArt.Quad> quads) {
+        quads.sort(Comparator.comparingInt(EngravedFloorArt.Quad::page));
+        for (var quad : quads) {
+            float[] vertices = quad.vertices();
+            for (int i = 0; i < vertices.length; i += 5) {
+                float x = (vertices[i] / ISO_X + vertices[i + 1] / ISO_Y) * .5f;
+                float y = (vertices[i + 1] / ISO_Y - vertices[i] / ISO_X) * .5f;
+                float shade = Math.min(1f, floorLayout.shade(x, y));
+                vertices[i + 2] = Color.toFloatBits(shade, shade, shade, 1f);
+            }
+        }
+        art.engravedFloor.cache(floorCache, quads.toArray(new EngravedFloorArt.Quad[0]));
+        return quads.size();
     }
 
     private static SpriteCache createFloorCache() {
@@ -197,7 +254,7 @@ public final class ArenaRenderer implements Disposable {
         }
         try {
             // SpriteCache owns and disposes its constructor-supplied base shader.
-            return new SpriteCache(ArenaTileLayout.QUADS, shader, true);
+            return new SpriteCache(EngravedFloorArt.MAX_FLOOR_QUADS, shader, true);
         } catch (RuntimeException | Error failure) {
             shader.dispose();
             throw failure;

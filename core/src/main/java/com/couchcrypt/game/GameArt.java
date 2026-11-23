@@ -14,6 +14,7 @@ public final class GameArt implements Disposable {
     public final EnemyAttackArt enemyAttacks;
     public final MagicProjectileArt projectiles;
     public final PaintedBorderArt paintedBorders;
+    public final EngravedFloorArt engravedFloor;
     public final TextureRegion shadow, glow, pixel, soul;
     public final long textureBytes;
     public final long retainedPixmapBytes = 0;
@@ -40,6 +41,9 @@ public final class GameArt implements Disposable {
             enemyAttacks = new EnemyAttackArt(pages);
             projectiles = new MagicProjectileArt(pages[2]);
             paintedBorders = new PaintedBorderArt(pages, metadata);
+            Texture[] groundPages = java.util.Arrays.copyOf(pages, pages.length + 1);
+            groundPages[pages.length] = borders.sharedTexture();
+            engravedFloor = new EngravedFloorArt(new JsonReader().parse(Gdx.files.internal("art/engraved-floor.json")), metadata, groundPages);
             frames = new TextureRegion[metadata.frames.length];
             for (int i = 0; i < frames.length; i++) {
                 GameplayAtlas.Frame frame = metadata.frames[i];

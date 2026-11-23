@@ -20,6 +20,7 @@ python3 scripts/BakeEnemyAttackArt.py --base-art .run/art-exploration/weekend/pa
 python3 scripts/BakeMagicProjectiles.py --output .run/art-exploration/weekend/packed
 python3 scripts/BakeCryptEnvironment.py --output .run/art-exploration/weekend/packed
 python3 scripts/BakePaintedArenaBorders.py --output .run/art-exploration/weekend/packed
+python3 scripts/BakeEngravedFloor.py --output .run/art-exploration/weekend/packed
 for file in gameplay-actors-main.png gameplay-actors-common.png gameplay-environment.png gameplay.json enemy-attacks.json magic-projectiles.json painted-borders.json; do
   cmp ".run/art-exploration/weekend/packed/$file" "assets/art/$file" || exit 1
 done
@@ -93,3 +94,19 @@ writes the derived proof paintings beside those sources. Without it, proof PNGs
 are written under `<output>/painted-border-sources`, keeping temporary rebuilds
 from modifying tracked sources. Archive-only reconstruction matched every output.
 See [runtime checks and limits](../docs/painted-arena-borders.md).
+
+
+## Engraved crypt floor (2026-11-23)
+
+[engraved-crypt-floor/](engraved-crypt-floor/README.md) preserves the approved
+concept, three original ImageGen masters, exact prompts and source provenance.
+The current final bake stage runs after the painted wall stage:
+
+```sh
+python3 scripts/BakeEngravedFloor.py --output assets/art --source-output art-source/engraved-crypt-floor
+```
+
+Its archive contains the untouched pre-floor baseline. Whole normalized floor
+materials are split only for storage in guarded spare areas of the four existing
+gameplay/foundation pages; it adds no textures and preserves prior sprite pixels
+and gutters. See [runtime integration](../docs/engraved-crypt-floor.md).

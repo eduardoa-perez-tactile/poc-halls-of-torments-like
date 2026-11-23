@@ -37,6 +37,8 @@ public final class BorderTileArt implements Disposable {
     }
 
     public Region region(Tile tile) { return regions[tile.ordinal()]; }
+    /** Supplemental ground paint borrows blank areas of this same managed page. */
+    Texture sharedTexture() { return texture; }
     @Override public void dispose() { texture.dispose(); }
 
     static final class Frame {
