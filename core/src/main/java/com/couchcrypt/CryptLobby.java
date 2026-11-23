@@ -44,6 +44,8 @@ import com.couchcrypt.ui.BuildIcons;
 import com.couchcrypt.ui.ItemArt;
 import com.couchcrypt.ui.RunDetailsView;
 import com.couchcrypt.ui.CharacterInfoView;
+import com.couchcrypt.ui.HeroSelectionView;
+import com.couchcrypt.ui.HeroPortraitDrawable;
 import com.couchcrypt.ui.LevelUpView;
 import com.couchcrypt.game.FrameMetrics;
 import com.badlogic.gdx.graphics.glutils.PixmapTextureData;
@@ -90,6 +92,9 @@ public final class CryptLobby extends ApplicationAdapter {
     private RemoteButton resultDetailsLink;
     private int characterInfoSlot, characterInfoFocus;
     private boolean characterInfoInvitation;
+    private boolean characterInfoFromChooser;
+    private ArenaWorld.Hero characterInfoPreview;
+    private HeroSelectionView heroChooser;
     private final ArenaWorld.Hero[] selectedHeroes = {ArenaWorld.Hero.WARDEN, ArenaWorld.Hero.RANGER};
     private int notifiedWave = 1, notifiedEliteKills;
     private boolean bossAnnounced, enrageAnnounced, hudPreview;
@@ -279,13 +284,14 @@ public final class CryptLobby extends ApplicationAdapter {
         card.pad(24);
         card.add(art.label(index == 0 ? "PLAYER I" : "PLAYER II", art.section,
             index == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO)).padBottom(10).row();
-        Image portrait = new Image(selectedHeroes[index] == ArenaWorld.Hero.WARDEN ? art.knight : art.ranger);
+        Image portrait = new Image(new HeroPortraitDrawable(
+            selectedHeroes[index] == ArenaWorld.Hero.WARDEN ? art.wardenFace : art.rangerFace, 1));
         portrait.setScaling(Scaling.fit);
-        card.add(portrait).size(380, 300).padBottom(10).row();
+        card.add(portrait).size(360).padBottom(10).row();
         Label status = art.label("AWAITING A SOUL", art.body, UiArt.GOLD);
         if (index == 0) firstStatus = status; else secondStatus = status;
         card.add(status).padBottom(12).row();
-        card.add(art.label(selectedHeroes[index] == ArenaWorld.Hero.WARDEN ? "WARDEN  /  SWORD SWEEP" : "RANGER  /  BOW", art.small, UiArt.MUTED));
+        card.add(art.label(selectedHeroes[index] == ArenaWorld.Hero.WARDEN ? "WARDEN  /  SWORD SWEEP" : "RANGER  /  ARCANE CROSSBOW", art.small, UiArt.MUTED));
         return card;
     }
 
@@ -351,17 +357,7 @@ public final class CryptLobby extends ApplicationAdapter {
         var player = index == 0 ? snapshot.first() : snapshot.second();
         if (screen == Screen.LOBBY || !world.players[index].active || generations[index] != player.generation()) {
             boolean invitation = screen == Screen.INVITE;
-            List<String> labels = new ArrayList<>(); List<Runnable> actions = new ArrayList<>();
-            labels.add("WARDEN  /  SWORD SWEEP"); actions.add(() -> { selectedHeroes[index] = ArenaWorld.Hero.WARDEN; showPartyScreen(invitation); });
-            labels.add("WARDEN INFO"); actions.add(() -> showCharacterInfo(index, ArenaWorld.Hero.WARDEN, invitation, 1));
-            labels.add("RANGER  /  BOW"); actions.add(() -> { selectedHeroes[index] = ArenaWorld.Hero.RANGER; showPartyScreen(invitation); });
-            labels.add("RANGER INFO"); actions.add(() -> showCharacterInfo(index, ArenaWorld.Hero.RANGER, invitation, 3));
-            if (player.reserved()) {
-                labels.add("REMOVE CONTROLLER"); actions.add(() -> { server.remove(index); showPartyScreen(invitation); });
-            }
-            labels.add("BACK"); actions.add(this::closeModal);
-            modal("Choose a hero", "Attacks are automatic. View a hero's story, base stats and available skills before choosing.",
-                labels.toArray(String[]::new), actions.toArray(Runnable[]::new));
+            showHeroChooser(index, invitation, selectedHeroes[index], selectedHeroes[index].ordinal());
             return;
         }
         if (!player.reserved()) {
@@ -374,8 +370,30 @@ public final class CryptLobby extends ApplicationAdapter {
                 () -> { server.remove(index); closeModal(); updateStatus(); }});
     }
 
+    private void showHeroChooser(int slot, boolean invitation, ArenaWorld.Hero preview, int returnFocus) {
+        if (overlay != null) closeModal();
+        modalKind = Modal.GENERAL;
+        savedButtons = new ArrayList<>(buttons); savedFocus = focus; buttons.clear();
+        overlay = new Table(); overlay.setFillParent(true); overlay.setBackground(art.scrim);
+        overlay.setTouchable(Touchable.enabled);
+        var snapshot = state.snapshot(System.currentTimeMillis());
+        boolean reserved = (slot == 0 ? snapshot.first() : snapshot.second()).reserved();
+        heroChooser = new HeroSelectionView(art, slot, preview,
+            () -> {
+                selectedHeroes[slot] = heroChooser.selectedHero();
+                showPartyScreen(invitation); setFocus(slot);
+            },
+            () -> showCharacterInfo(slot, heroChooser.selectedHero(), invitation, focus),
+            reserved ? () -> { server.remove(slot); showPartyScreen(invitation); setFocus(slot); } : null,
+            buttons::add);
+        overlay.add(heroChooser).width(1380);
+        stage.addActor(overlay); overlay.validate(); setFocus(returnFocus);
+    }
+
     private void showCharacterInfo(int slot, ArenaWorld.Hero hero, boolean invitation, int returnFocus) {
         characterInfoSlot = slot; characterInfoInvitation = invitation; characterInfoFocus = returnFocus;
+        characterInfoFromChooser = heroChooser != null;
+        characterInfoPreview = hero;
         reset(Screen.CHARACTER_INFO);
         // Leave the existing LOBBY/INVITE phase intact: viewing lore never changes joining or a paused run.
         content.setBackground(art.scrim); content.pad(0);
@@ -386,7 +404,10 @@ public final class CryptLobby extends ApplicationAdapter {
 
     private void backFromCharacterInfo() {
         showPartyScreen(characterInfoInvitation);
-        managePlayer(characterInfoSlot);
+        setFocus(characterInfoSlot);
+        if (characterInfoFromChooser)
+            showHeroChooser(characterInfoSlot, characterInfoInvitation, characterInfoPreview, characterInfoFocus);
+        else managePlayer(characterInfoSlot);
         setFocus(characterInfoFocus);
     }
 
@@ -712,6 +733,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private void closeModal() {
         if (overlay == null) return;
         overlay.remove(); overlay = null;
+        heroChooser = null;
         pauseResume = null; pauseMessage = modalMessage = null; modalKind = Modal.GENERAL;
         buttons.clear(); buttons.addAll(savedButtons); savedButtons = null;
         setFocus(savedFocus);
@@ -734,6 +756,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private void setFocus(int index) {
         if (buttons.isEmpty()) return;
         focus = Math.max(0, Math.min(index, buttons.size() - 1));
+        if (heroChooser != null) heroChooser.focusChanged(focus);
         for (int i = 0; i < buttons.size(); i++) {
             RemoteButton button = buttons.get(i); button.focused(i == focus);
             if (button == resultDetailsLink) ((Label) button.getChildren().first()).setColor(i == focus ? UiArt.GOLD : UiArt.IVORY);
@@ -854,6 +877,10 @@ public final class CryptLobby extends ApplicationAdapter {
         int dx = key == Input.Keys.LEFT ? -1 : key == Input.Keys.RIGHT ? 1 : 0;
         int dy = key == Input.Keys.UP ? 1 : key == Input.Keys.DOWN ? -1 : 0;
         if (dx == 0 && dy == 0) return false;
+        if (heroChooser != null) {
+            int target = heroChooser.navigate(key, focus);
+            if (target >= 0) { setFocus(target); return true; }
+        }
         RemoteButton current = buttons.get(focus);
         current.localToStageCoordinates(from.set(current.getWidth() / 2, current.getHeight() / 2));
         float best = Float.MAX_VALUE; int target = focus;

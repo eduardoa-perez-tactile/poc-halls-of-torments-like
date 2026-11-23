@@ -41,7 +41,7 @@ public final class CharacterInfoView {
     private static Table identity(UiArt art, HeroCatalog.Profile profile, Color accent) {
         Table column = new Table(); column.top();
         Table identity = new Table();
-        Image hero = new Image(heroRegion(art, profile.hero()));
+        Image hero = new Image(new HeroPortraitDrawable(heroRegion(art, profile.hero()), 1));
         hero.setScaling(Scaling.fit); hero.setTouchable(Touchable.disabled);
         identity.add(hero).width(196).height(310).padRight(16);
         Table introduction = new Table(); introduction.left();
@@ -122,14 +122,9 @@ public final class CharacterInfoView {
         return label;
     }
 
-    /** Trim transparent source margins without allocating or uploading a texture. */
+    /** Reuse the chooser identity without allocating or uploading another texture. */
     private static TextureRegion heroRegion(UiArt art, ArenaWorld.Hero hero) {
-        TextureRegion source = hero == ArenaWorld.Hero.WARDEN ? art.knight : art.ranger;
-        float left = hero == ArenaWorld.Hero.WARDEN ? 234f / 887f : 134f / 887f;
-        float width = hero == ArenaWorld.Hero.WARDEN ? 481f / 887f : 570f / 887f;
-        int x = Math.round(source.getRegionWidth() * left);
-        int w = Math.min(source.getRegionWidth() - x, Math.round(source.getRegionWidth() * width));
-        return new TextureRegion(source, x, 0, w, source.getRegionHeight());
+        return hero == ArenaWorld.Hero.WARDEN ? art.wardenFace : art.rangerFace;
     }
 
     private static Image rule(UiArt art, Color color) {

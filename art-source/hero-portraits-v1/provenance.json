@@ -1,0 +1,23 @@
+{
+  "method": "Built-in ImageGen generation followed by built-in ImageGen background extraction; deterministic offline Pillow resizing only.",
+  "generation": "exec-723c7988-346e-4f25-8acf-4ae54f752267.png",
+  "backgroundExtraction": "exec-30a91f75-78b9-4976-9380-91b5962447e8.png",
+  "files": {
+    "master.png": {
+      "sha256": "742c0feeb7f31dd68b535c7de3e2c9a2c2a78c20f273c385ce4de98d05bc2f2c",
+      "size": [
+        1774,
+        887
+      ],
+      "mode": "RGB"
+    },
+    "transparent.png": {
+      "sha256": "613346372ec565dce1fa3f8e08ec147c071eba736e18f0d4e45595a65958ca32",
+      "size": [
+        1774,
+        887
+      ],
+      "mode": "RGBA"
+    }
+  }
+}
