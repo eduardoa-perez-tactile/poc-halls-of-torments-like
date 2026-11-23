@@ -88,6 +88,7 @@ public final class ArenaRenderer implements Disposable {
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
             drawHazards(world, camera);
+            drawAttackRanges(world, camera);
             drawGroundMarks(world, camera);
             drawPickups(world, camera);
             drawDust(world, camera);
@@ -450,6 +451,22 @@ public final class ArenaRenderer implements Disposable {
         batch.setColor(Color.WHITE);
     }
 
+    /** One quiet projected ground ring, using the same primary range as target acquisition. */
+    private void drawAttackRanges(ArenaWorld world, OrthographicCamera camera) {
+        for (ArenaWorld.Player player : world.players) {
+            if (!player.active || !player.alive) continue;
+            float radius = world.primaryAttackRange(player);
+            if (!visible(camera, player.x, player.y, radius)) continue;
+            // A slim dark edge keeps the understated participant colour visible on pale floor tiles.
+            batch.setColor(0, 0, 0, .12f);
+            ring(player.x, player.y, radius, 0f, 2.2f, 64);
+            if (player.slot == 0) batch.setColor(.82f, .7f, .46f, .42f);
+            else batch.setColor(.49f, .75f, .7f, .42f);
+            ring(player.x, player.y, radius, 0f, 1.15f, 64);
+        }
+        batch.setColor(Color.WHITE);
+    }
+
     private void drawAura(float age, float x, float y, float radius, EnemyAttackArt.Layer layer) {
         art.enemyAttacks.drawAura(batch, age, screenX(x, y), screenY(x, y),
             radius / art.enemyAttacks.auraGroundRadius(), layer);
@@ -476,13 +493,15 @@ public final class ArenaRenderer implements Disposable {
             float x = screenX(effect.x, effect.y), y = screenY(effect.x, effect.y);
             switch (effect.kind) {
                 case SLASH -> {
-                    // A traveling, tapered crescent gives the committed sweep a readable leading edge.
+                    // Spend most of the cosmetic lifetime sweeping, then let the final crescent fade.
                     float lift = art.actor(ActorAnimation.Actor.WARDEN).worldHeight * .5f;
-                    float head = Math.min(1f, .2f + (1f - life) * 1.4f);
-                    float tail = Math.max(0f, head - .58f * life);
+                    float phase = 1f - life;
+                    float head = .18f + .82f * Math.min(1f, phase / .7f);
+                    float tail = Math.max(0f, head - .65f);
+                    float visibility = Math.min(1f, life / .3f);
                     for (int layer = 0; layer < 2; layer++) {
-                        if (layer == 0) batch.setColor(1f, .61f, .2f, life * .38f);
-                        else batch.setColor(1f, .97f, .78f, life * .95f);
+                        if (layer == 0) batch.setColor(1f, .61f, .2f, visibility * .38f);
+                        else batch.setColor(1f, .97f, .78f, visibility * .88f);
                         float previousX = 0f, previousY = 0f;
                         for (int segment = 0; segment <= 13; segment++) {
                             float progress = segment / 13f;
@@ -491,7 +510,7 @@ public final class ArenaRenderer implements Disposable {
                             float wx = effect.x + MathUtils.cos(angle) * effect.radius;
                             float wy = effect.y + MathUtils.sin(angle) * effect.radius;
                             float sx = screenX(wx, wy), sy = screenY(wx, wy) + lift;
-                            float width = (layer == 0 ? 8f : 3.5f) * (.15f + progress * .85f) * life;
+                            float width = (layer == 0 ? 8f : 3.5f) * (.15f + progress * .85f) * visibility;
                             if (segment > 0) line(previousX, previousY, sx, sy, Math.max(.6f, width));
                             previousX = sx; previousY = sy;
                         }
