@@ -38,3 +38,17 @@ A short actual 1920×1080 Android TV API 33 ARM64 emulator recording shows co-op
 After closing the reference demo, a seven-second busy co-op boss fixture reported 301 frames: interval p95/p99/max **19.84/21.28/26.80 ms**, CPU submission **10.83/15.45/21.54 ms**, 148 intervals above 16.7 ms and none above 33.4 ms; the reported frame used 64 draws. A separate twelve-frame fixture-construction window included a **52.71 ms** interval / **51.49 ms** CPU outlier and 170 draws while the late fixture and simultaneous arrivals were prepared. This is not a sustained 60 FPS pass; physical-TV performance and perceived game feel require user playtesting. No full survival playthrough was run.
 
 Local raw exploration and rejected candidates are under `.run/art-exploration/vfx-integration-v2/`; native video, captures, measurements, APK hash and verification are under its `native-preview/`. The existing emulator and phone relay remain available for the user; synthetic capture controllers were closed.
+
+
+## Radial projectile contacts (2026-11-23)
+
+Player crossbow contacts now use a brief circular white core, cyan bloom, six small
+round motes and an expanding ring. Critical contacts are slightly larger with warm
+highlights. The effect never rotates or fans along incoming velocity. The existing
+projectile-plane/launch-facing offset still positions it at the visible collision;
+shot trajectory, damage, recoil and pooled lifetimes are unchanged. Sword contacts
+retain their authored directional feedback. These accents reuse the existing glow
+and pixel regions, add no texture or retained Pixmap, and create no frame-loop objects.
+
+The old short player-colour marker below living heroes is removed. Actual downed
+revival progress, ally guidance and combat ground telegraphs are retained.
