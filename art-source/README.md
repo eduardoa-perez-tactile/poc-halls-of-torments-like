@@ -26,3 +26,6 @@ Independent QA already verified all indexed source hashes/byte counts, confined 
 `scripts/ArchiveGameplaySources.py` recreates the compact archive from a complete strict local pack plus provenance and refuses incomplete input. It is an archival step for changed approved sources, not part of a normal rebuild.
 
 `legacy-gameplay/` retains the four superseded original `game-*.png` masters outside runtime assets. Their exact initial prompts remain in [the historical art record](../docs/gameplay-art.md). See [current integration and verification](../docs/gameplay-art-integration.md) for resource accounting and known limits.
+## Combat VFX sources
+
+`combat-vfx-canonical.zip` contains the four original sprite sheets, exact generation prompts/provenance, source hashes and baked projection/timing parameters. Run `python3 scripts/BakeCombatVfx.py --output /path/to/rebuilt-art` with installed Pillow to reproduce `combat-vfx.png` and `combat-vfx.json`. No extraction, generation service or dependency download is required. See [combat-feedback details](../docs/combat-vfx.md) for resource bounds, behavior and measured limits.

@@ -9,6 +9,7 @@ import com.badlogic.gdx.utils.JsonReader;
 /** File-backed managed pages; canonical frame geometry is baked offline. */
 public final class GameArt implements Disposable {
     public final GameplayAtlas metadata;
+    public final VfxArt vfx;
     public final TextureRegion shadow, glow, pixel, soul;
     public final TextureRegion[] floors = new TextureRegion[3];
     public final long textureBytes;
@@ -18,8 +19,9 @@ public final class GameArt implements Disposable {
 
     public GameArt() {
         metadata = new GameplayAtlas(new JsonReader().parse(Gdx.files.internal("art/gameplay.json")));
-        textureBytes = metadata.textureBytes;
         pages = new Texture[metadata.pages.length];
+        vfx = new VfxArt();
+        textureBytes = metadata.textureBytes + vfx.textureBytes;
         try {
             for (int i = 0; i < pages.length; i++) {
                 GameplayAtlas.Page page = metadata.pages[i];
@@ -53,5 +55,6 @@ public final class GameArt implements Disposable {
 
     @Override public void dispose() {
         for (Texture page : pages) if (page != null) page.dispose();
+        vfx.dispose();
     }
 }

@@ -80,13 +80,15 @@ public final class PartyProgression {
     private float choiceSecondsLeft;
     private boolean resolvingTimeout;
     public int level, xp, xpToNext, totalXp;
+    /** Presentation identity for a shared skill-choice round; individual acknowledgments do not change it. */
+    public int choiceRound;
     public final Offer[] offers = { new Offer(), new Offer() };
 
     public PartyProgression(ArenaWorld world) { this.world = world; reset(); }
 
     /** Identities survive reset, so a packet from the previous run cannot select a new offer. */
     public void reset() {
-        level = 1; xp = totalXp = 0; xpToNext = threshold(level);
+        level = 1; xp = totalXp = choiceRound = 0; xpToNext = threshold(level);
         choiceSecondsLeft = 0; resolvingTimeout = false;
         for (int slot = 0; slot < offers.length; slot++) {
             participants[slot] = false; applied[slot] = 0;
@@ -247,7 +249,10 @@ public final class PartyProgression {
         if (resolvingTimeout || hasPendingOffers()) return;
         choiceSecondsLeft = 0;
         for (int slot = 0; slot < offers.length; slot++) startNextOffer(slot);
-        if (hasPendingOffers()) choiceSecondsLeft = CHOICE_SECONDS;
+        if (hasPendingOffers()) {
+            choiceSecondsLeft = CHOICE_SECONDS; choiceRound++;
+            world.beginLevelUpFx(choiceRound);
+        }
     }
 
     private void startNextOffer(int slot) {
