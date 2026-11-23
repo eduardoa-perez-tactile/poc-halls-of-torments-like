@@ -33,6 +33,8 @@ Options: `--no-build` to reuse an APK, `--headless` for a brief automated UI che
 
 The emulator's own `10.0.2.x` address is not reachable by physical phones; the helper bridges that boundary. Phones and the computer must be on the same LAN, and the local firewall must allow incoming TCP 8787. Guest Wi-Fi client isolation can prevent joining.
 
+The emulator remembers the helper's advertised LAN address when the app is reopened from its icon or its process restarts. Keep the helper running: it restores its own ADB forwarding on demand if that forwarding disappears, and reports a temporary connection error if restoration fails. If the computer's Wi-Fi address changes, restart the helper to publish the new address. Physical TVs continue discovering their own LAN address.
+
 ## Run on a physical Android TV
 
 Set `ANDROID_HOME` to your SDK, or set `sdk.dir` in an untracked `local.properties`. Build and install:

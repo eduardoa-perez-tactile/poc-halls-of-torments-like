@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import socket
 import subprocess
+import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,11 +29,52 @@ def lan_ip():
             raise SystemExit('Cannot find a LAN address. Connect to Wi-Fi or pass --host YOUR_LAN_IP.')
 
 
-async def bridge(reader, writer, forwarded_port):
+class EmulatorForward:
+    """Repair a lost ADB listener on demand, without polling healthy connections."""
+    def __init__(self, target, port):
+        self.target = target
+        self.port = port
+        self.repair_lock = asyncio.Lock()
+
+    async def _connect(self):
+        return await asyncio.wait_for(asyncio.open_connection('127.0.0.1', self.port), timeout=3)
+
+    def _restore(self):
+        # Never replace a listener claimed by another process after an ADB restart.
+        subprocess.run(self.target + ['forward', '--no-rebind', f'tcp:{self.port}', f'tcp:{PORT}'],
+                       check=True, capture_output=True, text=True, timeout=5)
+
+    async def open(self):
+        try:
+            return await self._connect()
+        except (OSError, asyncio.TimeoutError):
+            pass
+        async with self.repair_lock:
+            # Another simultaneous HTTP/WebSocket request may already have repaired it.
+            try:
+                return await self._connect()
+            except (OSError, asyncio.TimeoutError):
+                pass
+            await asyncio.to_thread(self._restore)
+            print(f'Restored emulator forwarding on localhost:{self.port}.', file=sys.stderr, flush=True)
+            return await self._connect()
+
+
+async def bridge(reader, writer, forward):
     upstream = None
     tasks = []
     try:
-        remote, upstream = await asyncio.open_connection('127.0.0.1', forwarded_port)
+        try:
+            remote, upstream = await forward.open()
+        except (OSError, asyncio.TimeoutError, subprocess.SubprocessError) as failure:
+            detail = getattr(failure, 'stderr', None) or str(failure)
+            print(f'Controller relay cannot reach the TV: {detail.strip()[:512]}', file=sys.stderr, flush=True)
+            body = b'TV connection unavailable. Keep the development launcher running and retry.\n'
+            writer.write(b'HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n'
+                         b'Content-Type: text/plain; charset=utf-8\r\nRetry-After: 2\r\nContent-Length: '
+                         + str(len(body)).encode() + b'\r\n\r\n' + body)
+            await asyncio.wait_for(writer.drain(), timeout=3)
+            return
 
         async def pump(source, destination):
             while True:
@@ -43,9 +85,11 @@ async def bridge(reader, writer, forwarded_port):
                 await destination.drain()
 
         tasks = [asyncio.create_task(pump(reader, upstream)), asyncio.create_task(pump(remote, writer))]
-        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-    except (OSError, ConnectionError):
-        pass
+        done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in done:
+            task.result()
+    except (OSError, asyncio.TimeoutError) as failure:
+        print(f'Controller relay connection closed: {failure}', file=sys.stderr, flush=True)
     finally:
         for task in tasks:
             task.cancel()
@@ -55,13 +99,14 @@ async def bridge(reader, writer, forwarded_port):
             if stream:
                 stream.close()
                 try:
-                    await stream.wait_closed()
-                except (OSError, ConnectionError):
+                    await asyncio.wait_for(stream.wait_closed(), timeout=3)
+                except (OSError, asyncio.TimeoutError):
                     pass
 
 
-async def serve(forwarded_port):
-    server = await asyncio.start_server(lambda r, w: bridge(r, w, forwarded_port), '0.0.0.0', PORT, limit=64 * 1024)
+async def serve(target, forwarded_port):
+    forward = EmulatorForward(target, forwarded_port)
+    server = await asyncio.start_server(lambda r, w: bridge(r, w, forward), '0.0.0.0', PORT, limit=64 * 1024)
     async with server:
         await server.serve_forever()
 
@@ -134,7 +179,7 @@ def main():
         run(target + ['shell', 'am', 'start', '-S', '-n', COMPONENT, '--es', 'joinHost', host, '--ez', 'profile', str(args.profile).lower()])
         print(f'Phone access: http://{host}:{PORT} — open the TV lobby and scan its QR code.', flush=True)
         print('Keep this process running. Ctrl+C stops the relay and cleans up its ADB forwarding.', flush=True)
-        asyncio.run(serve(forwarded_port))
+        asyncio.run(serve(target, forwarded_port))
     except KeyboardInterrupt:
         print('\nStopping the development lobby.', flush=True)
     finally:
