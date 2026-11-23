@@ -972,7 +972,8 @@ public final class CryptLobby extends ApplicationAdapter {
             boolean itemPending = participant && !world.levelUpPending() && itemOffer.pending;
             state.publishEquipment(i, itemPending ? itemOffer.id : 0, itemPending ? itemOffer.secondsLeft : 0,
                 itemPending ? itemOffer.options : null, itemPending ? itemOffer.cards : null,
-                itemPending && itemOffer.catchUp, itemPending ? itemOffer.durationSeconds : 30f);
+                itemPending && itemOffer.catchUp, itemPending ? itemOffer.durationSeconds : 30f,
+                itemPending ? itemOffer.origin : null);
             state.publishStarterBuild(i, participant, progression.foundationCount(i), world.equipment.foundationCount(i));
         }
     }

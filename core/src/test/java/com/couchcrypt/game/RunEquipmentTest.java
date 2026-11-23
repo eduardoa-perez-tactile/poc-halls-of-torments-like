@@ -18,12 +18,58 @@ class RunEquipmentTest {
         assertFalse(gear.choose(0, firstId, 0));
         gear.updateChoices(4);
         assertEquals(21, gear.choiceSecondsLeft()); assertEquals(21, gear.offers[1].secondsLeft);
-        assertTrue(gear.choose(1, secondId, 2));
+        assertTrue(gear.choose(1, secondId, 1));
         assertEquals(1, gear.appliedCount(0)); assertEquals(1, gear.appliedCount(1));
         assertTrue(gear.offers[0].pending); assertTrue(gear.offers[1].pending);
         assertTrue(gear.offers[0].id > firstId); assertTrue(gear.offers[1].id > secondId);
         assertEquals(30, gear.choiceSecondsLeft());
         assertEquals(30, gear.offers[0].secondsLeft); assertEquals(30, gear.offers[1].secondsLeft);
+    }
+
+    @Test void queuedRewardCausesSurviveSkillPriorityRefreshReconnectAndLateJoinWithoutBorrowingLaterClockTime() {
+        ArenaWorld world = solo(); var gear = world.equipment;
+        world.progression.addXp(world.progression.xpToNext);
+        gear.rewardElite(); // This entitlement waits behind a skill round.
+        assertFalse(gear.offers[0].pending);
+        assertTrue(world.progression.choose(0, world.progression.offers[0].id, 0));
+        world.elapsed = 90; gear.update(.01f); // The timed reliquary queues behind that elite.
+        assertEquals(2, gear.rewardsEarned());
+        var elite = gear.choiceOrigin();
+        assertEquals("elite", elite.source()); assertEquals("ELITE DEFEATED", elite.label());
+        assertEquals(1, elite.number()); assertEquals(2, gear.offers[0].options.length);
+        assertFalse(gear.choose(0, gear.offers[0].id, 2));
+        float remaining = gear.choiceSecondsLeft();
+        world.progression.addXp(world.progression.xpToNext);
+        gear.updateChoices(20);
+        assertEquals(remaining, gear.choiceSecondsLeft()); assertSame(elite, gear.choiceOrigin());
+        assertTrue(world.progression.choose(0, world.progression.offers[0].id, 0));
+        assertTrue(gear.choose(0, gear.offers[0].id, -1));
+        assertEquals(30, gear.choiceSecondsLeft(), "Each queued entitlement starts a fresh shared window");
+        var reliquary = gear.choiceOrigin();
+        assertEquals("reliquary", reliquary.source()); assertEquals(90, reliquary.scheduledSeconds());
+        assertEquals("TIMED RELIQUARY 1:30", reliquary.label()); assertEquals(2, reliquary.number());
+        world.elapsed = 500; // Cause belongs to the earned entitlement, not its eventual presentation time.
+        var offer = gear.offers[0]; int old = offer.id;
+        offer.options[0] = ItemCatalog.byId("fletchers_hood"); // Ranger-only gear invalidates a Warden offer.
+        assertFalse(gear.choose(0, old, 0));
+        assertNotEquals(old, offer.id); assertSame(reliquary, offer.origin); assertEquals(30, offer.secondsLeft);
+        gear.updateChoices(4);
+        world.activatePlayer(1); // Fresh participant receives the earlier two rewards without offers.
+        assertEquals(2, gear.foundationCount(1)); assertFalse(gear.offers[1].pending);
+        assertSame(reliquary, gear.offers[0].origin);
+        gear.rewardElite();
+        assertTrue(gear.choose(0, offer.id, -1));
+        assertEquals(30, gear.choiceSecondsLeft());
+        assertEquals(3, gear.offers[0].origin.number());
+        assertEquals("elite", gear.offers[0].origin.source());
+        assertSame(gear.offers[0].origin, gear.offers[1].origin);
+        int restoredId = gear.offers[1].id;
+        gear.updateChoices(4); world.activatePlayer(1); gear.activatePlayer(1);
+        assertEquals(restoredId, gear.offers[1].id); assertEquals(26, gear.offers[1].secondsLeft);
+        assertSame(gear.offers[0].origin, gear.offers[1].origin);
+        gear.updateChoices(26);
+        assertFalse(gear.offers[0].pending); assertFalse(gear.offers[1].pending);
+        assertEquals(3, gear.appliedCount(0)); assertEquals(3, gear.appliedCount(1));
     }
 
     @Test void timeoutDefaultsOnlyUnansweredLootAndStartsOneFreshQueuedRound() {
@@ -93,6 +139,7 @@ class RunEquipmentTest {
         gear.equip(0, 0, ItemCatalog.byId("gatekeeper_helm"));
         gear.grantReward(); int id = gear.offers[0].id;
         assertFalse(gear.choose(0, id, -2));
+        assertFalse(gear.choose(0, id, 2), "The removed third equipment choice is invalid");
         assertTrue(gear.choose(0, id, -1));
         assertEquals(1, gear.appliedCount(0));
         assertFalse(gear.offers[0].pending);
@@ -269,7 +316,8 @@ class RunEquipmentTest {
     @Test void everyOfferPreservesFullModifierTradeoffsAndNoUnsupportedAbilityCards() {
         ArenaWorld world = solo(); world.equipment.grantReward();
         var offer = world.equipment.offers[0];
-        for (int i = 0; i < 3; i++) {
+        assertEquals(2, offer.options.length); assertEquals(2, offer.cards.length);
+        for (int i = 0; i < offer.options.length; i++) {
             var item = offer.options[i]; var card = offer.cards[i];
             assertEquals(0, item.amount(ItemCatalog.Stat.AURA_DAMAGE));
             assertEquals(0, item.amount(ItemCatalog.Stat.STORM_DAMAGE));
