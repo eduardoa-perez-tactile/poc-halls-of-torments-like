@@ -29,3 +29,11 @@ Independent QA already verified all indexed source hashes/byte counts, confined 
 ## Combat VFX sources
 
 `combat-vfx-canonical.zip` contains the four original sprite sheets, exact generation prompts/provenance, source hashes and baked projection/timing parameters. Run `python3 scripts/BakeCombatVfx.py --output /path/to/rebuilt-art` with installed Pillow to reproduce `combat-vfx.png` and `combat-vfx.json`. No extraction, generation service or dependency download is required. See [combat-feedback details](../docs/combat-vfx.md) for resource bounds, behavior and measured limits.
+
+## Border tiles awaiting game integration
+
+[`border-tiles-v1/`](border-tiles-v1/README.md) contains nine integrated floor/border tiles,
+their original painted master and prompt, matching full/half-size atlases, and a
+reproducible export/packing/QA workflow. Review maps are assembled from those PNGs,
+not the generated concept painting. These assets are outside the runtime asset
+tree; the current game's map, collision and rendering remain unchanged.
