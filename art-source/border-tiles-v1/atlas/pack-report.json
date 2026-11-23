@@ -1,0 +1,477 @@
+{
+  "source": "../tiles.json",
+  "renderSource": "Exported tile PNGs only; source master is never read",
+  "atlas": {
+    "packed": true,
+    "file": "border-tiles-atlas.png",
+    "size": [
+      1024,
+      512
+    ],
+    "rgbaGpuBytes": 2097152,
+    "scale": 1,
+    "padding": 2,
+    "edgeExtrusion": 1,
+    "tileWidth": 240,
+    "tileHeight": 120,
+    "anchor": [
+      152,
+      2
+    ],
+    "tiles": [
+      {
+        "id": "interior",
+        "rect": [
+          541,
+          2,
+          238,
+          120
+        ],
+        "sourceSize": [
+          304,
+          168
+        ],
+        "trimOffset": [
+          33,
+          2
+        ],
+        "anchor": [
+          152,
+          2
+        ]
+      },
+      {
+        "id": "edge-nw",
+        "rect": [
+          297,
+          2,
+          240,
+          121
+        ],
+        "sourceSize": [
+          304,
+          168
+        ],
+        "trimOffset": [
+          31,
+          1
+        ],
+        "anchor": [
+          152,
+          2
+        ]
+      },
+      {
+        "id": "edge-ne",
+        "rect": [
+          270,
+          288,
+          242,
+          121
+        ],
+        "sourceSize": [
+          304,
+          168
+        ],
+        "trimOffset": [
+          33,
+          1
+        ],
+        "anchor": [
+          152,
+          2
+        ]
+      },
+      {
+        "id": "edge-sw",
+        "rect": [
+          2,
+          151,
+          265,
+          133
+        ],
+        "sourceSize": [
+          304,
+          168
+        ],
+        "trimOffset": [
+          6,
+          2
+        ],
+        "anchor": [
+          152,
+          2
+        ]
+      },
+      {
+        "id": "edge-se",
+        "rect": [
+          2,
+          288,
+          264,
+          133
+        ],
+        "sourceSize": [
+          304,
+          168
+        ],
+        "trimOffset": [
+          33,
+          2
+        ],
+        "anchor": [
+          152,
+          2
+        ]
+      },
+      {
+        "id": "corner-n",
+        "rect": [
+          271,
+          151,
+          242,
+          120
+        ],
+        "sourceSize": [
+          304,
+          168
+        ],
+        "trimOffset": [
+          31,
+          2
+        ],
+        "anchor": [
+          152,
+          2
+        ]
+      },
+      {
+        "id": "corner-w",
+        "rect": [
+          517,
+          127,
+          239,
+          134
+        ],
+        "sourceSize": [
+          304,
+          168
+        ],
+        "trimOffset": [
+          32,
+          1
+        ],
+        "anchor": [
+          152,
+          2
+        ]
+      },
+      {
+        "id": "corner-e",
+        "rect": [
+          516,
+          275,
+          239,
+          134
+        ],
+        "sourceSize": [
+          304,
+          168
+        ],
+        "trimOffset": [
+          33,
+          1
+        ],
+        "anchor": [
+          152,
+          2
+        ]
+      },
+      {
+        "id": "corner-s",
+        "rect": [
+          2,
+          2,
+          291,
+          145
+        ],
+        "sourceSize": [
+          304,
+          168
+        ],
+        "trimOffset": [
+          7,
+          2
+        ],
+        "anchor": [
+          152,
+          2
+        ]
+      }
+    ],
+    "sha256": "9dd0398de81237b65b38f4f8c62b0f4822212160f6386678fe13aa2775f655a8",
+    "exactReconstruction": true
+  },
+  "halfScaleCandidate": {
+    "packed": true,
+    "file": "border-tiles-half-atlas.png",
+    "size": [
+      512,
+      256
+    ],
+    "rgbaGpuBytes": 524288,
+    "scale": 0.5,
+    "padding": 2,
+    "edgeExtrusion": 1,
+    "tileWidth": 120.0,
+    "tileHeight": 60.0,
+    "anchor": [
+      76.0,
+      1.0
+    ],
+    "tiles": [
+      {
+        "id": "interior",
+        "rect": [
+          386,
+          73,
+          119,
+          60
+        ],
+        "sourceSize": [
+          152,
+          84
+        ],
+        "trimOffset": [
+          16,
+          1
+        ],
+        "anchor": [
+          76.0,
+          1.0
+        ]
+      },
+      {
+        "id": "edge-nw",
+        "rect": [
+          262,
+          142,
+          120,
+          60
+        ],
+        "sourceSize": [
+          152,
+          84
+        ],
+        "trimOffset": [
+          15,
+          1
+        ],
+        "anchor": [
+          76.0,
+          1.0
+        ]
+      },
+      {
+        "id": "edge-ne",
+        "rect": [
+          138,
+          142,
+          120,
+          61
+        ],
+        "sourceSize": [
+          152,
+          84
+        ],
+        "trimOffset": [
+          16,
+          0
+        ],
+        "anchor": [
+          76.0,
+          1.0
+        ]
+      },
+      {
+        "id": "edge-sw",
+        "rect": [
+          2,
+          148,
+          132,
+          66
+        ],
+        "sourceSize": [
+          152,
+          84
+        ],
+        "trimOffset": [
+          3,
+          1
+        ],
+        "anchor": [
+          76.0,
+          1.0
+        ]
+      },
+      {
+        "id": "edge-se",
+        "rect": [
+          2,
+          78,
+          132,
+          66
+        ],
+        "sourceSize": [
+          152,
+          84
+        ],
+        "trimOffset": [
+          16,
+          1
+        ],
+        "anchor": [
+          76.0,
+          1.0
+        ]
+      },
+      {
+        "id": "corner-n",
+        "rect": [
+          138,
+          78,
+          121,
+          60
+        ],
+        "sourceSize": [
+          152,
+          84
+        ],
+        "trimOffset": [
+          15,
+          1
+        ],
+        "anchor": [
+          76.0,
+          1.0
+        ]
+      },
+      {
+        "id": "corner-w",
+        "rect": [
+          386,
+          2,
+          119,
+          67
+        ],
+        "sourceSize": [
+          152,
+          84
+        ],
+        "trimOffset": [
+          16,
+          0
+        ],
+        "anchor": [
+          76.0,
+          1.0
+        ]
+      },
+      {
+        "id": "corner-e",
+        "rect": [
+          151,
+          2,
+          120,
+          67
+        ],
+        "sourceSize": [
+          152,
+          84
+        ],
+        "trimOffset": [
+          16,
+          0
+        ],
+        "anchor": [
+          76.0,
+          1.0
+        ]
+      },
+      {
+        "id": "corner-s",
+        "rect": [
+          2,
+          2,
+          145,
+          72
+        ],
+        "sourceSize": [
+          152,
+          84
+        ],
+        "trimOffset": [
+          4,
+          1
+        ],
+        "anchor": [
+          76.0,
+          1.0
+        ]
+      }
+    ],
+    "sha256": "610cfa74f66f50839953f2a6624df15dbe5f124830fe36d34fdf083598a4b6ab",
+    "exactReconstruction": true,
+    "resampling": {
+      "color": "Lanczos",
+      "alpha": "nearest shared ownership",
+      "zeroAlphaRgb": "zeroed"
+    }
+  },
+  "contents": [
+    "border-tiles-atlas.png",
+    "border-tiles-atlas.json",
+    "border-tiles-half-atlas.png",
+    "border-tiles-half-atlas.json",
+    "pack-report.json"
+  ],
+  "verification": {
+    "maps": [
+      {
+        "sha256": "7fce16212941ca73e21b7164487ee6ebdcb616dd1c8d2d59917bbc785c90e50b",
+        "cells": 9,
+        "exactAtlasMatch": true
+      },
+      {
+        "sha256": "aa4de1f926ee6ab773d462622d47a73f521f59f51dc4c2b934ecc682852dacd3",
+        "cells": 48,
+        "exactAtlasMatch": true
+      },
+      {
+        "sha256": "a5253c78c976b6752099c85af48e7008b30b61d8ed60648b788548e3a2f524d0",
+        "cells": 300,
+        "exactAtlasMatch": true
+      }
+    ],
+    "reviewImagesIncluded": false,
+    "halfScaleMap": {
+      "cells": 300,
+      "sha256": "31319168585c19d3ec98642a7715724836085fc2bb68994dadb136dcc7dda5ac",
+      "exactHalfPngAssemblyMatch": true,
+      "opacity": {
+        "footprintInsetPixels": 2,
+        "minimumAlpha": 255,
+        "transparentPixels": 0,
+        "partialAlphaPixels": 0,
+        "opaquePixels": 1068481
+      },
+      "unfixedLanczosOpacity": {
+        "footprintInsetPixels": 2,
+        "minimumAlpha": 203,
+        "transparentPixels": 0,
+        "partialAlphaPixels": 96907,
+        "opaquePixels": 971574
+      }
+    }
+  }
+}
