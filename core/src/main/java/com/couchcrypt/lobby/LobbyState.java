@@ -32,8 +32,9 @@ public final class LobbyState {
         PartyProgression.CardPreview firstCard, PartyProgression.CardPreview secondCard, PartyProgression.CardPreview thirdCard) {}
     public record ProgressionFeedback(int level, int xp, int xpToNext, UpgradeFeedback upgrade) {}
     public record EquipmentFeedback(int id, float secondsLeft, boolean catchUp, float durationSeconds,
-        ItemCatalog.Item first, ItemCatalog.Item second, ItemCatalog.Item third,
-        PartyProgression.CardPreview firstCard, PartyProgression.CardPreview secondCard, PartyProgression.CardPreview thirdCard) {}
+        ItemCatalog.Item first, ItemCatalog.Item second,
+        PartyProgression.CardPreview firstCard, PartyProgression.CardPreview secondCard,
+        RunEquipment.RewardOrigin origin) {}
     public record StarterBuild(int skillsGranted, int equipmentGranted) {}
     public record Snapshot(Player first, Player second, int connected, boolean hostActive, Phase phase, long revision) {}
     public record Join(int slot, String token, String error) {
@@ -56,11 +57,12 @@ public final class LobbyState {
         int equipmentId, claimedEquipmentId, equipmentOption;
         float equipmentSeconds, equipmentDuration = PartyProgression.CHOICE_SECONDS;
         boolean equipmentCatchUp;
+        RunEquipment.RewardOrigin equipmentOrigin;
         boolean participating;
         StarterBuild starterBuild;
         boolean equipmentQueued;
-        final ItemCatalog.Item[] equipmentOptions = new ItemCatalog.Item[3];
-        final PartyProgression.CardPreview[] equipmentCards = new PartyProgression.CardPreview[3];
+        final ItemCatalog.Item[] equipmentOptions = new ItemCatalog.Item[RunEquipment.CHOICE_COUNT];
+        final PartyProgression.CardPreview[] equipmentCards = new PartyProgression.CardPreview[RunEquipment.CHOICE_COUNT];
         void clearUpgradeRequest() {
             if (upgradeQueued) claimedOfferId = 0;
             upgradeQueued = false;
@@ -72,7 +74,8 @@ public final class LobbyState {
         void clearEquipment() {
             equipmentId = claimedEquipmentId = equipmentOption = 0;
             equipmentSeconds = 0; equipmentDuration = PartyProgression.CHOICE_SECONDS; equipmentCatchUp = false; equipmentQueued = false;
-            for (int i = 0; i < 3; i++) { equipmentOptions[i] = null; equipmentCards[i] = null; }
+            equipmentOrigin = null;
+            for (int i = 0; i < RunEquipment.CHOICE_COUNT; i++) { equipmentOptions[i] = null; equipmentCards[i] = null; }
         }
         void clearProgression() {
             level = 1; xp = 0; xpToNext = 6; offerId = offerLevel = claimedOfferId = 0;
@@ -285,20 +288,27 @@ public final class LobbyState {
 
     public synchronized void publishEquipment(int index, int offerId, float secondsLeft,
         ItemCatalog.Item[] options, PartyProgression.CardPreview[] cards, boolean catchUp, float durationSeconds) {
+        publishEquipment(index, offerId, secondsLeft, options, cards, catchUp, durationSeconds, RunEquipment.UNKNOWN_ORIGIN);
+    }
+
+    public synchronized void publishEquipment(int index, int offerId, float secondsLeft,
+        ItemCatalog.Item[] options, PartyProgression.CardPreview[] cards, boolean catchUp, float durationSeconds,
+        RunEquipment.RewardOrigin origin) {
         Slot slot = slots[index];
-        boolean offered = offerId > 0 && options != null && options.length >= 3
-            && options[0] != null && options[1] != null && options[2] != null
-            && cards != null && cards.length >= 3 && cards[0] != null && cards[1] != null && cards[2] != null
+        boolean offered = offerId > 0 && options != null && options.length == RunEquipment.CHOICE_COUNT
+            && options[0] != null && options[1] != null
+            && cards != null && cards.length == RunEquipment.CHOICE_COUNT && cards[0] != null && cards[1] != null
             && Float.isFinite(secondsLeft) && secondsLeft > 0;
         int nextId = offered ? offerId : 0;
         if (slot.equipmentId != nextId || nextId == 0) {
             slot.equipmentQueued = false; slot.claimedEquipmentId = 0;
         }
         slot.equipmentId = nextId;
+        slot.equipmentOrigin = offered ? origin == null ? RunEquipment.UNKNOWN_ORIGIN : origin : null;
         slot.equipmentCatchUp = offered && catchUp;
         slot.equipmentDuration = choiceDuration(catchUp, durationSeconds);
         slot.equipmentSeconds = offered ? Math.min(slot.equipmentDuration, secondsLeft) : 0;
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < RunEquipment.CHOICE_COUNT; i++) {
             slot.equipmentOptions[i] = offered ? options[i] : null;
             slot.equipmentCards[i] = offered ? cards[i] : null;
         }
@@ -307,7 +317,7 @@ public final class LobbyState {
     private boolean equipmentChoicePhase() { return phase == Phase.SESSION || phase == Phase.LOOT; }
 
     public synchronized boolean chooseEquipment(String connection, int offerId, int option) {
-        if (!hostActive || !equipmentChoicePhase() || offerId <= 0 || option < -1 || option >= 3) return false;
+        if (!hostActive || !equipmentChoicePhase() || offerId <= 0 || option < -1 || option >= RunEquipment.CHOICE_COUNT) return false;
         for (Slot slot : slots) {
             if (!connection.equals(slot.connection)) continue;
             if (slot.offerId > 0 || slot.equipmentId != offerId || slot.equipmentSeconds <= 0
@@ -332,8 +342,8 @@ public final class LobbyState {
         Slot slot = slots[index];
         return slot.equipmentId > 0
             ? new EquipmentFeedback(slot.equipmentId, slot.equipmentSeconds, slot.equipmentCatchUp, slot.equipmentDuration,
-                slot.equipmentOptions[0], slot.equipmentOptions[1], slot.equipmentOptions[2],
-                slot.equipmentCards[0], slot.equipmentCards[1], slot.equipmentCards[2]) : null;
+                slot.equipmentOptions[0], slot.equipmentOptions[1],
+                slot.equipmentCards[0], slot.equipmentCards[1], slot.equipmentOrigin) : null;
     }
 
     /** Publish current-run membership and a nonblocking confirmation, without per-frame snapshots. */

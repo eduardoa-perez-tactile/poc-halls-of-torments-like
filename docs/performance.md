@@ -288,6 +288,72 @@ Accounted textures remain 33,516,364 bytes (31.9637 MiB); retained Pixmaps remai
 is not established. Synthetic controllers/logging were stopped and the existing
 emulator/relay returned to Home. No physical device was touched.
 
-The separately generated arena illustration is a proposed replacement design,
-not an implemented room or a gameplay/balance/performance verification. Its resource
-and modular-art plan is recorded in docs/arena-redesign-proposal.md.
+That illustration was the initial proposal. The subsequent open-landmark implementation and character-height ruined-wall revision are recorded in docs/arena-redesign-proposal.md; the concept itself is not a gameplay or performance verification.
+
+
+## Two equipment choices and reward explanations (2026-11-23)
+
+Equipment offers now carry exactly two illustrated choices and immutable reward
+provenance. Skills retain three. TV and phone name the elite defeat or original
+timed reliquary, and explain equip/replace, run-only gear and Keep Current Gear.
+Sixty-three focused layout/art/equipment/lobby/socket checks and twelve directly
+affected late-join/item-combat checks passed with JDK 21; the controller protocol
+script also passed. Desktop classes and Android debug assembly succeeded.
+
+A real headless browser connected through the emulator's controller server was
+checked at 390×844 portrait and 844×390 landscape. The native late-encounter fixture
+queued separate 1:30 and 10:00 reliquaries; both source labels appeared in order,
+with exactly two visible gear cards. Declining both restored the controller;
+a following real skill offer restored three cards. A clipped landscape comparison
+was corrected by placing equipment art beside its copy, then this affected flow
+was rechecked. Native TV source/explanation text was also captured. This fixture
+does not establish what triggered rewards in an unrecorded user playtest.
+
+Temporary browser/controllers/logging were stopped and the emulator returned to
+Home. Native captures and logs are ignored under `.run/`; a phone page opened
+before this update needs a reload to receive the changed controller JavaScript.
+
+
+## Open landmarks and low ruined borders (2026-11-23)
+
+The authored open arena has 59 placements: 36 wide wall sections, four corner
+supports and 19 props across four landmark groups. Broken masonry replaces the
+rejected tall clean wall treatment. Wall stone bodies are approximately 70–85
+render units with broken tops, against roughly 104-unit visible heroes; diagonal
+half-spans add to their bounding-box peaks. Corner peaks are about 106 units.
+Small measured source projection errors are calibrated using the same four sprite
+vertices, with fitted ground pivots. A fixed 20-float staging array is reused;
+there are no additional textures, GPU buffers or frame-loop object allocations.
+
+The source kit includes original built-in ImageGen masters/exact prompt chains,
+fit samples, metadata and independently rebuildable canonical inputs. An
+archive-only bake reproduced all three runtime files byte for byte. Actor pages
+and frame prefix 0–207, all 24 missile RGBA frames/timing/pivots and utilities are
+preserved. Runtime residency including QR remains **33,516,364 bytes (31.9637 MiB)**;
+retained Pixmaps remain **20,245,324 bytes**. Gameplay retains no decoded Pixmaps.
+
+Across targeted runs, 76 focused tests passed for layout, projection/occlusion,
+art contracts, equipment, protocol/lobby, item combat and late joining. Final
+JDK 21 desktop classes and Android debug assembly passed. The controller script
+and actual portrait/landscape phone checks are recorded above. Native solo views
+covered landmarks and near/far corners; independent co-op cameras were checked
+at the near border. The first capture exposed overly broad fading of low walls.
+The final overlap check uses the local diagonal wall height at the actor and
+requires upper-body obstruction; low masonry remains continuous when the head
+and upper body are clear. Only the affected views were rechecked. The profile-only
+camera fixture clears combat pools and gives separated split views, with no
+blinking inspection shield; normal movement/combat is unchanged.
+
+The final brief co-op window contained 295 frames: interval p95/p99/max
+**20.06/33.33/97.02 ms**, CPU submission **6.13/14.11/18.63 ms**, 138 intervals above
+16.7 ms and two above 33.4 ms, with 12 draw calls. Startup/capture work is included;
+the preceding lobby transition had much larger startup hitches. This establishes
+rendering/joins and bounded residency, not sustained physical-TV 60 FPS, gameplay
+balance or arena fun. The 16.7 ms displayed-frame requirement remains unproven.
+
+Native captures/logs are ignored under `.run/ruined-arena-*`; the final split view
+is `ruined-arena-coop-near-corner.png`. Temporary controllers, browser profiles,
+logging and inspection scripts were removed/stopped; the existing emulator is at
+Home and the existing relay/ADB forward remain available. No physical phone/TV
+was targeted. Floor artwork remains unchanged pending the user's follow-up
+conversation about the concept's engraved circle, paths and tile variation.

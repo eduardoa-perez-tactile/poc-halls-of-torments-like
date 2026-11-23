@@ -12,6 +12,21 @@ Each item has a new original illustration in a bounded shared equipment atlas. E
 
 Summons, elemental status conversions, gold economies, potion inventories, permanent retrieval, equipment unlock quests, marks and artifacts require systems outside the current arena and are omitted rather than represented by inactive items. There are no rarity variants or persistent inventory in this pass.
 
+## Earning and choosing gear
+
+Equipment is separate from XP levels. The party earns one personal choice for each
+of up to five defeated elites, plus timed reliquaries at 1:30, 10:00 and 19:00 of
+the normal twenty-minute combat timeline. There are at most eight rewards per run.
+Skill choices take priority; earned gear waits behind them, so separate rewards
+can appear consecutively. The TV and phone name the original source of each round.
+This describes the rules, not the unrecorded cause of a particular playtest reward.
+
+Each phone offers **two** items with their illustrations and current → next bonuses.
+Pick one to equip its slot or replace the item already there, or Keep Current Gear
+to decline that reward. There are seven positions, including two rings. Combat
+pauses for the shared 30-second round; timeout picks the first option. Gear lasts
+for the current run only. XP skill upgrades retain three choices.
+
 ## Balance envelope
 
 Individual bonuses are generally 3–25%, 5–30 health, 0.15–0.35 health/second or 7–12 retaliation damage. Life-steal items grant 0.8–1% before runtime caps. XP gear is modest (3–6%) so it improves collection builds without replacing the rising level curve. More arrows, broader reach and piercing remain class-specific and respect the existing projectile pools/caps.

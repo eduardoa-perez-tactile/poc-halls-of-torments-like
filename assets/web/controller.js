@@ -13,6 +13,7 @@
   const upgradeSecondsLabel = byId('upgrade-seconds'), upgradeTimerLabel = byId('upgrade-timer-label');
   const upgradeButtons = [0, 1, 2].map((index) => byId(`upgrade-option-${index}`));
   const keepEquipment = byId('equipment-keep');
+  const equipmentSource = byId('equipment-source'), equipmentExplanation = byId('equipment-explanation');
   const starterBuild = byId('starter-build');
   let upgradeOffer = null, upgradeSeconds = 0, upgradeDuration = 30, upgradeSampleTime = 0, upgradeTicker;
   let choiceKind = 'upgrade';
@@ -82,7 +83,7 @@
     document.body.classList.toggle('choice-urgent', seconds <= Math.min(10, upgradeDuration / 3) && hostActive && choicePhaseActive());
     const disabled = !canChooseUpgrade() || remaining <= 0 || upgradeSelected >= 0;
     upgradeButtons.forEach((button, index) => {
-      button.disabled = disabled;
+      button.disabled = disabled || index >= upgradeOffer.options.length;
       button.classList.toggle('selected', index === upgradeSelected);
     });
     keepEquipment.hidden = choiceKind !== 'equipment';
@@ -129,19 +130,26 @@
     const next = kind === 'upgrade' ? progression.upgrade : phase === 'level_up' ? null : equipment;
     if (!joined || !['session', 'level_up', 'loot', 'paused', 'invite'].includes(phase) || !next
       || !Number.isSafeInteger(next.id) || next.id <= 0 || !Number.isFinite(next.secondsLeft)
-      || !Array.isArray(next.options) || next.options.length !== 3
+      || !Array.isArray(next.options) || next.options.length !== (kind === 'equipment' ? 2 : 3)
       || !next.options.every((option) => typeof option?.title === 'string' && typeof option.description === 'string')) {
       clearUpgrade(); return;
     }
     if (upgradeOffer?.id !== next.id || choiceKind !== kind) {
       upgradeOffer = next; upgradeSelected = -1; upgradePendingSince = 0;
       choiceKind = kind;
-      upgradeButtons.forEach((button, index) => paintSkillCard(button, next.options[index], kind === 'equipment'));
+      upgradeButtons.forEach((button, index) => {
+        button.hidden = index >= next.options.length;
+        if (!button.hidden) paintSkillCard(button, next.options[index], kind === 'equipment');
+      });
       upgradeChoices.hidden = false; document.body.classList.add('has-upgrade');
       upgradeChoices.querySelector('.upgrade-options').scrollTop = 0;
       // Both personal choice views release movement while the host pauses combat.
       releaseControls();
     }
+    upgradeChoices.dataset.kind = kind;
+    equipmentSource.hidden = equipmentExplanation.hidden = kind !== 'equipment';
+    equipmentSource.textContent = kind === 'equipment'
+      ? typeof next.sourceLabel === 'string' ? next.sourceLabel.slice(0, 96) : 'GEAR REWARD' : '';
     upgradeChoices.querySelector('.upgrade-kicker').textContent = kind === 'equipment' ? 'CHOOSE YOUR EQUIPMENT' : 'CHOOSE YOUR POWER';
     upgradeLevel.textContent = kind === 'equipment' ? 'EQUIPMENT' : `LEVEL ${Number.isSafeInteger(next.level) ? next.level : ''}`;
     upgradeDuration = Number.isFinite(next.durationSeconds) && next.durationSeconds > 0
@@ -151,7 +159,8 @@
     paintUpgrade();
   }
   upgradeButtons.forEach((button, index) => button.addEventListener('click', () => {
-    if (!upgradeOffer || !canChooseUpgrade() || upgradeSelected >= 0 || remainingUpgradeSeconds() <= 0) return;
+    if (!upgradeOffer || index >= upgradeOffer.options.length || !canChooseUpgrade()
+      || upgradeSelected >= 0 || remainingUpgradeSeconds() <= 0) return;
     upgradeSelected = index; upgradePendingSince = performance.now();
     socket.send(JSON.stringify({ type: choiceKind, offerId: upgradeOffer.id, option: index }));
     paintUpgrade();

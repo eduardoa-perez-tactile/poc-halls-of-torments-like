@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "sourceArchive": "canonical-inputs.zip",
+  "environmentSize": [
+    512,
+    512
+  ],
+  "environmentTextureBytes": 1048576,
+  "addedTextureBytes": 0,
+  "newEnvironmentSprites": 12,
+  "utilitiesPreserved": 4,
+  "projectileFramesPreserved": 24,
+  "actorFramesPreserved": 208,
+  "padding": 2,
+  "edgeExtrusion": 1,
+  "packer": "max-side/short-side",
+  "savedRgbaReconstruction": true,
+  "actorPageSha256": {
+    "gameplay-actors-main.png": "03fe9d2a3e13181bd72f941f9f4b140057f59b477af77c6854caf9d7b47e9fe0",
+    "gameplay-actors-common.png": "0531b71609797fd4ba20feed95e91a6231159b3e85ccfc944504e7da712b6e39"
+  },
+  "outputs": {
+    "gameplay-environment.png": "106f821fa40ed1e47e60175e49fdba5aca76de841770096b742d127eda7cef4e",
+    "gameplay.json": "c455c0aff9492a21e0226b64a1ee0f3561b1deca0d88201193af02bee1134d9a",
+    "magic-projectiles.json": "99b5dc983af5bbcccd35ac4db532f127ee27bbab5a6c10beea925736b30cfbb1"
+  },
+  "archiveOnlyRebuildByteIdentical": true,
+  "actorPageBytesUnchanged": true,
+  "projectileNonRectangleMetadataUnchanged": true,
+  "sourceArchiveSha256": "fed6960687d5504de68748ecf084430ce8e5018e98e93f9d7bf0967100878fe1",
+  "wallCalibration": {
+    "wall-x": {
+      "renderShearY": -0.011264,
+      "pivot": [
+        56,
+        94.986655
+      ],
+      "baseCalibration": {
+        "coordinateSystem": "source image pixels, +Y down",
+        "method": "least-squares fit of alpha>=32 bottom contour across central20%-80% of selected source alpha bounds",
+        "sampleCount": 680,
+        "firstContourPoint": [
+          285,
+          1061
+        ],
+        "lastContourPoint": [
+          964,
+          714
+        ],
+        "fitSlopeDown": -0.5107,
+        "fitInterceptDown": 1206.258621,
+        "targetSlopeDown": -0.5,
+        "renderShearY": -0.011264,
+        "pixelModification": false,
+        "normalizedFitSlopeDown": -0.511264,
+        "normalizedFitAtPivotX": 102.030133,
+        "frontGroundOffset": 7.043478,
+        "calibratedPivotY": 94.986655,
+        "normalizedSlopeDown": -0.511264,
+        "frontBaseYAtPivot": 102.030133,
+        "normalizedInterceptDown": 130.660917
+      }
+    },
+    "wall-x-broken": {
+      "renderShearY": -0.026131,
+      "pivot": [
+        56,
+        95.091584
+      ],
+      "baseCalibration": {
+        "coordinateSystem": "source image pixels, +Y down",
+        "method": "least-squares fit of alpha>=32 bottom contour across central20%-80% of selected source alpha bounds",
+        "sampleCount": 678,
+        "firstContourPoint": [
+          288,
+          1086
+        ],
+        "lastContourPoint": [
+          965,
+          730
+        ],
+        "fitSlopeDown": -0.52575,
+        "fitInterceptDown": 1238.169986,
+        "targetSlopeDown": -0.5,
+        "renderShearY": -0.026131,
+        "pixelModification": false,
+        "normalizedFitSlopeDown": -0.526131,
+        "normalizedFitAtPivotX": 102.135062,
+        "frontGroundOffset": 7.043478,
+        "calibratedPivotY": 95.091584,
+        "normalizedSlopeDown": -0.526131,
+        "frontBaseYAtPivot": 102.135062,
+        "normalizedInterceptDown": 131.598398
+      }
+    },
+    "wall-y": {
+      "renderShearY": -0.039143,
+      "pivot": [
+        56,
+        98.545704
+      ],
+      "baseCalibration": {
+        "coordinateSystem": "source image pixels, +Y down",
+        "method": "least-squares fit of alpha>=32 bottom contour across central20%-80% of selected source alpha bounds",
+        "sampleCount": 666,
+        "firstContourPoint": [
+          296,
+          705
+        ],
+        "lastContourPoint": [
+          961,
+          1013
+        ],
+        "fitSlopeDown": 0.46227,
+        "fitInterceptDown": 568.769611,
+        "targetSlopeDown": 0.5,
+        "renderShearY": -0.039143,
+        "pixelModification": false,
+        "normalizedFitSlopeDown": 0.460857,
+        "normalizedFitAtPivotX": 105.589182,
+        "frontGroundOffset": 7.043478,
+        "calibratedPivotY": 98.545704,
+        "normalizedSlopeDown": 0.460857,
+        "frontBaseYAtPivot": 105.589182,
+        "normalizedInterceptDown": 79.78119
+      }
+    },
+    "wall-y-broken": {
+      "renderShearY": -0.029882,
+      "pivot": [
+        56,
+        98.972445
+      ],
+      "baseCalibration": {
+        "coordinateSystem": "source image pixels, +Y down",
+        "method": "least-squares fit of alpha>=32 bottom contour across central20%-80% of selected source alpha bounds",
+        "sampleCount": 678,
+        "firstContourPoint": [
+          300,
+          714
+        ],
+        "lastContourPoint": [
+          977,
+          1032
+        ],
+        "fitSlopeDown": 0.469286,
+        "fitInterceptDown": 573.403662,
+        "targetSlopeDown": 0.5,
+        "renderShearY": -0.029882,
+        "pixelModification": false,
+        "normalizedFitSlopeDown": 0.470118,
+        "normalizedFitAtPivotX": 106.015923,
+        "frontGroundOffset": 7.043478,
+        "calibratedPivotY": 98.972445,
+        "normalizedSlopeDown": 0.470118,
+        "frontBaseYAtPivot": 106.015923,
+        "normalizedInterceptDown": 79.689315
+      }
+    }
+  }
+}

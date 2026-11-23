@@ -124,9 +124,12 @@ public final class JoinServer extends NanoWSD {
             .append(",\"catchUp\":").append(offer.catchUp()).append(",\"durationSeconds\":").append(offer.durationSeconds())
             .append(",\"options\":[");
         appendEquipment(result, offer.first(), offer.firstCard()); result.append(',');
-        appendEquipment(result, offer.second(), offer.secondCard()); result.append(',');
-        appendEquipment(result, offer.third(), offer.thirdCard());
-        return result.append("]}").toString();
+        appendEquipment(result, offer.second(), offer.secondCard());
+        result.append("],\"source\":"); quote(result, offer.origin().source());
+        result.append(",\"sourceLabel\":"); quote(result, offer.origin().label());
+        result.append(",\"sourceSeconds\":").append(offer.origin().scheduledSeconds());
+        result.append(",\"rewardNumber\":").append(offer.origin().number());
+        return result.append('}').toString();
     }
 
     private static void appendEquipment(StringBuilder target, ItemCatalog.Item item, PartyProgression.CardPreview card) {
@@ -234,7 +237,7 @@ public final class JoinServer extends NanoWSD {
                     boolean equipment = "equipment".equals(message.getString("type"));
                     JsonValue offerId = message.get("offerId"), option = message.get("option");
                     if (offerId == null || !offerId.isLong() || offerId.asLong() <= 0 || offerId.asLong() > Integer.MAX_VALUE
-                        || option == null || !option.isLong() || option.asLong() < (equipment ? -1 : 0) || option.asLong() > 2) return;
+                        || option == null || !option.isLong() || option.asLong() < (equipment ? -1 : 0) || option.asLong() > (equipment ? 1 : 2)) return;
                     if (state.owns(id)) {
                         lastSeen = System.currentTimeMillis();
                         if (equipment) state.chooseEquipment(id, offerId.asInt(), option.asInt());

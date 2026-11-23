@@ -1,0 +1,253 @@
+{
+  "version": 1,
+  "tool": "built-in image_gen",
+  "reference": "../reference-layout.png",
+  "coordinates": "top-left image pixels; projected ground centre pivot; footprint dimensions are world X/Y suggestions, not collisions",
+  "assets": {
+    "sarcophagus-x": {
+      "path": "sarcophagus-x.png",
+      "sourcePath": "sarcophagus-x-source.png",
+      "sourceSize": [
+        96,
+        96
+      ],
+      "pivot": [
+        48,
+        72
+      ],
+      "projectedFootprintWidth": 92,
+      "footprintWorldX": 170,
+      "footprintWorldY": 70,
+      "imageLongEdgeSlope": -0.5,
+      "sha256": "510152bd34229f4c0d9e424692edde7c4012065fb8f78905ba4f76e138f62325",
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          142,
+          87,
+          1422,
+          1016
+        ],
+        "contentSize": [
+          92,
+          67
+        ],
+        "offset": [
+          2,
+          27
+        ],
+        "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      }
+    },
+    "sarcophagus-y": {
+      "path": "sarcophagus-y.png",
+      "sourcePath": "sarcophagus-y-source.png",
+      "sourceSize": [
+        96,
+        96
+      ],
+      "pivot": [
+        48,
+        72
+      ],
+      "projectedFootprintWidth": 92,
+      "footprintWorldX": 70,
+      "footprintWorldY": 170,
+      "imageLongEdgeSlope": 0.5,
+      "sha256": "2ff36f4bd66108df4f93dbd28d8eefabf594911c949b1d4168287baf9478cc28",
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          145,
+          69,
+          1354,
+          986
+        ],
+        "contentSize": [
+          92,
+          70
+        ],
+        "offset": [
+          2,
+          24
+        ],
+        "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      }
+    },
+    "altar": {
+      "path": "altar.png",
+      "sourcePath": "altar-source.png",
+      "sourceSize": [
+        128,
+        112
+      ],
+      "pivot": [
+        64,
+        92
+      ],
+      "projectedFootprintWidth": 124,
+      "footprintWorldX": 90,
+      "footprintWorldY": 200,
+      "imageLongEdgeSlope": 0.5,
+      "sha256": "f5ed9e3a8a7a2f74929eed8dbf543ab6606d6a6f2fa2f408b5f7a8049f97e081",
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          240,
+          42,
+          1534,
+          880
+        ],
+        "contentSize": [
+          124,
+          80
+        ],
+        "offset": [
+          2,
+          30
+        ],
+        "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      }
+    },
+    "guardian": {
+      "path": "guardian.png",
+      "sourcePath": "guardian-source.png",
+      "sourceSize": [
+        72,
+        144
+      ],
+      "pivot": [
+        36,
+        127
+      ],
+      "projectedFootprintWidth": 68,
+      "footprintWorldX": 80,
+      "footprintWorldY": 80,
+      "imageLongEdgeSlope": null,
+      "sha256": "09e8922693c4188c0bfe57f3e602cb2b3345435fc21c8473fd7f3a9017db7971",
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          275,
+          73,
+          923,
+          1253
+        ],
+        "contentSize": [
+          68,
+          124
+        ],
+        "offset": [
+          2,
+          18
+        ],
+        "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      }
+    },
+    "broken-column": {
+      "path": "broken-column.png",
+      "sourcePath": "broken-column-source.png",
+      "sourceSize": [
+        64,
+        96
+      ],
+      "pivot": [
+        32,
+        79
+      ],
+      "projectedFootprintWidth": 60,
+      "footprintWorldX": 68,
+      "footprintWorldY": 68,
+      "imageLongEdgeSlope": null,
+      "sha256": "bfdeb92efb8e98ce3b122b826e2d48ed068f92b633da5dc5bd480c20b3877d49",
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          618,
+          160,
+          1145,
+          827
+        ],
+        "contentSize": [
+          60,
+          76
+        ],
+        "offset": [
+          2,
+          18
+        ],
+        "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      }
+    },
+    "rubble": {
+      "path": "rubble.png",
+      "sourcePath": "rubble-source.png",
+      "sourceSize": [
+        80,
+        48
+      ],
+      "pivot": [
+        40,
+        35
+      ],
+      "projectedFootprintWidth": 73,
+      "footprintWorldX": 45,
+      "footprintWorldY": 160,
+      "imageLongEdgeSlope": 0.5,
+      "sha256": "e78300efd4c33ab366c619c00eb69eb61cc8e1b6a4af248fc3c573ba9556ea16",
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          301,
+          93,
+          1426,
+          771
+        ],
+        "contentSize": [
+          73,
+          44
+        ],
+        "offset": [
+          3,
+          2
+        ],
+        "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      }
+    },
+    "sealed-gate": {
+      "path": "sealed-gate.png",
+      "sourcePath": "sealed-gate-source.png",
+      "sourceSize": [
+        128,
+        192
+      ],
+      "pivot": [
+        64,
+        165
+      ],
+      "projectedFootprintWidth": 124,
+      "footprintWorldX": 250,
+      "footprintWorldY": 50,
+      "imageLongEdgeSlope": -0.5,
+      "sha256": "3f8a0247cad1d95695ae1cf9d8eb9db0eeb62413238c29934417354daa93d9fe",
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          308,
+          41,
+          1226,
+          1000
+        ],
+        "contentSize": [
+          124,
+          130
+        ],
+        "offset": [
+          2,
+          60
+        ],
+        "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      }
+    }
+  }
+}

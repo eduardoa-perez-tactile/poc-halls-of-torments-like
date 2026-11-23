@@ -1,0 +1,251 @@
+{
+  "date": "2026-11-23",
+  "authoring": "Original generated ruined crypt art; user approved broken tops and character-height scale.",
+  "walls": {
+    "wall-x": {
+      "selectedMaster": "wall-x-source.png",
+      "selectedMasterSha256": "ae554d918855350bb1ef0c66d2ff806371fbe8714cc746a4bece1de46fcbaebf",
+      "normalizedSprite": "wall-x.png",
+      "originalBuiltInOutput": "/Users/eduardoleale/.codex/generated_images/01a2081c-e0b7-7163-80da-7c209811d13c/exec-2675c5f9-cd9c-451f-a9e3-17ae369b800e.png",
+      "tool": "built-in image_gen",
+      "promptChain": [
+        "wall-x-ruined-prompt.txt",
+        "wall-x-ruined-correction-prompt.txt",
+        "wall-x-ground-correction-prompt.txt",
+        "wall-x-seam-correction-prompt.txt"
+      ],
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          59,
+          132,
+          1192,
+          1138
+        ],
+        "contentSize": [
+          108,
+          96
+        ],
+        "offset": [
+          2,
+          30
+        ],
+        "resample": "proportional Lanczos; no mirror, warp, recolour or repaint"
+      },
+      "baseCalibration": {
+        "coordinateSystem": "source image pixels, +Y down",
+        "method": "least-squares fit of alpha>=32 bottom contour across central20%-80% of selected source alpha bounds",
+        "sampleCount": 680,
+        "firstContourPoint": [
+          285,
+          1061
+        ],
+        "lastContourPoint": [
+          964,
+          714
+        ],
+        "fitSlopeDown": -0.5107,
+        "fitInterceptDown": 1206.258621,
+        "targetSlopeDown": -0.5,
+        "renderShearY": -0.011264,
+        "pixelModification": false,
+        "normalizedFitSlopeDown": -0.511264,
+        "normalizedFitAtPivotX": 102.030133,
+        "frontGroundOffset": 7.043478,
+        "calibratedPivotY": 94.986655,
+        "normalizedSlopeDown": -0.511264,
+        "frontBaseYAtPivot": 102.030133,
+        "normalizedInterceptDown": 130.660917
+      },
+      "groundPivot": [
+        56,
+        94.986655
+      ],
+      "renderShearY": -0.011264
+    },
+    "wall-x-broken": {
+      "selectedMaster": "wall-x-broken-source.png",
+      "selectedMasterSha256": "867ca2a5dbdc73a8c9f678b3dc23abc9ba085a4a46beb0830a25985690527db5",
+      "normalizedSprite": "wall-x-broken.png",
+      "originalBuiltInOutput": "/Users/eduardoleale/.codex/generated_images/01a2081c-e0b7-7163-80da-7c209811d13c/exec-4bb5da69-bbaf-4cca-84a3-1677f09ba927.png",
+      "tool": "built-in image_gen",
+      "promptChain": [
+        "wall-x-broken-ruined-prompt.txt",
+        "wall-x-broken-ruined-final-prompt.txt",
+        "wall-x-broken-seam-correction-prompt.txt"
+      ],
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          62,
+          122,
+          1193,
+          1158
+        ],
+        "contentSize": [
+          108,
+          99
+        ],
+        "offset": [
+          2,
+          27
+        ],
+        "resample": "proportional Lanczos; no mirror, warp, recolour or repaint"
+      },
+      "baseCalibration": {
+        "coordinateSystem": "source image pixels, +Y down",
+        "method": "least-squares fit of alpha>=32 bottom contour across central20%-80% of selected source alpha bounds",
+        "sampleCount": 678,
+        "firstContourPoint": [
+          288,
+          1086
+        ],
+        "lastContourPoint": [
+          965,
+          730
+        ],
+        "fitSlopeDown": -0.52575,
+        "fitInterceptDown": 1238.169986,
+        "targetSlopeDown": -0.5,
+        "renderShearY": -0.026131,
+        "pixelModification": false,
+        "normalizedFitSlopeDown": -0.526131,
+        "normalizedFitAtPivotX": 102.135062,
+        "frontGroundOffset": 7.043478,
+        "calibratedPivotY": 95.091584,
+        "normalizedSlopeDown": -0.526131,
+        "frontBaseYAtPivot": 102.135062,
+        "normalizedInterceptDown": 131.598398
+      },
+      "groundPivot": [
+        56,
+        95.091584
+      ],
+      "renderShearY": -0.026131
+    },
+    "wall-y": {
+      "selectedMaster": "wall-y-source.png",
+      "selectedMasterSha256": "d5246e7334acf83ad31114c0b2ac1015c5bd01dc184f365c95255b0b04ed4020",
+      "normalizedSprite": "wall-y.png",
+      "originalBuiltInOutput": "/Users/eduardoleale/.codex/generated_images/01a2081c-e0b7-7163-80da-7c209811d13c/exec-19dd3ba0-44a1-4698-be75-32fe6d2ed92b.png",
+      "tool": "built-in image_gen",
+      "promptChain": [
+        "wall-y-ruined-prompt.txt",
+        "wall-y-ruined-final-prompt.txt",
+        "wall-y-seam-correction-prompt.txt",
+        "wall-y-selected-final-prompt.txt"
+      ],
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          75,
+          143,
+          1184,
+          1070
+        ],
+        "contentSize": [
+          108,
+          90
+        ],
+        "offset": [
+          2,
+          36
+        ],
+        "resample": "proportional Lanczos; no mirror, warp, recolour or repaint"
+      },
+      "baseCalibration": {
+        "coordinateSystem": "source image pixels, +Y down",
+        "method": "least-squares fit of alpha>=32 bottom contour across central20%-80% of selected source alpha bounds",
+        "sampleCount": 666,
+        "firstContourPoint": [
+          296,
+          705
+        ],
+        "lastContourPoint": [
+          961,
+          1013
+        ],
+        "fitSlopeDown": 0.46227,
+        "fitInterceptDown": 568.769611,
+        "targetSlopeDown": 0.5,
+        "renderShearY": -0.039143,
+        "pixelModification": false,
+        "normalizedFitSlopeDown": 0.460857,
+        "normalizedFitAtPivotX": 105.589182,
+        "frontGroundOffset": 7.043478,
+        "calibratedPivotY": 98.545704,
+        "normalizedSlopeDown": 0.460857,
+        "frontBaseYAtPivot": 105.589182,
+        "normalizedInterceptDown": 79.78119
+      },
+      "groundPivot": [
+        56,
+        98.545704
+      ],
+      "renderShearY": -0.039143
+    },
+    "wall-y-broken": {
+      "selectedMaster": "wall-y-broken-source.png",
+      "selectedMasterSha256": "58cf1fd503e44f9f62105e3125f031b3272975aeff581a9b8898264527f5e601",
+      "normalizedSprite": "wall-y-broken.png",
+      "originalBuiltInOutput": "/Users/eduardoleale/.codex/generated_images/01a2081c-e0b7-7163-80da-7c209811d13c/exec-c3b634be-c4ee-459a-b425-26f9cdbd3e4c.png",
+      "tool": "built-in image_gen",
+      "promptChain": [
+        "wall-y-broken-ruined-prompt.txt",
+        "wall-y-broken-ruined-final-prompt.txt",
+        "wall-y-broken-seam-correction-prompt.txt",
+        "wall-y-broken-selected-final-prompt.txt"
+      ],
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          74,
+          142,
+          1204,
+          1082
+        ],
+        "contentSize": [
+          108,
+          90
+        ],
+        "offset": [
+          2,
+          36
+        ],
+        "resample": "proportional Lanczos; no mirror, warp, recolour or repaint"
+      },
+      "baseCalibration": {
+        "coordinateSystem": "source image pixels, +Y down",
+        "method": "least-squares fit of alpha>=32 bottom contour across central20%-80% of selected source alpha bounds",
+        "sampleCount": 678,
+        "firstContourPoint": [
+          300,
+          714
+        ],
+        "lastContourPoint": [
+          977,
+          1032
+        ],
+        "fitSlopeDown": 0.469286,
+        "fitInterceptDown": 573.403662,
+        "targetSlopeDown": 0.5,
+        "renderShearY": -0.029882,
+        "pixelModification": false,
+        "normalizedFitSlopeDown": 0.470118,
+        "normalizedFitAtPivotX": 106.015923,
+        "frontGroundOffset": 7.043478,
+        "calibratedPivotY": 98.972445,
+        "normalizedSlopeDown": 0.470118,
+        "frontBaseYAtPivot": 106.015923,
+        "normalizedInterceptDown": 79.689315
+      },
+      "groundPivot": [
+        56,
+        98.972445
+      ],
+      "renderShearY": -0.029882
+    }
+  },
+  "corner": "corner-ruined.json",
+  "landmarks": "props/generation-records.json"
+}

@@ -7,9 +7,8 @@ import java.util.Locale;
 /** Validated offline atlas metadata. It neither loads GL textures nor fits artwork. */
 public final class GameplayAtlas {
     public static final long MAX_TEXTURE_BYTES = 6L * 1_048_576;
-    public static final String[] REQUIRED_REGIONS = {"floor-intact", "floor-chipped", "floor-fractured",
-        "wall-ne", "wall-nw", "corner", "arch", "pillar", "sarcophagus", "rubble", "urn", "relic",
-        "obelisk", "shrine", "orb", "shadow", "glow", "soul", "white"};
+    public static final String[] REQUIRED_REGIONS = {"wall-x", "wall-x-broken", "wall-y", "wall-y-broken", "buttress", "sarcophagus-x", "sarcophagus-y",
+        "altar", "guardian", "broken-column", "rubble", "sealed-gate", "shadow", "glow", "soul", "white"};
 
     public record Page(String file, int width, int height) {}
 
@@ -131,7 +130,9 @@ public final class GameplayAtlas {
         }
     }
 
-    public record Region(int frame, float worldHeight) {}
+    /** Footprint width is measured in source pixels; world extents are authored ground-plane units. */
+    public record Region(int frame, float worldHeight, float footprintWidth,
+                         float footprintWorldX, float footprintWorldY, float renderShearY) {}
 
     public final Page[] pages;
     public final Frame[] frames;
@@ -170,7 +171,18 @@ public final class GameplayAtlas {
             int frame = entry.getInt("frame"); float height = entry.getFloat("worldHeight");
             if (frame < 0 || frame >= frames.length || !Float.isFinite(height) || height <= 0)
                 throw invalid("Invalid environment region");
-            if (regions.put(entry.name, new Region(frame, height)) != null) throw invalid("Duplicate environment region");
+            float footprintWidth = entry.getFloat("footprintWidth", frames[frame].sourceWidth);
+            float footprintWorldX = entry.getFloat("footprintWorldX", height);
+            float footprintWorldY = entry.getFloat("footprintWorldY", height);
+            float renderShearY = entry.getFloat("renderShearY", 0f);
+            if (!Float.isFinite(footprintWidth) || footprintWidth <= 0 || footprintWidth > frames[frame].sourceWidth
+                || !Float.isFinite(footprintWorldX) || footprintWorldX <= 0 || footprintWorldX > 2400
+                || !Float.isFinite(footprintWorldY) || footprintWorldY <= 0 || footprintWorldY > 2400
+                || !Float.isFinite(renderShearY) || Math.abs(renderShearY) > .1f
+                || renderShearY != 0 && !entry.name.startsWith("wall-"))
+                throw invalid("Invalid environment footprint");
+            if (regions.put(entry.name, new Region(frame, height, footprintWidth, footprintWorldX, footprintWorldY, renderShearY)) != null)
+                throw invalid("Duplicate environment region");
         }
         for (String name : REQUIRED_REGIONS) if (!regions.containsKey(name)) throw invalid("Missing region " + name);
     }

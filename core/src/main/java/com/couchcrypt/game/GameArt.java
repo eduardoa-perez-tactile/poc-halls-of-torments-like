@@ -14,7 +14,6 @@ public final class GameArt implements Disposable {
     public final EnemyAttackArt enemyAttacks;
     public final MagicProjectileArt projectiles;
     public final TextureRegion shadow, glow, pixel, soul;
-    public final TextureRegion[] floors = new TextureRegion[3];
     public final long textureBytes;
     public final long retainedPixmapBytes = 0;
     private final Texture[] pages;
@@ -45,7 +44,6 @@ public final class GameArt implements Disposable {
                 frames[i] = new TextureRegion(pages[frame.page], frame.x, frame.y, frame.width, frame.height);
             }
             shadow = region("shadow"); glow = region("glow"); pixel = region("white"); soul = region("soul");
-            floors[0] = region("floor-intact"); floors[1] = region("floor-chipped"); floors[2] = region("floor-fractured");
         } catch (RuntimeException | Error failure) {
             dispose();
             throw failure;
