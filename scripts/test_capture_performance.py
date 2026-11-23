@@ -184,7 +184,7 @@ class DuplicateFieldsTest(unittest.TestCase):
 class SystemTraceTest(unittest.TestCase):
     def test_configuration_is_finite_and_bounded(self):
         config = capture.trace_configuration(7)
-        for expected in ('duration_ms: 7000', 'size_kb: 8192', 'RING_BUFFER',
+        for expected in ('duration_ms: 7000', 'size_kb: 65536', 'RING_BUFFER',
                          'sched/sched_switch', 'sched/sched_wakeup', '"gfx"', '"view"', '"dalvik"',
                          'atrace_apps: "com.couchcrypt.tv"', 'scan_all_processes_on_start: true',
                          'android.surfaceflinger.frametimeline'):

@@ -196,7 +196,7 @@ def trace_configuration(seconds):
     if not 5 <= seconds <= 30:
         raise ValueError('System trace duration must be 5..30 seconds')
     return f'''duration_ms: {seconds * 1000}
-buffers {{ size_kb: 8192 fill_policy: RING_BUFFER }}
+buffers {{ size_kb: 65536 fill_policy: RING_BUFFER }}
 data_sources {{ config {{ name: "linux.ftrace" ftrace_config {{
   ftrace_events: "sched/sched_switch"
   ftrace_events: "sched/sched_wakeup"
@@ -217,7 +217,7 @@ class SystemTrace:
         self.device_path = f'/data/misc/perfetto-traces/couchcrypt-baseline-{os.getpid()}.perfetto-trace'
         self.process = None
         self.metadata = {'requested': True, 'status': 'pending', 'duration_ms': seconds * 1000,
-                         'buffer_kib': 8192, 'device_path': self.device_path,
+                         'buffer_kib': 65536, 'device_path': self.device_path,
                          'note': 'Trace attempt adds overhead; compare with a separate trace_on=false baseline. FrameTimeline source is optional and does not establish SurfaceView presentation timing.'}
 
     def start(self):
