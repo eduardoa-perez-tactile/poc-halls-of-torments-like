@@ -92,10 +92,41 @@ integration handoff/performance record. Short automated or emulator checks do
 not establish that the arena is fun, balanced or sustained 60 FPS on a physical TV.
 
 
-## Deferred floor discussion
+## Border repair status
 
-The user highlighted the concept's engraved central circle, broad stone paths
-and subtle tile variation on 2026-11-23, asking to discuss them after the wall and
-item work is finished. This milestone keeps the existing floor artwork/cache;
-that feedback is a follow-up discussion, not authorization to add floor ornament.
-The reference is preserved in the concept archive linked above.
+The user reported visible seams between wall sections after handoff. The painted
+fragments have independent end faces, stone courses and lighting. Their overlapping
+footprints and calibrated ground slopes do not establish visual continuity; the
+earlier seamlessness claim was too strong. The attempted shared-material surface
+renderer was then rejected visually. It was not merged, and production sources
+have been restored to the prior painted-wall implementation.
+
+A close-up visual proposal is saved in
+[`art-source/arena-border-repair-proposal/`](../art-source/arena-border-repair-proposal/README.md):
+low painted ruined masonry, continuous courses and a natural chipped skyline.
+It is awaiting visual review, not an implemented or verified seam repair. Keep the floor unchanged
+until its separate proposal below is discussed.
+
+## Floor proposal for discussion
+
+The user asked how to carry the concept's central engraving, stone paths and
+variation into the game after the border work. No floor artwork or behavior is
+changed by the border repair.
+
+- Use one original worn stone medallion at the central spawn, roughly 720–840 world
+  units across. A true ground-plane circle projects to an ellipse half as high as
+  it is wide. Keep carving shallow and close to the surrounding stone value,
+  without glow or sharp gold rings that could compete with combat indicators.
+- Run broad paving paths, about 240–300 world units wide, from the centre toward
+  the four landmark areas. They orient players without blocking movement.
+- Place a small family of quiet stone variants, worn patches and sparse cracks in
+  authored zones. Cluster wear around landmarks/paths; avoid noisy random decals
+  across every tile or dark patches resembling hazards.
+
+Author these zones/paths in arena data. Base and path tiles stay in the existing
+static floor cache. Draw the transparent engraving before combat ground marks
+through SpriteBatch, because the current floor shader forces opaque alpha. Repack
+or replace art inside the existing 512×256 floor page rather than adding a texture;
+the exact variant count must be validated alongside retained border/foundation art.
+The reference is preserved in the concept archive linked above. This is a proposed
+floor direction for discussion, not a claim that the mockup has been implemented.
