@@ -11,6 +11,8 @@ public final class GameArt implements Disposable {
     public final GameplayAtlas metadata;
     public final VfxArt vfx;
     public final BorderTileArt borders;
+    public final EnemyAttackArt enemyAttacks;
+    public final MagicProjectileArt projectiles;
     public final TextureRegion shadow, glow, pixel, soul;
     public final TextureRegion[] floors = new TextureRegion[3];
     public final long textureBytes;
@@ -34,6 +36,9 @@ public final class GameArt implements Disposable {
                     throw new IllegalArgumentException("Gameplay art page disagrees with metadata: " + page.file());
                 texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
             }
+            // Supplemental strips borrow unused space in these already managed pages.
+            enemyAttacks = new EnemyAttackArt(pages);
+            projectiles = new MagicProjectileArt(pages[2]);
             frames = new TextureRegion[metadata.frames.length];
             for (int i = 0; i < frames.length; i++) {
                 GameplayAtlas.Frame frame = metadata.frames[i];

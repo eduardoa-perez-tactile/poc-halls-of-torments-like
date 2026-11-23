@@ -30,9 +30,12 @@ public final class UiArt implements Disposable {
     public static final Color PLAYER_TWO = Color.valueOf("9bc3bb");
     public static final Color BUTTON_INK = Color.valueOf("1d1710");
     public static final Color BUTTON_DISABLED_INK = Color.valueOf("554b3e");
-    // The unchanged illustration is exported above the largest portrait draw.
-    // Keep its full-size master out of GPU residency (roughly 4 MiB saved).
+    // Offline exports keep full-size masters out of GPU residency. Both portrait
+    // pages together cost less than the former 1024x512 full-body page alone.
     public final Texture heroes = load("art/adventurers-runtime.png");
+    public final Texture heroFaces = load("art/hero-portraits.png");
+    public final TextureRegion wardenFace = new TextureRegion(heroFaces, 0, 0, heroFaces.getWidth() / 2, heroFaces.getHeight());
+    public final TextureRegion rangerFace = new TextureRegion(heroFaces, heroFaces.getWidth() / 2, 0, heroFaces.getWidth() / 2, heroFaces.getHeight());
     public final Texture homeLogo;
     public final MenuSceneArt menuScene;
     public final TextureRegion knight = new TextureRegion(heroes, 0, 0, heroes.getWidth() / 2, heroes.getHeight());
@@ -96,7 +99,8 @@ public final class UiArt implements Disposable {
         NinePatchDrawable exitFocus = patch(focusedButtonTexture, 144, 64, 48, 20);
         exitNormal = new Button.ButtonStyle(exitPlate, exitFocus, exitPlate);
         exitFocused = new Button.ButtonStyle(exitFocus, exitFocus, exitFocus);
-        long bytes = (long) heroes.getWidth() * heroes.getHeight() * 4 + menuScene.textureBytes;
+        long bytes = (long) heroes.getWidth() * heroes.getHeight() * 4
+            + (long) heroFaces.getWidth() * heroFaces.getHeight() * 4 + menuScene.textureBytes;
         for (Texture texture : generated) bytes += (long) texture.getWidth() * texture.getHeight() * 4;
         textureBytes = bytes;
         long retained = menuScene.retainedPixmapBytes;
@@ -214,6 +218,7 @@ public final class UiArt implements Disposable {
     @Override public void dispose() {
         title.dispose(); heading.dispose(); section.dispose(); body.dispose(); small.dispose();
         heroes.dispose();
+        heroFaces.dispose();
         menuScene.dispose();
         for (Texture texture : generated) texture.dispose();
         fontPacker.dispose();

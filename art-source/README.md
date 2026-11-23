@@ -2,7 +2,7 @@
 
 `gameplay-canonical.zip` preserves the exact selected canonical PNGs, actor/environment manifests, original creative prompts, normalization/selection records and source hashes for the current seven-actor crypt kit. Artwork came from built-in ImageGen; installed Pillow performs deterministic exports and atlas packing. No image API, installation or dependency download is needed for a rebuild.
 
-The archive is **1,945,905 bytes**, with **427 entries**. `CANONICAL-SOURCES.json` indexes the other 426 entries by SHA-256 and byte count and records the four expected runtime output hashes. Historical review statuses are preserved; final inclusion is established by the complete strict pack. Raw generated posters and review media remain local in `.run/art-exploration/` and are excluded from this compact archive.
+This base archive is **1,945,905 bytes**, with **427 entries**. `CANONICAL-SOURCES.json` indexes the other 426 entries by SHA-256 and byte count and records the four expected runtime output hashes. Historical review statuses are preserved; final inclusion is established by the complete strict pack. Raw generated posters and review media remain local in `.run/art-exploration/` and are excluded from this compact archive.
 
 ## Rebuild
 
@@ -13,10 +13,12 @@ python3 -m zipfile -e art-source/gameplay-canonical.zip .run/art-exploration
 python3 scripts/BakeGameplayAtlas.py
 ```
 
-The strict baker writes `.run/art-exploration/weekend/packed/`, leaving `assets/art/` unchanged. It requires all seven actors and nineteen regions, preserves canonical pixels/timing/roots, and validates the fixed 6 MiB page layout, saved RGBA reconstruction, nonoverlap and gutters. Confirm exact agreement with the shipped output:
+The strict base baker writes `.run/art-exploration/weekend/packed/`, leaving `assets/art/` unchanged. It requires all seven actors and nineteen regions, preserves canonical pixels/timing/roots, and validates the fixed 6 MiB layout, saved RGBA reconstruction, nonoverlap and gutters. The later attack/projectile passes fill spare pixels in these pages. Run both stages before comparing with the current shipped output:
 
 ```sh
-for file in gameplay-actors-main.png gameplay-actors-common.png gameplay-environment.png gameplay.json; do
+python3 scripts/BakeEnemyAttackArt.py --base-art .run/art-exploration/weekend/packed --output .run/art-exploration/weekend/packed
+python3 scripts/BakeMagicProjectiles.py --output .run/art-exploration/weekend/packed
+for file in gameplay-actors-main.png gameplay-actors-common.png gameplay-environment.png gameplay.json enemy-attacks.json magic-projectiles.json; do
   cmp ".run/art-exploration/weekend/packed/$file" "assets/art/$file" || exit 1
 done
 ```
@@ -39,3 +41,7 @@ not the generated concept painting. The source bank stays outside runtime assets
 only the bounded half-size atlas is exported into the game. See the
 [integration record](../docs/border-tiles-integration.md) for unchanged playable
 bounds, resource accounting and in-game verification.
+
+## Enemy attacks and magic missiles
+
+`enemy-attacks-canonical.zip` retains the approved southwest attacks, three additional authored facings per enemy, the neutral aura loop, exact built-in ImageGen prompts/provenance and normalized fixed-root frames. `magic-projectiles-canonical.zip` retains three original eight-frame magical missile sheets, their prompts/provenance, head pivots and untouched base environment page. The ordered supplemental stages above reproduce all three current gameplay PNGs and both supplemental manifests while preserving every original frame and sampling gutter. They allocate no additional runtime textures. See [attack art](../docs/enemy-attack-art.md), [magic projectiles](../docs/magic-projectiles.md) and [runtime integration](../docs/enemy-attacks.md).

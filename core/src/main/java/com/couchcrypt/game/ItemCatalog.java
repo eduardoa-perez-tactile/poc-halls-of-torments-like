@@ -12,7 +12,7 @@ public final class ItemCatalog {
     public enum Stat {
         DAMAGE("damage"), ATTACK_SPEED("attack speed"), MOVE_SPEED("move speed"),
         MAX_HEALTH("max health"), DODGE_COOLDOWN("dodge cooldown"), REACH("sword reach"),
-        PROJECTILES("arrow"), PIERCE("arrow pierce"), AURA_DAMAGE("Soul Circle damage"),
+        PROJECTILES("arcane bolt"), PIERCE("bolt pierce"), AURA_DAMAGE("Soul Circle damage"),
         STORM_DAMAGE("Chain Storm damage"), PICKUP_RANGE("pickup range"),
         CRIT_CHANCE("critical chance"), CRIT_DAMAGE("critical damage"),
         DAMAGE_REDUCTION("damage reduction"), REGENERATION("health/s"),

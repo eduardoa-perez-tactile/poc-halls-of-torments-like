@@ -1,5 +1,7 @@
 # Gameplay art integration
 
+The [enemy-attack and magic-crossbow pass](enemy-attacks.md) adds authored four-facing Wraith/Brute/Cultist attacks, reusable aura sprites and three animated magic missile types in spare atlas space. It adds no GPU texture memory. The [border pass](border-tiles-integration.md) brings the combined accounted total including QR to 31.8699455 MiB.
+
 The [integrated border pass](border-tiles-integration.md) replaces the old floor/wall arrangement with the approved merged tiles, preserves the playable arena and adds a bounded 0.5 MiB managed page. Its native join checks and current texture totals supersede the historical floor/resource notes below.
 
 The later [sprite combat-feedback pass](combat-vfx.md) adds a bounded 0.5625 MiB VFX page, stronger weapon contacts and choice-round celebrations. Its measured combined texture total is 31.3699455 MiB; the original actor/environment bank below remains unchanged at 6 MiB.

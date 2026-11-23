@@ -190,8 +190,8 @@ public final class RunDetailsView {
             case VITALITY -> (int) world.equipment.maxHealth(player) + " maximum health";
             case EVASION -> "Dodge cooldown: " + tenths(world.equipment.dodgeCooldown(player)) + "s";
             case SWEEP -> signedPercent(world.equipment.reachMultiplier(player) - 1) + "% sword reach";
-            case MULTISHOT -> world.equipment.projectileCount(player) + " arrows per attack";
-            case PIERCE -> "Arrows pierce " + world.equipment.pierce(player) + (world.equipment.pierce(player) == 1 ? " extra target" : " extra targets");
+            case MULTISHOT -> world.equipment.projectileCount(player) + " arcane bolts per attack";
+            case PIERCE -> "Bolts pierce " + world.equipment.pierce(player) + (world.equipment.pierce(player) == 1 ? " extra target" : " extra targets");
             case AURA -> "Damage pulses every 0.7s";
             case STORM -> "Chains across " + (player.stormLevel + 1) + " targets every 2s";
             case MAGNET -> signedPercent(world.equipment.pickupMultiplier(player) - 1) + "% pickup attraction";

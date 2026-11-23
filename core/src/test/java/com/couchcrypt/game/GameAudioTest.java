@@ -41,6 +41,22 @@ class GameAudioTest {
         }
     }
 
+    @Test void committedEnemyAttacksHaveDistinctGatedCuesAndDoNotReplayAfterReset() {
+        Mixer mixer = new Mixer(); ArenaWorld world = new ArenaWorld();
+        try (Fixture f = new Fixture(mixer, world, true)) {
+            world.bruteSlams++; world.wraithDashes++; world.hostileShotsFired += 5;
+            f.audio.update(world, .016f);
+            assertEquals(List.of("brute-slam", "wraith-dash", "magic-cast"), mixer.played);
+            world.bruteSlams++; world.wraithDashes++; world.hostileShotsFired++;
+            f.audio.update(world, .01f);
+            assertEquals(3, mixer.played.size());
+            f.audio.update(world, .2f);
+            assertEquals(3, mixer.played.size(), "Gated crowded casts must not replay later");
+            f.audio.reset(world); f.audio.update(world, .2f);
+            assertEquals(3, mixer.played.size());
+        }
+    }
+
     @Test void trackedVoiceCapIncludesReplacementsAndPlayerDamageCanPreemptCrowdAudio() {
         Mixer mixer = new Mixer(); ArenaWorld world = new ArenaWorld();
         try (Fixture f = new Fixture(mixer, world, true)) {
@@ -94,7 +110,8 @@ class GameAudioTest {
 
     private static final class Mixer {
         static final String[] NAMES = {"sword", "arrow", "hit", "pickup", "level", "boss", "victory", "defeat",
-            "sword-hit", "bolt-hit", "critical", "dodge", "hurt", "death", "heal", "aura", "storm", "block"};
+            "sword-hit", "bolt-hit", "critical", "dodge", "hurt", "death", "heal", "aura", "storm", "block",
+            "wraith-dash", "brute-slam", "magic-cast"};
         final List<String> played = new ArrayList<>();
         final Map<Long, String> active = new HashMap<>();
         int maximumActive; long nextId;

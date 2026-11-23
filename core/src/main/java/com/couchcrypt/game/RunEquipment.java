@@ -261,7 +261,7 @@ public final class RunEquipment {
             if (!absolute) result.append('%');
             result.append(' ').append(switch (stat) {
                 case DAMAGE -> "DMG"; case ATTACK_SPEED -> "ATK SPD"; case MOVE_SPEED -> "MOVE"; case MAX_HEALTH -> "HP";
-                case DODGE_COOLDOWN -> "DODGE RED"; case REACH -> "REACH"; case PROJECTILES -> "ARROWS"; case PIERCE -> "PIERCE";
+                case DODGE_COOLDOWN -> "DODGE RED"; case REACH -> "REACH"; case PROJECTILES -> "BOLTS"; case PIERCE -> "PIERCE";
                 case AURA_DAMAGE -> "CIRCLE"; case STORM_DAMAGE -> "STORM"; case PICKUP_RANGE -> "PICKUP"; case CRIT_CHANCE -> "CRIT";
                 case CRIT_DAMAGE -> "CRIT DMG"; case DAMAGE_REDUCTION -> "DMG RED"; case REGENERATION -> "HP/s";
                 case LIFE_STEAL -> "LIFE STEAL"; case THORNS -> "THORNS"; case XP_GAIN -> "XP"; case KILL_HEAL -> "HP/KILL";

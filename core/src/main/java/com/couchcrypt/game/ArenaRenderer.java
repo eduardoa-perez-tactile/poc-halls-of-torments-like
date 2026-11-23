@@ -22,7 +22,6 @@ public final class ArenaRenderer implements Disposable {
     // Fixed SE/SW/NE/NW release landmarks, in untrimmed source pixels relative to the ground root.
     // Only the rendered origin moves; the simulation keeps its original projectile coordinates and trajectory.
     private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
-    private static final float[] CULTIST_ORIGIN = {17, 38, -4, 27, 15, 46, -17, 35};
     private static final float[] SOVEREIGN_ORIGIN = {37, 78, -12, 67, 18, 90, -35, 82};
     private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PROP_COUNT = 14;
     private final GameArt art;
@@ -241,7 +240,10 @@ public final class ArenaRenderer implements Disposable {
                 art.actor(ActorAnimation.actor(enemy.kind)), enemyScale(enemy));
             boolean arrival = enemy.spawnAge < art.vfx.duration(VfxArt.Animation.SPAWN)
                 && visible(camera, enemy.x, enemy.y, art.vfx.maxRadius(VfxArt.Animation.SPAWN) * spawnScale(enemy));
-            if (body || arrival) add(ENEMY, i, enemy.x, enemy.y);
+            boolean attack = enemy.attack != ArenaWorld.EnemyAttack.NONE
+                && visible(camera, enemy.x, enemy.y, art.enemyAttacks.actorRadius(enemy.kind)
+                    * art.actor(ActorAnimation.actor(enemy.kind)).pixelScale * enemyScale(enemy) + 20f);
+            if (body || arrival || attack) add(ENEMY, i, enemy.x, enemy.y);
         }
         for (int i = 0; i < world.players.length; i++) {
             ArenaWorld.Player player = world.players[i];
@@ -322,22 +324,13 @@ public final class ArenaRenderer implements Disposable {
     private void drawBolts(ArenaWorld world, OrthographicCamera camera) {
         for (ArenaWorld.Bolt bolt : world.bolts) {
             if (!bolt.active) continue;
-            ActorAnimation.Facing facing = ActorAnimation.facing(bolt.launchFacingX, bolt.launchFacingY, ActorAnimation.Facing.SE);
-            int origin = facing.ordinal() * 2;
-            float scale = art.actor(ActorAnimation.Actor.RANGER).pixelScale;
-            float x = screenX(bolt.x, bolt.y) + BOLT_ORIGIN[origin] * scale;
-            float y = screenY(bolt.x, bolt.y) + BOLT_ORIGIN[origin + 1] * scale;
-            if (!visibleProjected(camera, x, y, 36f)) continue;
-            float vx = screenX(bolt.vx, bolt.vy), vy = screenY(bolt.vx, bolt.vy);
-            float length = Math.max(.001f, (float) Math.sqrt(vx * vx + vy * vy));
-            float dx = vx / length, dy = vy / length;
-            batch.setColor(bolt.owner == 0 ? 1f : .45f, .76f, .34f, .32f);
-            line(x - dx * 31f, y - dy * 31f, x, y, 4.5f);
-            batch.setColor(bolt.owner == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO);
-            line(x - dx * 24f, y - dy * 24f, x, y, 2.2f);
-            batch.setColor(1f, .95f, .8f, 1f);
-            line(x, y, x - dx * 7f - dy * 3f, y - dy * 7f + dx * 3f, 2f);
-            line(x, y, x - dx * 7f + dy * 3f, y - dy * 7f - dx * 3f, 2f);
+            int origin = ActorAnimation.facing(bolt.launchFacingX, bolt.launchFacingY,
+                ActorAnimation.Facing.SE).ordinal() * 2;
+            float sourceScale = art.actor(ActorAnimation.Actor.RANGER).pixelScale;
+            float x = screenX(bolt.x, bolt.y) + BOLT_ORIGIN[origin] * sourceScale;
+            float y = screenY(bolt.x, bolt.y) + BOLT_ORIGIN[origin + 1] * sourceScale;
+            drawMagicProjectile(camera, MagicProjectileArt.Type.RANGER, bolt.age,
+                x, y, bolt.vx, bolt.vy, bolt.critical ? 1.4f : 1.2f);
         }
         batch.setColor(Color.WHITE);
     }
@@ -346,21 +339,37 @@ public final class ArenaRenderer implements Disposable {
         for (ArenaWorld.Shot shot : world.shots) {
             if (!shot.active) continue;
             boolean boss = shot.casterKind == ArenaWorld.EnemyKind.BOSS;
-            ActorAnimation.Facing facing = ActorAnimation.facing(shot.launchFacingX, shot.launchFacingY, ActorAnimation.Facing.SE);
+            ActorAnimation.Facing facing = ActorAnimation.facing(shot.launchFacingX,
+                shot.launchFacingY, ActorAnimation.Facing.SE);
             int origin = facing.ordinal() * 2;
-            float[] point = boss ? SOVEREIGN_ORIGIN : CULTIST_ORIGIN;
             float scale = art.actor(boss ? ActorAnimation.Actor.SOVEREIGN : ActorAnimation.Actor.CULTIST).pixelScale
                 * enemyScale(boss ? ArenaWorld.EnemyKind.BOSS : ArenaWorld.EnemyKind.CULTIST, shot.casterElite);
-            float x = screenX(shot.x, shot.y) + point[origin] * scale;
-            float y = screenY(shot.x, shot.y) + point[origin + 1] * scale;
-            float radius = Math.max(8f, shot.radius * 1.5f);
-            if (!visibleProjected(camera, x, y, radius * 1.5f)) continue;
-            batch.setColor(1f, .18f, .06f, .85f);
-            batch.draw(art.glow, x - radius * 1.5f, y - radius * 1.5f, radius * 3f, radius * 3f);
-            batch.setColor(1f, .68f, .24f, 1f);
-            batch.draw(art.pixel, x - 2.5f, y - 2.5f, 5f, 5f);
+            // The launch pose is a value snapshot: turning, death and pool reuse cannot move a missile's emitter.
+            float ox = boss ? SOVEREIGN_ORIGIN[origin] : art.enemyAttacks.muzzleX(ArenaWorld.EnemyKind.CULTIST, facing);
+            float oy = boss ? SOVEREIGN_ORIGIN[origin + 1] : art.enemyAttacks.muzzleY(ArenaWorld.EnemyKind.CULTIST, facing);
+            float x = screenX(shot.x, shot.y) + ox * scale;
+            float y = screenY(shot.x, shot.y) + oy * scale;
+            drawMagicProjectile(camera, boss ? MagicProjectileArt.Type.SOVEREIGN : MagicProjectileArt.Type.CULTIST,
+                shot.age, x, y, shot.vx, shot.vy, boss ? 1.5f : 1.15f);
         }
         batch.setColor(Color.WHITE);
+    }
+
+    private void drawMagicProjectile(OrthographicCamera camera, MagicProjectileArt.Type type,
+                                     float age, float x, float y, float vx, float vy, float scale) {
+        if (!visibleProjected(camera, x, y, art.projectiles.maxRadius(type) * scale + 24f)) return;
+        float dx = screenX(vx, vy), dy = screenY(vx, vy);
+        float length = Math.max(.001f, (float) Math.sqrt(dx * dx + dy * dy));
+        float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
+        dx /= length; dy /= length;
+        // The painted energy tail rotates with projected world velocity, never a screen-space target line.
+        for (int ghost = 2; ghost >= 1; ghost--) {
+            batch.setColor(1f, 1f, 1f, ghost == 1 ? .2f : .09f);
+            art.projectiles.draw(batch, type, age - ghost * .025f,
+                x - dx * ghost * 9f, y - dy * ghost * 9f, scale, angle);
+        }
+        batch.setColor(Color.WHITE);
+        art.projectiles.draw(batch, type, age, x, y, scale, angle);
     }
 
     private void drawHazards(ArenaWorld world, OrthographicCamera camera) {
@@ -390,21 +399,71 @@ public final class ArenaRenderer implements Disposable {
 
     private void drawGroundMarks(ArenaWorld world, OrthographicCamera camera) {
         for (ArenaWorld.Enemy enemy : world.enemies) {
-            if (!enemy.active || !visible(camera, enemy.x, enemy.y, 170f)) continue;
-            if (enemy.kind == ArenaWorld.EnemyKind.BOSS || enemy.elite) {
-                boolean boss = enemy.kind == ArenaWorld.EnemyKind.BOSS;
-                batch.setColor(1f, boss ? .2f : .64f, boss ? .15f : .24f, .7f);
-                ring(enemy.x, enemy.y, Math.max(32f, enemy.radius + 12f), 0f, 2f, 24);
-            } else if (enemy.kind == ArenaWorld.EnemyKind.CULTIST && enemy.windup > 0f) {
-                batch.setColor(1f, .62f, .16f, .7f);
-                ring(enemy.x, enemy.y, 30f, 0f, 1.5f, 20);
+            if (!enemy.active || enemy.attack == ArenaWorld.EnemyAttack.NONE) continue;
+            float age = enemy.attackAge;
+            if (enemy.attack == ArenaWorld.EnemyAttack.BRUTE_SLAM) {
+                if (!visible(camera, enemy.attackTargetX, enemy.attackTargetY, enemy.attackRadius + 80f)) continue;
+                if (age < ArenaWorld.BRUTE_STRIKE_END) {
+                    boolean windup = age < ArenaWorld.BRUTE_WINDUP;
+                    batch.setColor(1f, windup ? .68f : .24f, windup ? .25f : .16f, .82f);
+                    drawAura(world.elapsed, enemy.attackTargetX, enemy.attackTargetY,
+                        enemy.attackRadius, EnemyAttackArt.Layer.ALL);
+                }
+                float strikeAge = age - ArenaWorld.BRUTE_WINDUP;
+                if (strikeAge >= 0 && strikeAge < .3f) {
+                    float progress = strikeAge / .3f;
+                    batch.setColor(1f, .74f, .42f, (1f - progress) * .8f);
+                    ring(enemy.attackTargetX, enemy.attackTargetY, 12f + 54f * progress, 0f, 2.5f, 28);
+                    for (int mote = 0; mote < 6; mote++) {
+                        float a = mote * MathUtils.PI2 / 6f, r = 12f + 50f * progress;
+                        float x = enemy.attackTargetX + MathUtils.cos(a) * r;
+                        float y = enemy.attackTargetY + MathUtils.sin(a) * r;
+                        float lift = 10f * MathUtils.sin(progress * MathUtils.PI);
+                        batch.draw(art.glow, screenX(x, y) - 4f, screenY(x, y) + lift - 2f, 8f, 4f);
+                    }
+                }
+            } else if (enemy.attack == ArenaWorld.EnemyAttack.WRAITH_DASH
+                && age < ArenaWorld.WRAITH_WINDUP + ArenaWorld.WRAITH_DASH_SECONDS) {
+                // Three low, separate runes show the fixed lane without covering the tiles with a guide bar.
+                for (int rune = 1; rune <= 3; rune++) {
+                    float along = rune * .24f;
+                    float x = MathUtils.lerp(enemy.attackStartX, enemy.attackTargetX, along);
+                    float y = MathUtils.lerp(enemy.attackStartY, enemy.attackTargetY, along);
+                    if (!visible(camera, x, y, 40f)) continue;
+                    boolean windup = age < ArenaWorld.WRAITH_WINDUP;
+                    batch.setColor(1f, windup ? .68f : .28f, .25f, windup ? .55f : .3f);
+                    drawAura(world.elapsed + rune * .125f, x, y, 13f, EnemyAttackArt.Layer.ALL);
+                }
+            } else if (enemy.attack == ArenaWorld.EnemyAttack.CULTIST_CAST
+                && age >= ArenaWorld.CULTIST_WINDUP - .15f && age < ArenaWorld.CULTIST_WINDUP
+                && visible(camera, enemy.attackTargetX, enemy.attackTargetY, 50f)) {
+                batch.setColor(1f, .68f, .25f, .65f);
+                drawAura(world.elapsed, enemy.attackTargetX, enemy.attackTargetY, 18f, EnemyAttackArt.Layer.ALL);
             }
         }
         for (ArenaWorld.Player player : world.players) {
             if (!player.active || !player.alive || player.auraLevel <= 0
                 || !visible(camera, player.x, player.y, 180f)) continue;
-            batch.setColor(player.slot == 0 ? 1f : .4f, .8f, .65f, .16f);
-            ring(player.x, player.y, 100f + player.auraLevel * 20f, 0f, 1f, 28);
+            batch.setColor(.32f, .85f, .78f, .3f);
+            drawAura(world.elapsed, player.x, player.y, 100f + player.auraLevel * 20f, EnemyAttackArt.Layer.ALL);
+        }
+        batch.setColor(Color.WHITE);
+    }
+
+    private void drawAura(float age, float x, float y, float radius, EnemyAttackArt.Layer layer) {
+        art.enemyAttacks.drawAura(batch, age, screenX(x, y), screenY(x, y),
+            radius / art.enemyAttacks.auraGroundRadius(), layer);
+    }
+
+    private void drawEnemyAura(ArenaWorld.Enemy enemy, EnemyAttackArt.Layer layer) {
+        if (enemy.elite || enemy.kind == ArenaWorld.EnemyKind.BOSS) {
+            boolean boss = enemy.kind == ArenaWorld.EnemyKind.BOSS;
+            batch.setColor(boss ? 1f : .72f, boss ? .26f : .47f, boss ? .18f : 1f, .56f);
+            drawAura(enemy.animTime, enemy.x, enemy.y, Math.max(32f, enemy.radius + 12f), layer);
+        }
+        if (enemy.attack != ArenaWorld.EnemyAttack.NONE && enemy.windup > 0) {
+            batch.setColor(1f, .68f, .25f, .72f);
+            drawAura(enemy.attackAge, enemy.x, enemy.y, 29f * Math.min(1.4f, enemyScale(enemy)), layer);
         }
         batch.setColor(Color.WHITE);
     }
@@ -458,7 +517,8 @@ public final class ArenaRenderer implements Disposable {
                         float scale = (clip == VfxArt.Animation.SWORD_HIT ? 1.45f : 1.18f)
                             * (effect.critical ? 1.22f : 1f);
                         float rotation = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees - 25f;
-                        batch.setColor(Color.WHITE);
+                        if (clip == VfxArt.Animation.BOLT_HIT) batch.setColor(.55f, .92f, 1f, 1f);
+                        else batch.setColor(Color.WHITE);
                         art.vfx.draw(batch, clip, effect.maxTtl - effect.ttl, impactX, impactY,
                             scale, rotation, VfxArt.Layer.ALL);
                     } else {
@@ -627,18 +687,40 @@ public final class ArenaRenderer implements Disposable {
                 ArenaWorld.Enemy enemy = world.enemies[index];
                 float scale = enemyScale(enemy);
                 drawArrival(enemy, VfxArt.Layer.BACK);
+                drawEnemyAura(enemy, EnemyAttackArt.Layer.BACK);
                 // Original painted identities retain their own colours. Damage feedback is transient.
                 if (enemy.hitFlash > 0f) batch.setColor(1f, .8f, .63f, 1f);
                 else batch.setColor(Color.WHITE);
                 GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(enemy.kind));
                 ActorAnimation.State state = ActorAnimation.state(enemy);
-                int frame = actor.clip(state, ActorAnimation.facing(enemy, state)).frame(ActorAnimation.phase(enemy, state));
                 float recoil = MathUtils.sin(MathUtils.clamp(enemy.hitFlash / .12f, 0f, 1f) * MathUtils.PI)
                     * (enemy.kind == ArenaWorld.EnemyKind.BOSS ? 1.5f : enemy.kind == ArenaWorld.EnemyKind.BRUTE ? 4f : 8f);
                 // This short reaction moves only the paint. Ground root, shadow, sort and collision stay fixed.
-                drawFrameOffset(frame, enemy.x, enemy.y, actor.pixelScale * scale,
-                    screenX(enemy.hitDirectionX, enemy.hitDirectionY) * recoil,
-                    screenY(enemy.hitDirectionX, enemy.hitDirectionY) * recoil);
+                if (enemy.attack != ArenaWorld.EnemyAttack.NONE) {
+                    ActorAnimation.Facing facing = ActorAnimation.facing(enemy, state);
+                    float sx = screenX(enemy.x, enemy.y), sy = screenY(enemy.x, enemy.y);
+                    if (enemy.attack == ArenaWorld.EnemyAttack.WRAITH_DASH
+                        && enemy.attackAge >= ArenaWorld.WRAITH_WINDUP
+                        && enemy.attackAge < ArenaWorld.WRAITH_WINDUP + ArenaWorld.WRAITH_DASH_SECONDS) {
+                        for (int ghost = 2; ghost >= 1; ghost--) {
+                            batch.setColor(1f, 1f, 1f, ghost == 1 ? .24f : .12f);
+                            art.enemyAttacks.drawActor(batch, enemy.kind, facing, enemy.attackAge,
+                                sx - screenX(enemy.castFacingX, enemy.castFacingY) * ghost * 18f,
+                                sy - screenY(enemy.castFacingX, enemy.castFacingY) * ghost * 18f,
+                                actor.pixelScale * scale);
+                        }
+                        batch.setColor(Color.WHITE);
+                    }
+                    art.enemyAttacks.drawActor(batch, enemy.kind, facing, enemy.attackAge,
+                        sx + screenX(enemy.hitDirectionX, enemy.hitDirectionY) * recoil,
+                        sy + screenY(enemy.hitDirectionX, enemy.hitDirectionY) * recoil, actor.pixelScale * scale);
+                } else {
+                    int frame = actor.clip(state, ActorAnimation.facing(enemy, state)).frame(ActorAnimation.phase(enemy, state));
+                    drawFrameOffset(frame, enemy.x, enemy.y, actor.pixelScale * scale,
+                        screenX(enemy.hitDirectionX, enemy.hitDirectionY) * recoil,
+                        screenY(enemy.hitDirectionX, enemy.hitDirectionY) * recoil);
+                }
+                drawEnemyAura(enemy, EnemyAttackArt.Layer.FRONT);
                 drawArrival(enemy, VfxArt.Layer.FRONT);
                 if (enemy.elite && enemy.kind != ArenaWorld.EnemyKind.BOSS) {
                     float x = screenX(enemy.x, enemy.y), y = screenY(enemy.x, enemy.y) + actor.maxAbove * scale + 4f;
@@ -703,17 +785,18 @@ public final class ArenaRenderer implements Disposable {
     }
 
     private void drawMuzzle(ArenaWorld.Player player) {
-        if (player.hero != ArenaWorld.Hero.RANGER || player.attackAge >= .065f) return;
+        if (player.hero != ArenaWorld.Hero.RANGER || player.attackAge >= .1f) return;
         int origin = ActorAnimation.facing(player.attackFacingX, player.attackFacingY, ActorAnimation.Facing.SE).ordinal() * 2;
         float scale = art.actor(ActorAnimation.Actor.RANGER).pixelScale;
         float x = screenX(player.x, player.y) + BOLT_ORIGIN[origin] * scale;
         float y = screenY(player.x, player.y) + BOLT_ORIGIN[origin + 1] * scale;
-        float life = 1f - player.attackAge / .065f;
+        float life = 1f - player.attackAge / .1f;
         float dx = screenX(player.attackFacingX, player.attackFacingY), dy = screenY(player.attackFacingX, player.attackFacingY);
-        float length = Math.max(.001f, (float) Math.sqrt(dx * dx + dy * dy));
-        dx /= length; dy /= length;
-        batch.setColor(1f, .85f, .49f, life * .75f);
-        burst(x, y, dx, dy, 12f * life + 3f, 1.5f, 3);
+        float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
+        batch.setColor(.48f, .88f, 1f, life * .65f);
+        batch.draw(art.glow, x - 18f, y - 18f, 36f, 36f);
+        batch.setColor(1f, 1f, 1f, life * .85f);
+        art.projectiles.draw(batch, MagicProjectileArt.Type.RANGER, player.attackAge, x, y, .6f + life * .25f, angle);
         batch.setColor(Color.WHITE);
     }
 

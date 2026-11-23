@@ -8,12 +8,14 @@ import com.badlogic.gdx.utils.Disposable;
 public final class GameAudio implements Disposable {
     private static final int SWORD = 0, ARROW = 1, PICKUP = 3, LEVEL = 4, BOSS = 5, VICTORY = 6, DEFEAT = 7;
     private static final int SWORD_HIT = 8, BOLT_HIT = 9, CRITICAL = 10, DODGE = 11, HURT = 12,
-        DEATH = 13, HEAL = 14, AURA = 15, STORM = 16, BLOCK = 17;
+        DEATH = 13, HEAL = 14, AURA = 15, STORM = 16, BLOCK = 17,
+        WRAITH_DASH = 18, BRUTE_SLAM = 19, MAGIC_CAST = 20;
     private static final String[] NAMES = {"sword", "arrow", "hit", "pickup", "level", "boss", "victory", "defeat",
-        "sword-hit", "bolt-hit", "critical", "dodge", "hurt", "death", "heal", "aura", "storm", "block"};
+        "sword-hit", "bolt-hit", "critical", "dodge", "hurt", "death", "heal", "aura", "storm", "block",
+        "wraith-dash", "brute-slam", "magic-cast"};
     // Keep in sync with the offline mono exports; pitch is included in each tracked voice's lifetime.
     private static final float[] DURATIONS = {.17f, .095f, .10f, .17f, .55f, .65f, .75f, .55f,
-        .12f, .09f, .18f, .16f, .16f, .24f, .24f, .24f, .22f, .13f};
+        .12f, .09f, .18f, .16f, .16f, .24f, .24f, .24f, .22f, .13f, .18f, .20f, .16f};
     private static final int MAX_VOICES = 6, MAX_STARTS_PER_UPDATE = 4;
     private final Sound[] sounds = new Sound[NAMES.length];
     private final float[] gates = new float[NAMES.length];
@@ -22,7 +24,7 @@ public final class GameAudio implements Disposable {
     private final float[] voiceRemaining = new float[MAX_VOICES];
     private boolean enabled;
     private int sword, arrows, deaths, pickups, hits, level, swordHits, boltHits, criticalHits,
-        dodges, blocks, heals, auras, storms, starts, variation;
+        dodges, blocks, heals, auras, storms, wraithDashes, bruteSlams, hostileShots, starts, variation;
     private boolean boss;
     private ArenaWorld.Outcome outcome;
 
@@ -83,6 +85,9 @@ public final class GameAudio implements Disposable {
             if (world.boltHits != boltHits) play(BOLT_HIT, .36f, 3, .045f);
             if (world.criticalHits != criticalHits) play(CRITICAL, .35f, 3, .08f);
             if (world.blockedHits != blocks) play(BLOCK, .33f, 3, .13f);
+            if (world.bruteSlams != bruteSlams) play(BRUTE_SLAM, .36f, 3, .14f);
+            if (world.wraithDashes != wraithDashes) play(WRAITH_DASH, .27f, 2, .12f);
+            if (world.hostileShotsFired != hostileShots) play(MAGIC_CAST, .24f, 2, .12f);
             if (world.healsCollected != heals) play(HEAL, .30f, 3, .14f);
             if (world.enemyDeaths != deaths) play(DEATH, .20f, 1, .09f);
             if (world.stormCasts != storms) play(STORM, .28f, 2, .15f);
@@ -101,6 +106,7 @@ public final class GameAudio implements Disposable {
         swordHits = world.swordHits; boltHits = world.boltHits; criticalHits = world.criticalHits;
         dodges = world.dodges; blocks = world.blockedHits; heals = world.healsCollected;
         auras = world.auraPulses; storms = world.stormCasts;
+        wraithDashes = world.wraithDashes; bruteSlams = world.bruteSlams; hostileShots = world.hostileShotsFired;
         boss = world.bossSpawned; outcome = world.outcome;
     }
 

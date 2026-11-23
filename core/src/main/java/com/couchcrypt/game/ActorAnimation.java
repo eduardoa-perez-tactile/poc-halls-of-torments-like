@@ -57,6 +57,7 @@ public final class ActorAnimation {
     }
 
     public static State state(ArenaWorld.Enemy enemy) {
+        if (enemy.attack != ArenaWorld.EnemyAttack.NONE) return enemy.windup > 0 ? State.WINDUP : State.ATTACK;
         if ((enemy.kind == ArenaWorld.EnemyKind.CULTIST || enemy.kind == ArenaWorld.EnemyKind.BOSS)
             && enemy.releaseAge < RELEASE_SECONDS) return State.ATTACK;
         if (enemy.windup > 0) return State.WINDUP;
@@ -72,6 +73,7 @@ public final class ActorAnimation {
     }
 
     public static float phase(ArenaWorld.Enemy enemy, State state) {
+        if (enemy.attack != ArenaWorld.EnemyAttack.NONE) return enemy.attackAge;
         return switch (state) {
             case MOVE -> enemy.kind == ArenaWorld.EnemyKind.WRAITH ? enemy.animTime
                 : enemy.kind == ArenaWorld.EnemyKind.CULTIST

@@ -15,7 +15,7 @@ public final class HeroCatalog {
         "Once sworn to guard the crypt's gates, the Warden now descends to silence what escaped them.",
         skills(ArenaWorld.Hero.WARDEN));
     private static final Profile RANGER = new Profile(ArenaWorld.Hero.RANGER, "Ranger", "Ranged / Mobility",
-        "Fires arrows at nearby foes and moves swiftly to keep a distance.",
+        "Fires arcane bolts from a magic crossbow and moves swiftly to keep a distance.",
         "Following a trail of vanished souls, the Ranger hunts the darkness beneath the old kingdom.",
         skills(ArenaWorld.Hero.RANGER));
 

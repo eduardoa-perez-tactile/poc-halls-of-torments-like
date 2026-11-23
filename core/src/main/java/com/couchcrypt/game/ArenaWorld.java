@@ -19,6 +19,13 @@ public final class ArenaWorld {
         }
     }
     public enum EnemyKind { GHOUL, WRAITH, BRUTE, CULTIST, BOSS }
+    public enum EnemyAttack { NONE, WRAITH_DASH, BRUTE_SLAM, CULTIST_CAST }
+    public static final float WRAITH_WINDUP = .5f, WRAITH_DASH_SECONDS = .25f, WRAITH_ATTACK_SECONDS = 1.3f;
+    public static final float WRAITH_ATTACK_RANGE = 240f, WRAITH_DASH_RANGE = 285f, WRAITH_ATTACK_COOLDOWN = 2.6f;
+    public static final float BRUTE_WINDUP = .75f, BRUTE_STRIKE_END = .95f, BRUTE_ATTACK_SECONDS = 1.45f;
+    public static final float BRUTE_ATTACK_RANGE = 115f, BRUTE_SLAM_RADIUS = 55f, BRUTE_ATTACK_COOLDOWN = 2.8f;
+    public static final float CULTIST_WINDUP = .7f, CULTIST_RELEASE_END = .82f, CULTIST_ATTACK_SECONDS = 1.44f;
+    public static final float CULTIST_ATTACK_RANGE = 650f, CULTIST_ATTACK_COOLDOWN = 2.6f;
     public enum EffectKind { SLASH, HIT, DEATH, AURA, LIGHTNING, DODGE, COLLECT, BLOCK }
     public enum ImpactKind { SWORD, BOLT, MAGIC }
 
@@ -32,6 +39,7 @@ public final class ArenaWorld {
     public int swordSwings, arrowsFired, enemyDeaths, pickupsCollected, heroHits;
     /** Committed combat events, consumed independently by presentation/audio; never drive game rules. */
     public int swordHits, boltHits, criticalHits, dodges, blockedHits, healsCollected, auraPulses, stormCasts;
+    public int wraithDashes, bruteSlams, hostileShotsFired;
     public final Player[] players = {new Player(0), new Player(1)};
     public final Enemy[] enemies = new Enemy[MAX_ENEMIES];
     public final Bolt[] bolts = new Bolt[MAX_BOLTS];
@@ -72,6 +80,7 @@ public final class ArenaWorld {
         levelUpFxAge = 2; presentedChoiceRound = 0;
         swordSwings = arrowsFired = enemyDeaths = pickupsCollected = heroHits = 0;
         swordHits = boltHits = criticalHits = dodges = blockedHits = healsCollected = auraPulses = stormCasts = 0;
+        wraithDashes = bruteSlams = hostileShotsFired = 0;
         spawnCountdown = .65f;
         runSeed = 0x5a17c9e3 ^ (++runNumber * 0x45d9f3b); randomState = runSeed;
         progression.reset(); equipment.reset();
@@ -135,10 +144,12 @@ public final class ArenaWorld {
     }
 
     private static void resetPresentation(Enemy e) {
-        e.moving = false; e.moveTime = e.castDuration = 0; e.castAge = e.releaseAge = 1;
+        e.moving = false; e.moveTime = e.castDuration = e.windup = 0; e.castAge = e.releaseAge = 1;
         e.facingX = e.castFacingX = 0; e.facingY = e.castFacingY = -1;
         e.hitDirectionX = e.hitDirectionY = 0;
         e.spawnAge = 1;
+        e.attack = EnemyAttack.NONE; e.attackAge = 2; e.attackHitMask = 0;
+        e.attackStartX = e.attackStartY = e.attackTargetX = e.attackTargetY = e.attackRadius = e.dashDistance = 0;
     }
 
     public void clearInputs() {
@@ -290,8 +301,7 @@ public final class ArenaWorld {
                 if (e.active) {
                     e.stunTime = Math.max(e.stunTime, e.kind == EnemyKind.BOSS ? .02f : .16f);
                     float knockback = e.kind == EnemyKind.BOSS ? 3 : e.kind == EnemyKind.BRUTE ? 12 : 25;
-                    e.x = clamp(e.x + ex / distance * knockback, -HALF_WIDTH + e.radius, HALF_WIDTH - e.radius);
-                    e.y = clamp(e.y + ey / distance * knockback, -HALF_HEIGHT + e.radius, HALF_HEIGHT - e.radius);
+                    knockbackEnemy(e, ex / distance * knockback, ey / distance * knockback);
                 }
             }
             p.attackCooldown = p.hero.attackInterval / equipment.attackRate(p);
@@ -302,7 +312,7 @@ public final class ArenaWorld {
                 Bolt b = freeBolt(); if (b == null) break;
                 if (i == 0) beginAttackPresentation(p);
                 float direction = angle + (i - (count - 1) * .5f) * .13f;
-                b.active = true; b.x = p.x; b.y = p.y;
+                b.active = true; b.x = p.x; b.y = p.y; b.age = 0;
                 b.launchFacingX = p.attackFacingX; b.launchFacingY = p.attackFacingY;
                 b.vx = (float) Math.cos(direction) * 760; b.vy = (float) Math.sin(direction) * 760;
                 b.critical = rollCritical(p);
@@ -348,35 +358,169 @@ public final class ArenaWorld {
     private void updateEnemies() {
         for (Enemy e : enemies) {
             if (!e.active) continue;
-            e.moving = false; e.castAge = Math.min(1, e.castAge + STEP);
+            e.moving = false; e.castAge = Math.min(2, e.castAge + STEP);
             e.spawnAge = Math.min(1, e.spawnAge + STEP);
             e.releaseAge = Math.min(1, e.releaseAge + STEP);
             float previousX = e.x, previousY = e.y;
             e.animTime += STEP; e.hitFlash = Math.max(0, e.hitFlash - STEP);
             e.stunTime = Math.max(0, e.stunTime - STEP); e.attackCooldown = Math.max(0, e.attackCooldown - STEP);
             Player target = nearestPlayer(e.x, e.y); if (target == null) { e.vx = e.vy = 0; continue; }
-            faceTarget(e, target);
-            if (e.kind == EnemyKind.BOSS) {
-                bossPhase = e.health <= e.maxHealth * .5f ? 2 : 1;
-                if (e.attackCooldown <= 0) bossAttack(e, target);
-            } else if (e.kind == EnemyKind.CULTIST && e.attackCooldown <= 0) {
-                e.windup = .7f; e.attackCooldown = 2.6f;
-                beginCastPresentation(e, .7f);
+            if (e.attack != EnemyAttack.NONE) {
+                // The target may move or change slots; an authored action never turns to chase it.
+                e.facingX = e.castFacingX; e.facingY = e.castFacingY;
+                updateEnemyAttack(e);
+            } else {
+                faceTarget(e, target);
+                if (e.kind == EnemyKind.BOSS) {
+                    bossPhase = e.health <= e.maxHealth * .5f ? 2 : 1;
+                    if (e.attackCooldown <= 0) bossAttack(e, target);
+                    if (e.windup > 0) {
+                        e.windup = Math.max(0, e.windup - STEP); e.vx = e.vy = 0;
+                    } else if (e.stunTime <= 0) moveEnemy(e, target);
+                } else if (e.stunTime <= 0 && e.attackCooldown <= 0 && attackInRange(e, target)) {
+                    beginEnemyAttack(e, target);
+                } else if (e.stunTime <= 0) moveEnemy(e, target);
             }
-            if (e.windup > 0) {
-                e.windup = Math.max(0, e.windup - STEP); e.vx = e.vy = 0;
-                if (e.windup <= 0 && e.kind == EnemyKind.CULTIST) {
-                    // Cultists still aim at the live target on release, not the earlier cast snapshot.
-                    e.castFacingX = e.facingX; e.castFacingY = e.facingY;
-                    e.releaseAge = 0;
-                    fireShot(e, target.x - e.x, target.y - e.y, 180, e.damage);
-                }
-            } else if (e.stunTime <= 0) moveEnemy(e, target);
             e.moving = e.x != previousX || e.y != previousY;
             if (e.moving) e.moveTime += STEP;
-            for (Player p : players) if (e.active && p.active && p.alive && distanceSquared(p.x, p.y, e.x, e.y) < square(PLAYER_RADIUS + e.radius))
-                hurt(p, e.damage, e);
+            // Wraith/Brute damage is exclusively the telegraphed strike, including during recovery.
+            if (e.kind == EnemyKind.GHOUL || e.kind == EnemyKind.BOSS
+                || e.kind == EnemyKind.CULTIST && e.attack == EnemyAttack.NONE)
+                for (Player p : players) if (e.active && p.active && p.alive
+                    && distanceSquared(p.x, p.y, e.x, e.y) < square(PLAYER_RADIUS + e.radius))
+                    hurt(p, e.damage, e);
         }
+    }
+
+    private static boolean attackInRange(Enemy e, Player target) {
+        float range = switch (e.kind) {
+            case WRAITH -> WRAITH_ATTACK_RANGE;
+            case BRUTE -> BRUTE_ATTACK_RANGE;
+            case CULTIST -> CULTIST_ATTACK_RANGE;
+            default -> 0;
+        };
+        return range > 0 && distanceSquared(e.x, e.y, target.x, target.y) <= square(range);
+    }
+
+    private static void beginEnemyAttack(Enemy e, Player target) {
+        e.attack = switch (e.kind) {
+            case WRAITH -> EnemyAttack.WRAITH_DASH;
+            case BRUTE -> EnemyAttack.BRUTE_SLAM;
+            case CULTIST -> EnemyAttack.CULTIST_CAST;
+            default -> EnemyAttack.NONE;
+        };
+        e.attackAge = 0; e.attackHitMask = 0;
+        e.attackStartX = e.x; e.attackStartY = e.y; e.vx = e.vy = 0;
+        e.attackTargetX = target.x; e.attackTargetY = target.y; e.attackRadius = 0;
+        float windup = switch (e.attack) {
+            case WRAITH_DASH -> WRAITH_WINDUP;
+            case BRUTE_SLAM -> BRUTE_WINDUP;
+            default -> CULTIST_WINDUP;
+        };
+        e.windup = windup; beginCastPresentation(e, windup);
+        switch (e.attack) {
+            case WRAITH_DASH -> {
+                e.attackCooldown = WRAITH_ATTACK_COOLDOWN;
+                e.dashDistance = Math.min(WRAITH_DASH_RANGE,
+                    Math.max(160, length(target.x - e.x, target.y - e.y) + 55));
+                e.attackTargetX = clamp(e.x + e.castFacingX * e.dashDistance,
+                    -HALF_WIDTH + e.radius, HALF_WIDTH - e.radius);
+                e.attackTargetY = clamp(e.y + e.castFacingY * e.dashDistance,
+                    -HALF_HEIGHT + e.radius, HALF_HEIGHT - e.radius);
+            }
+            case BRUTE_SLAM -> {
+                e.attackCooldown = BRUTE_ATTACK_COOLDOWN; e.attackRadius = BRUTE_SLAM_RADIUS;
+                ActorAnimation.Facing facing = ActorAnimation.facing(e.castFacingX, e.castFacingY, ActorAnimation.Facing.SE);
+                e.attackTargetX = e.x + EnemyAttackGeometry.bruteSlamX(facing, e.elite);
+                e.attackTargetY = e.y + EnemyAttackGeometry.bruteSlamY(facing, e.elite);
+            }
+            case CULTIST_CAST -> e.attackCooldown = CULTIST_ATTACK_COOLDOWN;
+            default -> { }
+        }
+    }
+
+    private void updateEnemyAttack(Enemy e) {
+        float previousAge = e.attackAge;
+        e.attackAge += STEP; e.vx = e.vy = 0;
+        // A boundary may accumulate a fraction below its authored value. Snap once so
+        // damage, body frames and renderer cue colours switch in the same fixed tick.
+        float windup = e.attack == EnemyAttack.WRAITH_DASH ? WRAITH_WINDUP
+            : e.attack == EnemyAttack.BRUTE_SLAM ? BRUTE_WINDUP : CULTIST_WINDUP;
+        if (Math.abs(e.attackAge - windup) < .000001f) e.attackAge = windup;
+        if (e.attack == EnemyAttack.WRAITH_DASH
+            && Math.abs(e.attackAge - (WRAITH_WINDUP + WRAITH_DASH_SECONDS)) < .000001f)
+            e.attackAge = WRAITH_WINDUP + WRAITH_DASH_SECONDS;
+        float duration;
+        switch (e.attack) {
+            case WRAITH_DASH -> {
+                duration = WRAITH_ATTACK_SECONDS;
+                e.windup = remainingWindup(WRAITH_WINDUP, e.attackAge);
+                float dashTime = Math.max(0, Math.min(e.attackAge, WRAITH_WINDUP + WRAITH_DASH_SECONDS)
+                    - Math.max(previousAge, WRAITH_WINDUP));
+                if (dashTime > 0) {
+                    if (previousAge <= WRAITH_WINDUP) wraithDashes++;
+                    float oldX = e.x, oldY = e.y;
+                    float speed = e.dashDistance / WRAITH_DASH_SECONDS;
+                    e.x = clamp(e.x + e.castFacingX * speed * dashTime, -HALF_WIDTH + e.radius, HALF_WIDTH - e.radius);
+                    e.y = clamp(e.y + e.castFacingY * speed * dashTime, -HALF_HEIGHT + e.radius, HALF_HEIGHT - e.radius);
+                    e.vx = (e.x - oldX) / STEP; e.vy = (e.y - oldY) / STEP;
+                    for (Player p : players) {
+                        int bit = 1 << p.slot;
+                        if ((e.attackHitMask & bit) != 0 || !p.active || !p.alive
+                            || segmentDistanceSquared(oldX, oldY, e.x, e.y, p.x, p.y) > square(e.radius + PLAYER_RADIUS)) continue;
+                        // An invulnerable Dodge consumes this crossing too; no delayed contact after it ends.
+                        e.attackHitMask |= bit; hurt(p, e.damage, e, e.castFacingX, e.castFacingY);
+                        if (!e.active) break; // Thorns may kill the striking enemy.
+                    }
+                }
+            }
+            case BRUTE_SLAM -> {
+                duration = BRUTE_ATTACK_SECONDS;
+                e.windup = remainingWindup(BRUTE_WINDUP, e.attackAge);
+                if (previousAge + .000001f < BRUTE_WINDUP && e.attackAge + .000001f >= BRUTE_WINDUP) {
+                    e.releaseAge = 0; bruteSlams++;
+                    for (Player p : players) if (p.active && p.alive
+                        && distanceSquared(p.x, p.y, e.attackTargetX, e.attackTargetY) <= square(e.attackRadius + PLAYER_RADIUS)) {
+                        e.attackHitMask |= 1 << p.slot;
+                        hurt(p, e.damage, e, p.x - e.attackTargetX, p.y - e.attackTargetY);
+                        if (!e.active) break;
+                    }
+                }
+            }
+            case CULTIST_CAST -> {
+                duration = CULTIST_ATTACK_SECONDS;
+                e.windup = remainingWindup(CULTIST_WINDUP, e.attackAge);
+                if (previousAge + .000001f < CULTIST_WINDUP && e.attackAge + .000001f >= CULTIST_WINDUP) {
+                    e.releaseAge = 0;
+                    fireShot(e, e.castFacingX, e.castFacingY, 180, e.damage);
+                }
+            }
+            default -> { return; }
+        }
+        if (e.attackAge + .000001f >= duration) {
+            e.attack = EnemyAttack.NONE; e.attackAge = duration; e.windup = 0;
+        }
+    }
+
+    private static void knockbackEnemy(Enemy e, float dx, float dy) {
+        float previousX = e.x, previousY = e.y;
+        e.x = clamp(e.x + dx, -HALF_WIDTH + e.radius, HALF_WIDTH - e.radius);
+        e.y = clamp(e.y + dy, -HALF_HEIGHT + e.radius, HALF_HEIGHT - e.radius);
+        boolean warningMoves = e.attack == EnemyAttack.WRAITH_DASH && e.attackAge < WRAITH_WINDUP + WRAITH_DASH_SECONDS
+            || e.attack == EnemyAttack.BRUTE_SLAM && e.attackAge < BRUTE_WINDUP
+            || e.attack == EnemyAttack.CULTIST_CAST && e.attackAge < CULTIST_WINDUP;
+        if (warningMoves) {
+            // Physical displacement moves the warned geometry with its origin, never its aim.
+            // Already committed slam impacts and released shots retain their world positions.
+            float actualX = e.x - previousX, actualY = e.y - previousY;
+            e.attackStartX += actualX; e.attackStartY += actualY;
+            e.attackTargetX += actualX; e.attackTargetY += actualY;
+        }
+    }
+
+    private static float remainingWindup(float duration, float age) {
+        float remaining = duration - age;
+        return remaining > .000001f ? remaining : 0;
     }
 
     private static void faceTarget(Enemy e, Player target) {
@@ -422,7 +566,7 @@ public final class ArenaWorld {
     private void updateBolts() {
         for (Bolt b : bolts) {
             if (!b.active) continue;
-            float oldX = b.x, oldY = b.y; b.x += b.vx * STEP; b.y += b.vy * STEP; b.ttl -= STEP;
+            float oldX = b.x, oldY = b.y; b.age += STEP; b.x += b.vx * STEP; b.y += b.vy * STEP; b.ttl -= STEP;
             for (int i = 0; i < enemies.length; i++) {
                 Enemy e = enemies[i]; long bit = 1L << i;
                 if (!e.active || (b.hitMask & bit) != 0 || segmentDistanceSquared(oldX, oldY, b.x, b.y, e.x, e.y) > square(e.radius + 5)) continue;
@@ -442,19 +586,19 @@ public final class ArenaWorld {
     private void fireShot(Enemy caster, float dx, float dy, float speed, float damage) {
         for (Shot shot : shots) {
             if (shot.active) continue;
-            float distance = length(dx, dy); shot.active = true; shot.x = caster.x; shot.y = caster.y;
+            float distance = length(dx, dy); shot.active = true; shot.x = caster.x; shot.y = caster.y; shot.age = 0;
             // Value snapshots survive caster death and enemy-pool reuse; only drawing reads them.
             shot.casterKind = caster.kind; shot.casterElite = caster.elite;
             shot.launchFacingX = caster.castFacingX; shot.launchFacingY = caster.castFacingY;
             shot.vx = dx / distance * speed; shot.vy = dy / distance * speed;
-            shot.ttl = 5; shot.damage = damage; shot.radius = 10; return;
+            shot.ttl = 5; shot.damage = damage; shot.radius = 10; hostileShotsFired++; return;
         }
     }
 
     private void updateShots() {
         for (Shot s : shots) {
             if (!s.active) continue;
-            float oldX = s.x, oldY = s.y; s.x += s.vx * STEP; s.y += s.vy * STEP; s.ttl -= STEP;
+            float oldX = s.x, oldY = s.y; s.age += STEP; s.x += s.vx * STEP; s.y += s.vy * STEP; s.ttl -= STEP;
             for (Player p : players) if (p.active && p.alive && segmentDistanceSquared(oldX, oldY, s.x, s.y, p.x, p.y) <= square(PLAYER_RADIUS + s.radius)) {
                 hurt(p, s.damage, null, s.vx, s.vy); s.active = false; break;
             }
@@ -695,6 +839,31 @@ public final class ArenaWorld {
         }
     }
 
+    /** Profile-only short attack composition; normal encounter spawning never calls this. */
+    public void debugEnemyAttackEncounter() {
+        if (outcome != Outcome.RUNNING || choicePending() || bossSpawned || activePlayerCount() == 0) return;
+        for (Enemy e : enemies) e.active = false;
+        for (Bolt b : bolts) b.active = false;
+        for (Shot s : shots) s.active = false;
+        for (Hazard h : hazards) h.active = false;
+        for (Effect e : effects) e.active = false;
+        for (Pickup p : pickups) p.active = false;
+        activeEnemies = 0; spawnCountdown = 12;
+        Player anchor = players[0].active && players[0].alive ? players[0] : players[1];
+        for (Player p : players) if (p.active && p.alive) {
+            p.health = equipment.maxHealth(p); p.invulnerable = 12; p.attackCooldown = .3f;
+        }
+        for (int i = 0; i < 3; i++) {
+            EnemyKind kind = i == 0 ? EnemyKind.WRAITH : i == 1 ? EnemyKind.BRUTE : EnemyKind.CULTIST;
+            Enemy e = spawn(kind, false, anchor, i);
+            if (e == null) continue;
+            e.x = clamp(anchor.x + (i == 0 ? -10 : i == 1 ? 85 : 290), -HALF_WIDTH + e.radius, HALF_WIDTH - e.radius);
+            e.y = clamp(anchor.y + (i == 0 ? 220 : i == 1 ? -50 : 10), -HALF_HEIGHT + e.radius, HALF_HEIGHT - e.radius);
+            e.health = e.maxHealth = 600; e.attackCooldown = .25f + i * .35f; e.spawnAge = 1;
+            faceTarget(e, anchor);
+        }
+    }
+
     /** Developer fixture: start the final encounter immediately without a survival playthrough. */
     public void debugStartBoss() {
         if (bossSpawned || outcome != Outcome.RUNNING || activePlayerCount() == 0) return;
@@ -802,6 +971,10 @@ public final class ArenaWorld {
     }
     public static final class Enemy {
         public boolean active, elite, moving;
+        public EnemyAttack attack = EnemyAttack.NONE;
+        public float attackAge = 2, attackStartX, attackStartY, attackTargetX, attackTargetY, attackRadius;
+        public int attackHitMask;
+        private float dashDistance;
         public EnemyKind kind = EnemyKind.GHOUL;
         public int soulPercent = 100;
         public float x, y, health, maxHealth, animTime, hitFlash, vx, vy;
@@ -812,7 +985,7 @@ public final class ArenaWorld {
     }
     public static final class Bolt {
         public boolean active, critical;
-        public float x, y, vx, vy, ttl, damage = 16;
+        public float x, y, vx, vy, ttl, age, damage = 16;
         public float launchFacingX, launchFacingY;
         public int owner, pierce;
         public long hitMask;
@@ -821,7 +994,7 @@ public final class ArenaWorld {
     public static final class Shot {
         public boolean active, casterElite;
         public EnemyKind casterKind;
-        public float x, y, vx, vy, ttl, damage, radius, launchFacingX, launchFacingY;
+        public float x, y, vx, vy, ttl, age, damage, radius, launchFacingX, launchFacingY;
     }
     public static final class Hazard { public boolean active; public float x, y, radius, warning, ttl, damage; }
     public static final class Effect {
