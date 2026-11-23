@@ -1,5 +1,7 @@
 # Gameplay art integration
 
+The [integrated border pass](border-tiles-integration.md) replaces the old floor/wall arrangement with the approved merged tiles, preserves the playable arena and adds a bounded 0.5 MiB managed page. Its native join checks and current texture totals supersede the historical floor/resource notes below.
+
 The later [sprite combat-feedback pass](combat-vfx.md) adds a bounded 0.5625 MiB VFX page, stronger weapon contacts and choice-round celebrations. Its measured combined texture total is 31.3699455 MiB; the original actor/environment bank below remains unchanged at 6 MiB.
 
 The 13 November 2026 art milestone replaces the temporary arena kit with the selected original crypt environment and seven actors. Four separately authored diagonal facings preserve asymmetric equipment. Warden uses the corrected northeast walk and northwest sword strike; Ranger retains the compact crossbow without introducing a reload delay. Existing combat cadence, damage, collision, controls and playable bounds remain unchanged.

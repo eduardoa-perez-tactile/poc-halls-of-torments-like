@@ -10,6 +10,7 @@ import com.badlogic.gdx.utils.JsonReader;
 public final class GameArt implements Disposable {
     public final GameplayAtlas metadata;
     public final VfxArt vfx;
+    public final BorderTileArt borders;
     public final TextureRegion shadow, glow, pixel, soul;
     public final TextureRegion[] floors = new TextureRegion[3];
     public final long textureBytes;
@@ -21,7 +22,9 @@ public final class GameArt implements Disposable {
         metadata = new GameplayAtlas(new JsonReader().parse(Gdx.files.internal("art/gameplay.json")));
         pages = new Texture[metadata.pages.length];
         vfx = new VfxArt();
-        textureBytes = metadata.textureBytes + vfx.textureBytes;
+        try { borders = new BorderTileArt(); }
+        catch (RuntimeException | Error failure) { vfx.dispose(); throw failure; }
+        textureBytes = metadata.textureBytes + vfx.textureBytes + borders.textureBytes;
         try {
             for (int i = 0; i < pages.length; i++) {
                 GameplayAtlas.Page page = metadata.pages[i];
@@ -56,5 +59,6 @@ public final class GameArt implements Disposable {
     @Override public void dispose() {
         for (Texture page : pages) if (page != null) page.dispose();
         vfx.dispose();
+        borders.dispose();
     }
 }

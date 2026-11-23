@@ -330,12 +330,28 @@ def copy_package(input_folder, review_folder, package_folder, report):
     (package_folder/"pack-report.json").write_text(json.dumps(packaged,indent=2)+"\n")
 
 
+def export_runtime(review_folder, output_folder, atlas):
+    """Only the bounded half-size page enters the game's managed asset bank."""
+    if not atlas["packed"] or atlas["size"] != [512, 256]:
+        raise ValueError("Runtime border atlas must fit the 512x256 texture budget")
+    output_folder.mkdir(parents=True, exist_ok=True)
+    filename = "arena-border.png"
+    shutil.copyfile(review_folder/atlas["file"], output_folder/filename)
+    metadata = {"version": 1, "file": filename,
+                **{key: atlas[key] for key in ("size", "tileWidth", "tileHeight", "anchor",
+                                                "padding", "edgeExtrusion", "tiles")},
+                "sourceAtlasSha256": atlas["sha256"]}
+    (output_folder/"arena-border.json").write_text(json.dumps(metadata, indent=2)+"\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, default=ROOT/"art-source/border-tiles-v1")
     parser.add_argument("--output", type=Path, default=ROOT/".run/border-tiles-review")
     parser.add_argument("--package-output", type=Path,
                         help="Copy only atlas PNG/JSON files and a package-scoped report here")
+    parser.add_argument("--runtime-output", type=Path,
+                        help="Export the half-MiB managed border page and runtime metadata here")
     args = parser.parse_args()
     try:
         manifest, records, images = load(args.input)
@@ -378,6 +394,8 @@ def main():
     (args.output/"pack-report.json").write_text(json.dumps(report,indent=2)+"\n")
     if args.package_output:
         copy_package(args.input,args.output,args.package_output,report)
+    if args.runtime_output:
+        export_runtime(args.output, args.runtime_output, half)
     print(json.dumps({"output":str(args.output),"atlasBytes":atlas["rgbaGpuBytes"],
                       "halfScaleCandidate":{key:half[key] for key in
                           ("packed","size","rgbaGpuBytes","reason") if key in half},

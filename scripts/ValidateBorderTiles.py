@@ -176,6 +176,8 @@ def main():
     parser.add_argument("--input", type=Path, default=ROOT/"art-source/border-tiles-v1")
     parser.add_argument("--review", type=Path, default=ROOT/".run/border-tiles-review")
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--require-standalone", action="store_true",
+                        help="Also require no runtime changes against develop (initial art review only)")
     args = parser.parse_args()
     manifest_path = args.input/"tiles.json"
     manifest = json.loads(manifest_path.read_text())
@@ -222,7 +224,8 @@ def main():
     changed = subprocess.check_output(["git", "diff", "--name-only", "develop"], cwd=ROOT, text=True).splitlines()
     changed += subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard"], cwd=ROOT, text=True).splitlines()
     runtime = [name for name in changed if name.startswith(("core/", "android/", "desktop/", "assets/"))]
-    assert not runtime, "Runtime code/assets changed: " + repr(runtime)
+    if args.require_standalone:
+        assert not runtime, "Runtime code/assets changed: " + repr(runtime)
     report = {"status": "passed-structural-and-pixel-checks", "independent": True,
               "renderSource": "Exported tile PNGs only, never painted master", "tiles": tile_results,
               "atlases": atlases, "maps": maps, "smallAndThinFixtures": fixtures, "halfScaleMap": half_map,
