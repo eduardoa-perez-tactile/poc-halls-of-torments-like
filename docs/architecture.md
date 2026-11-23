@@ -12,6 +12,8 @@ Session identifiers isolate browser reconnect tokens across app restarts. This i
 
 The Android launcher supplies an optional advertised host through the joinHost intent extra. On a physical TV, local IPv4 discovery supplies the address. During emulator development, the Python launcher forwards an ephemeral loopback ADB port and serves a bounded streaming relay on the computer's LAN port 8787. This keeps QR links usable by real phones without depending on the emulator's isolated address.
 
+On Android Emulator hardware (`ranchu`/`goldfish`), an explicit `joinHost` and its port are retained in local preferences and restored on subsequent launches without extras. An explicit empty host clears that override. Physical TV address discovery is unchanged. The development relay repairs a missing owned ADB listener on connection failure, serializes concurrent repairs, uses finite connection/ADB timeouts, and preserves HTTP/WebSocket bytes. Healthy requests perform no ADB work. Recovery failure returns HTTP 503 and a relay diagnostic instead of an empty reply. Changes to the Mac's LAN address still require restarting the helper.
+
 LibGDX uses a fixed logical 1920x1080 FitViewport with safe margins. The UI is laid out once per screen; geometric D-pad navigation selects enabled controls, and modals preserve/restore focus. Desktop supports keyboard and mouse. Android supports D-pad/OK/Back and uses immersive landscape rendering with touchscreen optional and the TV launcher declared.
 
 Resources are shared across screens. File textures and retained font atlas data support Android GL context restoration; QR textures are regenerated on resume and disposed on replacement. Server threads are stopped and GPU resources disposed at application shutdown.
