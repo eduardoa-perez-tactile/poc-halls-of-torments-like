@@ -52,3 +52,14 @@ and pixel regions, add no texture or retained Pixmap, and create no frame-loop o
 
 The old short player-colour marker below living heroes is removed. Actual downed
 revival progress, ally guidance and combat ground telegraphs are retained.
+
+
+## Weapon reach and Warden sweep readability (2026-11-23)
+
+Living heroes have a quiet, thin projected ground ring at the exact primary
+acquisition radius; Warden reach upgrades/gear apply immediately. Ranger's 800-unit
+radius is much wider than the close camera, so only intersecting boundary portions
+are visible. The ring has no fill, glow or spikes and reuses the existing pixel.
+Warden's cosmetic slash now lasts 0.38 seconds instead of 0.18, spending 70% of that
+window sweeping and the rest fading. A new swing replaces an old same-player trail
+at high haste; damage, attack cadence and committed aim remain unchanged.

@@ -24,6 +24,49 @@ class CombatVfxStateTest {
         assertEquals(1, full.swordHits); assertEquals(ArenaWorld.MAX_EFFECTS, full.effects.length);
     }
 
+    @Test void attackIndicatorRangeTracksGearAndSkillsAndMatchesPrimaryAcquisition() {
+        ArenaWorld world = solo();
+        ArenaWorld.Player player = world.players[0];
+        assertEquals(160f, world.primaryAttackRange(player));
+        player.cleaveMultiplier = 1.4f;
+        world.equipment.equip(0, 6, ItemCatalog.byId("farreach_gauntlets"));
+        float reach = 160f * 1.4f * 1.15f;
+        assertEquals(reach, world.primaryAttackRange(player), .0001f);
+        ArenaWorld.Enemy target = enemy(world, reach + 1f, 1000);
+        world.update(ArenaWorld.STEP);
+        assertEquals(0, world.swordSwings, "Enemy centers outside the indicated acquisition radius do not start a swing");
+        target.x = reach - 1f;
+        world.update(ArenaWorld.STEP);
+        assertEquals(1, world.swordSwings);
+        assertEquals(reach, slash(world).radius, .0001f);
+        player.hero = ArenaWorld.Hero.RANGER;
+        assertEquals(800f, world.primaryAttackRange(player), "Sword reach gear and ranks do not exaggerate Ranger targeting range");
+    }
+
+    @Test void longerSlashKeepsItsCommittedOriginAndAimWithoutSlowingHasteAttacksOrStackingTrails() {
+        ArenaWorld world = solo();
+        ArenaWorld.Player player = world.players[0]; player.attackRateMultiplier = 3f;
+        ArenaWorld.Enemy target = enemy(world, 80, 10000);
+        world.update(ArenaWorld.STEP);
+        ArenaWorld.Effect first = slash(world);
+        assertTrue(first.maxTtl >= .35f && first.maxTtl <= .4f, "The visible sweep needs enough reading time");
+        assertEquals(.7f / 3f, player.attackCooldown, .0001f);
+        assertEquals(9972f, target.health, .0001f);
+        float angle = first.angle, x = first.x, y = first.y;
+        world.setInput(0, 0, 1, false);
+        world.update(.1f); world.update(.1f);
+        assertTrue(first.active, "The trail remains visible beyond its former 0.18-second lifetime");
+        assertEquals(angle, first.angle); assertEquals(x, first.x); assertEquals(y, first.y);
+        assertTrue(player.y > 0); assertEquals(1, world.swordSwings);
+        world.update(.05f);
+        assertEquals(2, world.swordSwings, "A longer cosmetic sweep must not postpone the next haste attack");
+        assertEquals(9944f, target.health, .0001f);
+        int trails = 0;
+        for (ArenaWorld.Effect effect : world.effects)
+            if (effect.active && effect.kind == ArenaWorld.EffectKind.SLASH && effect.owner == 0) trails++;
+        assertEquals(1, trails, "A fresh committed swing replaces the older trail instead of piling up arcs");
+    }
+
     @Test void boltImpactKeepsItsCriticalTravelAimAndCasterIdentityAfterPoolReuse() {
         ArenaWorld world = solo(); world.players[0].attackCooldown = 10;
         ArenaWorld.Enemy target = enemy(world, 80, 25); target.elite = true;
@@ -93,6 +136,11 @@ class CombatVfxStateTest {
     private static ArenaWorld.Enemy enemy(ArenaWorld world, float x, float health) {
         ArenaWorld.Enemy e = world.enemies[0]; e.active = true; e.x = x; e.y = 0;
         e.health = e.maxHealth = health; e.attackCooldown = 10; world.activeEnemies = 1; return e;
+    }
+    private static ArenaWorld.Effect slash(ArenaWorld world) {
+        for (ArenaWorld.Effect effect : world.effects)
+            if (effect.active && effect.kind == ArenaWorld.EffectKind.SLASH) return effect;
+        throw new AssertionError("No committed slash");
     }
     private static ArenaWorld.Effect hit(ArenaWorld world) {
         for (ArenaWorld.Effect effect : world.effects) if (effect.active && effect.kind == ArenaWorld.EffectKind.HIT && !effect.heroHit) return effect;

@@ -263,3 +263,31 @@ checks. The strict frame target is not proven. Native screenrecord is silent.
 Temporary controllers/logging were stopped and the app returned to Home. The
 existing emulator, relay and ADB forward remain available; no physical device
 was touched.
+
+
+## Attack reach and readable Warden sweep (2026-11-23)
+
+A thin projected gold/teal ground ring reads the same primary-targeting helper used
+by combat: Warden skill/gear reach is included, Ranger's 800-unit range is unchanged.
+Ranger's boundary can lie partly outside the close camera. Two thin 64-segment passes
+provide understated contrast on the pale floor, before actors/pickups are drawn.
+The cosmetic Warden slash lasts 0.38 seconds with a readable sweep/fade; repeated
+haste attacks replace their owner's previous trail rather than stacking trails.
+Damage/cooldown timing and committed aim/origin remain unchanged. No textures,
+Pixmaps or frame-loop objects were added.
+
+All 18 focused combat-VFX/actor-presentation checks passed, including live reach
+and high-haste snapshot/cadence coverage, with JDK 21 desktop classes/Android debug
+assembly. A brief Television_1080p Android 13 ARM64 check captured a five-second
+Warden close encounter and a manual-pause view; native screenshots/recording are
+ignored under `.run/attack-range-*.png` and `.run/range-and-warden-slash.mp4`.
+The 283-frame window reported interval p95/p99/max 19.83/77.48/101.45 ms and CPU
+submission 8.73/29.77/58.55 ms, with 144 intervals above 16.7 ms and four above 33.4 ms.
+Accounted textures remain 33,516,364 bytes (31.9637 MiB); retained Pixmaps remain
+20,245,324 bytes. Capture/startup work is included, and sustained physical-TV 60 FPS
+is not established. Synthetic controllers/logging were stopped and the existing
+emulator/relay returned to Home. No physical device was touched.
+
+The separately generated arena illustration is a proposed replacement design,
+not an implemented room or a gameplay/balance/performance verification. Its resource
+and modular-art plan is recorded in docs/arena-redesign-proposal.md.

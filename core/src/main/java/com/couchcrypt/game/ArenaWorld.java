@@ -6,6 +6,8 @@ public final class ArenaWorld {
     public static final int MAX_ENEMIES = 64, MAX_BOLTS = 96, MAX_PICKUPS = 96;
     public static final int MAX_SHOTS = 96, MAX_HAZARDS = 12, MAX_EFFECTS = 96;
     public static final float STEP = 1f / 60f;
+    /** Cosmetic sweep lifetime only; damage and attack cadence still commit immediately. */
+    public static final float WARDEN_SLASH_SECONDS = .38f;
     private static final float DODGE_DURATION = .22f, PLAYER_RADIUS = 20f;
     public enum Outcome { RUNNING, VICTORY, DEFEAT }
     public enum Hero {
@@ -278,8 +280,13 @@ public final class ArenaWorld {
         if (p.stormLevel > 0 && p.stormCooldown <= 0) storm(p);
     }
 
+    /** Primary targeting envelope, also used by the ground indicator. Target centers must enter it. */
+    public float primaryAttackRange(Player player) {
+        return player.hero.attackRange * (player.hero == Hero.WARDEN ? equipment.reachMultiplier(player) : 1f);
+    }
+
     private void attack(Player p) {
-        float reach = p.hero.attackRange * (p.hero == Hero.WARDEN ? equipment.reachMultiplier(p) : 1);
+        float reach = primaryAttackRange(p);
         Enemy target = nearest(p.x, p.y, reach, 0);
         if (target == null) return;
         float dx = target.x - p.x, dy = target.y - p.y, length = length(dx, dy);
@@ -287,7 +294,10 @@ public final class ArenaWorld {
         if (p.hero == Hero.WARDEN) {
             beginAttackPresentation(p);
             float halfArcCos = .5735764f; // cos(55 degrees)
-            Effect fx = effect(EffectKind.SLASH, p.x, p.y, p.slot, .18f);
+            // A haste build replaces its older cosmetic trail instead of stacking overlapping sweeps.
+            for (Effect previous : effects)
+                if (previous.active && previous.kind == EffectKind.SLASH && previous.owner == p.slot) previous.active = false;
+            Effect fx = effect(EffectKind.SLASH, p.x, p.y, p.slot, WARDEN_SLASH_SECONDS);
             if (fx != null) { fx.angle = (float) Math.atan2(dy, dx); fx.radius = reach; fx.sweep = 1.9198622f; }
             swordSwings++;
             for (Enemy e : enemies) {
