@@ -1,0 +1,31 @@
+{
+  "type": "Concept art proposal, not runtime screenshot proof",
+  "tool": "built-in image_gen",
+  "date": "2026-11-23",
+  "prompt": "prompt.txt",
+  "generatedOutput": "/Users/eduardoleale/.codex/generated_images/01a2081c-e0b7-7163-80da-7c209811d13c/exec-554b857d-8c38-4d8e-aa69-a090adaa14f0.png",
+  "savedProposal": "native-camera-proposal.png",
+  "inputs": [
+    {
+      "role": "edit target",
+      "path": ".run/ruined-arena-near-corner.png",
+      "sha256": "6678c6c0e5db6dcd8a6476c4889fbae63071a27ceb0851b67a273ef6a58a561c"
+    },
+    {
+      "role": "style reference only",
+      "path": "/Users/eduardoleale/.codex/generated_images/01a207d7-f0cb-7130-82c2-8d08d2d54f83/exec-39a806b1-cd4a-42a2-81ce-9e0d70cf8246.png",
+      "sha256": "57c2d2d5e395cc877821c094002aa61c7462717f1c2cd10b6bbc31d55302cf5a"
+    }
+  ],
+  "proposalSha256": "5a82b9bc78c2e6e504cdc023600af45c427d5b178d97760fa64457e12daf046d",
+  "sourceSize": [
+    1920,
+    1080
+  ],
+  "outputSize": [
+    1672,
+    941
+  ],
+  "runtimeFilesChanged": false,
+  "generationCalls": 1
+}

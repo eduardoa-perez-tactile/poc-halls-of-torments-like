@@ -1,9 +1,10 @@
 # Open ruined crypt environment, version 2
 
 Original painted artwork authored on 2026-11-23 with built-in `image_gen` for the
-user's open arena and coherent isometric landmarks. The final wall revision
-implements **ruined crypt with broken tops**, **character height** and **seamless
-integration** feedback. Chunky aged grey-brown masonry replaces the rejected tall
+user's open arena and coherent isometric landmarks. The selected paintings follow the **ruined crypt with broken tops** and
+**character height** direction. The user subsequently reported visible seams
+between their independently painted end faces/courses; geometric calibration
+does not establish that these fragments tile seamlessly. Chunky aged grey-brown masonry replaces the rejected tall
 clean panels and gold pilasters. The floor and seven selected landmarks are unchanged.
 
 Selected wall masters are `wall-*-source.png`; normalized sprites sit beside them.
