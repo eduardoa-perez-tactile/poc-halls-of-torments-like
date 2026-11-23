@@ -107,26 +107,10 @@ wall runs and four corner positions now produce 206 cached painted quads, while
 nineteen interior landmark props continue through the normal sprite path. No
 movement/collision or floor-art change is included.
 
-## Floor proposal for discussion
+## Approved engraved floor
 
-The user asked how to carry the concept's central engraving, stone paths and
-variation into the game after the border work. No floor artwork or behavior is
-changed by the border repair.
-
-- Use one original worn stone medallion at the central spawn, roughly 720–840 world
-  units across. A true ground-plane circle projects to an ellipse half as high as
-  it is wide. Keep carving shallow and close to the surrounding stone value,
-  without glow or sharp gold rings that could compete with combat indicators.
-- Run broad paving paths, about 240–300 world units wide, from the centre toward
-  the four landmark areas. They orient players without blocking movement.
-- Place a small family of quiet stone variants, worn patches and sparse cracks in
-  authored zones. Cluster wear around landmarks/paths; avoid noisy random decals
-  across every tile or dark patches resembling hazards.
-
-Author these zones/paths in arena data. Base and path tiles stay in the existing
-static floor cache. Draw the transparent engraving before combat ground marks
-through SpriteBatch, because the current floor shader forces opaque alpha. Repack
-or replace art inside the existing 512×256 floor page rather than adding a texture;
-the exact variant count must be validated alongside retained border/foundation art.
-The reference is preserved in the concept archive linked above. This is a proposed
-floor direction for discussion, not a claim that the mockup has been implemented.
+The user approved the gameplay-scale floor proposal and authorized implementation
+on 2026-11-23. The implemented floor adds the central shallow engraved medallion,
+flush dressed-stone paths, muted flagstone variation and authored wear. The open
+movement area and arena bounds stay unchanged. Sources, placement, texture limits
+and native checks are recorded in [the floor integration](engraved-crypt-floor.md).

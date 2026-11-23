@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "sourceArchive": "bake-inputs.zip",
+  "sourceArchiveSha256": "6f2d5c1d29c81e394fa6a6c29fc6957b4bbf0ca7e853f76790ee9291db5c92cf",
+  "addedTextureBytes": 0,
+  "newTexturePages": 0,
+  "sourcePixelsAndNeighbourContextPreserved": true,
+  "existingPixelsAndGuttersPreserved": true,
+  "coreSize": [
+    24,
+    8
+  ],
+  "newPieceOuterPadding": 0,
+  "originalNeighbourContext": 1,
+  "packingOrder": "height/short-side",
+  "pieces": 364,
+  "paintingPieces": {
+    "field": 48,
+    "path": 24,
+    "medallion": 292
+  },
+  "contentCoverage": {
+    "field": {
+      "significantPixelsCoveredExactlyOnce": true,
+      "excludedLowAlphaPixels": 0,
+      "maximumExcludedAlpha": 0
+    },
+    "path": {
+      "significantPixelsCoveredExactlyOnce": true,
+      "excludedLowAlphaPixels": 0,
+      "maximumExcludedAlpha": 0
+    },
+    "medallion": {
+      "significantPixelsCoveredExactlyOnce": true,
+      "excludedLowAlphaPixels": 30,
+      "maximumExcludedAlpha": 3
+    }
+  },
+  "pageCapacityBeforeAppend": [
+    {
+      "size": [
+        1024,
+        1024
+      ],
+      "legacyRectangles": 289,
+      "protectedPixels": 968343,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 80233
+    },
+    {
+      "size": [
+        512,
+        512
+      ],
+      "legacyRectangles": 85,
+      "protectedPixels": 247760,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 14384
+    },
+    {
+      "size": [
+        512,
+        512
+      ],
+      "legacyRectangles": 62,
+      "protectedPixels": 232277,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 29867
+    },
+    {
+      "size": [
+        512,
+        256
+      ],
+      "legacyRectangles": 9,
+      "protectedPixels": 79769,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 51303
+    }
+  ],
+  "paintedPixelsWithPadding": 92880,
+  "baselineMetadataSha256": {
+    "gameplay.json": "c455c0aff9492a21e0226b64a1ee0f3561b1deca0d88201193af02bee1134d9a",
+    "enemy-attacks.json": "bc07ad52deb8daf4443f03a0a4867e981ef32ac34d4a9bd01aae4878e7ab2cef",
+    "magic-projectiles.json": "99b5dc983af5bbcccd35ac4db532f127ee27bbab5a6c10beea925736b30cfbb1",
+    "painted-borders.json": "6c12fb5579baa6c569a24a0b7df7da18a10bc98d71410e2b8dfde8934c5bf4fb",
+    "arena-border.json": "1cd7c8c61d5a6d457e22800094c5c862e42e08abc4a24cfea7fedf2a0ab4a5c6"
+  },
+  "normalizedSourceSha256": {
+    "field.png": "5473c7b4e1d42a4f23ed9fd48c8b3e6ca9dfd04109514bbd18170bbaa247ef0a",
+    "path.png": "2d15e1289cae5b8d911ddce4b1d088112124853c7100f58be09ef78dea1aa773",
+    "medallion.png": "e93302c633d7eedf75226309510926954fda499571a21efda415dce9471508a1"
+  },
+  "outputs": {
+    "gameplay-actors-main.png": "96cb7cdf156ba9cbabccc5b95a59283e235c8540300a376eb7d36957a6d92eb3",
+    "gameplay-actors-common.png": "3988b2521f1d5fbfd87db994bdcc89834e82f1e43529b67265be0d5914c30a72",
+    "gameplay-environment.png": "f5e6cc16c6e01ce0a9bb244b02ccd2f0ac5816ca6e4dde798c7c3abffa64e9c6",
+    "arena-border.png": "da2c0265b6474010c7a19f26f5928cc2a7b898441ae55c5067213f0bbd5f2dee",
+    "engraved-floor.json": "c0e752f9e9085234d5e39c9e78fc99bc11ecfd9df821f4135c84f4f81f15198c"
+  },
+  "independentArchiveOnlyRebuildMatched": true,
+  "baselineMetadataUnchanged": true,
+  "pathSourceRevisedAfterNativeReview": true,
+  "unchangedBaselineArchiveEntriesDuringPathRevision": true
+}

@@ -371,3 +371,21 @@ cameras. A final 301-frame co-op window reported interval p95/p99/max
 above 16.7 ms and none above 33.4 ms. This exceeds the strict interval target and
 does not establish physical-TV 60 FPS, long-run balance or stability. See
 [implementation, source proof and limits](painted-arena-borders.md).
+
+
+## Engraved floor (2026-11-23)
+
+The approved floor reuses four existing managed texture pages. Accounted texture
+residency remains 33,516,364 bytes includingQR; no decoded floor Pixmap is retained.
+The startup-only cache uses 5,666 quads (453,280 vertex +67,992 index bytes), within
+8,000 quad allocated capacity (640,000 vertex +96,000 index bytes). The 292 cached
+medallion quads have 23,360 vertex bytes and draw through the existing SpriteBatch.
+Twenty-two focused floor/UV/layout/wall/foundation checks, desktop classes and
+Android debug assembly passed. Native centre/landmark/co-op captures verify
+rendering, not sustained 60 FPS. A final 275-frame co-op window reported interval
+p 95/p 99/max 27.96/42.31/46.78 ms and render-callback wall time 19.89/39.60/42.98 ms;
+7 intervals exceeded 33.4 ms. These observation windows includeADB/navigation and
+screenshot work. Earlier checks also contained much larger callback spikes;
+the cause is not established. Raw evidence was passed to the coordinated
+performance-baseline chat for controlled investigation. Physical-TV performance
+and full-run balance remain unverified. See [floor integration](engraved-crypt-floor.md).

@@ -1,5 +1,10 @@
 # Gameplay art integration
 
+The latest [engraved floor pass](engraved-crypt-floor.md) appends original paving,
+path and medallion materials into guarded spare areas of four existing pages,
+without texture growth. Run its baker after the painted border stage. Earlier
+whole-page hashes predate this additive floor bake.
+
 The latest [continuous painted border pass](painted-arena-borders.md) supersedes
 the repeated wall fragments. It appends original whole-side paintings into blank
 areas of all three existing gameplay pages, preserving earlier sprite pixels,

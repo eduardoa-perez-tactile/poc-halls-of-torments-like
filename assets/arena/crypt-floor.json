@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "worldSize": [2400, 1800],
+  "center": [0, 0],
+  "medallionDiameter": 600,
+  "pathWidth": 200,
+  "materialRepeat": 200,
+  "paths": [
+    {"id": "east", "to": [1200, 0]},
+    {"id": "north-east", "to": [1200, 900]},
+    {"id": "north", "to": [0, 900]},
+    {"id": "north-west", "to": [-1200, 900]},
+    {"id": "west", "to": [-1200, 0]},
+    {"id": "south-west", "to": [-1200, -900]},
+    {"id": "south", "to": [0, -900]},
+    {"id": "south-east", "to": [1200, -900]}
+  ],
+  "wear": [
+    {"at": [-760, 470], "radius": 460, "delta": -0.035},
+    {"at": [650, 610], "radius": 390, "delta": -0.025},
+    {"at": [780, -490], "radius": 420, "delta": -0.04},
+    {"at": [-730, -560], "radius": 410, "delta": -0.03},
+    {"at": [-220, 680], "radius": 340, "delta": 0.018},
+    {"at": [260, -690], "radius": 350, "delta": 0.02}
+  ]
+}
