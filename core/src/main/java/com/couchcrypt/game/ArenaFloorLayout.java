@@ -7,7 +7,7 @@ import java.util.HashSet;
 /** Authored, render-only ground geometry. Construct once; it never changes movement or collision. */
 public final class ArenaFloorLayout {
     public static final int MAX_PATHS = 12, MAX_CELLS = 128, MAX_CELL_VERTICES = 8;
-    public final float centerX, centerY, medallionDiameter, pathWidth, materialRepeat;
+    public final float centerX, centerY, medallionDiameter, pathWidth, materialRepeat, fieldRepeat;
     public final Path[] paths;
     public final Cell[] pathCells;
     private final Wear[] wear;
@@ -38,6 +38,7 @@ public final class ArenaFloorLayout {
         medallionDiameter = number(root, "medallionDiameter", 300, 1000);
         pathWidth = number(root, "pathWidth", 100, 300);
         materialRepeat = number(root, "materialRepeat", 100, 400);
+        fieldRepeat = number(root, "fieldRepeat", 96, 320);
         if (Math.abs(centerX) + medallionDiameter * .5f > ArenaWorld.HALF_WIDTH
             || Math.abs(centerY) + medallionDiameter * .5f > ArenaWorld.HALF_HEIGHT)
             throw invalid("medallion exceeds the floor");

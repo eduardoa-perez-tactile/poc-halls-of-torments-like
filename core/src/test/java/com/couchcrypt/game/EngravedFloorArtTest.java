@@ -21,8 +21,8 @@ class EngravedFloorArtTest {
         JsonValue pages = json("assets/art/engraved-floor.json").get("pages");
         BufferedImage[] packed = new BufferedImage[pages.size];
         for (int i = 0; i < pages.size; i++) packed[i] = ImageIO.read(root().resolve("assets/art/" + pages.get(i).getString("file")).toFile());
-        for (var painting : new EngravedFloorArt.Painting[]{art.field, art.path, art.medallion}) {
-            BufferedImage source = ImageIO.read(root().resolve("art-source/engraved-crypt-floor/" + painting.file).toFile());
+        for (var painting : new EngravedFloorArt.Painting[]{art.field, art.path, art.medallion, art.curb}) {
+            BufferedImage source = ImageIO.read(root().resolve("art-source/crypt-floor-clarity/" + painting.file).toFile());
             boolean[] seen = new boolean[painting.width * painting.height];
             for (var p : painting.pieces) {
                 for (int y = 0; y < p.height; y++) for (int x = 0; x < p.width; x++)
@@ -41,7 +41,7 @@ class EngravedFloorArtTest {
     @Test void materialCollarsWrapRealOppositeEdgePixelsWithoutChangingStoneScale() throws Exception {
         var art = art();
         for (var painting : new EngravedFloorArt.Painting[]{art.field, art.path}) {
-            var image = ImageIO.read(root().resolve("art-source/engraved-crypt-floor/" + painting.file).toFile());
+            var image = ImageIO.read(root().resolve("art-source/crypt-floor-clarity/" + painting.file).toFile());
             int x = painting.contentX, y = painting.contentY, w = painting.contentWidth, h = painting.contentHeight;
             for (int i = 0; i < h && painting == art.field; i++) {
                 assertEquals(image.getRGB(x + w - 1, y + i), image.getRGB(x - 1, y + i));
@@ -57,20 +57,23 @@ class EngravedFloorArtTest {
     @Test void clippedMaterialGeometryCoversTheFloorAndFitsTheStaticCache() throws Exception {
         var art = art(); var layout = new ArenaFloorLayout(json("assets/arena/crypt-floor.json"));
         float area = 0; int count = ArenaTileLayout.QUADS - ArenaTileLayout.COLUMNS * ArenaTileLayout.ROWS;
-        for (float x = -1200; x < 1200; x += 240) for (float y = -900; y < 900; y += 240) {
-            float right = Math.min(x + 240, 1200), top = Math.min(y + 240, 900);
+        float repeat = layout.fieldRepeat;
+        for (float x = -1200; x < 1200; x += repeat) for (float y = -900; y < 900; y += repeat) {
+            float right = Math.min(x + repeat, 1200), top = Math.min(y + repeat, 900);
             float[] polygon = EngravedFloorArt.rectangle(x, y, right, top);
-            polygon[10] = polygon[14] = (right - x) / 240;
-            polygon[3] = polygon[15] = 1 - (top - y) / 240;
+            polygon[10] = polygon[14] = (right - x) / repeat;
+            polygon[3] = polygon[15] = 1 - (top - y) / repeat;
             var geometry = art.geometry(art.field, polygon, 1f);
             for (var quad : geometry) { area += worldArea(quad.vertices()); assertVertices(quad.vertices()); }
             count += geometry.length;
         }
         assertEquals(2400 * 1800f, area, 12f, "Clipped atlas storage pieces must own the complete floor exactly once");
         for (var cell : layout.pathCells) {
-            var geometry = art.geometry(art.path, cell.vertices, 1f); count += geometry.length;
+            var geometry = art.geometry(art.path, cell.vertices, 1f, .10f, .90f); count += geometry.length;
             for (var quad : geometry) assertVertices(quad.vertices());
         }
+        for (float[] polygon : new StonePathBorders(layout).polygons)
+            count += art.geometry(art.curb, polygon, 1f).length;
         assertTrue(count < EngravedFloorArt.MAX_FLOOR_QUADS, "Bounded shared static cache must fit the shipped layout");
         assertEquals(0, json("assets/art/engraved-floor.json").getLong("addedTextureBytes"));
     }
@@ -83,9 +86,24 @@ class EngravedFloorArtTest {
         assertThrows(IllegalArgumentException.class, () -> new EngravedFloorArt(wrong, atlas, null));
     }
 
+    @Test void bordersKeepTheirFullStoneDetailAndTheirAlphaCannotCreateBrightFringes() throws Exception {
+        var art = art(); var floor = new ArenaFloorLayout(json("assets/arena/crypt-floor.json"));
+        assertEquals(1, art.curb.pieces.length, "A border block should not require many atlas submissions");
+        assertTrue(art.field.contentWidth / floor.fieldRepeat >= .5f, "Field details need enough samples at gameplay scale");
+        assertTrue(art.path.contentWidth / floor.pathWidth >= .6f, "Path joints need more cross-path samples than the old64px bands");
+        var source = ImageIO.read(root().resolve("art-source/crypt-floor-clarity/" + art.curb.file).toFile());
+        int transparent = 0, stone = 0;
+        for (int y = 0; y < source.getHeight(); y++) for (int x = 0; x < source.getWidth(); x++) {
+            int rgba = source.getRGB(x, y), a = rgba >>> 24;
+            assertTrue((rgba >> 16 & 255) <= a && (rgba >> 8 & 255) <= a && (rgba & 255) <= a);
+            if (a == 0) transparent++; else if (a > 200) stone++;
+        }
+        assertTrue(transparent > 0 && stone > 100, "Painted chips must reveal the ground between separate blocks");
+    }
+
     @Test void actualProjectedVerticesSampleTheSameWholePaintingAcrossStorageCuts() throws Exception {
         var art = art(); var pages = json("assets/art/engraved-floor.json").get("pages");
-        for (var painting : new EngravedFloorArt.Painting[]{art.field, art.path, art.medallion}) {
+        for (var painting : new EngravedFloorArt.Painting[]{art.field, art.path, art.medallion, art.curb}) {
             var geometry = art.geometry(painting, EngravedFloorArt.rectangle(0, 0, 240, 240), 1f);
             for (var quad : geometry) {
                 float[] v = quad.vertices();

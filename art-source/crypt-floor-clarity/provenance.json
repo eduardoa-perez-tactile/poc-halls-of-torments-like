@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "created": "2026-11-23",
+  "tool": "built-in image_gen.imagegen",
+  "scope": "Original source candidates only; no runtime assets, baker, renderer, branch or emulator changed.",
+  "approvedReference": "approved-reference.png",
+  "generationOutputs": {
+    "field": "/Users/eduardoleale/.codex/generated_images/01a20913-9123-7f91-8d20-94c802410ebc/exec-c39220fc-dbda-4193-80ac-66df3cb4353b.png",
+    "path": "/Users/eduardoleale/.codex/generated_images/01a20913-9123-7f91-8d20-94c802410ebc/exec-91edd706-afca-4307-9fe1-dea5c27e51b9.png",
+    "curbstoneLongUnselected": "/Users/eduardoleale/.codex/generated_images/01a20913-9123-7f91-8d20-94c802410ebc/exec-df938ff0-7065-4a4c-aa49-5d63f1943f51.png",
+    "curbstoneSelected": "/Users/eduardoleale/.codex/generated_images/01a20913-9123-7f91-8d20-94c802410ebc/exec-e0236204-4120-432d-b12b-f7ece2d6a632.png"
+  },
+  "normalization": {
+    "fieldAndPathPreviews": "Whole image proportional Lanczos resize to64,96,128pixels; no sharpening, paint edits or periodic wrap correction. Preview files are not runtime atlases.",
+    "curbstonePreview": {
+      "alphaThresholdForCrop": 32,
+      "sourceCrop": [
+        244,
+        173,
+        1531,
+        714
+      ],
+      "canvas": [
+        32,
+        16
+      ],
+      "maxPaintSize": [
+        30,
+        14
+      ],
+      "actualPaintSize": [
+        30,
+        13
+      ],
+      "method": "Proportional Lanczos downsample, centered on transparent RGBA canvas; alpha preserved."
+    }
+  },
+  "files": {
+    "approved-reference.png": {
+      "bytes": 2557444,
+      "sha256": "4f66bcd4c1869f443c01d5a3bc5615c498e1adfd78a3ca6a9830bd39408cd568",
+      "size": [
+        1672,
+        941
+      ],
+      "alphaBounds": [
+        0,
+        0,
+        1672,
+        941
+      ]
+    },
+    "curbstone-correction-prompt.txt": {
+      "bytes": 729,
+      "sha256": "01f0c21034188526de93b46eb695c6b053fc6fe828eb664d4621dd73480a1927"
+    },
+    "curbstone-long-master.png": {
+      "bytes": 1217108,
+      "sha256": "9802a89fc6dda26c0d112666dff37c0eed6616b3fd3d01f6cd8288484dcb5d9e",
+      "size": [
+        1774,
+        887
+      ],
+      "alphaBounds": [
+        0,
+        4,
+        1755,
+        887
+      ]
+    },
+    "curbstone-preview-32x16.png": {
+      "bytes": 923,
+      "sha256": "88eeef3bbc08d5cee02fb81978f72bb1f715960334a713f9273e422cf618167b",
+      "size": [
+        32,
+        16
+      ],
+      "alphaBounds": [
+        1,
+        1,
+        31,
+        14
+      ]
+    },
+    "curbstone-prompt.txt": {
+      "bytes": 1407,
+      "sha256": "80c4ce535a83830795755d85609f222c13e218ac7f40f006d27e7be799800999"
+    },
+    "field-master.png": {
+      "bytes": 2006181,
+      "sha256": "d322bc18e96b5c3319731ad9069eda6a8b267e3c1deb1fdc687b1536f1bd4bed",
+      "size": [
+        1254,
+        1254
+      ],
+      "alphaBounds": [
+        0,
+        0,
+        1254,
+        1254
+      ]
+    },
+    "field-preview-128.png": {
+      "bytes": 23320,
+      "sha256": "7124996a6b390c744a7cb05460fd7342478695e723a4b3fddbec54277f1aabf5",
+      "size": [
+        128,
+        128
+      ],
+      "alphaBounds": [
+        0,
+        0,
+        128,
+        128
+      ]
+    },
+    "field-preview-64.png": {
+      "bytes": 6399,
+      "sha256": "ad91c7e2919ba444b155dc23a17404971f9d378f9fe74d0ff4c714d03f7dcd43",
+      "size": [
+        64,
+        64
+      ],
+      "alphaBounds": [
+        0,
+        0,
+        64,
+        64
+      ]
+    },
+    "field-preview-96.png": {
+      "bytes": 13564,
+      "sha256": "4f26e8ac27a69022d52419562f5f90a9ac5a4bca2ebe4ba283fbe38d3f581842",
+      "size": [
+        96,
+        96
+      ],
+      "alphaBounds": [
+        0,
+        0,
+        96,
+        96
+      ]
+    },
+    "field-prompt.txt": {
+      "bytes": 1604,
+      "sha256": "9fddd00c33d2d2a16b63d6728f77fe8d984c5cd2da0236736ffc7bb73dac59f0"
+    },
+    "path-master.png": {
+      "bytes": 2353277,
+      "sha256": "48df6a26567c26f5bfa2ff1f4cfd7fd8affc134b68276c3580f62d8b47990390",
+      "size": [
+        1254,
+        1254
+      ],
+      "alphaBounds": [
+        0,
+        0,
+        1254,
+        1254
+      ]
+    },
+    "path-preview-128.png": {
+      "bytes": 24675,
+      "sha256": "e9937466a1302c59f6329736f286179697407fdf71d3475e23d7d8370d086e0f",
+      "size": [
+        128,
+        128
+      ],
+      "alphaBounds": [
+        0,
+        0,
+        128,
+        128
+      ]
+    },
+    "path-preview-64.png": {
+      "bytes": 6573,
+      "sha256": "1a1c654bd541cec825e7cd610bc18813910b35f7157ed9b73f2c0ad2925fae26",
+      "size": [
+        64,
+        64
+      ],
+      "alphaBounds": [
+        0,
+        0,
+        64,
+        64
+      ]
+    },
+    "path-preview-96.png": {
+      "bytes": 14212,
+      "sha256": "b9cbdfbf9cda3c91acfe43a613e1222fa3e43d2578af626a0a2d3f4e10fa0840",
+      "size": [
+        96,
+        96
+      ],
+      "alphaBounds": [
+        0,
+        0,
+        96,
+        96
+      ]
+    },
+    "path-prompt.txt": {
+      "bytes": 2064,
+      "sha256": "d26f00abc6f0255775be8d6a7a415e0d867dfc9bc553dd16062261f0b582a01f"
+    },
+    "curb-master.png": {
+      "bytes": 959259,
+      "sha256": "be0755be7645f27d85d1e271b3351b2d1d33150df56f54d2558818184335060e",
+      "size": [
+        1774,
+        887
+      ],
+      "alphaBounds": [
+        0,
+        0,
+        1673,
+        871
+      ]
+    }
+  }
+}

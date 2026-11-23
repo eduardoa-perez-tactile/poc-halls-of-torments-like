@@ -84,7 +84,7 @@ The source paintings are not repeated within a side. The baker's standalone
 python3 scripts/BakePaintedArenaBorders.py --output assets/art --source-output art-source/painted-arena-borders
 ```
 
-Run this stage last. It adds original neighbouring-pixel slices into empty space
+Run this stage before the engraved-floor stage. It adds original neighbouring-pixel slices into empty space
 in the existing three gameplay pages and writes `painted-borders.json`. Every
 previous sprite/gutter is preserved; existing gameplay, enemy-attack and missile
 metadata are unchanged. One global 85% Lanczos normalization of the two full wall
@@ -100,13 +100,30 @@ See [runtime checks and limits](../docs/painted-arena-borders.md).
 
 [engraved-crypt-floor/](engraved-crypt-floor/README.md) preserves the approved
 concept, three original ImageGen masters, exact prompts and source provenance.
-The current final bake stage runs after the painted wall stage:
+This historical floor archive can still be rebuilt byte-for-byte:
 
 ```sh
-python3 scripts/BakeEngravedFloor.py --output assets/art --source-output art-source/engraved-crypt-floor
+python3 scripts/BakeEngravedFloor.py --archive art-source/engraved-crypt-floor/bake-inputs.zip --output .run/legacy-floor-rebuild
 ```
 
 Its archive contains the untouched pre-floor baseline. Whole normalized floor
 materials are split only for storage in guarded spare areas of the four existing
 gameplay/foundation pages; it adds no textures and preserves prior sprite pixels
 and gutters. See [runtime integration](../docs/engraved-crypt-floor.md).
+
+
+## Clear paving and separate path borders (2026-11-23)
+
+[crypt-floor-clarity/](crypt-floor-clarity/README.md) is the current selected floor
+source. It preserves clearer original field/path paintings, a transparent border
+stone, exact ImageGen prompts, baseline archive and independent rebuild proof.
+The final stage still runs after the painted wall baker:
+
+```sh
+python3 scripts/BakeEngravedFloor.py --output assets/art --source-output art-source/crypt-floor-clarity
+```
+
+It preserves the medallion, earlier sprite pixels/gutters and five metadata files.
+The same four existing pages hold 317 source pieces; no texture is added. Runtime
+uses separately placed border blocks with real grout gaps. The old floor archive
+remains supported for historical exports; it is not the current runtime selection.

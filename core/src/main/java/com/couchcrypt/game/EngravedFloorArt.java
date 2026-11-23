@@ -12,7 +12,7 @@ import java.util.Comparator;
 public final class EngravedFloorArt {
     private static final float ISO_X = .70710678f, ISO_Y = .35355339f;
     public static final int MAX_PIECES = 512, MAX_FLOOR_QUADS = 8000;
-    public final Painting field, path, medallion;
+    public final Painting field, path, medallion, curb;
     private final Texture[] textures;
     private final int[] pageWidths, pageHeights;
 
@@ -78,7 +78,9 @@ public final class EngravedFloorArt {
         field = new Painting("field", paints.require("field"), this);
         path = new Painting("path", paints.require("path"), this);
         medallion = new Painting("medallion", paints.require("medallion"), this);
-        if (field.pieces.length + path.pieces.length + medallion.pieces.length > MAX_PIECES) throw invalid("piece pool");
+        curb = new Painting("curb", paints.require("curb"), this);
+        if (!paints.get("curb").getBoolean("premultipliedAlpha", false)) throw invalid("curb coverage colour");
+        if (field.pieces.length + path.pieces.length + medallion.pieces.length + curb.pieces.length > MAX_PIECES) throw invalid("piece pool");
     }
 
     /** Packed vertex payloads contain the final projected coordinates and source-neighbour UVs. */
@@ -86,6 +88,11 @@ public final class EngravedFloorArt {
     private record Vertex(float x, float y, float u, float v) {}
 
     public Quad[] geometry(Painting painting, float[] polygon, float shade) {
+        return geometry(painting, polygon, shade, 0, 1);
+    }
+
+    /** Crop the old painted path margins where the separately drawn border stones begin. */
+    public Quad[] geometry(Painting painting, float[] polygon, float shade, float minU, float maxU) {
         if (polygon.length < 12 || polygon.length % 4 != 0 || polygon.length > 32 || !Float.isFinite(shade))
             throw invalid("ground polygon");
         ArrayList<Vertex> original = new ArrayList<>();
@@ -95,9 +102,9 @@ public final class EngravedFloorArt {
         }
         ArrayList<Quad> result = new ArrayList<>();
         for (Piece p : painting.pieces) {
-            float u0 = (float)(p.coreX - painting.contentX) / painting.contentWidth;
+            float u0 = Math.max(minU, (float)(p.coreX - painting.contentX) / painting.contentWidth);
             float v0 = (float)(p.coreY - painting.contentY) / painting.contentHeight;
-            float u1 = (float)(p.coreX + p.coreWidth - painting.contentX) / painting.contentWidth;
+            float u1 = Math.min(maxU, (float)(p.coreX + p.coreWidth - painting.contentX) / painting.contentWidth);
             float v1 = (float)(p.coreY + p.coreHeight - painting.contentY) / painting.contentHeight;
             if (u1 <= u0) continue;
             var clipped = clip(clip(clip(clip(original, true, u0, true), true, u1, false), false, v0, true), false, v1, false);
