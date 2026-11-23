@@ -11,6 +11,8 @@ public final class ArenaLayout {
     public static final int MAX_PLACEMENTS = 192;
     private static final float ISO_X = .70710678f, ISO_Y = .35355339f;
     public final Placement[] placements;
+    public final WallRun[] wallRuns;
+    public record WallRun(String id, boolean alongX, float x, float y, float length, float thickness) {}
 
     public static final class Placement {
         public final String id, region, zone;
@@ -37,6 +39,7 @@ public final class ArenaLayout {
             throw invalid("scenery may not change the playable bounds");
         ArrayList<Placement> result = new ArrayList<>(128);
         HashSet<String> ids = new HashSet<>();
+        ArrayList<WallRun> wallData = new ArrayList<>(4);
         JsonValue runs = root.require("wallRuns");
         if (!runs.isArray() || runs.size != 4) throw invalid("four authored wall runs required");
         for (JsonValue run = runs.child; run != null; run = run.next) {
@@ -54,6 +57,12 @@ public final class ArenaLayout {
                 || source.footprintWorldX() != other.footprintWorldX()
                 || source.footprintWorldY() != other.footprintWorldY())
                 throw invalid("wall repeats must meet at their measured footprint edges");
+            float thickness = finite(run.getFloat("thickness",
+                (axis.equals("x") ? source.footprintWorldY() : source.footprintWorldX()) * size), "wall thickness");
+            if (thickness < 16 || thickness > 80) throw invalid("wall thickness");
+            wallData.add(new WallRun(id, axis.equals("x"),
+                start[0] + (axis.equals("x") ? (count - 1) * step * .5f : 0),
+                start[1] + (axis.equals("y") ? (count - 1) * step * .5f : 0), count * step, thickness));
             for (int i = 0; i < count; i++) {
                 float x = start[0] + (axis.equals("x") ? i * step : 0);
                 float y = start[1] + (axis.equals("y") ? i * step : 0);
@@ -75,6 +84,7 @@ public final class ArenaLayout {
             }
         }
         placements = result.toArray(new Placement[0]);
+        wallRuns = wallData.toArray(new WallRun[0]);
     }
 
     private static void add(ArrayList<Placement> result, HashSet<String> ids, GameplayAtlas metadata,

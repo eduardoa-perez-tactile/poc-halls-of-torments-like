@@ -1,5 +1,11 @@
 # Gameplay art integration
 
+The latest [continuous painted border pass](painted-arena-borders.md) supersedes
+the repeated wall fragments. It appends original whole-side paintings into blank
+areas of all three existing gameplay pages, preserving earlier sprite pixels,
+gutters and metadata with no texture growth. Its source/rebuild contract is
+current; historical whole-page hashes predate this additive bake.
+
 The 23 November [open crypt pass](arena-redesign-proposal.md) replaces the legacy
 environment regions with measured isometric landmarks and character-height ruined
 walls in the same 512×512 page. It preserves the actor frames and projectile art.

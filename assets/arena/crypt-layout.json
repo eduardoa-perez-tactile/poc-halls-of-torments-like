@@ -17,7 +17,9 @@
       "count": 10,
       "step": 240,
       "sizeScale": 1,
-      "regionAlternate": "wall-x-broken"
+      "regionAlternate": "wall-x-broken",
+      "thickness": 36,
+      "fadeWhenOccluding": false
     },
     {
       "id": "south",
@@ -30,7 +32,9 @@
       "count": 10,
       "step": 240,
       "sizeScale": 1,
-      "regionAlternate": "wall-x-broken"
+      "regionAlternate": "wall-x-broken",
+      "thickness": 36,
+      "fadeWhenOccluding": false
     },
     {
       "id": "east",
@@ -43,7 +47,9 @@
       "count": 8,
       "step": 225,
       "sizeScale": 0.9375,
-      "regionAlternate": "wall-y-broken"
+      "regionAlternate": "wall-y-broken",
+      "thickness": 36,
+      "fadeWhenOccluding": false
     },
     {
       "id": "west",
@@ -56,7 +62,9 @@
       "count": 8,
       "step": 225,
       "sizeScale": 0.9375,
-      "regionAlternate": "wall-y-broken"
+      "regionAlternate": "wall-y-broken",
+      "thickness": 36,
+      "fadeWhenOccluding": false
     }
   ],
   "landmarks": [
@@ -268,7 +276,8 @@
             -912
           ],
           "wall": true,
-          "sizeScale": 1
+          "sizeScale": 1,
+          "fadeWhenOccluding": false
         },
         {
           "id": "-1212-912",
@@ -278,7 +287,8 @@
             912
           ],
           "wall": true,
-          "sizeScale": 1
+          "sizeScale": 1,
+          "fadeWhenOccluding": false
         },
         {
           "id": "1212--912",
@@ -288,7 +298,8 @@
             -912
           ],
           "wall": true,
-          "sizeScale": 1
+          "sizeScale": 1,
+          "fadeWhenOccluding": false
         },
         {
           "id": "1212-912",
@@ -298,7 +309,8 @@
             912
           ],
           "wall": true,
-          "sizeScale": 1
+          "sizeScale": 1,
+          "fadeWhenOccluding": false
         }
       ]
     }

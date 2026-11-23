@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "sourceArchive": "bake-inputs.zip",
+  "sourceArchiveSha256": "5e145ed0da4983fd4cae447a02f48801991c071af005558bfffb26ec27d8e1ff",
+  "addedTextureBytes": 0,
+  "newTexturePages": 0,
+  "stripCoreWidth": 32,
+  "packingOrder": "height/short-side",
+  "maxCoreHeight": 48,
+  "runtimeSourceScale": 0.85,
+  "derivedSourceSha256": {
+    "wall-x-runtime.png": "9bd088b7c541216da6d7c650cd44b4820ceef56b5055c6bd9b6d3b0f84ae208f",
+    "wall-y-runtime.png": "23b895a2f0031e5abd3df069dd6e21b73f2557b6a7e7243a648bb46e0801ae17"
+  },
+  "strips": 99,
+  "runtimePlacedQuads": 206,
+  "originalNeighbourContext": 1,
+  "existingPixelsAndGuttersPreserved": true,
+  "trimAlphaThreshold": 32,
+  "paintingTrim": {
+    "x": {
+      "excludedLowAlphaPixels": 286,
+      "maximumExcludedAlpha": 9,
+      "drawnBounds": [
+        0,
+        0,
+        852,
+        475
+      ]
+    },
+    "y": {
+      "excludedLowAlphaPixels": 92,
+      "maximumExcludedAlpha": 7,
+      "drawnBounds": [
+        0,
+        0,
+        644,
+        323
+      ]
+    },
+    "corner": {
+      "excludedLowAlphaPixels": 1,
+      "maximumExcludedAlpha": 1,
+      "drawnBounds": [
+        1,
+        1,
+        53,
+        90
+      ]
+    }
+  },
+  "sourceStripRgbaPreserved": true,
+  "pageCapacityBeforeAppend": [
+    {
+      "size": [
+        1024,
+        1024
+      ],
+      "legacyRectangles": 214,
+      "protectedPixels": 846291,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 202285
+    },
+    {
+      "size": [
+        512,
+        512
+      ],
+      "legacyRectangles": 83,
+      "protectedPixels": 245100,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 17044
+    },
+    {
+      "size": [
+        512,
+        512
+      ],
+      "legacyRectangles": 40,
+      "protectedPixels": 204057,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 58087
+    }
+  ],
+  "paintedPixelsWithPadding": 152932,
+  "baselineMetadataSha256": {
+    "gameplay.json": "c455c0aff9492a21e0226b64a1ee0f3561b1deca0d88201193af02bee1134d9a",
+    "enemy-attacks.json": "bc07ad52deb8daf4443f03a0a4867e981ef32ac34d4a9bd01aae4878e7ab2cef",
+    "magic-projectiles.json": "99b5dc983af5bbcccd35ac4db532f127ee27bbab5a6c10beea925736b30cfbb1"
+  },
+  "outputs": {
+    "gameplay-actors-main.png": "9dc497005bad4a0d7c54fe9b9ca474e471d011dff46d02413e4f5bf33f4e1328",
+    "gameplay-actors-common.png": "77cdc72fbd771d7417b8b9063d672e9ac1f6aa87a53dda56bda5d543c8aca863",
+    "gameplay-environment.png": "463be8b9a1d87d7e00d76439590025c216928b60db7283e4d8b1b255d4ba4079",
+    "painted-borders.json": "6c12fb5579baa6c569a24a0b7df7da18a10bc98d71410e2b8dfde8934c5bf4fb"
+  },
+  "independentArchiveOnlyRebuildMatched": true,
+  "originalSourceFilesAndMetadataUnchanged": true
+}

@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ArenaLayoutTest {
-    @Test void shippedOpenRoomHasContinuousBordersClearCourtAndBoundedMeasuredLandmarks() throws Exception {
+    @Test void shippedOpenRoomPreservesBoundsClearCourtAndBoundedMeasuredLandmarks() throws Exception {
         GameplayAtlas atlas = atlas();
         ArenaLayout layout = new ArenaLayout(layout(), atlas);
         assertTrue(layout.placements.length <= ArenaLayout.MAX_PLACEMENTS);
@@ -16,7 +16,8 @@ class ArenaLayoutTest {
         for (ArenaLayout.Placement p : layout.placements) {
             GameplayAtlas.Region region = atlas.regions.get(p.region);
             assertTrue(p.scale > 0 && Float.isFinite(p.scale));
-            assertTrue(p.fadeWhenOccluding, "A foreground landmark must not hide a living actor");
+            if (p.wall) assertFalse(p.fadeWhenOccluding, "The low painted perimeter stays opaque");
+            else assertTrue(p.fadeWhenOccluding, "Tall landmarks retain their independent reveal");
             if (p.wall) {
                 GameplayAtlas.Frame frame = atlas.frames[region.frame()];
                 float rise = (frame.bottom + frame.height) * p.scale;
@@ -40,6 +41,12 @@ class ArenaLayoutTest {
             assertTrue(region.footprintWidth() > 0, "Each placed sprite has a measured source footprint");
         }
         assertEquals(20, wallX); assertEquals(16, wallY);
+        assertEquals(4, layout.wallRuns.length);
+        for (var run : layout.wallRuns) {
+            assertEquals(run.alongX() ? 2400f : 1800f, run.length());
+            assertEquals(36f, run.thickness());
+            assertEquals(0f, run.alongX() ? run.x() : run.y());
+        }
         assertTrue(landmarks >= 12 && landmarks <= 32, "The room needs grouped landmarks, not a floor full of clutter");
     }
 
