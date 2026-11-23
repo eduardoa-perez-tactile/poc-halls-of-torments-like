@@ -21,8 +21,8 @@ public final class PartyProgression {
         VITALITY("vitality", "Vitality", "Max health +20. Restore 20 health."),
         EVASION("evasion", "Shadow Step", "Dodge cooldown -15% of base."),
         SWEEP("sweep", "Wide Sweep", "Warden sword reach +20% of base."),
-        MULTISHOT("multishot", "Split Shot", "Ranger fires one extra arrow."),
-        PIERCE("pierce", "Piercing Arrow", "Ranger arrows pierce one more target."),
+        MULTISHOT("multishot", "Split Shot", "The magic crossbow fires one extra arcane bolt."),
+        PIERCE("pierce", "Piercing Bolt", "Arcane bolts pierce one more target."),
         AURA("aura", "Soul Circle", "Unlock or strengthen a nearby damage aura."),
         STORM("storm", "Chain Storm", "Unlock or strengthen automatic chain strikes."),
         MAGNET("magnet", "Soul Draw", "Pickup attraction +30% of base."),
@@ -342,9 +342,9 @@ public final class PartyProgression {
             case MULTISHOT -> {
                 category = "WEAPON"; int currentArrows = world.equipment.projectileCount(player);
                 int arrows = Math.min(5, currentArrows + 1);
-                headline = "+" + (arrows - currentArrows) + " ARROW";
-                before = currentArrows + (currentArrows == 1 ? " ARROW" : " ARROWS");
-                after = arrows + (arrows == 1 ? " ARROW" : " ARROWS");
+                headline = "+" + (arrows - currentArrows) + " ARCANE BOLT";
+                before = currentArrows + (currentArrows == 1 ? " BOLT" : " BOLTS");
+                after = arrows + (arrows == 1 ? " BOLT" : " BOLTS");
             }
             case PIERCE -> {
                 category = "WEAPON"; int currentPierce = world.equipment.pierce(player);

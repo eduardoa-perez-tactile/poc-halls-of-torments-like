@@ -81,7 +81,10 @@ def sword(t, d, n):
 
 def arrow(t, d, n):
     n.sample()
-    return (sine(t, 580) * .40 + sine(t, 917) * .20) * math.exp(-t * 42) + n.high * .55 * math.exp(-t * 90) + sweep(t, 170, 70, d) * .25 * math.exp(-t * 32)
+    # A compact crossbow snap opens into a bright, phase-continuous arcane chirp.
+    snap = n.high * .42 * math.exp(-t * 90) + sweep(t, 170, 70, d) * .25 * math.exp(-t * 32)
+    magic = (sweep(t, 1150, 390, d) * .4 + sine(t, 1568) * .16) * math.exp(-t * 25)
+    return snap + magic
 
 
 def sword_hit(t, d, n):
@@ -93,7 +96,24 @@ def sword_hit(t, d, n):
 
 def bolt_hit(t, d, n):
     n.sample()
-    return sweep(t, 250, 88, d) * .66 * math.exp(-t * 32) + sine(t, 1367) * .20 * math.exp(-t * 86) + n.high * .52 * math.exp(-t * 100) + n.low * .65 * math.exp(-t * 45)
+    crystal = (sine(t, 1367) * .20 + sine(t, 2249) * .14) * math.exp(-t * 36)
+    return sweep(t, 250, 88, d) * .66 * math.exp(-t * 32) + crystal + n.high * .52 * math.exp(-t * 100) + n.low * .65 * math.exp(-t * 45)
+
+
+def wraith_dash(t, d, n):
+    n.sample()
+    air = math.sin(math.pi * t / d) ** .55
+    return n.high * air * .48 + sweep(t, 730, 180, d) * .28 * air * math.exp(-t * 11)
+
+
+def brute_slam(t, d, n):
+    n.sample()
+    return sweep(t, 125, 38, d) * .78 * math.exp(-t * 18) + n.low * 1.5 * math.exp(-t * 19) + n.high * .35 * math.exp(-t * 65)
+
+
+def magic_cast(t, d, n):
+    n.sample()
+    return (sweep(t, 410, 850, d) * .35 + sine(t, 1271) * .12) * math.exp(-t * 18) + n.high * .35 * math.exp(-t * 44)
 
 
 def critical(t, d, n):
@@ -169,3 +189,6 @@ combat('heal', .24, heal)
 combat('aura', .24, aura)
 combat('storm', .22, storm)
 combat('block', .13, block)
+combat('wraith-dash', .18, wraith_dash)
+combat('brute-slam', .20, brute_slam)
+combat('magic-cast', .16, magic_cast)

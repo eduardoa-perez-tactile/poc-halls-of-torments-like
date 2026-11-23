@@ -784,7 +784,7 @@ public final class CryptLobby extends ApplicationAdapter {
 
     private boolean key(int key) {
         if (key == Input.Keys.F1 && config.profile() && screen == Screen.SESSION && overlay == null) {
-            world.debugVfxEncounter(); return true;
+            world.debugEnemyAttackEncounter(); return true;
         }
         if (key == Input.Keys.F2 && config.profile() && screen == Screen.SESSION && overlay == null) {
             world.equipment.grantReward(); publishProgression(); return true;
