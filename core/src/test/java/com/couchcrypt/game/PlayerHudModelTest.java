@@ -8,14 +8,20 @@ class PlayerHudModelTest {
     @Test void sparseBuildsUseActualRanksAndChosenHeroInsteadOfPhoneSlot() {
         ArenaWorld world = new ArenaWorld();
         world.setHero(0, ArenaWorld.Hero.RANGER); world.setHero(1, ArenaWorld.Hero.WARDEN);
+        world.reset();
         world.activatePlayer(0); world.activatePlayer(1);
-        choose(world, 0, POWER); choose(world, 0, POWER); choose(world, 0, MULTISHOT);
-        choose(world, 1, HASTE); choose(world, 1, SWEEP);
         PlayerHudModel ranger = new PlayerHudModel(), warden = new PlayerHudModel();
+        ranger.refresh(world, 0); warden.refresh(world, 1);
+        assertEmpty(ranger); assertEmpty(warden); // Automatic base weapons do not invent upgrade ranks.
+        // Every party round waits for both players before another earned offer opens.
+        choose(world, 0, POWER); choose(world, 1, HASTE);
+        choose(world, 0, POWER); choose(world, 1, SWEEP);
+        choose(world, 0, MULTISHOT);
         ranger.refresh(world, 0); warden.refresh(world, 1);
         assertBuild(ranger, new PartyProgression.Upgrade[]{MULTISHOT, POWER}, new int[]{1, 2}, 0);
         assertBuild(warden, new PartyProgression.Upgrade[]{SWEEP, HASTE}, new int[]{1, 1}, 0);
         assertEquals(-1, ranger.iconIndices[2]); assertEquals(0, ranger.ranks[2]);
+        assertTrue(world.progression.offers[1].pending); // An unchosen offer adds no HUD emblem.
     }
 
     @Test void denseBuildsPrioritizeWeaponTraitsAndCountUniqueOverflowRatherThanRanks() {
@@ -39,26 +45,40 @@ class PlayerHudModelTest {
         world.deactivatePlayer(0); model.refresh(world, 0);
         assertEmpty(model);
         world.activatePlayer(0); model.refresh(world, 0);
-        assertEmpty(model); // Catch-up offers are not acquired skills.
+        // A fresh mid-run participant receives earned foundation ranks immediately.
+        assertBuild(model, new PartyProgression.Upgrade[]{SWEEP, POWER}, new int[]{1, 1}, 0);
+        assertFalse(world.progression.offers[0].pending);
         choose(world, 0, AURA); model.refresh(world, 0);
-        assertEquals(AURA.ordinal(), model.iconIndices[0]);
+        assertBuild(model, new PartyProgression.Upgrade[]{SWEEP, POWER, AURA}, new int[]{1, 1, 1}, 0);
         world.reset(); model.refresh(world, 0); assertEmpty(model);
+        world.activatePlayer(0); model.refresh(world, 0); assertEmpty(model);
         assertSame(icons, model.iconIndices); assertSame(ranks, model.ranks);
     }
 
-    @Test void lateJoinShowsOnlyItsAppliedCatchupChoicesWhilePartyLevelStaysShared() {
+    @Test void lateJoinShowsAutomaticClassFoundationAndLaterPersonalChoicesWhilePartyLevelStaysShared() {
         ArenaWorld world = new ArenaWorld(); world.activatePlayer(0);
         choose(world, 0, POWER); choose(world, 0, POWER);
         int partyLevel = world.progression.level;
         world.activatePlayer(1);
         PlayerHudModel first = new PlayerHudModel(), second = new PlayerHudModel();
         first.refresh(world, 0); second.refresh(world, 1);
-        assertEmpty(second);
+        assertBuild(second, new PartyProgression.Upgrade[]{MULTISHOT, POWER}, new int[]{1, 1}, 0);
         assertBuild(first, new PartyProgression.Upgrade[]{POWER}, new int[]{2}, 0);
-        choose(world, 1, MULTISHOT); second.refresh(world, 1);
-        assertBuild(second, new PartyProgression.Upgrade[]{MULTISHOT}, new int[]{1}, 0);
-        assertTrue(world.progression.offers[1].pending);
+        assertEquals(2, world.progression.foundationCount(1));
+        assertFalse(world.progression.offers[1].pending);
+        assertFalse(world.progression.catchingUp(1));
+        assertEquals(0f, world.progression.choiceSecondsLeft());
         assertEquals(partyLevel, world.progression.level);
+
+        world.progression.addXp(world.progression.xpToNext - world.progression.xp);
+        assertTrue(world.progression.offers[0].pending);
+        assertTrue(world.progression.offers[1].pending);
+        second.refresh(world, 1);
+        assertBuild(second, new PartyProgression.Upgrade[]{MULTISHOT, POWER}, new int[]{1, 1}, 0);
+        choose(world, 1, PIERCE); second.refresh(world, 1);
+        assertBuild(second, new PartyProgression.Upgrade[]{MULTISHOT, PIERCE, POWER}, new int[]{1, 1, 1}, 0);
+        assertFalse(world.progression.offers[1].pending);
+        assertEquals(partyLevel + 1, world.progression.level);
         first.refresh(world, 0);
         assertBuild(first, new PartyProgression.Upgrade[]{POWER}, new int[]{2}, 0);
     }

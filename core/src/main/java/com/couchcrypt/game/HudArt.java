@@ -10,8 +10,8 @@ public final class HudArt implements Disposable {
     public static final int ORB_SIZE = 128, BLOOD_INSET = 21, BLOOD_SIZE = 86;
     public final long textureBytes = 512L * 256 * 4;
     public final long retainedPixmapBytes = 0; // File-backed managed texture restores from the small PNG.
-    public final TextureRegion orbBack, orbBlood, orbReflection, orbGold, orbTeal;
-    public final TextureRegion skillGold, skillTeal, dodgeBack, dodgeGlyph, healthFill, xpGold, xpTeal, pixel;
+    public final TextureRegion orbBack, orbBlood, orbReflection, orbGold, orbTeal, lowHealthGlow;
+    public final TextureRegion skillGold, skillTeal, dodgeBack, dodgeIcon, healthFill, xpGold, xpTeal, pixel;
     private final Texture texture;
     private boolean disposed;
 
@@ -28,10 +28,11 @@ public final class HudArt implements Disposable {
         orbReflection = region(256, 0, 128, 128);
         orbGold = region(384, 0, 128, 128);
         orbTeal = region(0, 128, 128, 128);
+        lowHealthGlow = region(320, 128, 64, 64);
         skillGold = region(128, 128, 64, 64);
         skillTeal = region(192, 128, 64, 64);
         dodgeBack = region(256, 128, 64, 64);
-        dodgeGlyph = region(320, 128, 64, 64);
+        dodgeIcon = region(384, 128, 128, 128);
         healthFill = region(256, 192, 32, 16);
         xpGold = region(288, 192, 32, 8);
         xpTeal = region(320, 192, 32, 8);

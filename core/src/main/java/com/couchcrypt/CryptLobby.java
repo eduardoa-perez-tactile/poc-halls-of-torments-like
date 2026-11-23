@@ -827,7 +827,11 @@ public final class CryptLobby extends ApplicationAdapter {
             return true;
         }
         if (key == Input.Keys.F10 && config.profile() && screen == Screen.SESSION && overlay == null) {
-            previewHud(12); return true;
+            // Repeat the populated HUD preview to inspect critical health without a survival run.
+            boolean critical = hudPreview && world.players[0].health > world.equipment.maxHealth(world.players[0]) * .2f;
+            previewHud(12);
+            if (critical) world.players[0].health = world.equipment.maxHealth(world.players[0]) * .15f;
+            return true;
         }
         if (key == Input.Keys.F9 && config.profile() && screen == Screen.SESSION && overlay == null
             && world.players[0].active && world.players[0].alive && world.players[1].active) {

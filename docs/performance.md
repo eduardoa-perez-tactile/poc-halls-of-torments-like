@@ -188,3 +188,34 @@ Raw evidence stays ignored under `.run/performance-art-coop.*` and `.run/art-exp
 ## 23 November — sprite VFX integration
 
 The later [combat-feedback pass](combat-vfx.md) adds one managed 512×288 RGBA VFX page (0.5625 MiB), retaining zero decoded Pixmaps for that page. Actual accounted textures including QR reached **32,893,772 bytes / 31.3699455 MiB**, below 32 MiB. A seven-second 301-frame co-op boss fixture reported interval p95/p99/max **19.84/21.28/26.80 ms**, CPU submission **10.83/15.45/21.54 ms**, 148 intervals above 16.7 ms and none above 33.4 ms; the reported frame used 64 draws. A separate short fixture-construction window included a **52.71 ms** interval and 170 draws while the equipped late encounter and simultaneous arrivals were prepared. Physical-TV 60 FPS remains unproven; this is not a full survival or balance test. Earlier measurements below are historical evidence for their original builds.
+
+
+## Cleaner combat HUD (2026-11-23)
+
+The approved revision uses smooth 176-pixel health orbs, no numeric health/duplicate rails,
+80-pixel skill emblems, a bottom shared XP lane and a new illustrated Dodge boot.
+A soft critical-health halo and the Dodge source occupy existing unused/obsolete cells
+in the same managed 512×256 HUD atlas: no additional GPU texture bytes or retained
+Pixmap. The halo varies only opacity; its 1.6-second clock uses the HUD delta and
+therefore freezes with manual pause. No frame-loop image processing or layout creation
+was introduced. Fonts and emblems remain shared.
+
+JDK 21 desktop classes and Android debug assembly passed. Focused HUD model/state tests
+cover actual ranks/overflow, shared-round completion, automatic late-join foundations
+and notices. Three stale model fixtures were corrected for the existing party-round
+and automatic catch-up behavior; gameplay/progression code was not changed.
+A brief Television_1080p / Android 13 ARM64 emulator check captured solo without the
+boss lane, populated co-op with critical P1 health/boss preview, a second pulse phase,
+manual pause, downed-ally guidance and revival progress. Ignored local screenshots are
+`.run/cleaner-hud-*.png`; the log is `.run/cleaner-hud-render.log`.
+
+The startup-adjacent co-op window contained 275 frames: interval p95/p99/max
+28.24/60.90/114.38 ms and CPU submission p95/p99/max 9.75/50.10/57.40 ms. The next
+183-frame partial window had interval p95/p99/max 18.76/19.58/19.83 ms and CPU
+2.74/6.81/8.84 ms. Accounted textures were 33,319,756 bytes (31.78 MiB), below
+32 MiB, and retained Pixmaps 20,245,324 bytes. These short startup/rendering checks
+include capture overhead; they do not prove physical-TV 60 FPS, sustained combat
+performance, or long-run memory behavior. The strict frame target remains unverified.
+Temporary controllers/logging were stopped and the game returned to Home. The existing
+emulator, relay and ADB forward remain running for user handoff; no physical device
+was touched.
