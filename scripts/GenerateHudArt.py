@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Bake the approved code-native orb HUD gradients/shapes into one bounded RGBA atlas.
 
-Source: original code-native HUD shapes, 2026-11-13; smooth orb rims and local
-low-health halo approved with the revised HUD on 2026-11-23. See docs/hud-art.md.
+Source: original code-native HUD shapes, 2026-11-13; smooth orb rims, local
+low-health halo and original painted boss frame approved on 2026-11-23.
+See docs/hud-art.md and art-source/boss-hud/README.md.
 Requires Pillow only for this offline asset-generation step; runtime has no dependency.
 """
 from pathlib import Path
@@ -132,7 +133,7 @@ def dodge_back():
 
 
 def main():
-    atlas = Image.new('RGBA',(512*SCALE,256*SCALE))
+    atlas = Image.new('RGBA',(512*SCALE,352*SCALE))
     with Image.open(ROOT/'art-source/dodge-icon/dodge-128.png') as source:
         if source.size != (128, 128):
             raise ValueError('Dodge icon must use its normalized 128x128 source')
@@ -148,9 +149,16 @@ def main():
     for x,colors in [(288,[(0,'#886738'),(1,'#e5cf92')]),(320,[(0,'#385f5c'),(1,'#a2d3c3')])]:
         atlas.alpha_composite(gradient(32,8,colors,horizontal=True),(x*SCALE,192*SCALE))
     ImageDraw.Draw(atlas).rectangle((352*SCALE,192*SCALE,356*SCALE-1,196*SCALE-1),fill="white")
+    for name, size, target, x, y in [('frame-512x96.png', (512,96), (512,96), 0, 256),
+                                      ('fill-128x16.png', (128,16), (120,16), 260, 212)]:
+        with Image.open(ROOT/'art-source/boss-hud'/name) as source:
+            if source.size != size:
+                raise ValueError(f'Boss HUD {name} must use its normalized {size} source')
+            atlas.alpha_composite(source.convert('RGBA').resize(
+                (target[0]*SCALE,target[1]*SCALE),Image.Resampling.LANCZOS), (x*SCALE,y*SCALE))
     output=ROOT/'assets/art/hud-atlas.png'
-    atlas.resize((512,256),Image.Resampling.LANCZOS).save(output,optimize=True)
-    print(f'{output}:512x256RGBA,524288GPUbytes,staticapprovedSVG-derivedart')
+    atlas.resize((512,352),Image.Resampling.LANCZOS).save(output,optimize=True)
+    print(f'{output}:512x352RGBA,720896GPUbytes,managedoriginalHUDart')
 
 
 if __name__ == '__main__':

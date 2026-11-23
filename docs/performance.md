@@ -219,3 +219,47 @@ performance, or long-run memory behavior. The strict frame target remains unveri
 Temporary controllers/logging were stopped and the game returned to Home. The existing
 emulator, relay and ADB forward remain running for user handoff; no physical device
 was touched.
+
+
+## Smaller painted boss header and combat feedback (2026-11-23)
+
+The approved painted death-mask/frame is a separate alpha sprite with a separate
+crimson fill. The live boss-health fraction crops the fill behind the reservoir;
+the name uses existing cached font glyphs. The 960×180 destination contains about
+814×165 visible artwork pixels, reduced from the approved full-size concept.
+Survival shows only the timer; boss combat shows the name/health header. Persistent
+Slain/Souls counters, BOSS/phase text and routine top banners no longer render.
+Dodge is anchored beside each orb, independent of acquired-skill count. The living
+hero colour marker is removed; actual revival progress remains. Projectile hits
+use short direction-free circular accents with the existing glow/pixel textures
+and pooled effect lifetime, with no frame-loop allocations or changes to projectile rules.
+
+The shared file-backed managed HUD page grows from 512×256 to 512×352 RGBA,
+adding 196,608 GPU bytes and no retained Pixmap. Existing named HUD regions retain
+their pixels and coordinates. Total accounted textures with QR are now
+33,516,364 bytes (31.9637 MiB), leaving 38,068 bytes below 32 MiB. Retained Pixmaps
+remain 20,245,324 bytes. The startup budget guard includes the fixed 360×360 QR.
+The boss master/concept are source files only; runtime loads the small shared atlas.
+Future art additions must respect this narrow remaining budget or repack residency.
+
+JDK 21 desktop classes and Android debug assembly passed, along with 19 focused
+HUD/model/state and actor-presentation checks (including projectile presentation
+snapshots and choice freezes). Brief Android 13 ARM64 Television_1080p observations
+covered Ranger solo with zero acquired skills, a four-second projectile-contact
+recording, populated solo/co-op boss previews, downed feedback and manual pause.
+The initial atlas inspection caught fill-filter bleed into a neighboring Dodge
+cell; a guarded fill region fixed it. The final APK was rebuilt and a final co-op
+capture confirmed that guarded atlas. Local evidence is ignored under
+`.run/epic-hud-*.png`, `.run/projectile-impacts.mp4` and `.run/epic-hud-render.log`.
+
+One startup-adjacent solo window contained 288 frames: interval p95/p99/max
+20.65/49.20/50.01 ms, CPU submission p95/p99/max 6.36/33.29/49.02 ms.
+The populated co-op window contained 290 frames: interval p95/p99/max
+20.08/44.69/73.94 ms, CPU 9.30/24.25/39.19 ms. A following 175-frame partial window
+including capture/transitions reached 130.94 ms interval and 130.28 ms CPU.
+These brief emulator samples include startup/capture work and do not isolate GPU
+time, establish sustained 60 FPS, or replace physical-TV gameplay/performance
+checks. The strict frame target is not proven. Native screenrecord is silent.
+Temporary controllers/logging were stopped and the app returned to Home. The
+existing emulator, relay and ADB forward remain available; no physical device
+was touched.

@@ -507,30 +507,30 @@ public final class ArenaRenderer implements Disposable {
                         impactX += BOLT_ORIGIN[origin] * sourceScale;
                         impactY = y + BOLT_ORIGIN[origin + 1] * sourceScale;
                     }
-                    float dx = screenX(effect.dirX, effect.dirY), dy = screenY(effect.dirX, effect.dirY);
-                    float magnitude = Math.max(.001f, (float) Math.sqrt(dx * dx + dy * dy));
-                    dx /= magnitude; dy /= magnitude;
-                    if (!effect.heroHit && (effect.impactKind == ArenaWorld.ImpactKind.SWORD
-                        || effect.impactKind == ArenaWorld.ImpactKind.BOLT)) {
-                        VfxArt.Animation clip = effect.impactKind == ArenaWorld.ImpactKind.SWORD
-                            ? VfxArt.Animation.SWORD_HIT : VfxArt.Animation.BOLT_HIT;
-                        float scale = (clip == VfxArt.Animation.SWORD_HIT ? 1.45f : 1.18f)
-                            * (effect.critical ? 1.22f : 1f);
-                        float rotation = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees - 25f;
-                        if (clip == VfxArt.Animation.BOLT_HIT) batch.setColor(.55f, .92f, 1f, 1f);
-                        else batch.setColor(Color.WHITE);
-                        art.vfx.draw(batch, clip, effect.maxTtl - effect.ttl, impactX, impactY,
-                            scale, rotation, VfxArt.Layer.ALL);
+                    if (!effect.heroHit && effect.impactKind == ArenaWorld.ImpactKind.BOLT) {
+                        // The collision origin follows the projectile plane; the burst itself has no heading.
+                        projectileBurst(impactX, impactY, life, effect.critical);
                     } else {
-                        float reach = (effect.heroHit ? 25f : 18f) * (1f - life * .55f);
-                        batch.setColor(1f, effect.heroHit ? .22f : .84f, effect.heroHit ? .12f : .58f, life);
-                        burst(x, y + lift, dx, dy, reach, effect.heroHit ? 3.5f : 2.2f, 5);
-                        batch.setColor(1f, effect.heroHit ? .3f : .92f, effect.heroHit ? .16f : .72f, life * .45f);
-                        batch.draw(art.glow, x - 18f, y + lift - 18f, 36f, 36f);
-                    }
-                    if (effect.critical) {
-                        batch.setColor(1f, .92f, .57f, life * .9f);
-                        burst(impactX, impactY, dx, dy, 32f * (1f - life * .4f), 2f, 3);
+                        float dx = screenX(effect.dirX, effect.dirY), dy = screenY(effect.dirX, effect.dirY);
+                        float magnitude = Math.max(.001f, (float) Math.sqrt(dx * dx + dy * dy));
+                        dx /= magnitude; dy /= magnitude;
+                        if (!effect.heroHit && effect.impactKind == ArenaWorld.ImpactKind.SWORD) {
+                            float scale = 1.45f * (effect.critical ? 1.22f : 1f);
+                            float rotation = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees - 25f;
+                            batch.setColor(Color.WHITE);
+                            art.vfx.draw(batch, VfxArt.Animation.SWORD_HIT, effect.maxTtl - effect.ttl,
+                                impactX, impactY, scale, rotation, VfxArt.Layer.ALL);
+                        } else {
+                            float reach = (effect.heroHit ? 25f : 18f) * (1f - life * .55f);
+                            batch.setColor(1f, effect.heroHit ? .22f : .84f, effect.heroHit ? .12f : .58f, life);
+                            burst(x, y + lift, dx, dy, reach, effect.heroHit ? 3.5f : 2.2f, 5);
+                            batch.setColor(1f, effect.heroHit ? .3f : .92f, effect.heroHit ? .16f : .72f, life * .45f);
+                            batch.draw(art.glow, x - 18f, y + lift - 18f, 36f, 36f);
+                        }
+                        if (effect.critical) {
+                            batch.setColor(1f, .92f, .57f, life * .9f);
+                            burst(impactX, impactY, dx, dy, 32f * (1f - life * .4f), 2f, 3);
+                        }
                     }
                 }
                 case DEATH -> {
@@ -607,11 +607,43 @@ public final class ArenaRenderer implements Disposable {
     private float effectMargin(ArenaWorld.Effect effect) {
         float radius = effect.radius + 80f;
         if (effect.kind == ArenaWorld.EffectKind.HIT) {
-            VfxArt.Animation clip = effect.impactKind == ArenaWorld.ImpactKind.SWORD
-                ? VfxArt.Animation.SWORD_HIT : VfxArt.Animation.BOLT_HIT;
-            radius = Math.max(radius, art.vfx.maxRadius(clip) * 1.8f + Math.max(100f, impactLift(effect)));
+            float reach = effect.impactKind == ArenaWorld.ImpactKind.BOLT
+                ? 42f * (effect.critical ? 1.22f : 1f)
+                : art.vfx.maxRadius(VfxArt.Animation.SWORD_HIT) * 1.8f;
+            radius = Math.max(radius, reach + Math.max(100f, impactLift(effect)));
         }
         return radius;
+    }
+
+    /** Short circular impact in screen space: core flash, soft bloom, six round motes and one ring. */
+    private void projectileBurst(float x, float y, float life, boolean critical) {
+        float age = 1f - life;
+        float scale = critical ? 1.22f : 1f;
+        float radius = (8f + 24f * (float) Math.sqrt(age)) * scale;
+        float fade = life * life;
+        float glowRadius = radius + 7f * scale;
+        batch.setColor(.3f, .8f, 1f, fade * .6f);
+        batch.draw(art.glow, x - glowRadius, y - glowRadius, glowRadius * 2f, glowRadius * 2f);
+        // The bright center is gone during the latter part of the existing pooled hit's lifetime.
+        float flash = Math.max(0f, 1f - age * 3.3f);
+        float coreRadius = (5f + 8f * flash) * scale;
+        batch.setColor(.9f, 1f, 1f, flash * .95f);
+        batch.draw(art.glow, x - coreRadius, y - coreRadius, coreRadius * 2f, coreRadius * 2f);
+        batch.setColor(critical ? 1f : .6f, critical ? .92f : .94f, critical ? .65f : 1f, fade * .85f);
+        float moteRadius = (3f * life + .7f) * scale;
+        for (int i = 0; i < 6; i++) {
+            float angle = MathUtils.PI2 * i / 6f + MathUtils.PI / 6f;
+            float px = x + MathUtils.cos(angle) * radius, py = y + MathUtils.sin(angle) * radius;
+            batch.draw(art.glow, px - moteRadius, py - moteRadius, moteRadius * 2f, moteRadius * 2f);
+        }
+        batch.setColor(.65f, .96f, 1f, fade * .8f);
+        float previousX = x + radius, previousY = y;
+        for (int i = 1; i <= 24; i++) {
+            float angle = MathUtils.PI2 * i / 24f;
+            float px = x + MathUtils.cos(angle) * radius, py = y + MathUtils.sin(angle) * radius;
+            line(previousX, previousY, px, py, (.6f + 1.6f * life) * scale);
+            previousX = px; previousY = py;
+        }
     }
 
     private float impactLift(ArenaWorld.Effect effect) {
@@ -767,8 +799,6 @@ public final class ArenaRenderer implements Disposable {
                     -screenY(player.attackFacingX, player.attackFacingY) * recoil);
                 drawLevelUp(world, player, VfxArt.Layer.FRONT);
                 drawMuzzle(player);
-                batch.setColor(index == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO);
-                batch.draw(art.pixel, sx - 10f, sy - 4f, 20f, 2f);
                 batch.setColor(Color.WHITE);
             }
         }

@@ -20,6 +20,7 @@ public final class GameHud {
     private static final float SKILL_Y = 150f, SKILL_SIZE = 88f, SKILL_STEP = 100f;
     private static final float DODGE_Y = 154f, DODGE_SIZE = 80f;
     private static final float CRITICAL_HEALTH = .2f, PULSE_SECONDS = 1.6f;
+    private static final float BOSS_X = 480f, BOSS_Y = 850f, BOSS_SCALE = 960f / 512f;
     private static final int ARC_SEGMENTS = 48;
     private final GameArt art;
     private final HudArt hudArt;
@@ -28,7 +29,7 @@ public final class GameHud {
     private final Text[] dodge = new Text[2], playerLabels = new Text[2], overflow = new Text[2], revivalStatus = new Text[2];
     private final Text[][] ranks = new Text[2][PlayerHudModel.MAX_SKILLS];
     private final Text[] allyDown = new Text[2], revival = new Text[2];
-    private final Text timer, slain, souls, bossName, bossPhase, noticeTitle, partyLevel, lowHealth;
+    private final Text timer, bossName, partyLevel, lowHealth;
     private final StringBuilder builder = new StringBuilder(64);
     private final boolean[] wasActive = new boolean[2], wasAlive = new boolean[2];
     private float refresh, pulseClock;
@@ -49,12 +50,8 @@ public final class GameHud {
         }
         lowHealth = new Text(ui.small, .85f, 180f, CRITICAL); lowHealth.set("LOW HEALTH");
         partyLevel = new Text(ui.small, .9f, 480f, UiArt.GOLD);
-        timer = new Text(ui.section, .9f, 110f, UiArt.IVORY);
-        slain = new Text(ui.small, 1f, 230f, UiArt.IVORY);
-        souls = new Text(ui.small, 1f, 230f, SOUL);
-        bossName = new Text(ui.small, 1f, 410f, UiArt.IVORY);
-        bossPhase = new Text(ui.small, 1f, 190f, UiArt.GOLD);
-        noticeTitle = new Text(ui.small, 1f, 670f, UiArt.GOLD);
+        timer = new Text(ui.section, 1.15f, 160f, UiArt.IVORY);
+        bossName = new Text(ui.heading, .6f, 750f, UiArt.IVORY);
     }
 
     public void reset() {
@@ -92,19 +89,10 @@ public final class GameHud {
         rect(batch, 60f, 46f, 1800f, 8f, Color.BLACK, .65f);
         rect(batch, 60f, 48f, 1800f, 4f, TRACK, .9f);
         if (xp > 0) { batch.setColor(Color.WHITE); batch.draw(hudArt.xpGold, 60f, 48f, 1800f * xp, 4f); }
-        if (state.bossVisible) {
-            rect(batch, 660f, 945f, 600f, 14f, Color.BLACK, .7f);
-            rect(batch, 660f, 948f, 600f, 8f, TRACK, 1f);
-            batch.setColor(Color.WHITE);
-            batch.draw(hudArt.healthFill, 660f, 948f, 600f * MathUtils.clamp(state.bossHealth / Math.max(1, state.bossMaxHealth), 0, 1), 8f);
-        }
-        ArenaHudState.Notice notice = state.current();
-        float noticeY = state.bossVisible ? 913f : 974f;
-        if (notice != null) {
-            noticeTitle.set(notice.title.isEmpty() ? notice.detail : notice.title);
-            diamond(batch, 960f - noticeTitle.layout.width / 2f - 17f, noticeY - 9f, 5f,
-                notice.tone == ArenaHudState.Tone.WARNING ? WARNING : notice.tone == ArenaHudState.Tone.SUCCESS ? SOUL : UiArt.GOLD,
-                MathUtils.clamp(notice.remaining / .3f, 0, 1));
+        if (state.bossVisible) bossArt(batch, state);
+        else {
+            batch.setColor(0, 0, 0, .38f);
+            batch.draw(art.shadow, 860f, 962f, 200f, 100f);
         }
         batch.setColor(Color.WHITE);
         for (ArenaWorld.Player player : world.players) if (player.active) {
@@ -116,24 +104,38 @@ public final class GameHud {
         for (ArenaWorld.Player player : world.players) if (player.active)
             playerText(batch, player, world, split && player.slot == 1);
         partyLevel.center(batch, 960f, 82f);
-        timer.center(batch, 960f, 1030f); slain.right(batch, 870f, 1025f); souls.draw(batch, 1050f, 1025f);
         if (state.bossVisible) {
-            bossName.set(state.bossName); bossPhase.set(state.bossPhase);
-            bossName.draw(batch, 660f, 977f); bossPhase.right(batch, 1260f, 977f);
-        }
-        if (notice != null) noticeTitle.draw(batch, 960f - noticeTitle.layout.width / 2f, noticeY,
-            notice.tone == ArenaHudState.Tone.WARNING ? WARNING : notice.tone == ArenaHudState.Tone.SUCCESS ? SOUL : UiArt.GOLD,
-            MathUtils.clamp(notice.remaining / .3f, 0, 1));
+            bossName.set(state.bossName);
+            bossName.center(batch, BOSS_X + HudArt.BOSS_TITLE_X * BOSS_SCALE,
+                BOSS_Y + HudArt.BOSS_TITLE_Y * BOSS_SCALE);
+        } else timer.center(batch, 960f, 1028f);
         batch.setColor(Color.WHITE);
+    }
+
+    /** Painted frame and live fill share the same managed HUD page. No baked text or health. */
+    private void bossArt(SpriteBatch batch, ArenaHudState state) {
+        float x = BOSS_X + HudArt.BOSS_TRACK_X * BOSS_SCALE;
+        float y = BOSS_Y + HudArt.BOSS_TRACK_Y * BOSS_SCALE;
+        float width = HudArt.BOSS_TRACK_WIDTH * BOSS_SCALE;
+        float height = HudArt.BOSS_TRACK_HEIGHT * BOSS_SCALE;
+        rect(batch, x, y, width, height, Color.BLACK, .94f);
+        float ratio = MathUtils.clamp(state.bossHealth / Math.max(1f, state.bossMaxHealth), 0, 1);
+        if (ratio > 0) {
+            batch.setColor(Color.WHITE);
+            // Crop the texture rather than compressing its painted detail as health falls.
+            TextureRegion fill = hudArt.bossFill;
+            batch.draw(fill.getTexture(), x, y, width * ratio, height,
+                fill.getU(), fill.getV2(), MathUtils.lerp(fill.getU(), fill.getU2(), ratio), fill.getV());
+        }
+        batch.setColor(Color.WHITE);
+        batch.draw(hudArt.bossFrame, BOSS_X, BOSS_Y, 960f, 180f);
     }
 
     private void refreshText(ArenaWorld world) {
         int remaining = (int) Math.ceil(world.timeRemaining());
         builder.setLength(0); builder.append(remaining / 60).append(':');
         if (remaining % 60 < 10) builder.append('0');
-        timer.set(world.bossSpawned ? "BOSS" : builder.append(remaining % 60).toString());
-        builder.setLength(0); slain.set(builder.append(world.kills).append(" SLAIN").toString());
-        builder.setLength(0); souls.set(builder.append(world.souls).append(" SOULS").toString());
+        timer.set(builder.append(remaining % 60).toString());
         builder.setLength(0); builder.append("PARTY LV ").append(world.progression.level);
         partyLevel.set(builder.append(world.progression.xpToNext > 0 ? "  /  XP" : "  /  MAX LEVEL").toString());
         for (ArenaWorld.Player player : world.players) {
@@ -187,7 +189,7 @@ public final class GameHud {
         }
         batch.setColor(Color.WHITE); batch.draw(hudArt.orbReflection, orbX, ORB_Y, ORB_SIZE, ORB_SIZE);
         batch.draw(teal ? hudArt.orbTeal : hudArt.orbGold, orbX, ORB_Y, ORB_SIZE, ORB_SIZE);
-        float dodgeX = mirror ? 1062f : 778f;
+        float dodgeX = mirror ? 1602f : 238f;
         batch.draw(hudArt.dodgeBack, dodgeX, DODGE_Y, DODGE_SIZE, DODGE_SIZE);
         if (player.alive) {
             float tint = player.dodgeCooldown <= .05f ? 1f : .36f;
@@ -210,7 +212,7 @@ public final class GameHud {
 
     private void playerText(SpriteBatch batch, ArenaWorld.Player player, ArenaWorld world, boolean mirror) {
         int slot = player.slot;
-        float center = mirror ? 1784f : 136f, dodgeX = mirror ? 1102f : 818f;
+        float center = mirror ? 1784f : 136f, dodgeX = mirror ? 1642f : 278f;
         playerLabels[slot].center(batch, center, 302f);
         if (player.alive && healthRatio(player, world) <= CRITICAL_HEALTH) lowHealth.center(batch, center, 110f);
         dodge[slot].center(batch, dodgeX, DODGE_Y + 52f);
@@ -218,11 +220,11 @@ public final class GameHud {
         PlayerHudModel build = builds[slot];
         for (int i = 0; i < build.count; i++)
             ranks[slot][i].center(batch, skillX(mirror, i) + 76f, SKILL_Y + 14f);
-        overflow[slot].center(batch, mirror ? 1168f : 752f, SKILL_Y + 55f);
+        overflow[slot].center(batch, mirror ? 1056f : 864f, SKILL_Y + 55f);
     }
 
     private static float skillX(boolean mirror, int index) {
-        return mirror ? 1594f - index * SKILL_STEP : 238f + index * SKILL_STEP;
+        return mirror ? 1488f - index * SKILL_STEP : 344f + index * SKILL_STEP;
     }
 
     private static float healthRatio(ArenaWorld.Player player, ArenaWorld world) {
@@ -248,11 +250,6 @@ public final class GameHud {
     private void rect(SpriteBatch batch, float x, float y, float width, float height, Color color, float alpha) {
         if (width <= 0 || height <= 0) return;
         batch.setColor(color.r, color.g, color.b, alpha); batch.draw(hudArt.pixel, x, y, width, height);
-    }
-
-    private void diamond(SpriteBatch batch, float cx, float cy, float size, Color color, float alpha) {
-        batch.setColor(color.r, color.g, color.b, alpha);
-        batch.draw(hudArt.pixel, cx - size / 2f, cy - size / 2f, size / 2f, size / 2f, size, size, 1f, 1f, 45f);
     }
 
     /** Fallen-ally cues use projected positions supplied by the matching split camera. */
