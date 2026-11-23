@@ -31,6 +31,20 @@ public final class ArenaWorld {
     public enum EffectKind { SLASH, HIT, DEATH, AURA, LIGHTNING, DODGE, COLLECT, BLOCK }
     public enum ImpactKind { SWORD, BOLT, MAGIC }
 
+    /** Opt-in, cumulative run counters. Never consulted by simulation rules. */
+    public static final class Diagnostics {
+        /** Active, not-yet-hit bolt/enemy pairs submitted to the geometric collision test. */
+        public long boltCollisionCandidates;
+        public long enemySpawnMisses, boltAcquireMisses, shotAcquireMisses, hazardAcquireMisses, effectAcquireMisses;
+        /** Rewards merged into existing pickups because every pickup slot was occupied. */
+        public long pickupMerges;
+
+        private void reset() {
+            boltCollisionCandidates = enemySpawnMisses = boltAcquireMisses = shotAcquireMisses = 0;
+            hazardAcquireMisses = effectAcquireMisses = pickupMerges = 0;
+        }
+    }
+
     public Outcome outcome;
     public float elapsed;
     /** Cosmetic time: advances during host-owned choice updates, never moves combat. */
@@ -42,6 +56,8 @@ public final class ArenaWorld {
     /** Committed combat events, consumed independently by presentation/audio; never drive game rules. */
     public int swordHits, boltHits, criticalHits, dodges, blockedHits, healsCollected, auraPulses, stormCasts;
     public int wraithDashes, bruteSlams, hostileShotsFired;
+    /** Fixed steps executed by the most recent update, including choice-only steps. */
+    public int lastUpdateSteps;
     public final Player[] players = {new Player(0), new Player(1)};
     public final Enemy[] enemies = new Enemy[MAX_ENEMIES];
     public final Bolt[] bolts = new Bolt[MAX_BOLTS];
@@ -59,6 +75,7 @@ public final class ArenaWorld {
     private int sharedXpRemainder;
     private int randomState, runNumber, nextCheckpoint, encounterPhase;
     private int presentedChoiceRound;
+    private Diagnostics diagnostics, diagnosticsStorage;
 
     public ArenaWorld() { this(ArenaTimeline.SHORT); }
 
@@ -76,6 +93,8 @@ public final class ArenaWorld {
     }
 
     public void reset() {
+        lastUpdateSteps = 0;
+        if (diagnosticsStorage != null) diagnosticsStorage.reset();
         outcome = Outcome.RUNNING; elapsed = accumulator = 0; simulationElapsed = 0; sharedXpRemainder = 0;
         kills = souls = activeEnemies = elitesKilled = nextCheckpoint = encounterPhase = 0;
         wave = bossPhase = 1; bossSpawned = bossDefeated = false; boss = null;
@@ -168,13 +187,23 @@ public final class ArenaWorld {
     }
 
     public void update(float delta) {
+        lastUpdateSteps = 0;
         if (outcome != Outcome.RUNNING || !Float.isFinite(delta) || delta <= 0) return;
         if (!players[0].active && !players[1].active) return;
         accumulator += Math.min(delta, .1f);
         while (accumulator + .000001f >= STEP && outcome == Outcome.RUNNING) {
-            accumulator = Math.max(0, accumulator - STEP); tick();
+            accumulator = Math.max(0, accumulator - STEP); lastUpdateSteps++; tick();
         }
     }
+
+    /** Allocate diagnostics once on first enable; disabling stops counting without discarding run history. */
+    public void setDiagnosticsEnabled(boolean enabled) {
+        if (enabled && diagnosticsStorage == null) diagnosticsStorage = new Diagnostics();
+        diagnostics = enabled ? diagnosticsStorage : null;
+    }
+
+    /** Null unless enabled. The returned object is reused and its counters clear with reset(). */
+    public Diagnostics diagnostics() { return diagnostics; }
 
     /** A personal skill choice pauses combat for the whole party, including players already done. */
     public boolean levelUpPending() {
@@ -579,7 +608,9 @@ public final class ArenaWorld {
             float oldX = b.x, oldY = b.y; b.age += STEP; b.x += b.vx * STEP; b.y += b.vy * STEP; b.ttl -= STEP;
             for (int i = 0; i < enemies.length; i++) {
                 Enemy e = enemies[i]; long bit = 1L << i;
-                if (!e.active || (b.hitMask & bit) != 0 || segmentDistanceSquared(oldX, oldY, b.x, b.y, e.x, e.y) > square(e.radius + 5)) continue;
+                if (!e.active || (b.hitMask & bit) != 0) continue;
+                if (diagnostics != null) diagnostics.boltCollisionCandidates++;
+                if (segmentDistanceSquared(oldX, oldY, b.x, b.y, e.x, e.y) > square(e.radius + 5)) continue;
                 b.hitMask |= bit;
                 Effect impact = hit(e, b.damage, b.owner, true, b.critical, ImpactKind.BOLT, b.vx, b.vy);
                 if (impact != null) {
@@ -603,6 +634,7 @@ public final class ArenaWorld {
             shot.vx = dx / distance * speed; shot.vy = dy / distance * speed;
             shot.ttl = 5; shot.damage = damage; shot.radius = 10; hostileShotsFired++; return;
         }
+        if (diagnostics != null) diagnostics.shotAcquireMisses++;
     }
 
     private void updateShots() {
@@ -620,6 +652,7 @@ public final class ArenaWorld {
         for (Hazard h : hazards) if (!h.active) {
             h.active = true; h.x = x; h.y = y; h.radius = radius; h.warning = warning; h.ttl = warning + .3f; h.damage = damage; return;
         }
+        if (diagnostics != null) diagnostics.hazardAcquireMisses++;
     }
 
     private void updateHazards() {
@@ -711,7 +744,11 @@ public final class ArenaWorld {
 
     private void drop(float x, float y, boolean healing, int value) {
         for (Pickup p : pickups) if (!p.active) { p.active = true; p.x = x; p.y = y; p.healing = healing; p.value = value; return; }
-        for (Pickup p : pickups) if (p.healing == healing) { p.value = (int) Math.min(Integer.MAX_VALUE, (long) p.value + value); return; }
+        for (Pickup p : pickups) if (p.healing == healing) {
+            p.value = (int) Math.min(Integer.MAX_VALUE, (long) p.value + value);
+            if (diagnostics != null) diagnostics.pickupMerges++;
+            return;
+        }
     }
 
     private void updatePickups() {
@@ -789,7 +826,10 @@ public final class ArenaWorld {
     }
 
     private Enemy spawn(EnemyKind kind, boolean elite, Player anchor, float angle) {
-        if (activeEnemies >= MAX_ENEMIES) return null;
+        if (activeEnemies >= MAX_ENEMIES) {
+            if (diagnostics != null) diagnostics.enemySpawnMisses++;
+            return null;
+        }
         if (anchor == null) return null;
         for (Enemy e : enemies) {
             if (e.active) continue;
@@ -824,6 +864,7 @@ public final class ArenaWorld {
             e.spawnAge = 0;
             e.active = true; activeEnemies++; return e;
         }
+        if (diagnostics != null) diagnostics.enemySpawnMisses++;
         return null;
     }
 
@@ -955,7 +996,11 @@ public final class ArenaWorld {
     }
     private int activePlayerCount() { int count = 0; for (Player p : players) if (p.active) count++; return count; }
     private int enemyIndex(Enemy enemy) { for (int i = 0; i < enemies.length; i++) if (enemies[i] == enemy) return i; return 0; }
-    private Bolt freeBolt() { for (Bolt b : bolts) if (!b.active) return b; return null; }
+    private Bolt freeBolt() {
+        for (Bolt b : bolts) if (!b.active) return b;
+        if (diagnostics != null) diagnostics.boltAcquireMisses++;
+        return null;
+    }
     private Effect effect(EffectKind kind, float x, float y, int owner, float duration) {
         for (Effect e : effects) if (!e.active) {
             e.active = true; e.kind = kind; e.x = x; e.y = y; e.x2 = x; e.y2 = y;
@@ -964,6 +1009,7 @@ public final class ArenaWorld {
             e.impactKind = ImpactKind.MAGIC;
             e.ttl = e.maxTtl = duration; e.owner = owner; return e;
         }
+        if (diagnostics != null) diagnostics.effectAcquireMisses++;
         return null;
     }
     private float random() {

@@ -123,18 +123,27 @@ public final class CryptLobby extends ApplicationAdapter {
     public CryptLobby(GameConfig config) { this.config = config; }
 
     @Override public void create() {
-        if (config.profile()) frameMetrics = new FrameMetrics();
+        long startupBegin = config.profile() ? System.nanoTime() : 0;
+        if (config.profile()) {
+            frameMetrics = new FrameMetrics();
+            world.setDiagnosticsEnabled(true);
+        }
         Gdx.graphics.setForegroundFPS(60);
         Gdx.input.setCatchKey(Input.Keys.BACK, true);
         stage = new Stage(new FitViewport(1920, 1080));
+        long startupStage = config.profile() ? System.nanoTime() : 0;
         art = new UiArt();
+        startupStage = profileStartup("uiArt", startupStage);
         gameArt = new GameArt();
+        startupStage = profileStartup("gameArt", startupStage);
         outcomeTitles = new OutcomeArt.Titles();
         buildIcons = new BuildIcons();
         itemArt = new ItemArt();
         hudArt = new HudArt();
-        arena = new ArenaRenderer(gameArt, art, buildIcons, hudArt);
+        startupStage = profileStartup("sharedTitlesIconsHud", startupStage);
+        arena = new ArenaRenderer(gameArt, art, buildIcons, hudArt, frameMetrics);
         audio = new GameAudio();
+        startupStage = profileStartup("rendererAudio", startupStage);
         if (residentArtBytes() + 360L * 360 * 4 > 32L * 1_048_576)
             throw new IllegalStateException("Combined art and join QR exceed 32 MiB texture budget");
         Gdx.app.log("GameArt", "Combined resident textures: " + residentArtBytes() / 1_048_576f + " MiB");
@@ -152,11 +161,40 @@ public final class CryptLobby extends ApplicationAdapter {
         diagnostics.setPosition(105, 22); diagnostics.setVisible(false); stage.addActor(diagnostics);
         host = config.advertisedHost();
         if (host == null) host = LanAddress.find().stream().findFirst().orElse(null);
+        startupStage = profileStartup("initialUi", startupStage);
         openServer();
+        startupStage = profileStartup("phoneAssetsServer", startupStage);
         Gdx.input.setInputProcessor(new InputMultiplexer(new InputAdapter() {
             @Override public boolean keyDown(int key) { return key(key); }
         }, stage));
         home();
+        profileStartup("homeLayout", startupStage);
+        if (config.profile()) {
+            profileStartup("createTotal", startupBegin);
+            Gdx.app.log("ProfileMemory", "uiTextureBytes=" + art.textureBytes
+                + " uiRetainedPixmapBytes=" + art.retainedPixmapBytes
+                + " gameplayTextureBytes=" + gameArt.textureBytes
+                + " gameplayRetainedPixmapBytes=" + gameArt.retainedPixmapBytes
+                + " hudTextureBytes=" + hudArt.textureBytes
+                + " titlesTextureBytes=" + outcomeTitles.textureBytes
+                + " skillsTextureBytes=" + buildIcons.textureBytes
+                + " itemsTextureBytes=" + itemArt.textureBytes
+                + " textureLimitBytes=" + 32L * 1_048_576
+                + " floorCachedQuads=" + arena.cachedFloorQuads
+                + " floorUsedVertexBytes=" + arena.cachedFloorQuads * 80L
+                + " floorUsedIndexBytes=" + arena.cachedFloorQuads * 12L
+                + " floorCapacityVertexBytes=" + com.couchcrypt.game.EngravedFloorArt.MAX_FLOOR_QUADS * 80L
+                + " floorCapacityIndexBytes=" + com.couchcrypt.game.EngravedFloorArt.MAX_FLOOR_QUADS * 12L
+                + " medallionVertexBytes=" + arena.medallionQuads() * 80L);
+        }
+    }
+
+    /** Startup wall durations are separate from settled frame measurements. */
+    private long profileStartup(String stageName, long begin) {
+        if (!config.profile()) return 0;
+        long end = System.nanoTime();
+        Gdx.app.log("ProfileStartup", "stage=" + stageName + " wallNs=" + Math.max(0, end - begin));
+        return System.nanoTime();
     }
 
     private void openServer() {
@@ -818,6 +856,11 @@ public final class CryptLobby extends ApplicationAdapter {
     }
 
     private boolean key(int key) {
+        // Profiling capture boundary only: exclude fixture/warm-up work without changing the run.
+        if (key == Input.Keys.PAGE_DOWN && frameMetrics != null) {
+            frameMetrics.reset();
+            return true;
+        }
         if (key == Input.Keys.PAGE_UP && config.profile() && screen == Screen.SESSION
             && overlay == null && !world.choicePending()) {
             previewArenaLandmark(); return true;
@@ -1049,7 +1092,10 @@ public final class CryptLobby extends ApplicationAdapter {
 
     @Override public void render() {
         if (frameMetrics != null) frameMetrics.beginFrame();
-        float delta = Math.min(Gdx.graphics.getDeltaTime(), 0.1f);
+        float rawDelta = Gdx.graphics.getDeltaTime();
+        float delta = Math.min(rawDelta, 0.1f);
+        int simulationSteps = 0;
+        if (frameMetrics != null) frameMetrics.beginStage(FrameMetrics.HANDOFF);
         refreshClock += delta; profileClock += delta;
         long now = System.currentTimeMillis();
         for (int i = 0; i < 2; i++) state.readControls(i, controls[i], now);
@@ -1086,8 +1132,21 @@ public final class CryptLobby extends ApplicationAdapter {
                             + (itemRequest.option < 0 ? "GEAR KEPT" : "EQUIPPED"), "", ArenaHudState.Tone.SUCCESS, 2f);
                     }
                 }
+                if (frameMetrics != null) {
+                    frameMetrics.endStage(FrameMetrics.HANDOFF);
+                    frameMetrics.beginStage(FrameMetrics.SIMULATION);
+                }
                 world.update(delta);
+                simulationSteps = world.lastUpdateSteps;
+                if (frameMetrics != null) {
+                    frameMetrics.endStage(FrameMetrics.SIMULATION);
+                    frameMetrics.beginStage(FrameMetrics.AUDIO);
+                }
                 audio.update(world, delta);
+                if (frameMetrics != null) {
+                    frameMetrics.endStage(FrameMetrics.AUDIO);
+                    frameMetrics.beginStage(FrameMetrics.HANDOFF);
+                }
                 announceLevelUp();
                 hudState.update(delta);
                 updateCombatNotices();
@@ -1095,6 +1154,10 @@ public final class CryptLobby extends ApplicationAdapter {
             }
         }
         syncChoices();
+        if (frameMetrics != null) {
+            frameMetrics.endStage(FrameMetrics.HANDOFF);
+            frameMetrics.beginStage(FrameMetrics.STATUS);
+        }
         if (refreshClock >= 0.2f) {
             refreshClock = 0; updateStatus(); publishProgression();
             for (int i = 0; i < 2; i++) {
@@ -1108,16 +1171,44 @@ public final class CryptLobby extends ApplicationAdapter {
                 String stats = Gdx.graphics.getFramesPerSecond() + " FPS  /  Java " + Gdx.app.getJavaHeap() / 1_048_576
                     + " MiB  /  Art " + residentArtBytes() / 1_048_576 + " MiB  /  Draws " + (arena.drawCalls + ((SpriteBatch) stage.getBatch()).renderCalls);
                 diagnostics.setText(stats);
-                if (config.profile()) Gdx.app.log("LobbyPerf", stats);
+                if (config.profile()) {
+                    Gdx.app.log("LobbyPerf", stats);
+                    var counters = world.diagnostics();
+                    Gdx.app.log("ProfileWorld", "phase=" + profileMode() + " runSeed=" + world.runSeed
+                        + " elapsed=" + world.elapsed + " candidates=" + counters.boltCollisionCandidates
+                        + " enemyMisses=" + counters.enemySpawnMisses + " boltMisses=" + counters.boltAcquireMisses
+                        + " shotMisses=" + counters.shotAcquireMisses + " hazardMisses=" + counters.hazardAcquireMisses
+                        + " effectMisses=" + counters.effectAcquireMisses + " pickupMerges=" + counters.pickupMerges);
+                }
             }
         }
         if (hostActive && background.isVisible()) art.menuScene.advance(delta);
+        if (frameMetrics != null) {
+            frameMetrics.endStage(FrameMetrics.STATUS);
+            frameMetrics.beginStage(FrameMetrics.ARENA);
+        }
         ScreenUtils.clear(0.025f, 0.035f, 0.04f, 1);
         if (screen == Screen.SESSION) arena.render(world, hudState,
             overlay != null || world.choicePending() ? 0f : delta, !world.choicePending());
+        if (frameMetrics != null) {
+            frameMetrics.endStage(FrameMetrics.ARENA);
+            frameMetrics.beginStage(FrameMetrics.UI);
+        }
         stage.getViewport().apply(); stage.act(delta); stage.draw();
-        if (frameMetrics != null) frameMetrics.endFrame(profileMode(), residentArtBytes(), residentPixmapBytes(),
-            Gdx.app.getJavaHeap(), (screen == Screen.SESSION ? arena.drawCalls : 0) + ((SpriteBatch) stage.getBatch()).renderCalls);
+        if (frameMetrics != null) {
+            frameMetrics.endStage(FrameMetrics.UI);
+            frameMetrics.addSimulationSteps(simulationSteps, rawDelta);
+            int enemies = 0, bolts = 0, pickups = 0, shots = 0, hazards = 0, effects = 0;
+            for (var value : world.enemies) if (value.active) enemies++;
+            for (var value : world.bolts) if (value.active) bolts++;
+            for (var value : world.pickups) if (value.active) pickups++;
+            for (var value : world.shots) if (value.active) shots++;
+            for (var value : world.hazards) if (value.active) hazards++;
+            for (var value : world.effects) if (value.active) effects++;
+            frameMetrics.recordPoolCounts(enemies, bolts, pickups, shots, hazards, effects);
+            frameMetrics.endFrame(profileMode(), residentArtBytes(), residentPixmapBytes(),
+                Gdx.app.getJavaHeap(), (screen == Screen.SESSION ? arena.drawCalls : 0) + ((SpriteBatch) stage.getBatch()).renderCalls);
+        }
     }
     @Override public void resize(int width, int height) { stage.getViewport().update(width, height, true); }
     @Override public void pause() {

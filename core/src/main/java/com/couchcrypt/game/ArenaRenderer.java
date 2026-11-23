@@ -2,6 +2,7 @@ package com.couchcrypt.game;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -31,7 +32,8 @@ public final class ArenaRenderer implements Disposable {
     private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PAINTED_BORDER = 3;
     private final GameArt art;
     private final GameHud gameHud;
-    private final SpriteBatch batch = new SpriteBatch(1800);
+    private final SpriteBatch batch;
+    private final FrameMetrics metrics;
     // One bounded static mesh; both cameras reuse the same floor, paths and wear colours.
     private final SpriteCache floorCache = createFloorCache();
     private final int floorCacheId;
@@ -53,6 +55,12 @@ public final class ArenaRenderer implements Disposable {
     public int medallionQuads() { return medallion.length; }
 
     public ArenaRenderer(GameArt gameArt, UiArt uiArt, BuildIcons buildIcons, HudArt hudArt) {
+        this(gameArt, uiArt, buildIcons, hudArt, null);
+    }
+
+    public ArenaRenderer(GameArt gameArt, UiArt uiArt, BuildIcons buildIcons, HudArt hudArt, FrameMetrics frameMetrics) {
+        metrics = frameMetrics;
+        batch = metrics == null ? new SpriteBatch(1800) : new ProfileBatch();
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
         floorLayout = new ArenaFloorLayout(new JsonReader().parse(Gdx.files.internal("arena/crypt-floor.json")));
         float radius = floorLayout.medallionDiameter * .5f;
@@ -85,6 +93,8 @@ public final class ArenaRenderer implements Disposable {
         int active = (world.players[0].active ? 1 : 0) + (world.players[1].active ? 1 : 0);
         boolean split = active == 2;
         drawCalls = 0;
+        int floorDraws = 0, worldDraws = 0, visibleSprites = 0;
+        if (metrics != null) ((ProfileBatch) batch).textureSelections = 0;
         Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST);
         for (int slot = 0; slot < 2; slot++) {
             if (!world.players[slot].active) continue;
@@ -94,7 +104,13 @@ public final class ArenaRenderer implements Disposable {
             Gdx.gl.glScissor(paneX, 0, paneWidth, height);
             OrthographicCamera camera = cameras[slot];
             updateCamera(camera, world.players[slot], slot, split, paneWidth, height, delta);
+            if (metrics != null) metrics.beginStage(FrameMetrics.FLOOR);
             drawFloor(camera);
+            if (metrics != null) {
+                metrics.endStage(FrameMetrics.FLOOR);
+                floorDraws += floorCache.renderCalls;
+                metrics.beginStage(FrameMetrics.WORLD_DRAW);
+            }
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
             art.engravedFloor.draw(batch, medallion);
@@ -103,7 +119,16 @@ public final class ArenaRenderer implements Disposable {
             drawGroundMarks(world, camera);
             drawPickups(world, camera);
             drawDust(world, camera);
+            if (metrics != null) {
+                metrics.endStage(FrameMetrics.WORLD_DRAW);
+                metrics.beginStage(FrameMetrics.GATHER);
+            }
             gatherSprites(world, camera);
+            if (metrics != null) {
+                metrics.endStage(FrameMetrics.GATHER);
+                visibleSprites += sortCount;
+                metrics.beginStage(FrameMetrics.WORLD_DRAW);
+            }
             drawShadows(world);
             drawSprites(world, camera, slot);
             drawBolts(world, camera);
@@ -111,7 +136,12 @@ public final class ArenaRenderer implements Disposable {
             drawEffects(world, camera);
             batch.end();
             drawCalls += batch.renderCalls;
+            if (metrics != null) {
+                metrics.endStage(FrameMetrics.WORLD_DRAW);
+                worldDraws += batch.renderCalls;
+            }
         }
+        if (metrics != null) metrics.beginStage(FrameMetrics.HUD);
         Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
         Gdx.gl.glViewport(0, 0, width, height);
         batch.setProjectionMatrix(hud.combined);
@@ -129,6 +159,21 @@ public final class ArenaRenderer implements Disposable {
         batch.setColor(Color.WHITE);
         batch.end();
         drawCalls += batch.renderCalls;
+        if (metrics != null) {
+            metrics.endStage(FrameMetrics.HUD);
+            metrics.recordRenderCounts(floorDraws, worldDraws, batch.renderCalls,
+                ((ProfileBatch) batch).textureSelections, visibleSprites);
+        }
+    }
+
+    /** Counts arena batch selections without intercepting GL or forcing extra flushes/fences. */
+    private static final class ProfileBatch extends SpriteBatch {
+        int textureSelections;
+        ProfileBatch() { super(1800); }
+        @Override protected void switchTexture(Texture texture) {
+            textureSelections++;
+            super.switchTexture(texture);
+        }
     }
 
     private void updateCamera(OrthographicCamera camera, ArenaWorld.Player player, int slot,
