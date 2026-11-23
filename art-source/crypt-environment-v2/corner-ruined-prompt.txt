@@ -1,0 +1,18 @@
+Built-in image_gen, transparent_background: true. Two calls: original generation and one proportions correction. No API/CLI fallback.
+
+INITIAL GENERATION
+Use case: stylized-concept.
+Asset type: one original isolated modular ruined-crypt CORNER MASONRY sprite for an isometric arena game.
+Input image1 is a PALETTE REFERENCE: the existing muted grey-brown game floor. Input image2 is a MATERIAL AND CAMERA reference: the selected rough ruined crypt wall. Generate ONE new matching corner block, not an edit of those images.
+Subject: a modest thick square stone masonry corner joining two low ruined walls, built from about THREE chunky courses of irregular grey-brown crypt stones. Complete square ground footprint, vertical sides, broad stones, rough mortar seams and an uneven partly broken top course. It is a squat rough wall corner, NOT an ornamental pillar or narrow tower. No separate wings: only the compact corner mass, width about half its full drawn height in this camera. The structure would stand about the height of one human hero, never taller than its adjacent low wall.
+Camera: orthographic exact2:1 dimetric game view. Ground diamond sides have image slopes+0.5 and-0.5 (26.565degrees); verticals exactly vertical. Show both visible faces and a little top. No perspective vanishing points, no frontal camera.
+Material/style: match image2's worn, chipped, broad grey-brown stone and masonry scale; about20percent darker than image1's floor. Upper-left neutral light. Painterly game realism with restrained broad surface detail readable at44×100pixels. Heavy ancient crypt masonry, no polished marble, no decorative gold, no modern clean pilaster, no pedestal steps, no smooth capstone, no mouldings.
+Composition: one complete isolated object in the centre with generous padding; complete base and all edges visible. Genuine TRANSPARENT BACKGROUND and zero alpha away from the object. No floor patch, drop shadow, grey halo, fog, scenery, labels, text, borders, UI, people, weapons or extra props. Do not crop the base.
+
+SELECTED PROPORTION CORRECTION
+Use case: precise-object-edit.
+Input image1 is the EDIT TARGET: the just-generated rough corner masonry block. Input image2 is the matching ruined-wall material reference.
+Keep the exact rough chipped grey-brown crypt-stone material, the top broken irregular shape, square2:1 diamond footprint, upper-left light and transparent outside alpha.
+CORRECT ONLY ITS PROPORTIONS: this current block is far too short and cube-shaped. Make it a MUCH TALLER plain rectangular masonry pier with the SAME narrow square base footprint, about THREE TIMES ITS CURRENT VERTICAL SIDE HEIGHT. Its final visible height must be about2.2times its projected base WIDTH on the image, NOT a cube: a48-pixel-wide game export should have an object about100pixels tall. Keep three very substantial irregular stone courses, with much taller vertical stone faces. No pedestal, no steps, no smooth cap, no gold, no column mouldings. It is a simple broken corner mass to join ruined walls, not a fancy tower. Do not widen the base; the vertical structure should occupy a portrait rectangle.
+Preserve the exact2:1 orthographic camera: ground edges image slope±0.5 and perfectly vertical upright edges, no perspective.
+One complete isolated object, generous transparent margin. Alpha must be zero away from the stone object. No floor, no shadow, no fog/halo, no extra wall wings, no text or UI.

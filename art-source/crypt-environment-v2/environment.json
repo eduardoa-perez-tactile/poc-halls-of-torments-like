@@ -1,0 +1,499 @@
+{
+  "version": 2,
+  "projection": "screenX=(x-y)*sqrt(.5); screenY-up=(x+y)*sqrt(.125)",
+  "coordinates": "source pivots use top-left image pixels at ground footprint centre",
+  "regions": {
+    "wall-x": {
+      "path": "wall-x.png",
+      "sourceSize": [
+        112,
+        128
+      ],
+      "pivot": [
+        56,
+        94.986655
+      ],
+      "projectedFootprintWidth": 108,
+      "footprintWorldX": 240,
+      "footprintWorldY": 36,
+      "measuredBaseSlope": -0.5107,
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          59,
+          132,
+          1192,
+          1138
+        ],
+        "contentSize": [
+          108,
+          96
+        ],
+        "offset": [
+          2,
+          30
+        ],
+        "resample": "proportional Lanczos; no mirror, warp, recolour or repaint"
+      },
+      "renderShearY": -0.011264,
+      "baseCalibration": {
+        "coordinateSystem": "source image pixels, +Y down",
+        "method": "least-squares fit of alpha>=32 bottom contour across central20%-80% of selected source alpha bounds",
+        "sampleCount": 680,
+        "firstContourPoint": [
+          285,
+          1061
+        ],
+        "lastContourPoint": [
+          964,
+          714
+        ],
+        "fitSlopeDown": -0.5107,
+        "fitInterceptDown": 1206.258621,
+        "targetSlopeDown": -0.5,
+        "renderShearY": -0.011264,
+        "pixelModification": false,
+        "normalizedFitSlopeDown": -0.511264,
+        "normalizedFitAtPivotX": 102.030133,
+        "frontGroundOffset": 7.043478,
+        "calibratedPivotY": 94.986655,
+        "normalizedSlopeDown": -0.511264,
+        "frontBaseYAtPivot": 102.030133,
+        "normalizedInterceptDown": 130.660917
+      }
+    },
+    "wall-x-broken": {
+      "path": "wall-x-broken.png",
+      "sourceSize": [
+        112,
+        128
+      ],
+      "pivot": [
+        56,
+        95.091584
+      ],
+      "projectedFootprintWidth": 108,
+      "footprintWorldX": 240,
+      "footprintWorldY": 36,
+      "measuredBaseSlope": -0.52575,
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          62,
+          122,
+          1193,
+          1158
+        ],
+        "contentSize": [
+          108,
+          99
+        ],
+        "offset": [
+          2,
+          27
+        ],
+        "resample": "proportional Lanczos; no mirror, warp, recolour or repaint"
+      },
+      "renderShearY": -0.026131,
+      "baseCalibration": {
+        "coordinateSystem": "source image pixels, +Y down",
+        "method": "least-squares fit of alpha>=32 bottom contour across central20%-80% of selected source alpha bounds",
+        "sampleCount": 678,
+        "firstContourPoint": [
+          288,
+          1086
+        ],
+        "lastContourPoint": [
+          965,
+          730
+        ],
+        "fitSlopeDown": -0.52575,
+        "fitInterceptDown": 1238.169986,
+        "targetSlopeDown": -0.5,
+        "renderShearY": -0.026131,
+        "pixelModification": false,
+        "normalizedFitSlopeDown": -0.526131,
+        "normalizedFitAtPivotX": 102.135062,
+        "frontGroundOffset": 7.043478,
+        "calibratedPivotY": 95.091584,
+        "normalizedSlopeDown": -0.526131,
+        "frontBaseYAtPivot": 102.135062,
+        "normalizedInterceptDown": 131.598398
+      }
+    },
+    "wall-y": {
+      "path": "wall-y.png",
+      "sourceSize": [
+        112,
+        128
+      ],
+      "pivot": [
+        56,
+        98.545704
+      ],
+      "projectedFootprintWidth": 108,
+      "footprintWorldX": 36,
+      "footprintWorldY": 240,
+      "measuredBaseSlope": 0.46227,
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          75,
+          143,
+          1184,
+          1070
+        ],
+        "contentSize": [
+          108,
+          90
+        ],
+        "offset": [
+          2,
+          36
+        ],
+        "resample": "proportional Lanczos; no mirror, warp, recolour or repaint"
+      },
+      "renderShearY": -0.039143,
+      "baseCalibration": {
+        "coordinateSystem": "source image pixels, +Y down",
+        "method": "least-squares fit of alpha>=32 bottom contour across central20%-80% of selected source alpha bounds",
+        "sampleCount": 666,
+        "firstContourPoint": [
+          296,
+          705
+        ],
+        "lastContourPoint": [
+          961,
+          1013
+        ],
+        "fitSlopeDown": 0.46227,
+        "fitInterceptDown": 568.769611,
+        "targetSlopeDown": 0.5,
+        "renderShearY": -0.039143,
+        "pixelModification": false,
+        "normalizedFitSlopeDown": 0.460857,
+        "normalizedFitAtPivotX": 105.589182,
+        "frontGroundOffset": 7.043478,
+        "calibratedPivotY": 98.545704,
+        "normalizedSlopeDown": 0.460857,
+        "frontBaseYAtPivot": 105.589182,
+        "normalizedInterceptDown": 79.78119
+      }
+    },
+    "wall-y-broken": {
+      "path": "wall-y-broken.png",
+      "sourceSize": [
+        112,
+        128
+      ],
+      "pivot": [
+        56,
+        98.972445
+      ],
+      "projectedFootprintWidth": 108,
+      "footprintWorldX": 36,
+      "footprintWorldY": 240,
+      "measuredBaseSlope": 0.469286,
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          74,
+          142,
+          1204,
+          1082
+        ],
+        "contentSize": [
+          108,
+          90
+        ],
+        "offset": [
+          2,
+          36
+        ],
+        "resample": "proportional Lanczos; no mirror, warp, recolour or repaint"
+      },
+      "renderShearY": -0.029882,
+      "baseCalibration": {
+        "coordinateSystem": "source image pixels, +Y down",
+        "method": "least-squares fit of alpha>=32 bottom contour across central20%-80% of selected source alpha bounds",
+        "sampleCount": 678,
+        "firstContourPoint": [
+          300,
+          714
+        ],
+        "lastContourPoint": [
+          977,
+          1032
+        ],
+        "fitSlopeDown": 0.469286,
+        "fitInterceptDown": 573.403662,
+        "targetSlopeDown": 0.5,
+        "renderShearY": -0.029882,
+        "pixelModification": false,
+        "normalizedFitSlopeDown": 0.470118,
+        "normalizedFitAtPivotX": 106.015923,
+        "frontGroundOffset": 7.043478,
+        "calibratedPivotY": 98.972445,
+        "normalizedSlopeDown": 0.470118,
+        "frontBaseYAtPivot": 106.015923,
+        "normalizedInterceptDown": 79.689315
+      }
+    },
+    "buttress": {
+      "path": "corner-ruined.png",
+      "sourceSize": [
+        48,
+        112
+      ],
+      "pivot": [
+        24,
+        99
+      ],
+      "projectedFootprintWidth": 44,
+      "footprintWorldX": 36,
+      "footprintWorldY": 36,
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          238,
+          49,
+          832,
+          1440
+        ],
+        "contentSize": [
+          44,
+          103
+        ],
+        "offset": [
+          2,
+          7
+        ],
+        "resample": "proportional Lanczos only; no mirror, alpha mask, recolour, repaint or warp"
+      }
+    },
+    "sarcophagus-x": {
+      "path": "props/sarcophagus-x.png",
+      "sourceSize": [
+        96,
+        96
+      ],
+      "pivot": [
+        48,
+        72
+      ],
+      "projectedFootprintWidth": 92,
+      "footprintWorldX": 170,
+      "footprintWorldY": 70,
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          142,
+          87,
+          1422,
+          1016
+        ],
+        "contentSize": [
+          92,
+          67
+        ],
+        "offset": [
+          2,
+          27
+        ],
+        "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      }
+    },
+    "sarcophagus-y": {
+      "path": "props/sarcophagus-y.png",
+      "sourceSize": [
+        96,
+        96
+      ],
+      "pivot": [
+        48,
+        72
+      ],
+      "projectedFootprintWidth": 92,
+      "footprintWorldX": 70,
+      "footprintWorldY": 170,
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          145,
+          69,
+          1354,
+          986
+        ],
+        "contentSize": [
+          92,
+          70
+        ],
+        "offset": [
+          2,
+          24
+        ],
+        "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      }
+    },
+    "altar": {
+      "path": "props/altar.png",
+      "sourceSize": [
+        128,
+        112
+      ],
+      "pivot": [
+        64,
+        92
+      ],
+      "projectedFootprintWidth": 124,
+      "footprintWorldX": 90,
+      "footprintWorldY": 200,
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          240,
+          42,
+          1534,
+          880
+        ],
+        "contentSize": [
+          124,
+          80
+        ],
+        "offset": [
+          2,
+          30
+        ],
+        "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      }
+    },
+    "guardian": {
+      "path": "props/guardian.png",
+      "sourceSize": [
+        72,
+        144
+      ],
+      "pivot": [
+        36,
+        127
+      ],
+      "projectedFootprintWidth": 68,
+      "footprintWorldX": 80,
+      "footprintWorldY": 80,
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          275,
+          73,
+          923,
+          1253
+        ],
+        "contentSize": [
+          68,
+          124
+        ],
+        "offset": [
+          2,
+          18
+        ],
+        "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      }
+    },
+    "broken-column": {
+      "path": "props/broken-column.png",
+      "sourceSize": [
+        64,
+        96
+      ],
+      "pivot": [
+        32,
+        79
+      ],
+      "projectedFootprintWidth": 60,
+      "footprintWorldX": 68,
+      "footprintWorldY": 68,
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          618,
+          160,
+          1145,
+          827
+        ],
+        "contentSize": [
+          60,
+          76
+        ],
+        "offset": [
+          2,
+          18
+        ],
+        "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      }
+    },
+    "rubble": {
+      "path": "props/rubble.png",
+      "sourceSize": [
+        80,
+        48
+      ],
+      "pivot": [
+        40,
+        35
+      ],
+      "projectedFootprintWidth": 73,
+      "footprintWorldX": 45,
+      "footprintWorldY": 160,
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          301,
+          93,
+          1426,
+          771
+        ],
+        "contentSize": [
+          73,
+          44
+        ],
+        "offset": [
+          3,
+          2
+        ],
+        "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      }
+    },
+    "sealed-gate": {
+      "path": "props/sealed-gate.png",
+      "sourceSize": [
+        128,
+        192
+      ],
+      "pivot": [
+        64,
+        165
+      ],
+      "projectedFootprintWidth": 124,
+      "footprintWorldX": 250,
+      "footprintWorldY": 50,
+      "normalization": {
+        "alphaBoundsThreshold": 32,
+        "crop": [
+          308,
+          41,
+          1226,
+          1000
+        ],
+        "contentSize": [
+          124,
+          130
+        ],
+        "offset": [
+          2,
+          60
+        ],
+        "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      }
+    }
+  }
+}

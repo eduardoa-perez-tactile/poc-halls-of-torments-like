@@ -805,7 +805,23 @@ public final class CryptLobby extends ApplicationAdapter {
         }
     }
 
+    /** Profile-only camera landmarks avoid walking a survival run to inspect the new room. */
+    private int arenaPreviewIndex = -1;
+    private void previewArenaLandmark() {
+        arenaPreviewIndex = (arenaPreviewIndex + 1) % 6;
+        float x = switch (arenaPreviewIndex) { case 0 -> -750f; case 1 -> 600f; case 2 -> 770f;
+            case 3 -> -1100f; case 4 -> 1100f; default -> 0f; };
+        float y = switch (arenaPreviewIndex) { case 0 -> 430f; case 1 -> 610f; case 2 -> -490f;
+            case 3 -> -780f; case 4 -> 780f; default -> 0f; };
+        world.debugSceneryView(x, y);
+        arena.resetCameras();
+    }
+
     private boolean key(int key) {
+        if (key == Input.Keys.PAGE_UP && config.profile() && screen == Screen.SESSION
+            && overlay == null && !world.choicePending()) {
+            previewArenaLandmark(); return true;
+        }
         if (key == Input.Keys.F1 && config.profile() && screen == Screen.SESSION && overlay == null) {
             world.debugEnemyAttackEncounter(); return true;
         }

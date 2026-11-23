@@ -18,6 +18,7 @@ The strict base baker writes `.run/art-exploration/weekend/packed/`, leaving `as
 ```sh
 python3 scripts/BakeEnemyAttackArt.py --base-art .run/art-exploration/weekend/packed --output .run/art-exploration/weekend/packed
 python3 scripts/BakeMagicProjectiles.py --output .run/art-exploration/weekend/packed
+python3 scripts/BakeCryptEnvironment.py --output .run/art-exploration/weekend/packed
 for file in gameplay-actors-main.png gameplay-actors-common.png gameplay-environment.png gameplay.json enemy-attacks.json magic-projectiles.json; do
   cmp ".run/art-exploration/weekend/packed/$file" "assets/art/$file" || exit 1
 done
@@ -45,3 +46,26 @@ bounds, resource accounting and in-game verification.
 ## Enemy attacks and magic missiles
 
 `enemy-attacks-canonical.zip` retains the approved southwest attacks, three additional authored facings per enemy, the neutral aura loop, exact built-in ImageGen prompts/provenance and normalized fixed-root frames. `magic-projectiles-canonical.zip` retains three original eight-frame magical missile sheets, their prompts/provenance, head pivots and untouched base environment page. The ordered supplemental stages above reproduce all three current gameplay PNGs and both supplemental manifests while preserving every original frame and sampling gutter. They allocate no additional runtime textures. See [attack art](../docs/enemy-attack-art.md), [magic projectiles](../docs/magic-projectiles.md) and [runtime integration](../docs/enemy-attacks.md).
+
+
+## Open crypt environment replacement (2026-11-23)
+
+[`crypt-environment-v2/`](crypt-environment-v2/README.md) retains the selected original
+painted low ruined walls and coherent isometric landmarks, their exact ImageGen prompts,
+measured ground-footprint metadata and a compact canonical baker-input archive.
+This final environment stage retires the unused legacy floor/wall/prop runtime
+regions; the old masters remain in the base canonical archive above. The newer
+floor/border page remains separate and unchanged.
+
+```sh
+python3 scripts/BakeCryptEnvironment.py --output assets/art
+```
+
+This stage is last after the base/attack/missile stages. It reads only its tracked
+`canonical-inputs.zip`, rewrites only the existing 512×512 environment page and
+its gameplay/missile metadata, and preserves the actor pages, actor indices 0–207,
+all 24 missile sprite pixels/timing/pivots and four utility sprites. Metadata
+rectangles move through complete deterministic repacking with gutters and saved
+RGBA reconstruction checks. No `.run` cache or image service is needed for a
+rebuild. The verification record in that folder preserves output/actor hashes and
+the archive-only deterministic rebuild result.

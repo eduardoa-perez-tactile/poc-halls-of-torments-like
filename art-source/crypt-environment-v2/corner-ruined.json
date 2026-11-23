@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "tool": "built-in image_gen",
+  "sourcePath": "corner-ruined-source.png",
+  "path": "corner-ruined.png",
+  "sourceSize": [
+    48,
+    112
+  ],
+  "pivot": [
+    24,
+    99
+  ],
+  "projectedFootprintWidth": 44,
+  "footprintWorldX": 36,
+  "footprintWorldY": 36,
+  "normalization": {
+    "alphaBoundsThreshold": 32,
+    "crop": [
+      238,
+      49,
+      832,
+      1440
+    ],
+    "contentSize": [
+      44,
+      103
+    ],
+    "offset": [
+      2,
+      7
+    ],
+    "resample": "proportional Lanczos only; no mirror, alpha mask, recolour, repaint or warp"
+  },
+  "measuredSourceBase": {
+    "left": [
+      237,
+      1289
+    ],
+    "near": [
+      534,
+      1438
+    ],
+    "right": [
+      831,
+      1289
+    ],
+    "groundCentre": [
+      534,
+      1289
+    ]
+  },
+  "expectedWorldScale": 1.1570838237598051,
+  "expectedVisibleHeightAboveGround": 106.45171178590208,
+  "sha256": "efad027ead8cab46f1d9ed582555460bfecf5c136fdfab72058b7926fe65e9b6",
+  "originalGeneratedSource": "/Users/eduardoleale/.codex/generated_images/01a2082a-0e5b-7020-9bf5-f231a1a7a272/exec-929c0ea9-3799-4305-878d-572bd79a4f23.png",
+  "provenance": "Original painted ruined masonry, initial generation plus one proportions correction; exact prompts retained in corner-ruined-prompt.txt. Reference floor controls palette; selected new ruined wall controls stone material. Generated source alpha preserved."
+}

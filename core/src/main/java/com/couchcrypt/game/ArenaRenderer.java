@@ -4,6 +4,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.SpriteCache;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
@@ -17,13 +18,14 @@ public final class ArenaRenderer implements Disposable {
     private static final float ISO_X = .70710678f, ISO_Y = .35355339f;
     private static final float HUD_WIDTH = 1920f, HUD_HEIGHT = 1080f;
     private static final float REVIVE_BAR_Y = 122f, REVIVE_BAR_HEIGHT = 4f;
-    private static final float PROP_SHADOW_WIDTH = 62f, SHADOW_Y = -9f, SHADOW_HEIGHT = 20f;
+    private static final float SHADOW_Y = -9f, SHADOW_HEIGHT = 20f;
+    private static final float ENVIRONMENT_BASE_HEIGHT = 24f;
     private static final float LEVEL_FX_SCALE = 1.6f, RECOIL_MARGIN = 30f;
     // Fixed SE/SW/NE/NW release landmarks, in untrimmed source pixels relative to the ground root.
     // Only the rendered origin moves; the simulation keeps its original projectile coordinates and trajectory.
     private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
     private static final float[] SOVEREIGN_ORIGIN = {37, 78, -12, 67, 18, 90, -35, 82};
-    private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PROP_COUNT = 14;
+    private static final int PLAYER = 0, ENEMY = 1, PROP = 2;
     private final GameArt art;
     private final GameHud gameHud;
     private final SpriteBatch batch = new SpriteBatch(1800);
@@ -34,21 +36,10 @@ public final class ArenaRenderer implements Disposable {
     private final OrthographicCamera[] cameras = { new OrthographicCamera(), new OrthographicCamera() };
     private final OrthographicCamera hud = new OrthographicCamera();
     private final boolean[] cameraReady = new boolean[2];
-    private final float[] propX = new float[PROP_COUNT], propY = new float[PROP_COUNT];
-    private final GameplayAtlas.Region[] propArt = new GameplayAtlas.Region[PROP_COUNT];
-    private final float[] propScale = new float[PROP_COUNT];
-    // Existing nonstructural landmarks retain their original world positions.
-    private static final String[] PROP_REGIONS = {
-        "pillar", "sarcophagus", "arch", "rubble", "urn", "relic", "obelisk", "shrine",
-        "pillar", "urn", "orb", "rubble", "sarcophagus", "relic"
-    };
-    private static final float[] PROP_X = {
-        -480, -180, 120, 720, -780, -180, 120, 720, -1140, -1140, -1140, 1140, 1140, 1140
-    };
-    private static final float[] PROP_Y = {
-        -840, -840, -840, -840, 840, 840, 840, 840, -390, 130, 650, -390, 130, 650
-    };
-    private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + PROP_COUNT];
+    private final ArenaLayout layout;
+    private final GameplayAtlas.Region[] propArt;
+    private final float[] environmentVertices = new float[20];
+    private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + ArenaLayout.MAX_PLACEMENTS];
     private final int[] types = new int[depths.length], indices = new int[depths.length];
     private int sortCount;
     public int drawCalls;
@@ -57,11 +48,10 @@ public final class ArenaRenderer implements Disposable {
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
         floorCacheId = cacheFloor();
         hud.setToOrtho(false, HUD_WIDTH, HUD_HEIGHT);
-        for (int i = 0; i < PROP_COUNT; i++) {
-            propX[i] = PROP_X[i]; propY[i] = PROP_Y[i];
-            propArt[i] = art.environment(PROP_REGIONS[i]);
-            propScale[i] = propArt[i].worldHeight() / art.metadata.frames[propArt[i].frame()].sourceHeight;
-        }
+        layout = ArenaLayout.load(art.metadata);
+        propArt = new GameplayAtlas.Region[layout.placements.length];
+        for (int i = 0; i < propArt.length; i++)
+            propArt[i] = art.environment(layout.placements[i].region);
     }
 
     public void resetCameras() {
@@ -94,7 +84,7 @@ public final class ArenaRenderer implements Disposable {
             drawDust(world, camera);
             gatherSprites(world, camera);
             drawShadows(world);
-            drawSprites(world);
+            drawSprites(world, camera, slot);
             drawBolts(world, camera);
             drawShots(world, camera);
             drawEffects(world, camera);
@@ -225,14 +215,18 @@ public final class ArenaRenderer implements Disposable {
 
     private void gatherSprites(ArenaWorld world, OrthographicCamera camera) {
         sortCount = 0;
-        for (int i = 0; i < PROP_COUNT; i++) {
+        for (int i = 0; i < layout.placements.length; i++) {
+            ArenaLayout.Placement placement = layout.placements[i];
             GameplayAtlas.Frame frame = art.metadata.frames[propArt[i].frame()];
-            float scale = propScale[i];
-            if (visible(camera, propX[i], propY[i], Math.max(PROP_SHADOW_WIDTH * .5f, -frame.left * scale),
-                Math.max(PROP_SHADOW_WIDTH * .5f, (frame.left + frame.width) * scale),
-                Math.max(SHADOW_Y + SHADOW_HEIGHT, (frame.bottom + frame.height) * scale),
-                Math.max(-SHADOW_Y, -frame.bottom * scale)))
-                add(PROP, i, propX[i], propY[i]);
+            float scale = placement.scale;
+            float shear = propArt[i].renderShearY();
+            float lowShift = Math.min(frame.left * shear, (frame.left + frame.width) * shear) * scale;
+            float highShift = Math.max(frame.left * shear, (frame.left + frame.width) * shear) * scale;
+            if (visible(camera, placement.x, placement.y, Math.max(placement.shadowWidth * .5f, -frame.left * scale),
+                Math.max(placement.shadowWidth * .5f, (frame.left + frame.width) * scale),
+                Math.max(placement.shadowHeight * .5f, (frame.bottom + frame.height) * scale + highShift),
+                Math.max(placement.shadowHeight * .5f, -frame.bottom * scale - lowShift)))
+                add(PROP, i, placement.x, placement.y);
         }
         for (int i = 0; i < world.enemies.length; i++) {
             ArenaWorld.Enemy enemy = world.enemies[i];
@@ -278,7 +272,14 @@ public final class ArenaRenderer implements Disposable {
                 x = player.x; y = player.y; width = player.alive ? 62f : 72f;
             } else if (types[i] == ENEMY) {
                 x = world.enemies[index].x; y = world.enemies[index].y; width = 44f * enemyScale(world.enemies[index]);
-            } else { x = propX[index]; y = propY[index]; width = PROP_SHADOW_WIDTH; }
+            } else {
+                ArenaLayout.Placement placement = layout.placements[index];
+                if (placement.shadowWidth > 0 && placement.shadowHeight > 0)
+                    batch.draw(art.shadow, screenX(placement.x, placement.y) - placement.shadowWidth * .5f,
+                        screenY(placement.x, placement.y) - placement.shadowHeight * .5f,
+                        placement.shadowWidth, placement.shadowHeight);
+                continue;
+            }
             batch.draw(art.shadow, screenX(x, y) - width * .5f, screenY(x, y) + SHADOW_Y, width, SHADOW_HEIGHT);
         }
         batch.setColor(Color.WHITE);
@@ -729,11 +730,11 @@ public final class ArenaRenderer implements Disposable {
             screenX(player.x, player.y), screenY(player.x, player.y), LEVEL_FX_SCALE, 0f, layer);
     }
 
-    private void drawSprites(ArenaWorld world) {
+    private void drawSprites(ArenaWorld world, OrthographicCamera camera, int viewer) {
         for (int i = 0; i < sortCount; i++) {
             int index = indices[i];
             if (types[i] == PROP) {
-                drawFrame(propArt[index].frame(), propX[index], propY[index], propScale[index]);
+                drawEnvironment(world, camera, viewer, index);
             } else if (types[i] == ENEMY) {
                 ArenaWorld.Enemy enemy = world.enemies[index];
                 float scale = enemyScale(enemy);
@@ -821,6 +822,106 @@ public final class ArenaRenderer implements Disposable {
                 batch.setColor(Color.WHITE);
             }
         }
+    }
+
+    /** Each camera computes its own reveal; shared placements and cached floor colours stay immutable. */
+    private void drawEnvironment(ArenaWorld world, OrthographicCamera camera, int viewer, int index) {
+        ArenaLayout.Placement placement = layout.placements[index];
+        GameplayAtlas.Frame frame = art.metadata.frames[propArt[index].frame()];
+        float rootX = screenX(placement.x, placement.y), rootY = screenY(placement.x, placement.y);
+        float left = rootX + frame.left * placement.scale, bottom = rootY + frame.bottom * placement.scale;
+        float width = frame.width * placement.scale, height = frame.height * placement.scale;
+        float shear = propArt[index].renderShearY();
+        float leftShift = (left - rootX) * shear, rightShift = (left + width - rootX) * shear;
+        float lowShift = Math.min(leftShift, rightShift), highShift = Math.max(leftShift, rightShift);
+        TextureRegion region = art.frame(propArt[index].frame());
+        float groundSlope = placement.region.startsWith("wall-x") ? .5f
+            : placement.region.startsWith("wall-y") ? -.5f : 0f;
+        if (!placement.fadeWhenOccluding || height <= ENVIRONMENT_BASE_HEIGHT * 2f
+            || !environmentOccludes(world, camera, viewer, groundSlope, rootY, left, rootY + ENVIRONMENT_BASE_HEIGHT + lowShift,
+                left + width, bottom + height + highShift)) {
+            batch.setColor(Color.WHITE);
+            drawEnvironmentPart(region, left, bottom, width, height, region.getV2(), region.getV(), rootX, shear);
+            return;
+        }
+        // Keep the ground footprint and the low wall/landmark base solid. Reveal only its upper paint.
+        float baseHeight = MathUtils.clamp(rootY + ENVIRONMENT_BASE_HEIGHT - bottom, 0f, height);
+        float splitV = MathUtils.lerp(region.getV2(), region.getV(), baseHeight / height);
+        batch.setColor(Color.WHITE);
+        if (baseHeight > 0f)
+            drawEnvironmentPart(region, left, bottom, width, baseHeight, region.getV2(), splitV, rootX, shear);
+        batch.setColor(1f, 1f, 1f, placement.wall ? .14f : .24f);
+        if (baseHeight < height)
+            drawEnvironmentPart(region, left, bottom + baseHeight, width, height - baseHeight,
+                splitV, region.getV(), rootX, shear);
+        batch.setColor(Color.WHITE);
+    }
+
+    /** Calibrate painted ground edges to the floor projection using the existing four sprite vertices. */
+    private void drawEnvironmentPart(TextureRegion region, float x, float y, float width, float height,
+                                     float bottomV, float topV, float rootX, float shear) {
+        if (shear == 0f) {
+            batch.draw(region.getTexture(), x, y, width, height, region.getU(), bottomV, region.getU2(), topV);
+            return;
+        }
+        float leftY = environmentProjectedY(y, x, rootX, shear);
+        float rightY = environmentProjectedY(y, x + width, rootX, shear);
+        float color = batch.getPackedColor();
+        environmentVertex(0, x, leftY, color, region.getU(), bottomV);
+        environmentVertex(5, x, leftY + height, color, region.getU(), topV);
+        environmentVertex(10, x + width, rightY + height, color, region.getU2(), topV);
+        environmentVertex(15, x + width, rightY, color, region.getU2(), bottomV);
+        batch.draw(region.getTexture(), environmentVertices, 0, environmentVertices.length);
+    }
+
+    private void environmentVertex(int offset, float x, float y, float color, float u, float v) {
+        environmentVertices[offset] = x; environmentVertices[offset + 1] = y;
+        environmentVertices[offset + 2] = color; environmentVertices[offset + 3] = u;
+        environmentVertices[offset + 4] = v;
+    }
+
+    static float environmentProjectedY(float y, float x, float rootX, float shear) {
+        return y + (x - rootX) * shear;
+    }
+
+    private boolean environmentOccludes(ArenaWorld world, OrthographicCamera camera, int viewer, float groundSlope,
+                                         float rootY, float left, float bottom, float right, float top) {
+        ArenaWorld.Player self = world.players[viewer];
+        if (environmentOccludesActor(groundSlope, rootY, left, bottom, right, top, self.x, self.y,
+            art.actor(ActorAnimation.actor(self.hero)), 1f)) return true;
+        ArenaWorld.Player ally = world.players[1 - viewer];
+        if (ally.active && visibleActor(camera, ally.x, ally.y, art.actor(ActorAnimation.actor(ally.hero)), 1f)
+            && environmentOccludesActor(groundSlope, rootY, left, bottom, right, top, ally.x, ally.y,
+                art.actor(ActorAnimation.actor(ally.hero)), 1f)) return true;
+        // Only sprites already gathered for this view can trigger a reveal; off-screen enemies cannot.
+        for (int i = 0; i < sortCount; i++) if (types[i] == ENEMY) {
+            ArenaWorld.Enemy enemy = world.enemies[indices[i]];
+            if (environmentOccludesActor(groundSlope, rootY, left, bottom, right, top, enemy.x, enemy.y,
+                art.actor(ActorAnimation.actor(enemy.kind)), enemyScale(enemy))) return true;
+        }
+        return false;
+    }
+
+    private static boolean environmentOccludesActor(float groundSlope, float rootY, float left, float bottom, float right, float top,
+                                                     float x, float y, GameplayAtlas.Actor actor, float scale) {
+        return environmentOccludesBody(groundSlope, rootY, left, bottom, right, top,
+            screenX(x, y), screenY(x, y), Math.max(actor.maxLeft, actor.maxRight) * scale,
+            actor.maxAbove * scale);
+    }
+
+    /** Ground-depth ordering and upper-body overlap decide fading, never distance or another camera's state. */
+    static boolean environmentOccludesBody(float rootY, float left, float bottom, float right, float top,
+                                           float actorX, float actorY, float halfWidth, float actorHeight) {
+        return environmentOccludesBody(0f, rootY, left, bottom, right, top, actorX, actorY, halfWidth, actorHeight);
+    }
+
+    static boolean environmentOccludesBody(float groundSlope, float rootY, float left, float bottom, float right, float top,
+                                           float actorX, float actorY, float halfWidth, float actorHeight) {
+        // A diagonal wall's far end can be high in its rectangle while stone beside the hero stays low.
+        float localTop = Math.min(top, top - Math.abs(groundSlope) * (right - left) * .5f
+            + groundSlope * (actorX - (left + right) * .5f) + Math.abs(groundSlope) * halfWidth);
+        return rootY < actorY && left < actorX + halfWidth && right > actorX - halfWidth
+            && bottom < actorY + actorHeight && localTop > actorY + actorHeight * .7f;
     }
 
     private void drawFrame(int index, float x, float y, float scale) {

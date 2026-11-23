@@ -1,108 +1,101 @@
-# Arena redesign proposal
+# Implemented open crypt arena
 
-This is the concrete replacement plan for the 2026-11-23 level-design feedback.
-The open-arena versus solid-interior-obstacle decision remains pending. Keep one
-2400×1800 world-unit arena, its twenty-minute encounter timeline and current UI.
+The 2026-11-23 redesign replaces the sparse legacy prop rows with character-height ruined borders
+and coherent, authored landmark groups. The user chose an OPEN arena: decorations
+remain visual landmarks, with no new collision obstacles or navigation system.
+The one-arena twenty-minute run, 2400×1800 playable bounds, player/enemy movement,
+projectiles and spawn rules remain unchanged.
 
-## Why the current room feels disconnected
+## Room composition
 
-- The 14 renderer-only props sit on two sparse edge rows and a few side points.
-  They have no authored footprint, collision, route or spawn-exclusion meaning.
-- The current border is intentionally low coping, painted into floor cells. Its
-  source contract uses a 120×60 diamond and 152×84 source canvas; it cannot contain
-  a convincing tall wall by merely increasing the draw height.
-- Props come from the older warm-brown environment kit; the newer floor/border is
-  cool grey. Their shared lighting, viewing angle and base sizes were never
-  measured against that floor. Bounds validation does not validate perspective.
-- Every prop uses the same 62-unit shadow. Several ground pivots are approximate
-  95–98% canvas-height values, and scale comes from full source-canvas height,
-  rather than a measured ground footprint. This weakens contact with the floor.
+The startup-loaded layout is [`assets/arena/crypt-layout.json`](../assets/arena/crypt-layout.json).
+It contains 59 bounded placements: 36 wall modules, four corner supports and
+19 members across four interior landmark groups. A clear central ritual court
+covers x=-420…420, y=-320…320; authored footprints are checked against that court.
 
-## Replacement room
-
-Use one coherent 2:1 isometric stone kit with the same camera, stone palette,
-upper-left lighting and tile-scale reference in every source image. Require a
-measured diamond footprint, ground pivot, facing and projected footprint width
-for each prop. Derive prop scale from that footprint; draw height follows the
-artwork. Use footprint-sized contact shadows instead of one universal shadow.
-
-Keep the middle ritual court open: approximately x=-420…420, y=-320…320. Build
-four readable peripheral landmark groups, with different silhouettes and density:
-
-| Group | Approximate world bounds | Composition |
+| Landmark | Group origin in world units | Composition |
 | --- | --- | --- |
-| Fallen choir | x=-900…-500, y=160…620 | Grouped tombs, two broken columns, low debris |
-| Sanctum | x=350…760, y=470…720 | One substantial altar and a wall niche |
-| Sealed crypt | x=430…900, y=-650…-260 | Recessed gate, paired pilasters and a low offering stone |
-| Broken gallery | x=-820…-440, y=-680…-360 | Uneven column group and a low rubble bank |
+| Fallen choir | (-750,430) | Paired tombs, broken column and low fragments |
+| Sanctum | (600,610) | Altar, two hooded guardians and a column base |
+| Sealed crypt | (770,-490) | Sealed gate, tomb, guardian, offering and fragments |
+| Broken gallery | (-720,-570) | Broken columns and scattered low rubble |
 
-Leave a broad outer circulation loop and at least two approaches to every group.
-Aim for 200–260 world-unit clear passages, not narrow doors or single-file lanes.
-Keep the joining position, central boss space and reward presentation clear.
-These are authored positions, not random scattering or a claim of proven balance.
+These clusters provide different silhouettes and orientation cues without
+turning the room into corridors. Their arrangement is authored rather than
+randomly scattered. Decorative footprints are visual scale/clearance metadata;
+players, enemies and projectiles can pass through interior scenery. Wide-looking
+spaces and an open center are layout choices, not proof of gameplay balance.
 
-## Tall borders and visibility
+## Grounding, walls and visibility
 
-Retain the current cached floor and low foundation. Add tall wall bodies as
-separate depth-sorted sprites with consistent footings, rather than stretching
-the opaque floor-cache quads. Their tops should read roughly two-and-a-half to three hero heights
-above the floor; validate that ratio in an actual camera capture.
+The original painted kit uses cool-grey crypt stone, upper-left lighting and a
+shared nominal 2:1 isometric camera. Wall X/Y and sarcophagus X/Y are separately
+authored facings. Each region records a ground-footprint center pivot, projected
+source footprint width and world X/Y footprint. `ArenaLayout` derives uniform
+scale from those footprints; it does not scale props from their canvas height.
+Optional `sizeScale` preserves proportions, while aspect-changing footprint
+overrides are rejected. Contact shadows follow the footprint size.
 
-Far walls can stay full-height. Near walls retain their bases while their upper
-parts cut away or fade when they obscure the viewing player's body/threat space.
-Compute that visibility separately for each split-screen camera. A wall near P2
-must not change P1's unrelated view. Keep the geometry bounded and cull wall
-segments before sorting; no framebuffer or extra scene texture is required.
+The painted wall sources retain small measured camera-angle deviations. A bounded
+per-region vertical shear calibrates only their four existing draw vertices to
+the exact floor diagonals, preserving upright edges and stone-body height. Ground
+pivots also match each fitted base intercept and the 36-unit wall thickness.
+Culling and reveal bounds include this projection correction. Source pixels remain
+unchanged; no new textures or GPU buffers are introduced. One fixed 20-float staging array
+is reused for the draw vertices, with no frame-loop allocation.
 
-## Authored placement data
+The user rejected the first tall, clean fortress-wall treatment and selected
+ruined crypt masonry with broken tops, approximately character height. Four wall
+runs alternate two painted variants per axis. X runs repeat at 240 world units;
+Y runs use a uniform 0.9375 scale and repeat at 225 units so both axes meet the
+original room bounds without shortened or stretched end panels. Four rough corner
+supports cover the joins, replacing the repetitive gold pilasters. Roots remain
+just outside the fighting floor at x=±1212 and y=±912. Module spacing is validated
+against measured world footprints. The cached floor/low foundation stays in place;
+wall bodies and landmarks depth-sort with actors as independent sprites.
 
-Replace `ArenaRenderer`'s three parallel prop arrays with one startup-loaded,
-bounded placement list, for example `assets/arena/crypt-layout.json`. Each entry
-has an asset/facing, world position, zone, ground footprint and occlusion policy.
-Keep positions reviewable in one source and validate bounds/clearance offline.
-The renderer reads cached primitive fields, never JSON or layout code each frame.
+Each camera computes upper-sprite reveal separately. When tall scenery obscures
+a visible player or enemy, its upper portion becomes translucent while the low
+base stays opaque. A wall can therefore reveal a hero in one split view while
+remaining solid in the other. This uses ordinary sprite alpha and source UV
+splitting, without an extra framebuffer or scene texture.
 
-If the arena stays open, footprints support shadows, placement validation and
-spawn exclusions; they do not silently become colliders. If solid obstacles are
-chosen, the same immutable footprint list must also drive player/Dodge movement,
-enemy movement/knockback/dashes, valid spawns and late-join placement. Decide the
-projectile/low-cover policy explicitly. Direct chase currently has no navigation;
-adding body colliders alone would leave enemies stuck. A small bounded route or
-visibility graph is sufficient for a few authored obstacle groups; no general
-navigation framework is needed.
+## Authoring and source files
 
-## Resource and source plan
+`ArenaLayout` validates the layout once at startup and caches placements for the
+renderer. The JSON groups named landmarks and border runs in one reviewable file,
+replacing the old parallel X/Y/region arrays. The fixed placement cap is 192;
+render loops use cached fields and culled, bounded sort storage.
 
-Current accounted residency with QR is 33,516,364 bytes, leaving only 38,068 bytes
-below 32 MiB. Replace artwork inside existing pages instead of adding textures.
-The unused legacy floor/wall/corner regions consume 74,524 visible pixels in the
-existing 512×512 environment page. Retire their runtime contract while retaining
-their masters in source archives; use that area for tall wall pieces and coherent
-replacement props. Keep the 6 MiB actor/environment bank and half-MiB border page.
+The source concept is preserved in
+[`art-source/arena-redesign-proposal.zip`](../art-source/arena-redesign-proposal.zip).
+Runtime uses separate sprites, not the flattened concept painting. Selected
+painted masters, exact ImageGen prompts, ground-footprint metadata and a canonical
+baker-input archive are in
+[`art-source/crypt-environment-v2/`](../art-source/crypt-environment-v2/README.md).
 
-Change `GameArt.floors`, `GameplayAtlas.REQUIRED_REGIONS` and the environment baker
-together, then rerun the supplemental attack/projectile packing. Those animations
-borrow the same environment page and must never be overlapped. Preserve actor
-frames, existing combat atlases and art provenance.
+```sh
+python3 scripts/BakeCryptEnvironment.py --output assets/art
+```
 
-Suggested production ownership: one art/baker chunk, one immutable layout and
-optional movement/navigation chunk, and one renderer/depth/occlusion chunk. Verify
-an assembled room and a few native near-wall solo/co-op views before delivery;
-short checks cannot establish arena fun, balance or physical-TV performance.
+This final bake stage retires the legacy runtime floor/wall/prop contract and
+repacks only the existing 512×512 environment page. The old masters remain in the
+base source archive. Actor pages and actor frames 0–207, all 24 missile sprite
+pixels/timing/pivots, and utility sprites are preserved. The actor/environment
+bank stays 6 MiB and the separate floor/border page stays 0.5 MiB: no new runtime
+texture or retained decoded Pixmap is added. Source hashes, gutter/nonoverlap
+checks and an archive-only byte-identical rebuild are recorded in the kit's
+verification file.
+
+Native rendering, solo/co-op occlusion and resource observations belong to the
+integration handoff/performance record. Short automated or emulator checks do
+not establish that the arena is fun, balanced or sustained 60 FPS on a physical TV.
 
 
-## Visual proposal and approval boundary
+## Deferred floor discussion
 
-The current painted proposal is preserved in
-[`art-source/arena-redesign-proposal.zip`](../art-source/arena-redesign-proposal.zip)
-alongside the exact built-in ImageGen prompts and reference input. It is a style,
-projection and grouping proposal, not runtime art or proof of route balance.
-No flattened environment painting is to be loaded as the arena. Production needs
-separate modular walls, floor treatment and grounded prop sprites using the
-metadata/resource plan above.
-
-The combat range/slash changes are independently implemented. Replacing the arena
-artwork and resolving solid obstacles are the next milestone; the current room
-has not been silently relabelled as the redesigned room. The project agreement
-requires approval before major visual direction changes. The open/solid-obstacle
-question was presented to the user while the combat fixes were underway.
+The user highlighted the concept's engraved central circle, broad stone paths
+and subtle tile variation on 2026-11-23, asking to discuss them after the wall and
+item work is finished. This milestone keeps the existing floor artwork/cache;
+that feedback is a follow-up discussion, not authorization to add floor ornament.
+The reference is preserved in the concept archive linked above.

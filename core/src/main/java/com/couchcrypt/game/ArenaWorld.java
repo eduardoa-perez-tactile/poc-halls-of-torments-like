@@ -827,6 +827,24 @@ public final class ArenaWorld {
         return null;
     }
 
+    /** Profile-only scenery inspection: preserve the run/build while giving the camera a quiet view. */
+    public void debugSceneryView(float x, float y) {
+        if (outcome != Outcome.RUNNING || choicePending()) return;
+        for (Enemy enemy : enemies) enemy.active = false;
+        for (Bolt bolt : bolts) bolt.active = false;
+        for (Shot shot : shots) shot.active = false;
+        for (Hazard hazard : hazards) hazard.active = false;
+        for (Effect effect : effects) effect.active = false;
+        for (Pickup pickup : pickups) pickup.active = false;
+        activeEnemies = 0; spawnCountdown = 12f;
+        for (Player player : players) if (player.active) {
+            // Separate split views enough to inspect independent scenery reveal.
+            player.x = clamp(x + player.slot * 600f, -HALF_WIDTH + PLAYER_RADIUS, HALF_WIDTH - PLAYER_RADIUS);
+            player.y = clamp(y, -HALF_HEIGHT + PLAYER_RADIUS, HALF_HEIGHT - PLAYER_RADIUS);
+            player.invulnerable = 0f; // The cleared, quiet scene needs no blinking inspection shield.
+        }
+    }
+
     /** Profile-only close combat fixture for brief sprite capture; normal encounters never use it. */
     public void debugVfxEncounter() {
         if (outcome != Outcome.RUNNING || choicePending() || bossSpawned) return;

@@ -1,0 +1,170 @@
+[
+  {
+    "name": "sarcophagus-x",
+    "prompt": "Use case: stylized-concept. Asset type: one original isolated modular isometric game-environment sprite for Couch Crypt.\nInput image 1 is ONLY a STYLE AND PROJECTION REFERENCE, not an edit target. Generate a new single asset matching the cool grey carved crypt stone, broad painted shading, precise dimetric floor plane and upper-left illumination of this reference.\nCamera: orthographic 2:1 dimetric/isometric, vertical edges perfectly vertical; the two horizontal ground axes slope at exactly plus/minus26.565 degrees (one screen pixel rise per two pixels run). No vanishing points, no frontal camera. Artwork must sit naturally on those diamond floor tiles.\nMaterials: matte blue-grey stone, worn broad edges and readable masonry joints, subtle low contrast wear. Clean game painting, not photorealistic or vector art; chunky broad forms readable at96pixels.\nSubject: A sealed medieval stone sarcophagus on a simple stepped plinth, heavy carved lid with a subtle sculpted cross. Its LONG axis runs from lower-left to upper-right on screen, slope-26.565 degrees; visible top plane follows the reference2:1 grid. This is a separately painted second facing, not a mirrored image. Cool grey stone with a slightly lighter worn lid. No gold, no body or bones. Make it low and long, length about2.3times its width.\nComposition: ONE complete isolated object only, centered with transparent margin around all edges. Show its complete grounded base. Fully transparent background and outside the base. No floor patch, no rectangular image backdrop, no cast shadow outside the base. No people, no character, no other props, no text, no labels, no UI, no watermark. Do not crop its base or silhouette.",
+    "generatedPath": "/Users/eduardoleale/.codex/generated_images/01a2082a-0e5b-7020-9bf5-f231a1a7a272/exec-af851e58-9953-48f9-92d0-1f379c369046.png",
+    "crop": [
+      142,
+      87,
+      1422,
+      1016
+    ],
+    "normalizedSize": [
+      96,
+      96
+    ],
+    "normalizedContentSize": [
+      92,
+      67
+    ],
+    "normalizedOffset": [
+      2,
+      27
+    ],
+    "alphaBoundsThreshold": 32
+  },
+  {
+    "name": "sarcophagus-y",
+    "prompt": "Use case: stylized-concept. Asset type: one original isolated modular isometric game-environment sprite for Couch Crypt.\nInput image 1 is ONLY a STYLE AND PROJECTION REFERENCE, not an edit target. Generate a new single asset matching the cool grey carved crypt stone, broad painted shading, precise dimetric floor plane and upper-left illumination of this reference.\nCamera: orthographic 2:1 dimetric/isometric, vertical edges perfectly vertical; the two horizontal ground axes slope at exactly plus/minus26.565 degrees (one screen pixel rise per two pixels run). No vanishing points, no frontal camera. Artwork must sit naturally on those diamond floor tiles.\nMaterials: matte blue-grey stone, worn broad edges and readable masonry joints, subtle low contrast wear. Clean game painting, not photorealistic or vector art; chunky broad forms readable at96pixels.\nSubject: A sealed medieval stone sarcophagus on a simple stepped plinth, heavy carved lid with a subtle sculpted cross. Its LONG axis runs from upper-left to lower-right on screen, slope+26.565 degrees; visible top plane follows the reference2:1 grid. Cool grey stone with a slightly lighter worn lid. No gold, no body or bones. Make it low and long, length about2.3times its width.\nComposition: ONE complete isolated object only, centered with transparent margin around all edges. Show its complete grounded base. Fully transparent background and outside the base. No floor patch, no rectangular image backdrop, no cast shadow outside the base. No people, no character, no other props, no text, no labels, no UI, no watermark. Do not crop its base or silhouette.",
+    "generatedPath": "/Users/eduardoleale/.codex/generated_images/01a2082a-0e5b-7020-9bf5-f231a1a7a272/exec-47a9fc8e-34ad-46bb-8949-19275ac6986d.png",
+    "crop": [
+      145,
+      69,
+      1354,
+      986
+    ],
+    "normalizedSize": [
+      96,
+      96
+    ],
+    "normalizedContentSize": [
+      92,
+      70
+    ],
+    "normalizedOffset": [
+      2,
+      24
+    ],
+    "alphaBoundsThreshold": 32
+  },
+  {
+    "name": "altar",
+    "prompt": "Use case: stylized-concept. Asset type: one original isolated modular isometric game-environment sprite for Couch Crypt.\nInput image 1 is ONLY a STYLE AND PROJECTION REFERENCE, not an edit target. Generate a new single asset matching the cool grey carved crypt stone, broad painted shading, precise dimetric floor plane and upper-left illumination of this reference.\nCamera: orthographic 2:1 dimetric/isometric, vertical edges perfectly vertical; the two horizontal ground axes slope at exactly plus/minus26.565 degrees (one screen pixel rise per two pixels run). No vanishing points, no frontal camera. Artwork must sit naturally on those diamond floor tiles.\nMaterials: matte blue-grey stone, worn broad edges and readable masonry joints, subtle low contrast wear. Clean game painting, not photorealistic or vector art; chunky broad forms readable at96pixels.\nSubject: A single substantial crypt altar on a two-step rectangular plinth: cool grey stone slab with sparse old-gold edge engraving, one draped dark muted burgundy cloth panel with a small worn gold crypt sigil, and a broad backless slab top. The LONG axis runs upper-left to lower-right on screen, slope+26.565 degrees. Low rectangular form, no tall backing shrine, no candles, no separate bowls or objects. Ground footprint length about twice depth.\nComposition: ONE complete isolated object only, centered with transparent margin around all edges. Show its complete grounded base. Fully transparent background and outside the base. No floor patch, no rectangular image backdrop, no cast shadow outside the base. No people, no character, no other props, no text, no labels, no UI, no watermark. Do not crop its base or silhouette.",
+    "generatedPath": "/Users/eduardoleale/.codex/generated_images/01a2082a-0e5b-7020-9bf5-f231a1a7a272/exec-81f05179-ab5a-4da8-b4ce-b9cf1bcbf6e0.png",
+    "crop": [
+      240,
+      42,
+      1534,
+      880
+    ],
+    "normalizedSize": [
+      128,
+      112
+    ],
+    "normalizedContentSize": [
+      124,
+      80
+    ],
+    "normalizedOffset": [
+      2,
+      30
+    ],
+    "alphaBoundsThreshold": 32
+  },
+  {
+    "name": "guardian",
+    "prompt": "Use case: stylized-concept. Asset type: one original isolated modular isometric game-environment sprite for Couch Crypt.\nInput image 1 is ONLY a STYLE AND PROJECTION REFERENCE, not an edit target. Generate a new single asset matching the cool grey carved crypt stone, broad painted shading, precise dimetric floor plane and upper-left illumination of this reference.\nCamera: orthographic 2:1 dimetric/isometric, vertical edges perfectly vertical; the two horizontal ground axes slope at exactly plus/minus26.565 degrees (one screen pixel rise per two pixels run). No vanishing points, no frontal camera. Artwork must sit naturally on those diamond floor tiles.\nMaterials: matte blue-grey stone, worn broad edges and readable masonry joints, subtle low contrast wear. Clean game painting, not photorealistic or vector art; chunky broad forms readable at96pixels.\nSubject: A single hooded funerary guardian statue carved from cool grey stone, hands resting on the pommel of a vertical stone ceremonial sword, long simple folded robes and a faceless dark hood. Stand on a complete square plinth whose visible diamond footprint exactly follows2:1 axes, side edges slopes\u00b126.565degrees. The statue faces the lower-left diagonal; show a clear dimetric view of the plinth. Broad painterly stone masses; a very restrained aged-gold rim on the plinth, no glow, no face detail, no wings, no extra objects.\nComposition: ONE complete isolated object only, centered with transparent margin around all edges. Show its complete grounded base. Fully transparent background and outside the base. No floor patch, no rectangular image backdrop, no cast shadow outside the base. No people, no character, no other props, no text, no labels, no UI, no watermark. Do not crop its base or silhouette.",
+    "generatedPath": "/Users/eduardoleale/.codex/generated_images/01a2082a-0e5b-7020-9bf5-f231a1a7a272/exec-4d3f738a-8e4c-4981-9a3b-67a85bd5bafd.png",
+    "crop": [
+      275,
+      73,
+      923,
+      1253
+    ],
+    "normalizedSize": [
+      72,
+      144
+    ],
+    "normalizedContentSize": [
+      68,
+      124
+    ],
+    "normalizedOffset": [
+      2,
+      18
+    ],
+    "alphaBoundsThreshold": 32
+  },
+  {
+    "name": "broken-column",
+    "prompt": "Use case: stylized-concept. Asset type: one original isolated modular isometric game-environment sprite for Couch Crypt.\nInput image 1 is ONLY a STYLE AND PROJECTION REFERENCE, not an edit target. Generate a new single asset matching the cool grey carved crypt stone, broad painted shading, precise dimetric floor plane and upper-left illumination of this reference.\nCamera: orthographic 2:1 dimetric/isometric, vertical edges perfectly vertical; the two horizontal ground axes slope at exactly plus/minus26.565 degrees (one screen pixel rise per two pixels run). No vanishing points, no frontal camera. Artwork must sit naturally on those diamond floor tiles.\nMaterials: matte blue-grey stone, worn broad edges and readable masonry joints, subtle low contrast wear. Clean game painting, not photorealistic or vector art; chunky broad forms readable at96pixels.\nSubject: A short broken crypt column, a cool grey fluted classical stone shaft ending in a rough fracture at about chest height, on a single complete square stepped plinth. Square plinth diamond must follow ground slopes\u00b10.5; upper-left light. One column only, no detached stones, no gold. Compact low landmark with readable broken silhouette, width about half its total height.\nComposition: ONE complete isolated object only, centered with transparent margin around all edges. Show its complete grounded base. Fully transparent background and outside the base; ALPHA MUST BE ZERO except on the actual stone object. No grey fog, no soft halo, no drop shadow, no floor patch, no rectangular image backdrop, no cast shadow outside the base. No people, no character, no other props, no text, no labels, no UI, no watermark. Do not crop its base or silhouette.",
+    "generatedPath": "/Users/eduardoleale/.codex/generated_images/01a2082a-0e5b-7020-9bf5-f231a1a7a272/exec-8a5c7d5c-57b3-4462-a2a6-3990f728a857.png",
+    "crop": [
+      618,
+      160,
+      1145,
+      827
+    ],
+    "normalizedSize": [
+      64,
+      96
+    ],
+    "normalizedContentSize": [
+      60,
+      76
+    ],
+    "normalizedOffset": [
+      2,
+      18
+    ],
+    "alphaBoundsThreshold": 32
+  },
+  {
+    "name": "rubble",
+    "prompt": "Use case: stylized-concept. Asset type: one original isolated modular isometric game-environment sprite for Couch Crypt.\nInput image 1 is ONLY a STYLE AND PROJECTION REFERENCE, not an edit target. Generate a new single asset matching the cool grey carved crypt stone, broad painted shading, precise dimetric floor plane and upper-left illumination of this reference.\nCamera: orthographic 2:1 dimetric/isometric, vertical edges perfectly vertical; the two horizontal ground axes slope at exactly plus/minus26.565 degrees (one screen pixel rise per two pixels run). No vanishing points, no frontal camera. Artwork must sit naturally on those diamond floor tiles.\nMaterials: matte blue-grey stone, worn broad edges and readable masonry joints, subtle low contrast wear. Clean game painting, not photorealistic or vector art; chunky broad forms readable at96pixels.\nSubject: A small low fallen crypt-wall rubble cluster: six to eight chunky cool grey masonry blocks, some stacked only two stones high, together as one coherent elongated low heap. Elongated ground axis from upper-left to lower-right, slope+0.5. Ground contact uses the same2:1 plane as reference. Broad shapes, no dust cloud, no grass, no scattering outside the small compact footprint.\nComposition: ONE complete isolated object only, centered with transparent margin around all edges. Show its complete grounded base. Fully transparent background and outside the base; ALPHA MUST BE ZERO except on the actual stone object. No grey fog, no soft halo, no drop shadow, no floor patch, no rectangular image backdrop, no cast shadow outside the base. No people, no character, no other props, no text, no labels, no UI, no watermark. Do not crop its base or silhouette.",
+    "generatedPath": "/Users/eduardoleale/.codex/generated_images/01a2082a-0e5b-7020-9bf5-f231a1a7a272/exec-3593add1-aa42-4efd-bd23-9af5b2158a7a.png",
+    "crop": [
+      301,
+      93,
+      1426,
+      771
+    ],
+    "normalizedSize": [
+      80,
+      48
+    ],
+    "normalizedContentSize": [
+      73,
+      44
+    ],
+    "normalizedOffset": [
+      3,
+      2
+    ],
+    "alphaBoundsThreshold": 32
+  },
+  {
+    "name": "sealed-gate",
+    "prompt": "Use case: stylized-concept. Asset type: one original isolated modular isometric game-environment sprite for Couch Crypt.\nInput image 1 is ONLY a STYLE AND PROJECTION REFERENCE, not an edit target. Generate a new single asset matching the cool grey carved crypt stone, broad painted shading, precise dimetric floor plane and upper-left illumination of this reference.\nCamera: orthographic 2:1 dimetric/isometric, vertical edges perfectly vertical; the two horizontal ground axes slope at exactly plus/minus26.565 degrees (one screen pixel rise per two pixels run). No vanishing points, no frontal camera. Artwork must sit naturally on those diamond floor tiles.\nMaterials: matte blue-grey stone, worn broad edges and readable masonry joints, subtle low contrast wear. Clean game painting, not photorealistic or vector art; chunky broad forms readable at96pixels.\nSubject: A single tall closed medieval crypt double gate of aged dark iron with sparse old-gold hardware, framed by cool grey stone jambs and a round stone arch. Complete low stone threshold base. Its door plane is vertical, its horizontal lintel/threshold LONG axis goes from lower-left to upper-right in IMAGE coordinates, slope-0.5(-26.565degrees), so it fits a world-X isometric wall. Both door and stone frame must be oblique, NOT front-on. See the TOP of the threshold as a2:1 diamond. No surrounding wall wings, no floor patch, no candles, no glowing cracks, no chains dangling outside, no text or glyphs resembling letters. Strong readable stoneframe, plain closed gate. Ground footprint width about1.5times depth.\nComposition: ONE complete isolated object only, centered with transparent margin around all edges. Show its complete grounded base. Fully transparent background and outside the base; ALPHA MUST BE ZERO except on the actual stone object. No grey fog, no soft halo, no drop shadow, no floor patch, no rectangular image backdrop, no cast shadow outside the base. No people, no character, no other props, no text, no labels, no UI, no watermark. Do not crop its base or silhouette.",
+    "generatedPath": "/Users/eduardoleale/.codex/generated_images/01a2082a-0e5b-7020-9bf5-f231a1a7a272/exec-0dfdd024-2d41-4e20-a388-02b8a897f4e9.png",
+    "crop": [
+      308,
+      41,
+      1226,
+      1000
+    ],
+    "normalizedSize": [
+      128,
+      192
+    ],
+    "normalizedContentSize": [
+      124,
+      130
+    ],
+    "normalizedOffset": [
+      2,
+      60
+    ],
+    "alphaBoundsThreshold": 32
+  }
+]
