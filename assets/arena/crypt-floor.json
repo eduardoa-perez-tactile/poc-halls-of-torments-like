@@ -5,6 +5,7 @@
   "medallionDiameter": 600,
   "pathWidth": 200,
   "materialRepeat": 200,
+  "fieldRepeat": 120,
   "paths": [
     {"id": "east", "to": [1200, 0]},
     {"id": "north-east", "to": [1200, 900]},

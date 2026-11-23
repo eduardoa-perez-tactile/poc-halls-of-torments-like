@@ -1,0 +1,3 @@
+Use case: precise-object-edit
+Edit target: the attached single transparent top-down stone paver.
+Change only its proportions: make this ONE stone much shorter, with an exact two-to-one length-to-width silhouette rather than the current long three-to-one rail. It should be a short squat rectangular border paving block, roughly two squares joined, its height about half its length. Keep the same restrained cool grey painterly face, naturally chipped corners, transparent exterior and very shallow flat edge treatment. True top-down, no tall side faces, no raised curb, no ground, no external shadow, no additional stones, no text. Landscape image with a modest transparent margin; genuinely transparent alpha outside the stone.

@@ -17,7 +17,7 @@ from PIL import Image
 import BakePaintedArenaBorders as packing
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCES = ROOT / 'art-source/engraved-crypt-floor'
+SOURCES = ROOT / 'art-source/crypt-floor-clarity'
 METADATA = ('gameplay.json', 'enemy-attacks.json', 'magic-projectiles.json',
             'painted-borders.json', 'arena-border.json')
 ASSETS = ('field', 'path', 'medallion')
@@ -42,7 +42,8 @@ def capture_inputs(archive, sources, runtime):
     floor = json.loads(entries['baseline/arena-border.json'])
     for page in pages + [{'file': floor['file']}]:
         entries['baseline/' + page['file']] = (runtime / page['file']).read_bytes()
-    for name in ASSETS:
+    assets = ASSETS + (('curb',) if (sources / 'curb-master.png').exists() else ())
+    for name in assets:
         entries['source/' + name + '-master.png'] = (sources / (name + '-master.png')).read_bytes()
     index = {name: {'bytes': len(data), 'sha256': digest(data)} for name, data in sorted(entries.items())}
     entries['SOURCES.json'] = (json.dumps(index, indent=2, sort_keys=True) + '\n').encode()
@@ -87,47 +88,73 @@ def periodic_material(master, side, wrap_axes=('x', 'y')):
     This keeps the generated painting, rather than inventing stone geometry. A
     cyclic centre transplant removes residual generator edge discontinuities.
     """
-    square = master.resize((side, side), Image.Resampling.LANCZOS).convert('RGBA')
+    width, height = (side, side) if isinstance(side, int) else side
+    square = master.resize((width, height), Image.Resampling.LANCZOS).convert('RGBA')
     original = square.copy()
     pixels, source = square.load(), original.load()
-    def phases(pos):
-        u = (pos + .5) / side
+    def phases(pos, size):
+        u = (pos + .5) / size
         weight = 1. - smooth(min(u, 1. - u) / .14)
-        return ((pos, 1. - weight), ((pos + side // 2) % side, weight))
-    for y in range(side):
-        for x in range(side):
+        return ((pos, 1. - weight), ((pos + size // 2) % size, weight))
+    for y in range(height):
+        for x in range(width):
             result = [0., 0., 0.]
-            for sx, wx in phases(x) if 'x' in wrap_axes else ((x, 1.),):
-                for sy, wy in phases(y) if 'y' in wrap_axes else ((y, 1.),):
+            for sx, wx in phases(x, width) if 'x' in wrap_axes else ((x, 1.),):
+                for sy, wy in phases(y, height) if 'y' in wrap_axes else ((y, 1.),):
                     color = source[sx, sy]
                     for c in range(3):
                         result[c] += color[c] * wx * wy
             pixels[x, y] = tuple(round(v) for v in result) + (255,)
     # An original opposite-side neighbour is retained outside every repeat edge.
-    wrapped = Image.new('RGBA', (side + CONTEXT * 2, side + CONTEXT * 2))
+    wrapped = Image.new('RGBA', (width + CONTEXT * 2, height + CONTEXT * 2))
     wp = wrapped.load()
     for y in range(wrapped.height):
         for x in range(wrapped.width):
             sx, sy = x - CONTEXT, y - CONTEXT
-            sx = sx % side if 'x' in wrap_axes else max(0, min(side-1, sx))
-            sy = sy % side if 'y' in wrap_axes else max(0, min(side-1, sy))
+            sx = sx % width if 'x' in wrap_axes else max(0, min(width-1, sx))
+            sy = sy % height if 'y' in wrap_axes else max(0, min(height-1, sy))
             wp[x, y] = pixels[sx, sy]
     return wrapped
 
 
 def normalize(masters):
+    clarity = 'curb' in masters
     medallion = Image.new('RGBA', (258, 258))
     medallion.paste(masters['medallion'].resize((256, 256), Image.Resampling.LANCZOS), (1, 1))
-    images = {'field': periodic_material(masters['field'], 96),
-              'path': periodic_material(masters['path'], 64, ('y',)),
+    images = {'field': periodic_material(masters['field'], 64 if clarity else 96),
+              'path': periodic_material(masters['path'], (128, 64) if clarity else 64, ('y',)),
               'medallion': medallion}
+    curb_normalization = None
+    if clarity:
+        curb = masters['curb']
+        bounds = curb.getchannel('A').point(lambda a: 255 if a >= 32 else 0).getbbox()
+        if bounds is None: raise ValueError('The selected curb must contain visible painted stone')
+        trimmed = curb.crop(bounds)
+        ratio = min(30 / trimmed.width, 14 / trimmed.height)
+        size = (max(1, round(trimmed.width * ratio)), max(1, round(trimmed.height * ratio)))
+        fitted = trimmed.resize(size, Image.Resampling.LANCZOS)
+        normalized = Image.new('RGBA', (34, 18))
+        offset = (1 + (32-size[0])//2, 1 + (16-size[1])//2)
+        normalized.paste(fitted, offset)
+        pixels = normalized.load()
+        for y in range(normalized.height):
+            for x in range(normalized.width):
+                r, g, b, a = pixels[x, y]
+                pixels[x, y] = (round(r*a/255), round(g*a/255), round(b*a/255), a)
+        images['curb'] = normalized
+        curb_normalization = {'alphaTrimThreshold': 32, 'sourceAlphaBounds': list(bounds),
+                              'fittedSize': list(size), 'fittedOffset': list(offset),
+                              'operation': 'alpha crop, proportional Lanczos fit, transparent margin, RGB premultiplication'}
     paintings = {}
     for name, image in images.items():
-        repeat = name != 'medallion'
+        repeat = name in ('field', 'path')
         paintings[name] = {'file': name + '.png', 'sourceSize': list(image.size),
                            'contentRect': [1, 1, image.width - 2, image.height - 2],
                            'repeat': repeat, 'wrapAxes': ['x', 'y'] if name == 'field' else ['y'] if name == 'path' else [],
                            'alphaBounds': list(image.getchannel('A').getbbox())}
+        if name == 'curb':
+            paintings[name]['premultipliedAlpha'] = True
+            paintings[name]['normalization'] = curb_normalization
     return paintings, images
 
 
@@ -157,8 +184,9 @@ def bake(archive, output, source_output=None):
             if len(data) != expected['bytes'] or digest(data) != expected['sha256']:
                 raise ValueError('Canonical input changed: ' + name)
         metadata, specs, baseline, rectangles = load_baseline(source.read)
+        assets = ASSETS + (('curb',) if 'source/curb-master.png' in index else ())
         masters = {name: Image.open(io.BytesIO(source.read('source/' + name + '-master.png'))).convert('RGBA')
-                   for name in ASSETS}
+                   for name in assets}
     for name in METADATA:
         old = output / name
         if old.exists() and digest(old.read_bytes()) != index['baseline/' + name]['sha256']:
@@ -167,7 +195,27 @@ def bake(archive, output, source_output=None):
     masks, capacity = packing.protect(baseline, rectangles)
     free = packing.free_rectangles(baseline, rectangles, masks)
     selected = None
-    for new_padding in (2, 0):
+    if 'curb' in masters:
+        curb_cells = cells_for({'curb': paintings['curb']}, {'curb': images['curb']}, 32, 16)
+        if len(curb_cells) != 1: raise ValueError('The curb must remain one complete storage piece')
+        cells = []
+        for name, cw, ch in (('field', 32, 16), ('path', 32, 16), ('medallion', 24, 8)):
+            cells += cells_for({name: paintings[name]}, {name: images[name]}, cw, ch)
+        old_padding = packing.PADDING
+        try:
+            packing.PADDING = 0
+            curb_placement = packing.pack(curb_cells, free, 'height', 'short-side')
+            if curb_placement is None: raise ValueError('The whole painted curb does not fit')
+            remaining = [rects[:] for rects in free]
+            for page, x, y, w, h in curb_placement.values():
+                remaining[page] = packing.subtract(remaining[page], (x, y, w, h))
+            placement = packing.pack(cells, remaining, 'height', 'short-side')
+        finally:
+            packing.PADDING = old_padding
+        if placement is None: raise ValueError('Clarity materials do not fit the guarded existing pages')
+        placement.update(curb_placement)
+        selected = cells + curb_cells, placement, None, None, 0, 'whole curb first; mixed cores height/short-side'
+    for new_padding in (() if selected else (2, 0)):
         for core_width, core_height in ((48, 48), (32, 32), (24, 24), (24, 8), (16, 8), (8, 8)):
             cells = cells_for(paintings, images, core_width, core_height)
             if len(cells) > 512: continue
@@ -217,6 +265,7 @@ def bake(archive, output, source_output=None):
     manifest = {'version': 1, 'addedTextureBytes': 0, 'pages': copy.deepcopy(specs), 'context': CONTEXT,
                 'padding': new_padding, 'edgeExtrusion': 1 if new_padding else 0, 'trimAlphaThreshold': 32,
                 'sourceArchiveSha256': digest(archive.read_bytes()), 'paintings': paintings}
+    if 'curb' in masters: manifest['materialVersion'] = 2
     for entry in paintings.values(): entry['pieces'] = []
     for cell in cells:
         page, x, y, w, h = placement[cell['key']]
@@ -247,7 +296,7 @@ def bake(archive, output, source_output=None):
             raise ValueError('Packed source context changed')
     manifest_data = (json.dumps(manifest, indent=2) + '\n').encode()
     (output / 'engraved-floor.json').write_bytes(manifest_data)
-    return {'version': 1, 'sourceArchive': archive.name, 'sourceArchiveSha256': digest(archive.read_bytes()),
+    report = {'version': 1, 'sourceArchive': archive.name, 'sourceArchiveSha256': digest(archive.read_bytes()),
             'addedTextureBytes': 0, 'newTexturePages': 0, 'sourcePixelsAndNeighbourContextPreserved': True,
             'existingPixelsAndGuttersPreserved': True, 'coreSize': [core_width, core_height],
             'newPieceOuterPadding': new_padding, 'originalNeighbourContext': CONTEXT, 'packingOrder': packing_order,
@@ -259,6 +308,11 @@ def bake(archive, output, source_output=None):
             'normalizedSourceSha256': {paintings[name]['file']: digest(encoded(image)) for name, image in images.items()},
             'outputs': {spec['file']: digest((output/spec['file']).read_bytes()) for spec in specs}
                        | {'engraved-floor.json': digest(manifest_data)}}
+    if 'curb' in masters:
+        report.pop('coreSize')
+        report['materialVersion'] = 2
+        report['coreSizes'] = {'field': [32, 16], 'path': [32, 16], 'medallion': [24, 8], 'curb': [32, 16]}
+    return report
 
 
 def main():

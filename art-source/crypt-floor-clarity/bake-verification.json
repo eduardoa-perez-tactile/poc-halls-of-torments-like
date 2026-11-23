@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "sourceArchive": "bake-inputs.zip",
+  "sourceArchiveSha256": "7c5fe09c9c0fa5fe2ed7b4f7f4a6c472a22531f697405d0f36d29761f3c5dc32",
+  "addedTextureBytes": 0,
+  "newTexturePages": 0,
+  "sourcePixelsAndNeighbourContextPreserved": true,
+  "existingPixelsAndGuttersPreserved": true,
+  "newPieceOuterPadding": 0,
+  "originalNeighbourContext": 1,
+  "packingOrder": "whole curb first; mixed cores height/short-side",
+  "pieces": 317,
+  "paintingPieces": {
+    "field": 8,
+    "path": 16,
+    "medallion": 292,
+    "curb": 1
+  },
+  "contentCoverage": {
+    "field": {
+      "significantPixelsCoveredExactlyOnce": true,
+      "excludedLowAlphaPixels": 0,
+      "maximumExcludedAlpha": 0
+    },
+    "path": {
+      "significantPixelsCoveredExactlyOnce": true,
+      "excludedLowAlphaPixels": 0,
+      "maximumExcludedAlpha": 0
+    },
+    "medallion": {
+      "significantPixelsCoveredExactlyOnce": true,
+      "excludedLowAlphaPixels": 30,
+      "maximumExcludedAlpha": 3
+    },
+    "curb": {
+      "significantPixelsCoveredExactlyOnce": true,
+      "excludedLowAlphaPixels": 0,
+      "maximumExcludedAlpha": 0
+    }
+  },
+  "pageCapacityBeforeAppend": [
+    {
+      "size": [
+        1024,
+        1024
+      ],
+      "legacyRectangles": 289,
+      "protectedPixels": 968343,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 80233
+    },
+    {
+      "size": [
+        512,
+        512
+      ],
+      "legacyRectangles": 85,
+      "protectedPixels": 247760,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 14384
+    },
+    {
+      "size": [
+        512,
+        512
+      ],
+      "legacyRectangles": 62,
+      "protectedPixels": 232277,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 29867
+    },
+    {
+      "size": [
+        512,
+        256
+      ],
+      "legacyRectangles": 9,
+      "protectedPixels": 79769,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 51303
+    }
+  ],
+  "paintedPixelsWithPadding": 90100,
+  "baselineMetadataSha256": {
+    "gameplay.json": "c455c0aff9492a21e0226b64a1ee0f3561b1deca0d88201193af02bee1134d9a",
+    "enemy-attacks.json": "bc07ad52deb8daf4443f03a0a4867e981ef32ac34d4a9bd01aae4878e7ab2cef",
+    "magic-projectiles.json": "99b5dc983af5bbcccd35ac4db532f127ee27bbab5a6c10beea925736b30cfbb1",
+    "painted-borders.json": "6c12fb5579baa6c569a24a0b7df7da18a10bc98d71410e2b8dfde8934c5bf4fb",
+    "arena-border.json": "1cd7c8c61d5a6d457e22800094c5c862e42e08abc4a24cfea7fedf2a0ab4a5c6"
+  },
+  "normalizedSourceSha256": {
+    "field.png": "37f1d273c37eb72365012f4abdc7726b93819a417ebb7c910452fed518d43a94",
+    "path.png": "247ef3ff1354e12d184a9651d94f83d195e8ac58b02dac8e1e0f50f4b11a40c0",
+    "medallion.png": "e93302c633d7eedf75226309510926954fda499571a21efda415dce9471508a1",
+    "curb.png": "1b1cd880d1dd532bd6edb86871278240ba74039a4a5ffcd06f82b30cdd5008ea"
+  },
+  "outputs": {
+    "gameplay-actors-main.png": "b70c7fcdd26e77898cc87e1a59723c0c8bdf5553889404abc78ea085ce576f21",
+    "gameplay-actors-common.png": "622f0572d88eaec37b8c9367e49bf0979c6095ac95cb713c77665267631b83ac",
+    "gameplay-environment.png": "39d3574c60b5985724f2aadba9500df7e59da62dd9fa1dbe5603db42ae98c0f7",
+    "arena-border.png": "b47a3d461a05a5ed5593ebe97eeeb4111f83b802b8093e904e77823976c28155",
+    "engraved-floor.json": "f05dac8082c88a8e873a2f805fac1d3655b5701afb374b5a25e7ef26691149d1"
+  },
+  "materialVersion": 2,
+  "coreSizes": {
+    "field": [
+      32,
+      16
+    ],
+    "path": [
+      32,
+      16
+    ],
+    "medallion": [
+      24,
+      8
+    ],
+    "curb": [
+      32,
+      16
+    ]
+  },
+  "independentArchiveOnlyRebuildMatched": true,
+  "legacyArchiveByteIdenticalRebuildMatched": true,
+  "baselinePagesAndMetadataUnchangedFromPreviousArchive": true,
+  "medallionMasterAndNormalizedSourceUnchanged": true,
+  "legacyArchiveSha256": "6f2d5c1d29c81e394fa6a6c29fc6957b4bbf0ca7e853f76790ee9291db5c92cf",
+  "originalRuntimeMetadataByteIdentical": true
+}

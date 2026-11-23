@@ -1,0 +1,63 @@
+{
+  "archive": "bake-inputs.zip",
+  "sha256": "7c5fe09c9c0fa5fe2ed7b4f7f4a6c472a22531f697405d0f36d29761f3c5dc32",
+  "entries": {
+    "baseline/arena-border.json": {
+      "bytes": 2737,
+      "sha256": "1cd7c8c61d5a6d457e22800094c5c862e42e08abc4a24cfea7fedf2a0ab4a5c6"
+    },
+    "baseline/arena-border.png": {
+      "bytes": 79549,
+      "sha256": "610cfa74f66f50839953f2a6624df15dbe5f124830fe36d34fdf083598a4b6ab"
+    },
+    "baseline/enemy-attacks.json": {
+      "bytes": 29647,
+      "sha256": "bc07ad52deb8daf4443f03a0a4867e981ef32ac34d4a9bd01aae4878e7ab2cef"
+    },
+    "baseline/gameplay-actors-common.png": {
+      "bytes": 370125,
+      "sha256": "77cdc72fbd771d7417b8b9063d672e9ac1f6aa87a53dda56bda5d543c8aca863"
+    },
+    "baseline/gameplay-actors-main.png": {
+      "bytes": 1522727,
+      "sha256": "9dc497005bad4a0d7c54fe9b9ca474e471d011dff46d02413e4f5bf33f4e1328"
+    },
+    "baseline/gameplay-environment.png": {
+      "bytes": 355424,
+      "sha256": "463be8b9a1d87d7e00d76439590025c216928b60db7283e4d8b1b255d4ba4079"
+    },
+    "baseline/gameplay.json": {
+      "bytes": 83231,
+      "sha256": "c455c0aff9492a21e0226b64a1ee0f3561b1deca0d88201193af02bee1134d9a"
+    },
+    "baseline/magic-projectiles.json": {
+      "bytes": 6709,
+      "sha256": "99b5dc983af5bbcccd35ac4db532f127ee27bbab5a6c10beea925736b30cfbb1"
+    },
+    "baseline/painted-borders.json": {
+      "bytes": 44209,
+      "sha256": "6c12fb5579baa6c569a24a0b7df7da18a10bc98d71410e2b8dfde8934c5bf4fb"
+    },
+    "source/curb-master.png": {
+      "bytes": 959259,
+      "sha256": "be0755be7645f27d85d1e271b3351b2d1d33150df56f54d2558818184335060e"
+    },
+    "source/field-master.png": {
+      "bytes": 2006181,
+      "sha256": "d322bc18e96b5c3319731ad9069eda6a8b267e3c1deb1fdc687b1536f1bd4bed"
+    },
+    "source/medallion-master.png": {
+      "bytes": 2549498,
+      "sha256": "e7b9ac7dd76506d3a2513bb4b9f68a13cb91d6dff4b09bf83ff540cc74062074"
+    },
+    "source/path-master.png": {
+      "bytes": 2353277,
+      "sha256": "48df6a26567c26f5bfa2ff1f4cfd7fd8affc134b68276c3580f62d8b47990390"
+    }
+  },
+  "baselineArchive": "../engraved-crypt-floor/bake-inputs.zip",
+  "baselineArchiveSha256": "6f2d5c1d29c81e394fa6a6c29fc6957b4bbf0ca7e853f76790ee9291db5c92cf",
+  "baselinePagesAndMetadataUnchanged": true,
+  "medallionMasterUnchanged": true,
+  "revision": "Sharper coarse field and path paintings plus one original transparent curb; untouched pre-floor baseline and medallion retained."
+}

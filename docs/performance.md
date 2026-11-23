@@ -389,3 +389,19 @@ screenshot work. Earlier checks also contained much larger callback spikes;
 the cause is not established. Raw evidence was passed to the coordinated
 performance-baseline chat for controlled investigation. Physical-TV performance
 and full-run balance remain unverified. See [floor integration](engraved-crypt-floor.md).
+
+
+## Clear stone floor (2026-11-23)
+
+The later [clarity pass](engraved-crypt-floor.md) replaces blurry field/path paint
+and adds separate flat border stones with real grout gaps. It uses 317 source
+pieces and 4,564 cached ground quads (365,120 vertex + 54,768 index used bytes),
+versus 364 pieces and 5,666 quads previously. Cache capacity remains 8,000; the
+medallion remains 292 cached quads. Texture/Pixmap accounting is unchanged.
+Twenty-five focused checks and desktop/Android builds passed. Brief native
+centre/landmark/co-op checks show the new stones and borders; a 298-frame co-op
+observation had interval p95/p99/max 21.81/23.81/56.85 ms, callback wall time
+7.04/8.60/41.60 ms and 39 draws (16 floor across both cameras). This is not a
+controlled before/after performance comparison or proof of physical-TV 60 FPS.
+The coordinated [baseline report](performance-baseline.md) measures the earlier
+cc8ab2a floor; preserve that version distinction for future comparisons.

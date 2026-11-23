@@ -220,7 +220,7 @@ public final class ArenaRenderer implements Disposable {
         }
         // Materials retain their own world repeat size rather than shrinking to the foundation grid.
         ArrayList<EngravedFloorArt.Quad> field = new ArrayList<>();
-        float repeat = 240f;
+        float repeat = floorLayout.fieldRepeat;
         for (float x = -ArenaWorld.HALF_WIDTH; x < ArenaWorld.HALF_WIDTH; x += repeat)
             for (float y = -ArenaWorld.HALF_HEIGHT; y < ArenaWorld.HALF_HEIGHT; y += repeat) {
                 float right = Math.min(x + repeat, ArenaWorld.HALF_WIDTH), top = Math.min(y + repeat, ArenaWorld.HALF_HEIGHT);
@@ -233,8 +233,12 @@ public final class ArenaRenderer implements Disposable {
         quads += cacheGround(field);
         ArrayList<EngravedFloorArt.Quad> paths = new ArrayList<>();
         for (var cell : floorLayout.pathCells)
-            java.util.Collections.addAll(paths, art.engravedFloor.geometry(art.engravedFloor.path, cell.vertices, 1f));
+            java.util.Collections.addAll(paths, art.engravedFloor.geometry(art.engravedFloor.path, cell.vertices, 1f, .10f, .90f));
         quads += cacheGround(paths);
+        ArrayList<EngravedFloorArt.Quad> curbs = new ArrayList<>();
+        for (float[] polygon : new StonePathBorders(floorLayout).polygons)
+            java.util.Collections.addAll(curbs, art.engravedFloor.geometry(art.engravedFloor.curb, polygon, 1f));
+        quads += cacheGround(curbs);
         if (quads > EngravedFloorArt.MAX_FLOOR_QUADS) throw new IllegalStateException("Floor cache capacity exceeded");
         cachedFloorQuads = quads;
         Gdx.app.log("FloorArt", "Cached ground quads=" + quads + ", medallion quads=" + medallion.length);

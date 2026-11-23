@@ -1,72 +1,77 @@
 # Engraved crypt floor
 
-The user approved the generated gameplay-view proposal and requested implementation
-on 23 November 2026. The floor now has an original shallow Gothic medallion, broad
-flush paths and quiet varied stone flags. It remains cosmetic: arena bounds,
-movement, spawns, collision and the open landmark layout are unchanged.
+The user approved the generated floor proposal and requested implementation on
+23 November 2026. Subsequent native feedback identified blurry paving and flat
+path stripes. The current clarity pass replaces those field/path materials with
+more clearly painted stones and independently placed border blocks. The original
+engraved medallion, open arena, combat bounds and gameplay remain unchanged.
 
-## Placement and rendering
+## Current placement
 
 `assets/arena/crypt-floor.json` authors the central 600-unit medallion, eight
-200-unit-wide paving spokes and six smooth wear zones. This diameter matches the
-approved gameplay-camera scale (roughly 1,050 pixels wide in a 1920-wide solo view).
-The true ground-plane circle projects to a 2:1 ellipse. A 45-degree world-plane
-rotation aligns the flourish with screen axes and its inner paving with the
-surrounding floor. Everything is flush; there is no platform or raised border.
+200-unit-wide paving spokes, a 120-unit field repeat and six quiet wear zones.
+The medallion remains a true ground-plane circle projected to a 2:1 ellipse;
+a 45-degree rotation aligns the flourish with screen axes. It stays flush and
+uses ordinary alpha before hazards, targeting rings, pickups and actors.
 
-The field material repeats every 240 world units, with smaller flags than the path's
-broader dressed slabs. Paths have separately painted edging stones and repeat
-along their length every 200 units. Geometry is clipped at the existing 2400×1800
-floor bounds with UV interpolation, so partial cells crop rather than stretch.
-Quiet stone colour/chips/cracks come from the original paintings; authored smooth
-wear changes vertex colours around landmarks without random per-frame decoration.
+The field has roughly four clearly painted stone courses per repeat, avoiding
+many weak joints compressed into a small texture. Its 64×64 material at a
+120-unit repeat has 25% more samples per world unit than the original 96px/240-unit
+material, with substantially more samples per individual painted stone. The
+128×64 path doubles samples across its width while keeping its 200-unit repeat.
 
-Base paving, paths and the retained foundation/exterior share one startup-built
-SpriteCache. Cells are grouped by texture page within each layer, avoiding a
-texture switch for every storage cut. The 292 medallion quads are cached once and
-grouped by page through the existing SpriteBatch. They use ordinary alpha before
-hazards, targeting rings, pickups and actors; the original floor-cache coverage
-shader stays limited to opaque paving/foundation. There are no floor frame-loop
-allocations or uploads. Both cameras reuse the same geometry.
+`StonePathBorders` builds separate 38×20-unit flat blocks on both sides of each
+path, on a 40-unit period with 2-unit grout gaps. Their transparent chipped
+silhouettes reveal the ground between blocks. The path's old painted margins
+are cropped at U=0.1/0.9, so the fill does not form a smooth stripe under those
+edges. All path/block geometry clips to the unchanged 2400×1800 arena with UV
+interpolation rather than stretched final stones. None creates collision.
 
-## Art and resource bounds
+Base paving, paths, blocks and retained foundation/exterior share one startup
+SpriteCache, grouped by page within each layer. The shipped floor uses 4,564
+cached quads, versus 5,666 previously: 365,120 vertex bytes and 54,768 index bytes
+of used payload. Allocated capacity remains 8,000 quads (640,000 vertex + 96,000
+index bytes). The medallion's 292 cached quads retain 23,360 vertex bytes and
+reuse the existing SpriteBatch. Both cameras share the static geometry; no
+floor allocations or uploads were added to the frame loop.
 
-[Original masters, approved concept and exact prompts](../art-source/engraved-crypt-floor/README.md)
-were made with built-in ImageGen. Production uses separate field/path materials
-and a 256×256 medallion, not the flattened proposal screenshot. The four existing
-managed gameplay/foundation pages hold 364 source pieces with 24×8 cores and one pixel
-of actual source-neighbour context on every side. These are storage cuts, not
-repeated fragments of the medallion. Field repeats in both axes; the path repeats
-only along its length so its side edging stays intact. Source masters and the
-first path attempt are preserved outside runtime assets.
+## Art and texture bounds
 
-No new texture page or retained decoded Pixmap is added. Accounted combined GPU
-texture residency including QR remains 33,516,364 bytes (31.9637 MiB); retained
-Pixmaps remain 20,245,324 bytes. The static floor cache is bounded to 8,000 quads:
-640,000 vertex bytes plus 96,000 index bytes of allocated mesh capacity. The shipped layout uses 5,666 cached quads (453,280 vertex bytes and 67,992
-index bytes of used payload). Medallion vertex payload adds 23,360 bytes, plus bounded
-quad/array metadata. These geometry costs are separate from texture residency.
+[Selected original sources, exact prompts and provenance](../art-source/crypt-floor-clarity/README.md)
+were created with built-in ImageGen. Production uses separate material paintings
+and an isolated border block, not the flattened proposal screenshot. The old
+medallion master and normalized source remain byte-identical.
 
-The standalone final stage is `scripts/BakeEngravedFloor.py`, after the painted
-border baker. Its source archive retains the untouched pre-floor four pages and
-five metadata files. [Bake verification](../art-source/engraved-crypt-floor/bake-verification.json)
-checks every old sprite/wall/foundation pixel and sampling gutter, exact new
-source coverage/context copies, unchanged old metadata, and an independent
-archive-only byte-identical rebuild.
+The four existing managed gameplay/foundation pages hold 317 source pieces:
+field 8, path 16, medallion 292 and curb 1. Field/path use 32×16 storage cores;
+medallion cuts retain their 24×8 cores. The curb stays whole at 32×16 with one
+pixel of context on every side. Its RGB is premultiplied for the existing
+coverage shader, preventing bright edges when that shader divides sampled RGB
+by coverage. All other field/path samples are opaque.
 
-## Verification and limits
+No texture page or retained decoded Pixmap is added. Combined accounted texture
+residency including QR stays 33,516,364 bytes (31.9637 MiB); retained Pixmaps stay
+20,245,324 bytes. The source archive preserves all four pre-floor baseline pages,
+five metadata files and medallion source. The additive bake preserves every old
+protected sprite/wall/foundation pixel and gutter. Its [verification record](../art-source/crypt-floor-clarity/bake-verification.json)
+also proves exact new source coverage/context, an independent current rebuild
+and a byte-identical historical floor rebuild.
 
-Twenty-two focused JDK 21 checks passed across floor source/UV coverage, repeat
-collars, clipped path geometry, wear continuity, malformed metadata and existing
-painted-wall/foundation contracts. Desktop classes and Android debug assembly
-passed. Brief native Android 13/API 33 ARM 64 Television_1080 p checks cover the centre,
-a landmark and separated co-op cameras; captures are ignored under
-`.run/engraved-floor-*.png`. The attack indicator remains separate above the stone
-engraving. No whole-run survival or balance playtest was performed.
+## Checks and limits
 
-The visual-check timing logs include ADB navigation and screenshots and contain
-large callback/interval spikes; their cause is not established by this check.
-The performance-baseline chat has the evidence for a controlled follow-up.
-These captures do not prove sustained 60 FPS or physical-TV performance. Temporary
-inspection controllers/logger/scripts are stopped and removed after the check;
-the emulator and LAN relay remain running for handoff.
+Twenty-five focused JDK 21 checks passed across source/UV coverage, repeat collars,
+curb alpha/density, clipped path/block geometry, real grout gaps, wear continuity,
+metadata rejection and retained painted-wall/foundation contracts. Desktop
+classes and Android debug assembly passed. Native Android 13/API 33 ARM64
+Television_1080p checks inspected the centre, a landmark and separated co-op
+cameras. Ignored captures/logs are `.run/clear-floor-*`.
+
+A short co-op observation after resetting frame metrics recorded 298 frames:
+interval p95/p99/max 21.81/23.81/56.85 ms; callback wall time 7.04/8.60/41.60 ms;
+39 draws, including 16 floor draws across two cameras. These visual checks do not
+establish a speedup, sustained 60 FPS, full-run balance or physical-TV performance.
+The [controlled performance baseline](performance-baseline.md) was captured before
+this clarity pass and remains evidence for that exact earlier floor/APK.
+
+Temporary inspection clients/logger/scripts were stopped/removed. The emulator
+and existing LAN relay remain available at ordinary Home for handoff.

@@ -43,7 +43,7 @@ repeat edges filter the same source neighbours as the following material repeat.
 ## Bounded atlas stage
 
 ```sh
-python3 scripts/BakeEngravedFloor.py --output assets/art \
+python3 scripts/BakeEngravedFloor.py --archive art-source/engraved-crypt-floor/bake-inputs.zip --output .run/legacy-floor-rebuild \
   --source-output art-source/engraved-crypt-floor
 ```
 
@@ -65,3 +65,9 @@ protected pixels are compared against the baseline before writing outputs.
 limits, output hashes and an independent archive-only rebuild. Source/bake checks
 do not prove native visual integration or physical-TV performance; those belong
 to the runtime handoff.
+
+
+The later [clarity pass](../crypt-floor-clarity/README.md) supersedes these field
+and path materials in the current game. This archive remains a byte-identical
+historical export; its medallion master/normalized painting are preserved in the
+current pass. Use the clarity source for current runtime rebuilds.
