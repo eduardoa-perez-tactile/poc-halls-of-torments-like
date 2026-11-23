@@ -357,3 +357,17 @@ logging and inspection scripts were removed/stopped; the existing emulator is at
 Home and the existing relay/ADB forward remain available. No physical phone/TV
 was targeted. Floor artwork remains unchanged pending the user's follow-up
 conversation about the concept's engraved circle, paths and tile variation.
+
+## Continuous painted borders (2026-11-23)
+
+The approved full-side paintings reuse the three existing gameplay pages with no
+GPU growth: 33,516,364 accounted texture bytes including QR, below 32 MiB. There
+are 99 stored pieces and 206 cached quads, with 16,480 vertex bytes; no frame-loop
+allocations or uploads were added. Old sprite pixels/gutters and metadata remain
+unchanged. Twenty-two focused checks, desktop classes and Android debug assembly
+passed. Native API-33 ARM64 checks covered all four corners and separated co-op
+cameras. A final 301-frame co-op window reported interval p95/p99/max
+20.91/21.85/22.57 ms, CPU submission 4.42/4.77/4.99 ms, 36 draws, 142 intervals
+above 16.7 ms and none above 33.4 ms. This exceeds the strict interval target and
+does not establish physical-TV 60 FPS, long-run balance or stability. See
+[implementation, source proof and limits](painted-arena-borders.md).

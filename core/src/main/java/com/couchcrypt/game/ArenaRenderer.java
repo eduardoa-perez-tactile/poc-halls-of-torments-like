@@ -25,7 +25,7 @@ public final class ArenaRenderer implements Disposable {
     // Only the rendered origin moves; the simulation keeps its original projectile coordinates and trajectory.
     private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
     private static final float[] SOVEREIGN_ORIGIN = {37, 78, -12, 67, 18, 90, -35, 82};
-    private static final int PLAYER = 0, ENEMY = 1, PROP = 2;
+    private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PAINTED_BORDER = 3;
     private final GameArt art;
     private final GameHud gameHud;
     private final SpriteBatch batch = new SpriteBatch(1800);
@@ -37,9 +37,10 @@ public final class ArenaRenderer implements Disposable {
     private final OrthographicCamera hud = new OrthographicCamera();
     private final boolean[] cameraReady = new boolean[2];
     private final ArenaLayout layout;
+    private final PaintedBorderArt.Scene paintedBorders;
     private final GameplayAtlas.Region[] propArt;
     private final float[] environmentVertices = new float[20];
-    private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + ArenaLayout.MAX_PLACEMENTS];
+    private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + ArenaLayout.MAX_PLACEMENTS + PaintedBorderArt.MAX_SCENERY];
     private final int[] types = new int[depths.length], indices = new int[depths.length];
     private int sortCount;
     public int drawCalls;
@@ -49,6 +50,7 @@ public final class ArenaRenderer implements Disposable {
         floorCacheId = cacheFloor();
         hud.setToOrtho(false, HUD_WIDTH, HUD_HEIGHT);
         layout = ArenaLayout.load(art.metadata);
+        paintedBorders = art.paintedBorders.place(layout, art.metadata);
         propArt = new GameplayAtlas.Region[layout.placements.length];
         for (int i = 0; i < propArt.length; i++)
             propArt[i] = art.environment(layout.placements[i].region);
@@ -217,6 +219,7 @@ public final class ArenaRenderer implements Disposable {
         sortCount = 0;
         for (int i = 0; i < layout.placements.length; i++) {
             ArenaLayout.Placement placement = layout.placements[i];
+            if (placement.wall) continue;
             GameplayAtlas.Frame frame = art.metadata.frames[propArt[i].frame()];
             float scale = placement.scale;
             float shear = propArt[i].renderShearY();
@@ -227,6 +230,11 @@ public final class ArenaRenderer implements Disposable {
                 Math.max(placement.shadowHeight * .5f, (frame.bottom + frame.height) * scale + highShift),
                 Math.max(placement.shadowHeight * .5f, -frame.bottom * scale - lowShift)))
                 add(PROP, i, placement.x, placement.y);
+        }
+        for (int i = 0; i < paintedBorders.quads.length; i++) if (paintedBorders.visible(camera, i)) {
+            PaintedBorderArt.Quad q = paintedBorders.quads[i];
+            add(PAINTED_BORDER, i, q.worldX, q.worldY);
+            depths[sortCount - 1] = q.sortDepth;
         }
         for (int i = 0; i < world.enemies.length; i++) {
             ArenaWorld.Enemy enemy = world.enemies[i];
@@ -267,6 +275,7 @@ public final class ArenaRenderer implements Disposable {
         batch.setColor(1f, 1f, 1f, .62f);
         for (int i = 0; i < sortCount; i++) {
             int index = indices[i]; float x, y, width;
+            if (types[i] == PAINTED_BORDER) continue;
             if (types[i] == PLAYER) {
                 ArenaWorld.Player player = world.players[index];
                 x = player.x; y = player.y; width = player.alive ? 62f : 72f;
@@ -733,7 +742,10 @@ public final class ArenaRenderer implements Disposable {
     private void drawSprites(ArenaWorld world, OrthographicCamera camera, int viewer) {
         for (int i = 0; i < sortCount; i++) {
             int index = indices[i];
-            if (types[i] == PROP) {
+            if (types[i] == PAINTED_BORDER) {
+                batch.setColor(Color.WHITE);
+                paintedBorders.draw(batch, index);
+            } else if (types[i] == PROP) {
                 drawEnvironment(world, camera, viewer, index);
             } else if (types[i] == ENEMY) {
                 ArenaWorld.Enemy enemy = world.enemies[index];

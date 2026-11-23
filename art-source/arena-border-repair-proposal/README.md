@@ -22,3 +22,8 @@ seams, player occlusion and memory/performance still require separate production
 implementation and native verification after visual approval.
 
 Only one generation was requested; no variants or contact sheets were produced.
+
+The user approved this direction on 2026-11-23. Production artwork, atlas packing
+and native verification are now recorded in
+[painted arena borders](../../docs/painted-arena-borders.md). This proposal remains
+a generated concept; the separate native captures verify the implementation.

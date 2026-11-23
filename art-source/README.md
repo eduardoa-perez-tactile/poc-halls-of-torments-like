@@ -19,7 +19,8 @@ The strict base baker writes `.run/art-exploration/weekend/packed/`, leaving `as
 python3 scripts/BakeEnemyAttackArt.py --base-art .run/art-exploration/weekend/packed --output .run/art-exploration/weekend/packed
 python3 scripts/BakeMagicProjectiles.py --output .run/art-exploration/weekend/packed
 python3 scripts/BakeCryptEnvironment.py --output .run/art-exploration/weekend/packed
-for file in gameplay-actors-main.png gameplay-actors-common.png gameplay-environment.png gameplay.json enemy-attacks.json magic-projectiles.json; do
+python3 scripts/BakePaintedArenaBorders.py --output .run/art-exploration/weekend/packed
+for file in gameplay-actors-main.png gameplay-actors-common.png gameplay-environment.png gameplay.json enemy-attacks.json magic-projectiles.json painted-borders.json; do
   cmp ".run/art-exploration/weekend/packed/$file" "assets/art/$file" || exit 1
 done
 ```
@@ -61,7 +62,7 @@ floor/border page remains separate and unchanged.
 python3 scripts/BakeCryptEnvironment.py --output assets/art
 ```
 
-This stage is last after the base/attack/missile stages. It reads only its tracked
+This environment stage follows the base/attack/missile stages; the continuous painted-border stage below now runs last. It reads only its tracked
 `canonical-inputs.zip`, rewrites only the existing 512×512 environment page and
 its gameplay/missile metadata, and preserves the actor pages, actor indices 0–207,
 all 24 missile sprite pixels/timing/pivots and four utility sprites. Metadata
@@ -69,3 +70,26 @@ rectangles move through complete deterministic repacking with gutters and saved
 RGBA reconstruction checks. No `.run` cache or image service is needed for a
 rebuild. The verification record in that folder preserves output/actor hashes and
 the archive-only deterministic rebuild result.
+
+
+## Approved continuous painted borders (2026-11-23)
+
+[painted-arena-borders/](painted-arena-borders/README.md) holds the original full-side
+wall paintings, low corner, exact ImageGen prompts, geometry references and fits.
+The source paintings are not repeated within a side. The baker's standalone
+`bake-inputs.zip` also preserves the exact earlier gameplay pages and metadata.
+
+```sh
+python3 scripts/BakePaintedArenaBorders.py --output assets/art --source-output art-source/painted-arena-borders
+```
+
+Run this stage last. It adds original neighbouring-pixel slices into empty space
+in the existing three gameplay pages and writes `painted-borders.json`. Every
+previous sprite/gutter is preserved; existing gameplay, enemy-attack and missile
+metadata are unchanged. One global 85% Lanczos normalization of the two full wall
+paintings precedes slicing; the corner retains its selected resolution. Full
+masters and earlier normalized sources remain intact. The explicit `--source-output`
+writes the derived proof paintings beside those sources. Without it, proof PNGs
+are written under `<output>/painted-border-sources`, keeping temporary rebuilds
+from modifying tracked sources. Archive-only reconstruction matched every output.
+See [runtime checks and limits](../docs/painted-arena-borders.md).

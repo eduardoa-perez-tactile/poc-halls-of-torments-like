@@ -92,20 +92,20 @@ integration handoff/performance record. Short automated or emulator checks do
 not establish that the arena is fun, balanced or sustained 60 FPS on a physical TV.
 
 
-## Border repair status
+## Approved painted border repair
 
-The user reported visible seams between wall sections after handoff. The painted
-fragments have independent end faces, stone courses and lighting. Their overlapping
-footprints and calibrated ground slopes do not establish visual continuity; the
-earlier seamlessness claim was too strong. The attempted shared-material surface
-renderer was then rejected visually. It was not merged, and production sources
-have been restored to the prior painted-wall implementation.
+The user approved the camera-scale painted proposal on 2026-11-23. The current
+implementation uses one complete source painting for each wall orientation,
+cut only for storage, instead of repeating separately capped fragments or
+stretching a material patch. Source-neighbour context protects filtered joins.
+The new low corner acts as backing for meeting wall ends; complete walls extend
+to the adjoining outer faces. Native solo and co-op corner/straight-run captures
+and the pixel-level checks are recorded in [the integration record](painted-arena-borders.md).
 
-A close-up visual proposal is saved in
-[`art-source/arena-border-repair-proposal/`](../art-source/arena-border-repair-proposal/README.md):
-low painted ruined masonry, continuous courses and a natural chipped skyline.
-It is awaiting visual review, not an implemented or verified seam repair. Keep the floor unchanged
-until its separate proposal below is discussed.
+The 59 authored legacy placement records remain as layout/footprint data; the four
+wall runs and four corner positions now produce 206 cached painted quads, while
+nineteen interior landmark props continue through the normal sprite path. No
+movement/collision or floor-art change is included.
 
 ## Floor proposal for discussion
 
