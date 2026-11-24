@@ -405,3 +405,15 @@ observation had interval p95/p99/max 21.81/23.81/56.85 ms, callback wall time
 controlled before/after performance comparison or proof of physical-TV 60 FPS.
 The coordinated [baseline report](performance-baseline.md) measures the earlier
 cc8ab2a floor; preserve that version distinction for future comparisons.
+
+
+## Startup and retained pixels (2026-11-24)
+
+The exact-output UI bake removes 18.8125 MiB of retained decoded pixels: total
+including QR falls from 20,245,324 to 518,988 bytes. Accounted GPU textures remain
+33,516,364 bytes. A three-restart comparison using the same emulator per-app ART
+compilation setting observed create-callback medians 953.20 → 857.99 ms; other
+startup samples varied with the environment. This does not establish a physical-TV
+speedup or sustained frame-rate improvement. Original pixels, font metrics and
+gameplay are preserved; the larger debug APK is an explicit storage tradeoff.
+See [implementation, reproduction, checks and limits](startup-art-memory.md).
