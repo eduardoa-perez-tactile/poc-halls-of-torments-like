@@ -1,30 +1,33 @@
 # Soft atmospheric iris
 
 The user approved the solo/split-screen visual prototype on 24 November 2026
-and authorized its implementation as a cosmetic atmosphere effect. Each camera
-has a constant feathered oval, with the HUD and shared menus drawn above it.
+and authorized its implementation as a cosmetic atmosphere effect. The later
+split-screen correction uses one wide oval across the outer TV border, with
+the HUD and shared menus drawn above it. Solo retains its original treatment.
 There is no exploration state or change to targeting, combat, enemy visibility,
 spawning, timing, phone controls or cameras.
 
-The selected prototype settings are a 72% clear opening and 94% maximum edge
-darkness. For coordinates normalized to −1…1 on each viewport axis, opacity is
-`0.94 × smoothstep(0.72, 1.08, length(position))`. The shade is RGB `(7, 11, 20)`.
-The ellipse follows screen proportions rather than a world radius. Both
-split-screen panes use their own centered oval, including their seam-side edges.
-It is static and does not pulse, breathe or follow an actor's feet.
+The original solo settings remain a 72% clear opening and 94% maximum edge
+darkness. Co-op uses the user's selected 76% opening and 82% darkness from the
+corrected preview. For coordinates normalized to −1…1 on the full TV axes,
+opacity is `darkness × smoothstep(opening, 1.08, length(position))`. The shade
+remains RGB `(7, 11, 20)`. Both parameters are set each draw so returning to solo
+restores the original values. The ellipse follows screen proportions rather
+than a world radius. The rejected two narrow ovals and their seam-side darkness
+are removed. It is static and does not pulse, breathe or follow an actor's feet.
 
 `SoftIris` owns one managed shader and one fixed indexed quad. `ArenaRenderer`
-draws it after the world batch for each already-scissored camera, then restores
-the full viewport and draws the HUD normally. Choice ceremonies and pause UI
+finishes both world cameras, disables their scissor and restores the full
+viewport, then draws the iris once before the HUD. Choice ceremonies and pause UI
 retain their existing draw order above the arena. Results and menu backgrounds
 do not use the effect.
 
-The pass adds one draw in solo or two in co-op, tracked in the existing world
+The pass adds one draw in either solo or co-op, tracked in the existing world
 draw counters. It allocates no textures, framebuffers, decoded Pixmaps or
 per-frame objects. The fixed mesh and managed shader support GL context
 restoration. The combined 32 MiB texture ceiling is unchanged.
 
-## Verification
+## Original per-camera verification
 
 Desktop classes and the Android debug APK build with JDK 21. The managed shader
 compiled and rendered on the existing Television_1080p emulator (Android 13/API
@@ -57,3 +60,26 @@ and sustained 60 FPS remain subject to user playtesting.
 Ignored screenshots, APK hashes, metadata and measurement logs are under
 `.run/soft-iris/`. The existing emulator, phone-reachable LAN relay and ADB
 forward are retained for handoff; synthetic controllers are closed afterward.
+
+## Outer-border correction
+
+Desktop classes and the Android debug APK compile with JDK 21 after the
+correction. Native solo/split-screen central-court captures, a populated co-op
+boss capture, remote Pause/Resume and the loot ceremony all render correctly.
+The central divider is clear and the HUD/ceremony remains above the iris. Solo
+retains its original shader parameters and shading; a 260,000-pixel static-floor
+crop matches the original capture apart from eight isolated changed pixels.
+
+An eight-second co-op boss sample after two seconds of warm-up reports 301
+frames, arena callback p95 5.53 ms and frame-interval p95 18.47 ms. Texture and
+retained-Pixmap storage remain 33,221,452 and 518,988 bytes respectively. The
+shared checkout included the independent enemy work during these captures, so
+these observations do not isolate an iris performance change. Only the iris
+rendering and documentation changes are included in the iris milestone.
+
+Captures, metadata and observations for the corrected pass are under
+`.run/soft-iris-outer/`; the original measurements above describe the
+superseded per-camera implementation. The emulator is left at the lobby,
+synthetic phones are closed, and the saved `192.168.14.248:8787` join address
+and existing `tcp:58408` ADB forward are retained. Sustained physical-TV
+performance remains unverified.

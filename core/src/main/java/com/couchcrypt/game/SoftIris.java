@@ -8,7 +8,7 @@ import com.badlogic.gdx.graphics.VertexAttributes;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.utils.Disposable;
 
-/** Constant cosmetic iris in the current camera's viewport; no world visibility or texture state. */
+/** Constant cosmetic iris across the TV viewport; no world visibility or texture state. */
 public final class SoftIris implements Disposable {
     private final ShaderProgram shader;
     private final Mesh quad;
@@ -41,12 +41,14 @@ public final class SoftIris implements Disposable {
      * Draw after the world batch ends and before the HUD. The caller owns viewport/scissor.
      * One static quad, one draw call, no textures, framebuffers or per-frame allocations.
      */
-    public void render() {
+    public void render(boolean splitScreen) {
         Gdx.gl.glDepthMask(false);
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         try {
             shader.bind();
+            // Set both values every pass so returning to solo restores its original treatment.
+            shader.setUniformf("u_iris", splitScreen ? .76f : .72f, splitScreen ? .82f : .94f);
             quad.render(shader, GL20.GL_TRIANGLES);
         } finally {
             // Match SpriteBatch.end(): the next floor or HUD batch establishes its own shader/blending.
@@ -85,8 +87,9 @@ public final class SoftIris implements Disposable {
         #define MEDIUMP
         #endif
         varying MEDIUMP vec2 v_irisPosition;
+        uniform vec2 u_iris;
         void main() {
-            float darkness = 0.94 * smoothstep(0.72, 1.08, length(v_irisPosition));
+            float darkness = u_iris.y * smoothstep(u_iris.x, 1.08, length(v_irisPosition));
             gl_FragColor = vec4(vec3(7.0, 11.0, 20.0) / 255.0, darkness);
         }
         """;

@@ -35,11 +35,12 @@ Phones send screen-relative axes and dodge edges at 30 Hz, bound by the server t
 
 ArenaRenderer projects the shared world isometrically, caches the fixed floor geometry in one managed mesh, depth-sorts a bounded preallocated sprite list, and draws either one camera or two independently scissored vertical viewports. The original painted masters are baked once into a managed 1024x512 actor/prop/FX atlas and 512x512 floor texture (3 MiB total); large source pixmaps are immediately released. No framebuffers or post-processing are used. HUD text is cached at 5 Hz. See gameplay-art.md for provenance.
 
-Each gameplay viewport finishes with a constant soft atmospheric iris before the
-HUD and shared UI. One managed shader and fixed quad add one texture-free draw
-per camera, without a framebuffer or frame-loop allocations. The approved
-72% opening/94% dark edges are screen-relative; simulation, targeting and enemy
-visibility are unchanged. See [soft iris](soft-iris.md).
+After all gameplay cameras, one constant soft atmospheric iris shades the outer
+TV border before the HUD and shared UI. Solo keeps its 72% opening/94% darkness;
+co-op uses the approved 76% opening/82% darkness across the complete screen,
+keeping the center divider clear. One managed shader and fixed quad add one
+texture-free draw per frame, without a framebuffer or frame-loop allocations.
+Simulation, targeting and enemy visibility are unchanged. See [soft iris](soft-iris.md).
 
 The TV owns shared screen transitions: Lobby -> Session -> Results; Pause -> Invite -> Pause -> Resume preserves the running world. A fresh second controller joins near its living companion on resume. Reconnection keeps the same generation and existing player health; a replacement controller has a new generation. Any participating controller disconnect pauses simulation, and app backgrounding also pauses. Hero selection and distinct class weapons are implemented; additional arenas and persistent campaign saves remain future work.
 
