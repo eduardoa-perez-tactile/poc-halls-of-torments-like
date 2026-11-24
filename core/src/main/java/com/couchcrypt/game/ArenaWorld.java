@@ -309,7 +309,7 @@ public final class ArenaWorld {
         if (p.stormLevel > 0 && p.stormCooldown <= 0) storm(p);
     }
 
-    /** Primary targeting envelope, also used by the ground indicator. Target centers must enter it. */
+    /** Primary targeting envelope. The compact painted foot aura is cosmetic. Target centers must enter this range. */
     public float primaryAttackRange(Player player) {
         return player.hero.attackRange * (player.hero == Hero.WARDEN ? equipment.reachMultiplier(player) : 1f);
     }
