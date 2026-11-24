@@ -42,7 +42,7 @@ fourth actor page. The actor bank is now 6.5 MiB; combined application residency
 remains the governing 32 MiB ceiling.
 
 Profiling shortcuts: F6 starts the final encounter without creating a historical
-mini; M (or desktop Shift+F6) starts the mini. Neither is a player-facing mode. These fixtures
+mini; Delete (or desktop Shift+F6) starts the mini. Neither is a player-facing mode. These fixtures
 avoid a full survival playthrough. Human solo/co-op playtests still own encounter
 feel, health tuning, visual scale and sustained physical-TV performance.
 

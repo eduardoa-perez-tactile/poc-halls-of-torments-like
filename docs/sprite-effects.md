@@ -1,5 +1,18 @@
 # Original sprite combat effects
 
+Latest 24 November feedback: the Warden's sword crescent was enlarged to the
+entire upgraded targeting radius, producing a very large, soft trail. Its paint
+now uses a fixed 48-world-unit visual radius at the existing weapon-height
+anchor. Skill/gear reach, damage, cadence, direction, 380 ms lifetime and
+replacement of the previous swing are unchanged. The original atlas pixels and
+texture dimensions remain unchanged; reducing the draw scale avoids enlarging
+the small exported sprite across the arena.
+
+Desktop/Android builds and eleven focused sprite/geometry/combat checks passed
+after this correction. Brief actual-APK captures beside both bosses confirmed
+the smaller directional crescent; no art was regenerated or GPU storage added.
+The replacement APK remains installed on the TV emulator, returned to its lobby.
+
 The user approved nine original animated sprite proposals on 2026-11-24 and then
 authorized replacing the code-drawn world circles and streaks. The selected
 artwork was created with the built-in `image_gen` tool, inspired by the supplied

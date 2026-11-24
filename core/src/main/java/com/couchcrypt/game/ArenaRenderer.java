@@ -27,6 +27,8 @@ public final class ArenaRenderer implements Disposable {
     private static final float LEVEL_FX_SCALE = 1.6f, RECOIL_MARGIN = 30f;
     // Cosmetic foot markers: deliberately independent of gameplay targeting/damage radii.
     private static final float PLAYER_AURA_RADIUS = 48f, SOUL_PULSE_RADIUS = 60f;
+    // Keep the painted cutting trail near the weapon's scale, independent of reach upgrades.
+    private static final float WARDEN_SLASH_RADIUS = 48f;
     // Fixed SE/SW/NE/NW release landmarks, in untrimmed source pixels relative to the ground root.
     // Only the rendered origin moves; the simulation keeps its original projectile coordinates and trajectory.
     private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
@@ -640,7 +642,7 @@ public final class ArenaRenderer implements Disposable {
                     batch.setColor(Color.WHITE);
                     // The painted crescent faces screen-down at angle zero. Rotate before projection.
                     art.spriteEffects.drawGround(batch, SpriteEffectArt.Type.SWORD_SWEEP, effectProgress(effect),
-                        x, y + 45f, effect.radius, effect.angle + MathUtils.PI * .75f, SpriteEffectArt.Layer.ALL);
+                        x, y + 45f, WARDEN_SLASH_RADIUS, effect.angle + MathUtils.PI * .75f, SpriteEffectArt.Layer.ALL);
                 }
                 case HIT -> {
                     float lift = impactLift(effect);

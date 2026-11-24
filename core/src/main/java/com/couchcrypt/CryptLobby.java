@@ -932,9 +932,9 @@ public final class CryptLobby extends ApplicationAdapter {
             && (key == Input.Keys.F7 || key == Input.Keys.F8)) {
             previewResults(key == Input.Keys.F7); return true;
         }
-        if ((key == Input.Keys.F6 || key == Input.Keys.M) && config.profile() && screen == Screen.SESSION && overlay == null) {
-            // Direct M also works with Android's injected key events, which may coalesce modifier releases.
-            if (key == Input.Keys.M || Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT))
+        if ((key == Input.Keys.F6 || key == Input.Keys.FORWARD_DEL) && config.profile() && screen == Screen.SESSION && overlay == null) {
+            // Delete also works with Android key injection without opening its letter-entry keyboard.
+            if (key == Input.Keys.FORWARD_DEL || Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT))
                 world.debugStartSovereign();
             else world.debugStartBoss();
             hudPreview = false; syncEncounterHud(); return true;
