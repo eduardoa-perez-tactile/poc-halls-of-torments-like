@@ -414,12 +414,13 @@ public final class ArenaRenderer implements Disposable {
         for (ArenaWorld.Pickup pickup : world.pickups) {
             if (!pickup.active || !visible(camera, pickup.x, pickup.y, 32f)) continue;
             float x = screenX(pickup.x, pickup.y), y = screenY(pickup.x, pickup.y);
-            if (pickup.healing) batch.setColor(.9f, .24f, .18f, .65f);
+            float fade = pickup.healing && pickup.maxTtl > 0 ? MathUtils.clamp(pickup.ttl / 5f, 0, 1) : 1;
+            if (pickup.healing) batch.setColor(.9f, .24f, .18f, .65f * fade);
             else batch.setColor(.3f, .8f, .78f, .45f);
             batch.draw(art.glow, x - 17f, y - 8f, 34f, 25f);
             batch.setColor(Color.WHITE);
             if (pickup.healing) {
-                batch.setColor(.95f, .34f, .23f, 1f);
+                batch.setColor(.95f, .34f, .23f, fade);
                 batch.draw(art.pixel, x - 2f, y + 1f, 4f, 13f);
                 batch.draw(art.pixel, x - 6f, y + 5f, 12f, 4f);
             } else batch.draw(art.soul, x - 7f, y - 1f, 14f, 20f);

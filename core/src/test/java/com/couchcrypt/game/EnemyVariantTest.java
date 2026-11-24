@@ -13,13 +13,13 @@ class EnemyVariantTest {
         world.elapsed = 720;
 
         ArenaWorld.Enemy moss = spawn(world, ArenaWorld.EnemyKind.BRUTE, true, EnemyVariant.MOSS);
-        assertStats(moss, 95 * 2.1f * 1.2f * 4 * 1.4f, 18 * 1.27f, 1.12f * .85f);
+        assertStats(moss, 95 * 3.2f * 1.6f * 4 * 1.4f, 18 * 1.575f, 1.21f * .85f);
         ArenaWorld.Enemy frost = spawn(world, ArenaWorld.EnemyKind.GHOUL, false, EnemyVariant.FROST);
-        assertStats(frost, 32 * 2.1f * 1.2f * .8f, 12 * 1.27f, 1.12f * 1.25f);
+        assertStats(frost, 32 * 3.2f * 1.6f * .8f, 12 * 1.575f, 1.21f * 1.25f);
         ArenaWorld.Enemy ember = spawn(world, ArenaWorld.EnemyKind.CULTIST, false, EnemyVariant.EMBER);
-        assertStats(ember, 35 * 2.1f * 1.2f * .85f, 12 * 1.27f * 1.25f, 1.12f);
+        assertStats(ember, 35 * 3.2f * 1.6f * .85f, 12 * 1.575f * 1.25f, 1.21f);
         ArenaWorld.Enemy dusk = spawn(world, ArenaWorld.EnemyKind.WRAITH, false, EnemyVariant.DUSK);
-        assertStats(dusk, 18 * 2.1f * 1.2f * 1.15f, 8 * 1.27f * .85f, 1.12f * 1.1f);
+        assertStats(dusk, 18 * 3.2f * 1.6f * 1.15f, 8 * 1.575f * .85f, 1.21f * 1.1f);
 
         ArenaWorld.Enemy boss = spawn(world, ArenaWorld.EnemyKind.BOSS, false, EnemyVariant.ORIGINAL);
         assertStats(boss, 8200 * 1.6f, 20, 1);

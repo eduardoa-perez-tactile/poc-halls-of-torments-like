@@ -1216,11 +1216,24 @@ public final class CryptLobby extends ApplicationAdapter {
                 if (config.profile()) {
                     Gdx.app.log("LobbyPerf", stats);
                     var counters = world.diagnostics();
+                    int healingOnFloor = 0, healingValue = 0;
+                    for (var pickup : world.pickups) if (pickup.active && pickup.healing) {
+                        healingOnFloor++; healingValue += pickup.value;
+                    }
                     Gdx.app.log("ProfileWorld", "phase=" + profileMode() + " runSeed=" + world.runSeed
                         + " elapsed=" + world.elapsed + " candidates=" + counters.boltCollisionCandidates
                         + " enemyMisses=" + counters.enemySpawnMisses + " boltMisses=" + counters.boltAcquireMisses
                         + " shotMisses=" + counters.shotAcquireMisses + " hazardMisses=" + counters.hazardAcquireMisses
-                        + " effectMisses=" + counters.effectAcquireMisses + " pickupMerges=" + counters.pickupMerges);
+                        + " effectMisses=" + counters.effectAcquireMisses + " pickupMerges=" + counters.pickupMerges
+                        + " partyLevel=" + world.progression.level + " partyXp=" + world.progression.totalXp
+                        + " kills=" + world.kills + " activeEnemies=" + world.activeEnemies
+                        + " healingOnFloor=" + healingOnFloor + " healingFloorValue=" + healingValue
+                        + " healingGenerated=" + world.healthDrops.generatedValue + " healingExpired=" + world.healthDrops.expiredValue
+                        + " healingCollected=" + (world.players[0].healingFromDrops + world.players[1].healingFromDrops)
+                        + " regeneration=" + (world.players[0].healingFromRegeneration + world.players[1].healingFromRegeneration)
+                        + " gearSustain=" + (world.players[0].healingFromSustain + world.players[1].healingFromSustain)
+                        + " sovereignFightSeconds=" + (world.sovereignSpawned
+                            ? Math.max(0, (world.sovereignDefeated ? world.sovereignDefeatedAt : world.elapsed) - world.timeline.sovereignSeconds()) : 0));
                 }
             }
         }

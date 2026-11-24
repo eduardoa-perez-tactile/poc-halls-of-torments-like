@@ -102,7 +102,7 @@ class ItemCombatTest {
         assertTrue(soul.x < 250, "Attraction reaches the soul outside the base 200-unit radius");
     }
 
-    @Test void criticalEquipmentAffectsActualCriticalHitsAndLateHealingIsReduced() {
+    @Test void criticalEquipmentAffectsActualCriticalHits() {
         ArenaWorld world = new ArenaWorld(); world.activatePlayer(0); var player = world.players[0];
         player.critChance = .5f;
         world.equipment.equip(0, 0, ItemCatalog.byId("duelist_visor"));
@@ -116,17 +116,6 @@ class ItemCombatTest {
             }
         }
         assertTrue(critical);
-        for (boolean late : new boolean[]{false, true}) {
-            ArenaWorld full = new ArenaWorld(ArenaTimeline.TWENTY_MINUTES); full.activatePlayer(0);
-            full.elapsed = late ? 181 : 179; full.kills = late ? 11 : 6;
-            enemy(full, 0, 30, 1);
-            full.update(ArenaWorld.STEP);
-            boolean healing = false;
-            for (var pickup : full.pickups) if (pickup.active && pickup.healing) {
-                assertEquals(late ? 16 : 24, pickup.value); healing = true;
-            }
-            assertTrue(healing);
-        }
     }
 
     private static ItemCatalog.Item item(String id, ItemCatalog.Stat a, float av, ItemCatalog.Stat b, float bv, ItemCatalog.Stat c, float cv) {

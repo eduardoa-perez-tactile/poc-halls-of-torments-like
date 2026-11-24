@@ -51,18 +51,18 @@ public final class ArenaTimeline {
 
     /** Authored twenty-minute survival schedule. Balance targets require human gameplay feedback. */
     public static final ArenaTimeline TWENTY_MINUTES = new ArenaTimeline(
-        longPhase("THE CRYPT STIRS", 90, Pattern.SWARM, 3.5f, 4, null, 1, 1, 26),
-        longPhase("RESTLESS HUNT", 90, Pattern.HUNT, 3.3f, 4, null, 1.12f, 1.04f, 28),
-        longPhase("THE IRON MARCH", 120, Pattern.BRUTE_PRESSURE, 3.2f, 5, ArenaWorld.EnemyKind.BRUTE, 1.3f, 1.08f, 30),
-        longPhase("CHOIR OF ASH", 120, Pattern.CULTIST_FORMATION, 3.3f, 4, null, 1.5f, 1.12f, 32),
-        longPhase("BROKEN RANKS", 120, Pattern.SIEGE, 3.1f, 5, ArenaWorld.EnemyKind.CULTIST, 1.7f, 1.17f, 34),
-        longPhase("WRAITH PROCESSION", 120, Pattern.HUNT, 2.5f, 4, null, 1.9f, 1.22f, 36),
-        longPhase("SOVEREIGN'S GUARD", 120, Pattern.SIEGE, 2.8f, 5, ArenaWorld.EnemyKind.BRUTE, 2.1f, 1.27f, 38),
-        longPhase("THE CLOSING CIRCLE", 120, Pattern.ONSLAUGHT, 3, 4, null, 2.35f, 1.32f, 40),
-        longPhase("DREAD REINFORCEMENTS", 90, Pattern.BRUTE_PRESSURE, 2.2f, 5, ArenaWorld.EnemyKind.CULTIST, 2.55f, 1.37f, 42),
-        longPhase("LAST VIGIL", 90, Pattern.CULTIST_FORMATION, 2.5f, 4, null, 2.8f, 1.42f, 44),
-        longPhase("THE HOLLOW HOST", 60, Pattern.ONSLAUGHT, 2.5f, 5, ArenaWorld.EnemyKind.BRUTE, 3, 1.46f, 46),
-        longPhase("BEFORE THE THRONE", 60, Pattern.ONSLAUGHT, 2.1f, 4, null, 3.2f, 1.5f, 46));
+        longPhase("THE CRYPT STIRS", 90, Pattern.SWARM, 2.7f, 4, null, 1, 1, 28),
+        longPhase("RESTLESS HUNT", 90, Pattern.HUNT, 2.55f, 3, null, 1.2f, 1.1f, 30),
+        longPhase("THE IRON MARCH", 120, Pattern.BRUTE_PRESSURE, 2.35f, 3, ArenaWorld.EnemyKind.BRUTE, 1.4f, 1.15f, 32),
+        longPhase("CHOIR OF ASH", 120, Pattern.CULTIST_FORMATION, 2.8f, 3, null, 1.7f, 1.25f, 34),
+        longPhase("BROKEN RANKS", 120, Pattern.SIEGE, 2.5f, 3, ArenaWorld.EnemyKind.CULTIST, 2, 1.3f, 36),
+        longPhase("WRAITH PROCESSION", 120, Pattern.HUNT, 1.75f, 3, null, 2.5f, 1.4f, 38),
+        longPhase("SOVEREIGN'S GUARD", 120, Pattern.SIEGE, 2.1f, 2, ArenaWorld.EnemyKind.BRUTE, 3, 1.5f, 40),
+        longPhase("THE CLOSING CIRCLE", 120, Pattern.ONSLAUGHT, 2.4f, 2, null, 3.4f, 1.65f, 42),
+        longPhase("DREAD REINFORCEMENTS", 90, Pattern.BRUTE_PRESSURE, 1.3f, 2, ArenaWorld.EnemyKind.CULTIST, 3.9f, 1.8f, 44),
+        longPhase("LAST VIGIL", 90, Pattern.CULTIST_FORMATION, 1.6f, 2, null, 4.2f, 1.85f, 46),
+        longPhase("THE HOLLOW HOST", 60, Pattern.ONSLAUGHT, 1.85f, 2, ArenaWorld.EnemyKind.BRUTE, 4.5f, 1.95f, 50),
+        longPhase("BEFORE THE THRONE", 60, Pattern.ONSLAUGHT, 5f / 3f, 2, null, 4.8f, 2, 50));
 
     private final List<Phase> phases;
     private final float duration;
@@ -95,6 +95,27 @@ public final class ArenaTimeline {
         float start = 0;
         for (int i = 0; i < index; i++) start += phases.get(i).durationSeconds();
         return start;
+    }
+
+    /** Progress belongs to the active phase and is bounded before/after the survival schedule. */
+    public float phaseProgress(float elapsed) {
+        int index = phaseIndex(elapsed);
+        return Math.max(0, Math.min(1, (elapsed - phaseStart(index)) / phases.get(index).durationSeconds()));
+    }
+
+    /** Full-run nodes are phase-start values; the final node remains steady into the boss encounter. */
+    public float healthMultiplier(float elapsed) {
+        int index = phaseIndex(elapsed);
+        float current = phases.get(index).healthMultiplier();
+        if (!isFullRun() || index == phases.size() - 1) return current;
+        return current + (phases.get(index + 1).healthMultiplier() - current) * phaseProgress(elapsed);
+    }
+
+    public float damageMultiplier(float elapsed) {
+        int index = phaseIndex(elapsed);
+        float current = phases.get(index).damageMultiplier();
+        if (!isFullRun() || index == phases.size() - 1) return current;
+        return current + (phases.get(index + 1).damageMultiplier() - current) * phaseProgress(elapsed);
     }
 
     public boolean isFullRun() { return duration >= 1200; }

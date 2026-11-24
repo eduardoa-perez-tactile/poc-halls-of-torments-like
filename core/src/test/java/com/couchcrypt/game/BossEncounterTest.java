@@ -16,7 +16,7 @@ class BossEncounterTest {
         world.update(ArenaWorld.STEP);
         assertTrue(world.sovereignSpawned); assertFalse(world.bossSpawned);
         ArenaWorld.Enemy sovereign = world.sovereign;
-        assertEquals(3000, sovereign.health); assertSame(sovereign, world.activeBoss());
+        assertEquals(5400, sovereign.health); assertSame(sovereign, world.activeBoss());
         assertEquals("THE HOLLOW SOVEREIGN", ArenaWorld.bossName(sovereign));
         assertFalse(sovereign.elite);
         finishChoices(world);
@@ -59,13 +59,13 @@ class BossEncounterTest {
         ArenaWorld world = solo(); world.debugStartSovereign();
         world.sovereign.health -= 100;
         world.activatePlayer(1);
-        assertEquals(3000, world.sovereign.maxHealth); assertEquals(2900, world.sovereign.health);
+        assertEquals(5400, world.sovereign.maxHealth); assertEquals(5300, world.sovereign.health);
         world.debugStartBoss();
         assertEquals(13120, world.boss.maxHealth, EPSILON);
         world.boss.health -= 200; world.activatePlayer(1);
         assertEquals(12920, world.boss.health, EPSILON);
         world.reset(); world.activatePlayer(0); world.activatePlayer(1); world.debugStartSovereign();
-        assertEquals(4800, world.sovereign.maxHealth, EPSILON);
+        assertEquals(8640, world.sovereign.maxHealth, EPSILON);
     }
 
     @Test void bothBossesSpawnClearOfBothPlayersAndFinalNeverEvictsTheMiniboss() {
