@@ -146,17 +146,23 @@ public final class ArenaRenderer implements Disposable {
             drawShots(world, camera);
             drawEffects(world, camera);
             batch.end();
-            // Fixed atmosphere belongs to each camera's viewport, below all shared HUD/UI.
-            iris.render();
-            drawCalls += batch.renderCalls + 1;
+            drawCalls += batch.renderCalls;
             if (metrics != null) {
                 metrics.endStage(FrameMetrics.WORLD_DRAW);
-                worldDraws += batch.renderCalls + 1;
+                worldDraws += batch.renderCalls;
             }
         }
-        if (metrics != null) metrics.beginStage(FrameMetrics.HUD);
         Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
         Gdx.gl.glViewport(0, 0, width, height);
+        // One outer TV iris shades the completed scene; the split divider stays clear.
+        if (metrics != null) metrics.beginStage(FrameMetrics.WORLD_DRAW);
+        iris.render(split);
+        drawCalls++;
+        if (metrics != null) {
+            metrics.endStage(FrameMetrics.WORLD_DRAW);
+            worldDraws++;
+            metrics.beginStage(FrameMetrics.HUD);
+        }
         batch.setProjectionMatrix(hud.combined);
         batch.begin();
         if (showHud) {
