@@ -15,12 +15,13 @@ public final class GameHud {
     private static final Color WARNING = Color.valueOf("e5a56a");
     private static final Color CRITICAL = Color.valueOf("f36d51");
     private static final Color SOUL = Color.valueOf("9bc3bb");
-    private static final float ORB_SIZE = 176f, ORB_Y = 104f;
+    private static final float ORB_SIZE = 224f, ORB_Y = 104f, ORB_LEFT = 32f;
     private static final float ORB_SCALE = ORB_SIZE / HudArt.ORB_SIZE;
-    private static final float SKILL_Y = 150f, SKILL_SIZE = 88f, SKILL_STEP = 100f;
-    private static final float DODGE_Y = 154f, DODGE_SIZE = 80f;
+    private static final float SKILL_Y = 100f, SKILL_SIZE = 88f, SKILL_STEP = 96f, SKILL_LEFT = 376f;
+    private static final float DODGE_Y = 104f, DODGE_SIZE = 80f, DODGE_LEFT = 272f;
     private static final float CRITICAL_HEALTH = .2f, PULSE_SECONDS = 1.6f;
-    private static final float BOSS_X = 480f, BOSS_Y = 850f, BOSS_SCALE = 960f / 512f;
+    private static final float BOSS_X = 288f, BOSS_Y = 928f, BOSS_WIDTH = 1344f, BOSS_HEIGHT = 86f;
+    private static final float BOSS_SCALE_X = BOSS_WIDTH / 512f, BOSS_SCALE_Y = BOSS_HEIGHT / 96f;
     private static final int ARC_SEGMENTS = 48;
     private final GameArt art;
     private final HudArt hudArt;
@@ -51,7 +52,7 @@ public final class GameHud {
         lowHealth = new Text(ui.small, .85f, 180f, CRITICAL); lowHealth.set("LOW HEALTH");
         partyLevel = new Text(ui.small, .9f, 480f, UiArt.GOLD);
         timer = new Text(ui.section, 1.15f, 160f, UiArt.IVORY);
-        bossName = new Text(ui.heading, .6f, 750f, UiArt.IVORY);
+        bossName = new Text(ui.heading, .78f, 1240f, UiArt.IVORY);
     }
 
     public void reset() {
@@ -75,7 +76,7 @@ public final class GameHud {
         for (ArenaWorld.Player player : world.players) if (player.active) {
             boolean mirror = split && player.slot == 1;
             batch.setColor(0, 0, 0, .64f);
-            batch.draw(art.shadow, mirror ? 1020f : 12f, 80f, 888f, 250f);
+            batch.draw(art.shadow, mirror ? 1020f : 12f, 76f, 888f, 276f);
         }
         batch.setColor(0, 0, 0, .35f); batch.draw(art.shadow, 40f, 16f, 1840f, 90f);
         if (split) {
@@ -106,18 +107,17 @@ public final class GameHud {
         partyLevel.center(batch, 960f, 82f);
         if (state.bossVisible) {
             bossName.set(state.bossName);
-            bossName.center(batch, BOSS_X + HudArt.BOSS_TITLE_X * BOSS_SCALE,
-                BOSS_Y + HudArt.BOSS_TITLE_Y * BOSS_SCALE);
+            bossName.center(batch, 960f, 1058f);
         } else timer.center(batch, 960f, 1028f);
         batch.setColor(Color.WHITE);
     }
 
     /** Painted frame and live fill share the same managed HUD page. No baked text or health. */
     private void bossArt(SpriteBatch batch, ArenaHudState state) {
-        float x = BOSS_X + HudArt.BOSS_TRACK_X * BOSS_SCALE;
-        float y = BOSS_Y + HudArt.BOSS_TRACK_Y * BOSS_SCALE;
-        float width = HudArt.BOSS_TRACK_WIDTH * BOSS_SCALE;
-        float height = HudArt.BOSS_TRACK_HEIGHT * BOSS_SCALE;
+        float x = BOSS_X + HudArt.BOSS_TRACK_X * BOSS_SCALE_X;
+        float y = BOSS_Y + HudArt.BOSS_TRACK_Y * BOSS_SCALE_Y;
+        float width = HudArt.BOSS_TRACK_WIDTH * BOSS_SCALE_X;
+        float height = HudArt.BOSS_TRACK_HEIGHT * BOSS_SCALE_Y;
         rect(batch, x, y, width, height, Color.BLACK, .94f);
         float ratio = MathUtils.clamp(state.bossHealth / Math.max(1f, state.bossMaxHealth), 0, 1);
         if (ratio > 0) {
@@ -128,7 +128,7 @@ public final class GameHud {
                 fill.getU(), fill.getV2(), MathUtils.lerp(fill.getU(), fill.getU2(), ratio), fill.getV());
         }
         batch.setColor(Color.WHITE);
-        batch.draw(hudArt.bossFrame, BOSS_X, BOSS_Y, 960f, 180f);
+        batch.draw(hudArt.bossFrame, BOSS_X, BOSS_Y, BOSS_WIDTH, BOSS_HEIGHT);
     }
 
     private void refreshText(ArenaWorld world) {
@@ -169,7 +169,7 @@ public final class GameHud {
 
     private void playerArt(SpriteBatch batch, ArenaWorld.Player player, ArenaWorld world, boolean mirror) {
         boolean teal = player.slot == 1;
-        float orbX = mirror ? 1696f : 48f;
+        float orbX = mirror ? 1920f - ORB_LEFT - ORB_SIZE : ORB_LEFT;
         float ratio = healthRatio(player, world);
         if (player.alive && ratio <= CRITICAL_HEALTH) {
             float pulse = .45f + .25f * MathUtils.sin(pulseClock / PULSE_SECONDS * MathUtils.PI2);
@@ -189,7 +189,7 @@ public final class GameHud {
         }
         batch.setColor(Color.WHITE); batch.draw(hudArt.orbReflection, orbX, ORB_Y, ORB_SIZE, ORB_SIZE);
         batch.draw(teal ? hudArt.orbTeal : hudArt.orbGold, orbX, ORB_Y, ORB_SIZE, ORB_SIZE);
-        float dodgeX = mirror ? 1602f : 238f;
+        float dodgeX = mirror ? 1920f - DODGE_LEFT - DODGE_SIZE : DODGE_LEFT;
         batch.draw(hudArt.dodgeBack, dodgeX, DODGE_Y, DODGE_SIZE, DODGE_SIZE);
         if (player.alive) {
             float tint = player.dodgeCooldown <= .05f ? 1f : .36f;
@@ -212,19 +212,20 @@ public final class GameHud {
 
     private void playerText(SpriteBatch batch, ArenaWorld.Player player, ArenaWorld world, boolean mirror) {
         int slot = player.slot;
-        float center = mirror ? 1784f : 136f, dodgeX = mirror ? 1642f : 278f;
-        playerLabels[slot].center(batch, center, 302f);
-        if (player.alive && healthRatio(player, world) <= CRITICAL_HEALTH) lowHealth.center(batch, center, 110f);
+        float center = mirror ? 1920f - ORB_LEFT - ORB_SIZE * .5f : ORB_LEFT + ORB_SIZE * .5f;
+        float dodgeX = mirror ? 1920f - DODGE_LEFT - DODGE_SIZE * .5f : DODGE_LEFT + DODGE_SIZE * .5f;
+        playerLabels[slot].center(batch, center, ORB_Y + ORB_SIZE + 18f);
+        if (player.alive && healthRatio(player, world) <= CRITICAL_HEALTH) lowHealth.center(batch, center, 100f);
         dodge[slot].center(batch, dodgeX, DODGE_Y + 52f);
         if (!player.alive) revivalStatus[slot].center(batch, dodgeX, DODGE_Y - 12f);
         PlayerHudModel build = builds[slot];
         for (int i = 0; i < build.count; i++)
             ranks[slot][i].center(batch, skillX(mirror, i) + 76f, SKILL_Y + 14f);
-        overflow[slot].center(batch, mirror ? 1056f : 864f, SKILL_Y + 55f);
+        overflow[slot].center(batch, mirror ? 1026f : 894f, SKILL_Y + 55f);
     }
 
     private static float skillX(boolean mirror, int index) {
-        return mirror ? 1488f - index * SKILL_STEP : 344f + index * SKILL_STEP;
+        return mirror ? 1920f - SKILL_LEFT - SKILL_SIZE - index * SKILL_STEP : SKILL_LEFT + index * SKILL_STEP;
     }
 
     private static float healthRatio(ArenaWorld.Player player, ArenaWorld world) {

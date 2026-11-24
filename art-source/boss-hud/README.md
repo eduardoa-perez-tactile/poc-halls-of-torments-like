@@ -1,5 +1,9 @@
 # Painted Hollow Sovereign HUD
 
+Historical source: the 2026-11-24 approval replaces this masked frame with the
+[wide face-free header](../epic-combat-hud/README.md). The original crimson fill
+from this folder remains in use; other files are retained for provenance.
+
 The user approved the original painted concept on 2026-11-23, then requested a
 smaller boss header to preserve arena visibility. The illustrated death-mask and
 weathered iron/gold frame are original generated artwork. The rejected stock-icon

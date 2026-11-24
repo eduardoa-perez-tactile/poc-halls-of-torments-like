@@ -2,8 +2,8 @@
 """Bake the approved code-native orb HUD gradients/shapes into one bounded RGBA atlas.
 
 Source: original code-native HUD shapes, 2026-11-13; smooth orb rims, local
-low-health halo and original painted boss frame approved on 2026-11-23.
-See docs/hud-art.md and art-source/boss-hud/README.md.
+low-health halo and original painted frames approved on 2026-11-24.
+See docs/hud-art.md and art-source/epic-combat-hud/README.md.
 Requires Pillow only for this offline asset-generation step; runtime has no dependency.
 """
 from pathlib import Path
@@ -134,12 +134,18 @@ def dodge_back():
 
 def main():
     atlas = Image.new('RGBA',(512*SCALE,352*SCALE))
+    rims = []
+    for name in ['gold', 'teal']:
+        with Image.open(ROOT/f'art-source/epic-combat-hud/orb-{name}-128.png') as source:
+            if source.size != (128, 128):
+                raise ValueError('Orb frames must use normalized 128x128 sources')
+            rims.append(source.convert('RGBA').resize((128*SCALE,128*SCALE),Image.Resampling.LANCZOS))
     with Image.open(ROOT/'art-source/dodge-icon/dodge-128.png') as source:
         if source.size != (128, 128):
             raise ValueError('Dodge icon must use its normalized 128x128 source')
         dodge_icon = source.convert('RGBA').resize((128*SCALE, 128*SCALE), Image.Resampling.LANCZOS)
     for image,x,y in [(orb_back(),0,0),(orb_blood(),128,0),(orb_reflection(),256,0),
-                      (orb_rim(),384,0),(orb_rim(True),0,128),
+                      (rims[0],384,0),(rims[1],0,128),
                       (skill_rim(),128,128),(skill_rim(True),192,128),
                       (dodge_back(),256,128),(low_health_glow(),320,128),
                       (dodge_icon,384,128)]:
@@ -149,9 +155,9 @@ def main():
     for x,colors in [(288,[(0,'#886738'),(1,'#e5cf92')]),(320,[(0,'#385f5c'),(1,'#a2d3c3')])]:
         atlas.alpha_composite(gradient(32,8,colors,horizontal=True),(x*SCALE,192*SCALE))
     ImageDraw.Draw(atlas).rectangle((352*SCALE,192*SCALE,356*SCALE-1,196*SCALE-1),fill="white")
-    for name, size, target, x, y in [('frame-512x96.png', (512,96), (512,96), 0, 256),
-                                      ('fill-128x16.png', (128,16), (120,16), 260, 212)]:
-        with Image.open(ROOT/'art-source/boss-hud'/name) as source:
+    for name, size, target, x, y in [('epic-combat-hud/boss-frame-512x96.png', (512,96), (512,96), 0, 256),
+                                      ('boss-hud/fill-128x16.png', (128,16), (120,16), 260, 212)]:
+        with Image.open(ROOT/'art-source'/name) as source:
             if source.size != size:
                 raise ValueError(f'Boss HUD {name} must use its normalized {size} source')
             atlas.alpha_composite(source.convert('RGBA').resize(
