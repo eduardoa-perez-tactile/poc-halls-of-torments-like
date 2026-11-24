@@ -4,9 +4,9 @@ package com.couchcrypt.game;
 public enum EnemyVariant {
     ORIGINAL(1f, 1f, 1f),
     MOSS(.67f, 1f, .74f),
-    FROST(.70f, .86f, 1f),
+    FROST(.22f, .80f, 1f),
     EMBER(1f, .70f, .56f),
-    DUSK(.68f, .78f, 1f);
+    DUSK(.18f, 1f, 1f);
 
     public final float red, green, blue;
 

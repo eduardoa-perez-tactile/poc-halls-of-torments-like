@@ -9,6 +9,10 @@ telegraphs, projectiles and combat rules retain their existing behaviour. Each
 successful spawn assigns a stable palette from a separate cosmetic hash, without
 consuming combat randomness or tying colours to reusable enemy-pool slots. Reset
 clears palettes. This pass adds no textures, decoded Pixmaps, shaders or draw calls.
+The follow-up contrast revision strengthens Frost to cyan/teal and Dusk to deep
+blue after the first grey/purple versions proved too close to the originals.
+Desktop sprite comparisons and JDK 21 desktop/Android builds verified that
+palette-only revision; the emulator measurements below belong to the first pass.
 JDK 21 desktop compilation, Android debug assembly and 20 focused existing
 animation/attack/feedback tests passed. A five-second co-op art fixture confirmed
 mixed palettes in both cameras and unchanged accounted texture use of 32,467,788
