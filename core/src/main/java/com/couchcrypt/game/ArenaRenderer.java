@@ -38,6 +38,7 @@ public final class ArenaRenderer implements Disposable {
     private final GameHud gameHud;
     private final SpriteBatch batch;
     private final ShaderProgram paletteShader;
+    private final SoftIris iris;
     private final FrameMetrics metrics;
     // One bounded static mesh; both cameras reuse the same floor, paths and wear colours.
     private final SpriteCache floorCache = createFloorCache();
@@ -67,6 +68,7 @@ public final class ArenaRenderer implements Disposable {
         metrics = frameMetrics;
         paletteShader = EnemyPalette.createShader();
         batch = metrics == null ? new SpriteBatch(1800, paletteShader) : new ProfileBatch(paletteShader);
+        iris = new SoftIris();
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
         floorLayout = new ArenaFloorLayout(new JsonReader().parse(Gdx.files.internal("arena/crypt-floor.json")));
         float radius = floorLayout.medallionDiameter * .5f;
@@ -144,10 +146,12 @@ public final class ArenaRenderer implements Disposable {
             drawShots(world, camera);
             drawEffects(world, camera);
             batch.end();
-            drawCalls += batch.renderCalls;
+            // Fixed atmosphere belongs to each camera's viewport, below all shared HUD/UI.
+            iris.render();
+            drawCalls += batch.renderCalls + 1;
             if (metrics != null) {
                 metrics.endStage(FrameMetrics.WORLD_DRAW);
-                worldDraws += batch.renderCalls;
+                worldDraws += batch.renderCalls + 1;
             }
         }
         if (metrics != null) metrics.beginStage(FrameMetrics.HUD);
@@ -1029,5 +1033,5 @@ public final class ArenaRenderer implements Disposable {
     }
     private static float screenX(float x, float y) { return (x - y) * ISO_X; }
     private static float screenY(float x, float y) { return (x + y) * ISO_Y; }
-    @Override public void dispose() { floorCache.dispose(); batch.dispose(); paletteShader.dispose(); }
+    @Override public void dispose() { floorCache.dispose(); batch.dispose(); paletteShader.dispose(); iris.dispose(); }
 }
