@@ -7,6 +7,28 @@ import com.couchcrypt.game.RunEquipment;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LobbyStateTest {
+    @Test void finishedOutcomeIsPublishedAtomicallyAndClearedBeforeTheNextRun() {
+        var state = new LobbyState(); state.join(null, "first", 1);
+        state.setPhase(LobbyState.Phase.SESSION);
+        assertTrue(state.input("first", 0, 1, 0, true, 2));
+        state.publishResult(true);
+        var victory = state.snapshot(3);
+        assertEquals(LobbyState.Phase.RESULTS, victory.phase());
+        assertEquals(LobbyState.Result.VICTORY, victory.result());
+        var controls = new LobbyState.Controls(); state.readControls(0, controls, 3);
+        assertEquals(0, controls.x); assertFalse(controls.dodge);
+        state.publishResult(true);
+        assertEquals(victory.revision(), state.snapshot(3).revision(), "Opening details does not republish unchanged results");
+        state.setPhase(LobbyState.Phase.SESSION);
+        assertNull(state.snapshot(4).result());
+        state.publishResult(false);
+        assertEquals(LobbyState.Result.DEFEAT, state.snapshot(5).result());
+        state.setPhase(LobbyState.Phase.LOBBY);
+        assertNull(state.snapshot(6).result());
+        state.setPhase(LobbyState.Phase.RESULTS);
+        assertNull(state.snapshot(7).result(), "A generic results phase cannot resurrect the last run's outcome");
+    }
+
     @Test void lootPhaseAcceptsOnlyEquipmentAndPreservesPendingChoicesAcrossRecovery() {
         var state = new LobbyState(); var joined = state.join(null, "first", 1);
         state.setPhase(LobbyState.Phase.SESSION);
