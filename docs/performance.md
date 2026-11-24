@@ -417,3 +417,13 @@ startup samples varied with the environment. This does not establish a physical-
 speedup or sustained frame-rate improvement. Original pixels, font metrics and
 gameplay are preserved; the larger debug APK is an explicit storage tradeoff.
 See [implementation, reproduction, checks and limits](startup-art-memory.md).
+
+## Shared font texture headroom (2026-11-24)
+
+Lossless font-block repacking reduces the single shared atlas from 1024×1024 to
+1024×768. Combined texture accounting including QR falls by exactly 1 MiB to
+32,467,788 bytes (30.9637 MiB), leaving 1,086,644 bytes (1.0363 MiB) under the
+32 MiB ceiling. Retained decoded Pixmaps remain 518,988 bytes. Glyph pixels,
+gutters, metrics and layout are preserved; the native fractional-scale fixture
+has 25 pixels differing by at most one RGB level, while six Home text/button
+crops are pixel-identical. See [proof, checks and limits](texture-headroom.md).

@@ -43,7 +43,7 @@ def main():
         classes = work / 'classes'
         classes.mkdir()
         subprocess.run([str(jdk / 'bin/javac'), '-cp', classpath, '-d', str(classes),
-                        str(ROOT / 'scripts/BakeUiAssets.java'), *sources], check=True, cwd=ROOT)
+                        str(ROOT / 'scripts/BakeUiAssets.java'), str(ROOT / 'scripts/PackUiFonts.java'), *sources], check=True, cwd=ROOT)
         subprocess.run([str(jdk / 'bin/java'), '-Xmx768m', '-cp', str(classes) + os.pathsep + classpath,
                         'BakeUiAssets', str(args.output.resolve()), str(args.phone_output.resolve()), revision],
                        check=True, cwd=ROOT / 'assets')

@@ -58,15 +58,24 @@ public final class BakeUiAssets {
             texture("victory-title.png", pixels(titles.get(true)));
             texture("defeat-title.png", pixels(titles.get(false)));
             var packer = (PixmapPacker) field(ui, "fontPacker");
-            List<String> pages = new ArrayList<>();
-            for (int i = 0; i < packer.getPages().size; i++) {
-                String name = "font-page-" + i + ".png";
-                texture(name, packer.getPages().get(i).getPixmap()); pages.add(name.replace(".png", ".ktx"));
-            }
+            if (packer.getPages().size != 1) throw new IllegalStateException("Expected original one-page font bank");
             Map<String, Object> fonts = new LinkedHashMap<>();
             for (String name : List.of("title", "heading", "section", "body", "small"))
                 fonts.put(name, font((BitmapFont) UiArt.class.getField(name).get(ui)));
-            writeJson(output.resolve("fonts.json"), Map.of("pages", pages, "fonts", fonts));
+            try (var packed = PackUiFonts.pack(packer.getPages().first().getPixmap(), fonts)) {
+                texture("font-page-0.png", packed.pixels);
+                writeJson(output.resolve("fonts.json"), Map.of("pages", List.of("font-page-0.ktx"), "fonts", fonts,
+                    "pageWidth", packed.pixels.getWidth(), "pageHeight", packed.pixels.getHeight(),
+                    "packing", Map.of("method", "height-sorted-skyline", "gutter", 2,
+                        "sourceWidth", 1024, "sourceHeight", 1024, "glyphCount", packed.glyphCount,
+                        "verifiedBlocks", packed.blockCount, "verifiedPixels", packed.copiedPixels)));
+                Texture fontTexture = new Texture(new com.badlogic.gdx.graphics.glutils.PixmapTextureData(packed.pixels, null, false, false, true));
+                try {
+                    var regions = new com.badlogic.gdx.utils.Array<com.badlogic.gdx.graphics.g2d.TextureRegion>();
+                    regions.add(new com.badlogic.gdx.graphics.g2d.TextureRegion(fontTexture));
+                    verifyFonts(ui, fonts, regions);
+                } finally { fontTexture.dispose(); }
+            }
             Map<String, byte[]> phones = new LinkedHashMap<>();
             phones.put("crypt.png", ui.controllerBackdrop()); phones.put("ui-panel-v2.png", ui.controllerPanel());
             phones.put("home-button.png", ui.controllerButton(false)); phones.put("home-button-focused.png", ui.controllerButton(true));
@@ -82,7 +91,6 @@ public final class BakeUiAssets {
                 outputs.put("web/art/" + entry.getKey(), Map.of("pngSha256", sha(entry.getValue()),
                     "file", reused == null ? "web/art/" + entry.getKey() : "art/runtime-ui/" + reused));
             }
-            verifyFonts(ui, fonts);
             Map<String, Object> inputs = new TreeMap<>();
             for (String name : List.of("art/menu-crypt-base-v2.png", "art/menu-crypt-guardians-v2.png",
                 "art/menu-crypt-orb-v2.png", "art/level-up-crest.png", "art/ui-panel-v2.png", "art/home-button.png",
@@ -95,20 +103,20 @@ public final class BakeUiAssets {
         } finally { titles.dispose(); icons.dispose(); ui.dispose(); }
     }
 
-    /** Compare actual old FreeType layout with the file loader, including UVs and wrapped runs. */
-    private static void verifyFonts(UiArt ui, Map<String, Object> fonts) throws Exception {
+    /** Compare old FreeType layout with relocated glyphs. Packing verifies every texel/gutter separately. */
+    private static void verifyFonts(UiArt ui, Map<String, Object> fonts, com.badlogic.gdx.utils.Array<com.badlogic.gdx.graphics.g2d.TextureRegion> regions) throws Exception {
         var reader = Class.forName("com.couchcrypt.ui.BakedUiFonts").getDeclaredMethod("readData", com.badlogic.gdx.utils.JsonValue.class);
         reader.setAccessible(true);
         int runs = 0;
         for (String name : fonts.keySet()) {
             BitmapFont original = (BitmapFont) UiArt.class.getField(name).get(ui);
             var data = (BitmapFont.BitmapFontData) reader.invoke(null, new com.badlogic.gdx.utils.JsonReader().parse(json(fonts.get(name))));
-            BitmapFont restored = new BitmapFont(data, original.getRegions(), false);
+            BitmapFont restored = new BitmapFont(data, regions, false);
             restored.setOwnsTexture(false);
             try {
                 for (var page : original.getData().glyphs) if (page != null) for (var glyph : page) if (glyph != null) {
                     var other = data.getGlyph((char) glyph.id);
-                    for (String key : List.of("id", "srcX", "srcY", "width", "height", "xoffset", "yoffset", "xadvance", "fixedWidth", "page", "u", "v", "u2", "v2")) {
+                    for (String key : List.of("id", "width", "height", "xoffset", "yoffset", "xadvance", "fixedWidth")) {
                         Field field = BitmapFont.Glyph.class.getField(key);
                         if (!Objects.equals(field.get(glyph), field.get(other))) throw new IllegalStateException(name + " glyph field differs: " + key);
                     }
@@ -133,7 +141,7 @@ public final class BakeUiAssets {
                 }
             } finally { restored.dispose(); }
         }
-        System.out.println("Verified all original glyph metrics, kerning, UVs and " + runs + " real font layouts.");
+        System.out.println("Verified all original glyph geometry, metrics, kerning and " + runs + " real font layouts.");
     }
 
     private static Map<String, Object> font(BitmapFont font) throws Exception {

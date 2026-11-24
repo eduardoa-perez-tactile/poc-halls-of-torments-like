@@ -8,6 +8,7 @@ import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Actor;
@@ -68,6 +69,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private Drawable homeBackground, partyBackground;
     private JoinServer server;
     private Table content, overlay;
+    private Table fontParityOverlay;
     private final List<RemoteButton> buttons = new ArrayList<>();
     private List<RemoteButton> savedButtons;
     private int focus, savedFocus;
@@ -855,7 +857,37 @@ public final class CryptLobby extends ApplicationAdapter {
         arena.resetCameras();
     }
 
+    /** Profile-only opaque glyph fixture; does not pause or change the underlying screen. */
+    private void toggleFontParityOverlay() {
+        if (fontParityOverlay != null) {
+            fontParityOverlay.remove(); fontParityOverlay = null;
+            return;
+        }
+        Table fixture = new Table();
+        fixture.setFillParent(true);
+        fixture.setTouchable(Touchable.disabled);
+        fixture.setBackground(((TextureRegionDrawable) art.pixel).tint(Color.BLACK));
+        BitmapFont[] fonts = {art.title, art.heading, art.section, art.body, art.small};
+        Color[] colors = {UiArt.GOLD, UiArt.IVORY, UiArt.PLAYER_TWO, UiArt.MUTED, UiArt.GREEN};
+        for (int row = 0; row < fonts.length; row++) {
+            float bottom = 810 - row * 180;
+            Label normal = art.label("AV To WA 0123", fonts[row], colors[row]);
+            normal.setAlignment(Align.left);
+            normal.setBounds(100.25f, bottom + .5f, 860, 160);
+            fixture.addActor(normal);
+            Label scaled = art.label("AV To 0123\nRank 3 +20%", fonts[row], colors[(row + 1) % colors.length]);
+            scaled.setFontScale(.73f); scaled.setAlignment(Align.left);
+            scaled.setBounds(1020.5f, bottom + .25f, 800, 160);
+            fixture.addActor(scaled);
+        }
+        fontParityOverlay = fixture;
+        stage.addActor(fixture); fixture.toFront();
+    }
+
     private boolean key(int key) {
+        if (key == Input.Keys.END && config.profile()) {
+            toggleFontParityOverlay(); return true;
+        }
         if (key == Input.Keys.INSERT && config.profile()) {
             long begin = System.nanoTime();
             art.reloadFileTextures(); buildIcons.reloadFileTexture(); outcomeTitles.reloadFileTextures();
@@ -1201,7 +1233,9 @@ public final class CryptLobby extends ApplicationAdapter {
             frameMetrics.endStage(FrameMetrics.ARENA);
             frameMetrics.beginStage(FrameMetrics.UI);
         }
-        stage.getViewport().apply(); stage.act(delta); stage.draw();
+        stage.getViewport().apply(); stage.act(delta);
+        if (fontParityOverlay != null) fontParityOverlay.toFront();
+        stage.draw();
         if (frameMetrics != null) {
             frameMetrics.endStage(FrameMetrics.UI);
             frameMetrics.addSimulationSteps(simulationSteps, rawDelta);
