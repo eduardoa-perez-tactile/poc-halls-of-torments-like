@@ -21,7 +21,7 @@ class BruteSlamGeometryTest {
             float x = EnemyAttackGeometry.bruteSlamX(facing, elite), y = EnemyAttackGeometry.bruteSlamY(facing, elite);
             float sx = (x - y) * .70710678f, sy = (x + y) * .35355339f;
             JsonValue measured = brute.require("slam").require(facing.name());
-            float scale = pixelScale * 1.4f * (elite ? 1.18f : 1f);
+            float scale = pixelScale * EnemySizing.renderScale(ArenaWorld.EnemyKind.BRUTE, EnemyVariant.ORIGINAL, elite);
             assertEquals(measured.getFloat(0) * scale, sx, .0001f, facing + " fist X");
             assertEquals(measured.getFloat(1) * scale, sy, .0001f, facing + " fist Y");
         }

@@ -36,6 +36,7 @@ public final class ArenaRenderer implements Disposable {
     private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PAINTED_BORDER = 3;
     private final GameArt art;
     private final GameHud gameHud;
+    private final EnemyRankMarkers rankMarkers;
     private final SpriteBatch batch;
     private final ShaderProgram paletteShader;
     private final SoftIris iris;
@@ -70,6 +71,7 @@ public final class ArenaRenderer implements Disposable {
         batch = metrics == null ? new SpriteBatch(1800, paletteShader) : new ProfileBatch(paletteShader);
         iris = new SoftIris();
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
+        rankMarkers = new EnemyRankMarkers(art.pixel);
         floorLayout = new ArenaFloorLayout(new JsonReader().parse(Gdx.files.internal("arena/crypt-floor.json")));
         float radius = floorLayout.medallionDiameter * .5f;
         float[] engraving = EngravedFloorArt.rectangle(floorLayout.centerX - radius, floorLayout.centerY - radius,
@@ -127,6 +129,7 @@ public final class ArenaRenderer implements Disposable {
             drawHazards(world, camera, SpriteEffectArt.Layer.ALL);
             drawPlayerAuras(world, camera);
             drawGroundMarks(world, camera, SpriteEffectArt.Layer.ALL);
+            drawEnemyFloorCues(world, camera);
             drawFootEffects(world, camera);
             drawPickups(world, camera);
             drawDust(world, camera);
@@ -145,6 +148,7 @@ public final class ArenaRenderer implements Disposable {
             drawBolts(world, camera);
             drawShots(world, camera);
             drawEffects(world, camera);
+            drawEnemyRanks(world);
             batch.end();
             drawCalls += batch.renderCalls;
             if (metrics != null) {
@@ -467,8 +471,7 @@ public final class ArenaRenderer implements Disposable {
             ActorAnimation.Facing facing = ActorAnimation.facing(shot.launchFacingX,
                 shot.launchFacingY, ActorAnimation.Facing.SE);
             int origin = facing.ordinal() * 2;
-            float scale = art.actor(ActorAnimation.actor(shot.casterKind)).pixelScale
-                * enemyScale(shot.casterKind, shot.casterElite);
+            float scale = art.actor(ActorAnimation.actor(shot.casterKind)).pixelScale * shot.casterRenderScale;
             // The launch pose is a value snapshot: turning, death and pool reuse cannot move a missile's emitter.
             float ox = sovereign ? SOVEREIGN_ORIGIN[origin] : graveKing ? 0f
                 : art.enemyAttacks.muzzleX(ArenaWorld.EnemyKind.CULTIST, facing);
@@ -615,17 +618,38 @@ public final class ArenaRenderer implements Disposable {
             radius / art.enemyAttacks.auraGroundRadius(), layer);
     }
 
-    private void drawEnemyAura(ArenaWorld.Enemy enemy, EnemyAttackArt.Layer layer) {
-        if (enemy.elite || enemy.kind == ArenaWorld.EnemyKind.BOSS || enemy.kind == ArenaWorld.EnemyKind.SOVEREIGN) {
-            boolean boss = enemy.kind == ArenaWorld.EnemyKind.BOSS || enemy.kind == ArenaWorld.EnemyKind.SOVEREIGN;
-            batch.setColor(boss ? 1f : .72f, boss ? .26f : .47f, boss ? .18f : 1f, .56f);
-            drawAura(enemy.animTime, enemy.x, enemy.y, Math.max(32f, enemy.radius + 12f), layer);
-        }
-        if (enemy.attack != ArenaWorld.EnemyAttack.NONE && enemy.windup > 0) {
-            batch.setColor(1f, .68f, .25f, .72f);
-            drawAura(enemy.attackAge, enemy.x, enemy.y, 29f * Math.min(1.4f, enemyScale(enemy)), layer);
+    private void drawEnemyFloorCues(ArenaWorld world, OrthographicCamera camera) {
+        for (ArenaWorld.Enemy enemy : world.enemies) {
+            if (!enemy.active || !visible(camera, enemy.x, enemy.y, 150f)) continue;
+            if (enemy.kind == ArenaWorld.EnemyKind.BOSS || enemy.kind == ArenaWorld.EnemyKind.SOVEREIGN) {
+                batch.setColor(1f, .26f, .18f, .56f);
+                drawAura(enemy.animTime, enemy.x, enemy.y, Math.max(32f, enemy.radius + 12f), EnemyAttackArt.Layer.ALL);
+            }
+            if (enemy.attack != ArenaWorld.EnemyAttack.NONE && enemy.windup > 0) {
+                batch.setColor(1f, .68f, .25f, .72f);
+                drawAura(enemy.attackAge, enemy.x, enemy.y, 29f * Math.min(1.4f, enemyScale(enemy)), EnemyAttackArt.Layer.ALL);
+            }
         }
         batch.setColor(Color.WHITE);
+    }
+
+    /** Overhead rank cues remain readable above the complete depth-sorted body pass. */
+    private void drawEnemyRanks(ArenaWorld world) {
+        for (int i = 0; i < sortCount; i++) if (types[i] == ENEMY) {
+            ArenaWorld.Enemy enemy = world.enemies[indices[i]];
+            if (enemy.kind == ArenaWorld.EnemyKind.BOSS || enemy.kind == ArenaWorld.EnemyKind.SOVEREIGN
+                || !enemy.elite && enemy.variant.healthMultiplier <= 1f) continue;
+            GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(enemy.kind));
+            float scale = enemyScale(enemy), top = screenY(enemy.x, enemy.y) + actor.maxAbove * scale;
+            if (enemy.attack == ArenaWorld.EnemyAttack.BRUTE_SLAM) {
+                // Follow the small head rise under lifted arms, rather than anchoring
+                // every idle badge above the highest outstretched fist in the bank.
+                float phase = MathUtils.clamp(enemy.attackAge / ArenaWorld.BRUTE_ATTACK_SECONDS, 0, 1);
+                top += 7f * actor.pixelScale * scale * MathUtils.sin(phase * MathUtils.PI);
+            }
+            rankMarkers.draw(batch, screenX(enemy.x, enemy.y), top,
+                enemy.elite, enemy.health / Math.max(1f, enemy.maxHealth));
+        }
     }
 
     private void drawEffects(ArenaWorld world, OrthographicCamera camera) {
@@ -737,18 +761,11 @@ public final class ArenaRenderer implements Disposable {
         if (effect.heroHit) return art.actor(ActorAnimation.actor(ArenaWorld.Hero.WARDEN)).worldHeight * .5f;
         if (effect.enemyKind == null) return 38f;
         return art.actor(ActorAnimation.actor(effect.enemyKind)).worldHeight * .5f
-            * enemyScale(effect.enemyKind, effect.elite);
+            * EnemySizing.renderScale(effect.enemyKind, effect.enemyVariant, effect.elite);
     }
 
     private static float enemyScale(ArenaWorld.Enemy enemy) {
-        return enemyScale(enemy.kind, enemy.elite);
-    }
-
-    private static float enemyScale(ArenaWorld.EnemyKind kind, boolean elite) {
-        float scale = kind == ArenaWorld.EnemyKind.BOSS || kind == ArenaWorld.EnemyKind.SOVEREIGN ? 2.2f
-            : kind == ArenaWorld.EnemyKind.BRUTE ? 1.4f
-            : kind == ArenaWorld.EnemyKind.WRAITH ? .82f : 1f;
-        return scale * (elite ? 1.18f : 1f);
+        return EnemySizing.renderScale(enemy.kind, enemy.variant, enemy.elite);
     }
 
     private static float spawnScale(ArenaWorld.Enemy enemy) {
@@ -791,7 +808,6 @@ public final class ArenaRenderer implements Disposable {
                 ArenaWorld.Enemy enemy = world.enemies[index];
                 float scale = enemyScale(enemy);
                 drawArrival(enemy, VfxArt.Layer.BACK);
-                drawEnemyAura(enemy, EnemyAttackArt.Layer.BACK);
                 setEnemyBodyColor(enemy);
                 EnemyVariant bodyVariant = enemy.hitFlash > 0f ? EnemyVariant.ORIGINAL : enemy.variant;
                 GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(enemy.kind));
@@ -827,14 +843,7 @@ public final class ArenaRenderer implements Disposable {
                         screenY(enemy.hitDirectionX, enemy.hitDirectionY) * recoil
                             + (enemy.kind == ArenaWorld.EnemyKind.BOSS ? graveKingHover(world.elapsed) : 0f), bodyVariant);
                 }
-                drawEnemyAura(enemy, EnemyAttackArt.Layer.FRONT);
                 drawArrival(enemy, VfxArt.Layer.FRONT);
-                if (enemy.elite && enemy.kind != ArenaWorld.EnemyKind.BOSS) {
-                    float x = screenX(enemy.x, enemy.y), y = screenY(enemy.x, enemy.y) + actor.maxAbove * scale + 4f;
-                    batch.setColor(.15f, .1f, .12f, .85f); batch.draw(art.pixel, x - 25f, y, 50f, 3f);
-                    batch.setColor(.88f, .38f, .27f, .95f);
-                    batch.draw(art.pixel, x - 25f, y, 50f * Math.max(0f, Math.min(1f, enemy.health / Math.max(1f, enemy.maxHealth))), 3f);
-                }
                 batch.setColor(Color.WHITE);
             } else {
                 ArenaWorld.Player player = world.players[index];

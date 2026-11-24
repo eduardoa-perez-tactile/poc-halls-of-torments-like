@@ -32,6 +32,7 @@ import com.couchcrypt.game.HudArt;
 import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.GameAudio;
 import com.couchcrypt.game.ArenaRenderer;
+import com.couchcrypt.game.ActorAnimation;
 import com.couchcrypt.lobby.JoinServer;
 import com.couchcrypt.lobby.LanAddress;
 import com.couchcrypt.lobby.LobbyState;
@@ -826,6 +827,7 @@ public final class CryptLobby extends ApplicationAdapter {
 
     /** Profile-only camera landmarks avoid walking a survival run to inspect the new room. */
     private int arenaPreviewIndex = -1;
+    private int enemySizePreviewFacing, enemyCastPreviewFacing;
     private void previewArenaLandmark() {
         arenaPreviewIndex = (arenaPreviewIndex + 1) % 8;
         float x = switch (arenaPreviewIndex) { case 0, 1 -> 0f; case 2 -> 600f;
@@ -882,6 +884,16 @@ public final class CryptLobby extends ApplicationAdapter {
         if (key == Input.Keys.PAGE_UP && config.profile() && screen == Screen.SESSION
             && overlay == null && !world.choicePending()) {
             previewArenaLandmark(); return true;
+        }
+        if ((key == Input.Keys.NUM_1 || key == Input.Keys.MEDIA_NEXT) && config.profile() && screen == Screen.SESSION
+            && overlay == null && !world.choicePending()) {
+            world.debugEnemySizeLineup(ActorAnimation.Facing.values()[enemySizePreviewFacing++ % 4]);
+            arena.resetCameras(); return true;
+        }
+        if ((key == Input.Keys.NUM_2 || key == Input.Keys.MEDIA_PREVIOUS) && config.profile() && screen == Screen.SESSION
+            && overlay == null && !world.choicePending()) {
+            world.debugSizedCultistAttack(ActorAnimation.Facing.values()[enemyCastPreviewFacing++ % 4]);
+            arena.resetCameras(); return true;
         }
         if (key == Input.Keys.F1 && config.profile() && screen == Screen.SESSION && overlay == null) {
             world.debugEnemyAttackEncounter(); return true;
