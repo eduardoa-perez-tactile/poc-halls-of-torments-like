@@ -52,7 +52,7 @@ public final class ArenaRenderer implements Disposable {
     private final GameplayAtlas.Region[] propArt;
     private final float[] environmentVertices = new float[20];
     private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + ArenaLayout.MAX_PLACEMENTS + PaintedBorderArt.MAX_SCENERY];
-    private final int[] types = new int[depths.length], indices = new int[depths.length];
+    private final int[] types = new int[depths.length], indices = new int[depths.length], layers = new int[depths.length];
     private int sortCount;
     public int drawCalls;
     /** Startup inventory; shared by both cameras and never rebuilt while playing. */
@@ -204,29 +204,8 @@ public final class ArenaRenderer implements Disposable {
     private int cacheFloor() {
         floorCache.beginCache();
         int quads = 0;
-        float scale = ArenaTileLayout.CELL * 2f * ISO_X / art.borders.tileWidth;
-        int minColumn = -ArenaTileLayout.PADDING, maxColumn = ArenaTileLayout.COLUMNS + ArenaTileLayout.PADDING - 1;
-        int minRow = -ArenaTileLayout.PADDING, maxRow = ArenaTileLayout.ROWS + ArenaTileLayout.PADDING - 1;
-        // The exterior is a backdrop: it must not cover the foreground foundation skirts.
-        for (int pass = 0; pass < 2; pass++) {
-            // Match the export's far-to-near order, including the i tie-break.
-            for (int depth = maxColumn + maxRow; depth >= minColumn + minRow; depth--) {
-                for (int column = minColumn; column <= maxColumn; column++) {
-                    int row = depth - column;
-                    if (row < minRow || row > maxRow) continue;
-                    boolean exterior = ArenaTileLayout.exterior(column, row);
-                    if (exterior != (pass == 0)) continue;
-                    if (column >= 0 && column < ArenaTileLayout.COLUMNS && row >= 0 && row < ArenaTileLayout.ROWS) continue;
-                    float x = ArenaTileLayout.farX(column), y = ArenaTileLayout.farY(row);
-                    float shade = exterior ? .10f : 1f;
-                    floorCache.setColor(shade, shade, shade, 1f);
-                    BorderTileArt.Region tile = art.borders.region(ArenaTileLayout.tile(column, row));
-                    floorCache.add(tile.texture(), screenX(x, y) + tile.left() * scale,
-                        screenY(x, y) + tile.bottom() * scale, tile.width() * scale, tile.height() * scale);
-                    quads++;
-                }
-            }
-        }
+        // The continuous painted walls are the only perimeter. The legacy tile
+        // foundation included an exterior walkway and a second set of corners.
         // Materials retain their own world repeat size rather than shrinking to the foundation grid.
         ArrayList<EngravedFloorArt.Quad> field = new ArrayList<>();
         float repeat = floorLayout.fieldRepeat;
@@ -244,10 +223,12 @@ public final class ArenaRenderer implements Disposable {
         for (var cell : floorLayout.pathCells)
             java.util.Collections.addAll(paths, art.engravedFloor.geometry(art.engravedFloor.path, cell.vertices, 1f, .10f, .90f));
         quads += cacheGround(paths);
-        ArrayList<EngravedFloorArt.Quad> curbs = new ArrayList<>();
-        for (float[] polygon : new StonePathBorders(floorLayout).polygons)
-            java.util.Collections.addAll(curbs, art.engravedFloor.geometry(art.engravedFloor.curb, polygon, 1f));
-        quads += cacheGround(curbs);
+        if (!floorLayout.usesPavingBands()) {
+            ArrayList<EngravedFloorArt.Quad> curbs = new ArrayList<>();
+            for (float[] polygon : new StonePathBorders(floorLayout).polygons)
+                java.util.Collections.addAll(curbs, art.engravedFloor.geometry(art.engravedFloor.curb, polygon, 1f));
+            quads += cacheGround(curbs);
+        }
         if (quads > EngravedFloorArt.MAX_FLOOR_QUADS) throw new IllegalStateException("Floor cache capacity exceeded");
         cachedFloorQuads = quads;
         Gdx.app.log("FloorArt", "Cached ground quads=" + quads + ", medallion quads=" + medallion.length);
@@ -337,19 +318,22 @@ public final class ArenaRenderer implements Disposable {
             if (placement.wall) continue;
             GameplayAtlas.Frame frame = art.metadata.frames[propArt[i].frame()];
             float scale = placement.scale;
-            float shear = propArt[i].renderShearY();
-            float lowShift = Math.min(frame.left * shear, (frame.left + frame.width) * shear) * scale;
-            float highShift = Math.max(frame.left * shear, (frame.left + frame.width) * shear) * scale;
+            GameplayAtlas.Region source = propArt[i];
+            float bottomLeft = EnvironmentProjection.projectedY(frame.left * scale, frame.bottom * scale, source);
+            float bottomRight = EnvironmentProjection.projectedY((frame.left + frame.width) * scale, frame.bottom * scale, source);
+            float topLeft = EnvironmentProjection.projectedY(frame.left * scale, (frame.bottom + frame.height) * scale, source);
+            float topRight = EnvironmentProjection.projectedY((frame.left + frame.width) * scale, (frame.bottom + frame.height) * scale, source);
             if (visible(camera, placement.x, placement.y, Math.max(placement.shadowWidth * .5f, -frame.left * scale),
                 Math.max(placement.shadowWidth * .5f, (frame.left + frame.width) * scale),
-                Math.max(placement.shadowHeight * .5f, (frame.bottom + frame.height) * scale + highShift),
-                Math.max(placement.shadowHeight * .5f, -frame.bottom * scale - lowShift)))
+                Math.max(placement.shadowHeight * .5f, Math.max(topLeft, topRight)),
+                Math.max(placement.shadowHeight * .5f, -Math.min(bottomLeft, bottomRight))))
                 add(PROP, i, placement.x, placement.y);
         }
         for (int i = 0; i < paintedBorders.quads.length; i++) if (paintedBorders.visible(camera, i)) {
             PaintedBorderArt.Quad q = paintedBorders.quads[i];
             add(PAINTED_BORDER, i, q.worldX, q.worldY);
             depths[sortCount - 1] = q.sortDepth;
+            layers[sortCount - 1] = q.renderLayer;
         }
         for (int i = 0; i < world.enemies.length; i++) {
             ArenaWorld.Enemy enemy = world.enemies[i];
@@ -372,17 +356,20 @@ public final class ArenaRenderer implements Disposable {
                 && visible(camera, player.x, player.y, art.vfx.maxRadius(VfxArt.Animation.LEVEL_UP) * LEVEL_FX_SCALE);
             if (body || level) add(PLAYER, i, player.x, player.y);
         }
-        // Small bounded insertion sort keeps anchors stable and avoids comparator allocation.
+        // Rear/near wall planes enclose every actor. Atlas storage columns are
+        // never independent obstacles that can slice one body at a packing seam.
+        // Within each plane/pass, keep the existing stable ground-depth ordering.
         for (int i = 1; i < sortCount; i++) {
-            float depth = depths[i]; int type = types[i], index = indices[i], j = i - 1;
-            while (j >= 0 && depths[j] < depth) {
-                depths[j + 1] = depths[j]; types[j + 1] = types[j]; indices[j + 1] = indices[j]; j--;
+            float depth = depths[i]; int type = types[i], index = indices[i], layer = layers[i], j = i - 1;
+            while (j >= 0 && (layers[j] > layer || layers[j] == layer && depths[j] < depth)) {
+                depths[j + 1] = depths[j]; types[j + 1] = types[j]; indices[j + 1] = indices[j]; layers[j + 1] = layers[j]; j--;
             }
-            depths[j + 1] = depth; types[j + 1] = type; indices[j + 1] = index;
+            depths[j + 1] = depth; types[j + 1] = type; indices[j + 1] = index; layers[j + 1] = layer;
         }
     }
 
     private void add(int type, int index, float x, float y) {
+        layers[sortCount] = PaintedBorderArt.INTERIOR_LAYER;
         types[sortCount] = type; indices[sortCount] = index; depths[sortCount++] = screenY(x, y);
     }
 
@@ -889,45 +876,48 @@ public final class ArenaRenderer implements Disposable {
         float rootX = screenX(placement.x, placement.y), rootY = screenY(placement.x, placement.y);
         float left = rootX + frame.left * placement.scale, bottom = rootY + frame.bottom * placement.scale;
         float width = frame.width * placement.scale, height = frame.height * placement.scale;
-        float shear = propArt[index].renderShearY();
+        GameplayAtlas.Region source = propArt[index];
+        float shear = source.renderShearY();
         float leftShift = (left - rootX) * shear, rightShift = (left + width - rootX) * shear;
         float lowShift = Math.min(leftShift, rightShift), highShift = Math.max(leftShift, rightShift);
         TextureRegion region = art.frame(propArt[index].frame());
-        float groundSlope = placement.region.startsWith("wall-x") ? .5f
-            : placement.region.startsWith("wall-y") ? -.5f : 0f;
-        if (!placement.fadeWhenOccluding || height <= ENVIRONMENT_BASE_HEIGHT * 2f
+        float groundSlope = placement.region.startsWith("wall-x") || placement.region.equals("sealed-gate") ? .5f
+            : placement.region.startsWith("wall-y") || placement.region.equals("altar") ? -.5f : 0f;
+        float projectedTop = rootY + (bottom + height - rootY) * source.renderScaleY() + highShift;
+        if (!placement.fadeWhenOccluding || height * source.renderScaleY() <= ENVIRONMENT_BASE_HEIGHT * 2f
             || !environmentOccludes(world, camera, viewer, groundSlope, rootY, left, rootY + ENVIRONMENT_BASE_HEIGHT + lowShift,
-                left + width, bottom + height + highShift)) {
+                left + width, projectedTop)) {
             batch.setColor(Color.WHITE);
-            drawEnvironmentPart(region, left, bottom, width, height, region.getV2(), region.getV(), rootX, shear);
+            drawEnvironmentPart(region, left, bottom, width, height, region.getV2(), region.getV(), rootX, rootY, source);
             return;
         }
         // Keep the ground footprint and the low wall/landmark base solid. Reveal only its upper paint.
-        float baseHeight = MathUtils.clamp(rootY + ENVIRONMENT_BASE_HEIGHT - bottom, 0f, height);
+        float baseHeight = MathUtils.clamp(rootY + ENVIRONMENT_BASE_HEIGHT / source.renderScaleY() - bottom, 0f, height);
         float splitV = MathUtils.lerp(region.getV2(), region.getV(), baseHeight / height);
         batch.setColor(Color.WHITE);
         if (baseHeight > 0f)
-            drawEnvironmentPart(region, left, bottom, width, baseHeight, region.getV2(), splitV, rootX, shear);
+            drawEnvironmentPart(region, left, bottom, width, baseHeight, region.getV2(), splitV, rootX, rootY, source);
         batch.setColor(1f, 1f, 1f, placement.wall ? .14f : .24f);
         if (baseHeight < height)
             drawEnvironmentPart(region, left, bottom + baseHeight, width, height - baseHeight,
-                splitV, region.getV(), rootX, shear);
+                splitV, region.getV(), rootX, rootY, source);
         batch.setColor(Color.WHITE);
     }
 
     /** Calibrate painted ground edges to the floor projection using the existing four sprite vertices. */
     private void drawEnvironmentPart(TextureRegion region, float x, float y, float width, float height,
-                                     float bottomV, float topV, float rootX, float shear) {
-        if (shear == 0f) {
+                                     float bottomV, float topV, float rootX, float rootY, GameplayAtlas.Region source) {
+        if (source.renderShearY() == 0f && source.renderScaleY() == 1f) {
             batch.draw(region.getTexture(), x, y, width, height, region.getU(), bottomV, region.getU2(), topV);
             return;
         }
-        float leftY = environmentProjectedY(y, x, rootX, shear);
-        float rightY = environmentProjectedY(y, x + width, rootX, shear);
+        float leftY = rootY + EnvironmentProjection.projectedY(x - rootX, y - rootY, source);
+        float rightY = rootY + EnvironmentProjection.projectedY(x + width - rootX, y - rootY, source);
+        float projectedHeight = height * source.renderScaleY();
         float color = batch.getPackedColor();
         environmentVertex(0, x, leftY, color, region.getU(), bottomV);
-        environmentVertex(5, x, leftY + height, color, region.getU(), topV);
-        environmentVertex(10, x + width, rightY + height, color, region.getU2(), topV);
+        environmentVertex(5, x, leftY + projectedHeight, color, region.getU(), topV);
+        environmentVertex(10, x + width, rightY + projectedHeight, color, region.getU2(), topV);
         environmentVertex(15, x + width, rightY, color, region.getU2(), bottomV);
         batch.draw(region.getTexture(), environmentVertices, 0, environmentVertices.length);
     }

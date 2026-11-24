@@ -133,7 +133,7 @@ public final class GameplayAtlas {
 
     /** Footprint width is measured in source pixels; world extents are authored ground-plane units. */
     public record Region(int frame, float worldHeight, float footprintWidth,
-                         float footprintWorldX, float footprintWorldY, float renderShearY) {}
+                         float footprintWorldX, float footprintWorldY, float renderShearY, float renderScaleY) {}
 
     public final Page[] pages;
     public final Frame[] frames;
@@ -176,13 +176,17 @@ public final class GameplayAtlas {
             float footprintWorldX = entry.getFloat("footprintWorldX", height);
             float footprintWorldY = entry.getFloat("footprintWorldY", height);
             float renderShearY = entry.getFloat("renderShearY", 0f);
+            float renderScaleY = entry.getFloat("renderScaleY", 1f);
+            boolean calibratedProp = entry.name.equals("altar") || entry.name.equals("sealed-gate");
             if (!Float.isFinite(footprintWidth) || footprintWidth <= 0 || footprintWidth > frames[frame].sourceWidth
                 || !Float.isFinite(footprintWorldX) || footprintWorldX <= 0 || footprintWorldX > 2400
                 || !Float.isFinite(footprintWorldY) || footprintWorldY <= 0 || footprintWorldY > 2400
                 || !Float.isFinite(renderShearY) || Math.abs(renderShearY) > .1f
-                || renderShearY != 0 && !entry.name.startsWith("wall-"))
+                || !Float.isFinite(renderScaleY) || renderScaleY < .85f || renderScaleY > 1.2f
+                || renderShearY != 0 && !entry.name.startsWith("wall-") && !calibratedProp
+                || renderScaleY != 1f && !calibratedProp)
                 throw invalid("Invalid environment footprint");
-            if (regions.put(entry.name, new Region(frame, height, footprintWidth, footprintWorldX, footprintWorldY, renderShearY)) != null)
+            if (regions.put(entry.name, new Region(frame, height, footprintWidth, footprintWorldX, footprintWorldY, renderShearY, renderScaleY)) != null)
                 throw invalid("Duplicate environment region");
         }
         for (String name : REQUIRED_REGIONS) if (!regions.containsKey(name)) throw invalid("Missing region " + name);

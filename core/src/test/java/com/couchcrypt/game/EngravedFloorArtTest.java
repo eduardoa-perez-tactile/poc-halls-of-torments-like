@@ -56,7 +56,7 @@ class EngravedFloorArtTest {
 
     @Test void clippedMaterialGeometryCoversTheFloorAndFitsTheStaticCache() throws Exception {
         var art = art(); var layout = new ArenaFloorLayout(json("assets/arena/crypt-floor.json"));
-        float area = 0; int count = ArenaTileLayout.QUADS - ArenaTileLayout.COLUMNS * ArenaTileLayout.ROWS;
+        float area = 0; int count = 0;
         float repeat = layout.fieldRepeat;
         for (float x = -1200; x < 1200; x += repeat) for (float y = -900; y < 900; y += repeat) {
             float right = Math.min(x + repeat, 1200), top = Math.min(y + repeat, 900);
@@ -68,9 +68,18 @@ class EngravedFloorArtTest {
             count += geometry.length;
         }
         assertEquals(2400 * 1800f, area, 12f, "Clipped atlas storage pieces must own the complete floor exactly once");
+        float[] bandAreas = new float[layout.bands.length];
         for (var cell : layout.pathCells) {
             var geometry = art.geometry(art.path, cell.vertices, 1f, .10f, .90f); count += geometry.length;
-            for (var quad : geometry) assertVertices(quad.vertices());
+            for (var quad : geometry) {
+                assertVertices(quad.vertices());
+                if (layout.usesPavingBands()) bandAreas[cell.pathIndex] += worldArea(quad.vertices());
+            }
+        }
+        for (int i = 0; i < layout.bands.length; i++) {
+            var band = layout.bands[i];
+            assertEquals((band.maxX() - band.minX()) * (band.maxY() - band.minY()), bandAreas[i], 5f,
+                "Cropping painted margins must preserve the complete approved paving footprint");
         }
         for (float[] polygon : new StonePathBorders(layout).polygons)
             count += art.geometry(art.curb, polygon, 1f).length;
@@ -90,7 +99,12 @@ class EngravedFloorArtTest {
         var art = art(); var floor = new ArenaFloorLayout(json("assets/arena/crypt-floor.json"));
         assertEquals(1, art.curb.pieces.length, "A border block should not require many atlas submissions");
         assertTrue(art.field.contentWidth / floor.fieldRepeat >= .5f, "Field details need enough samples at gameplay scale");
-        assertTrue(art.path.contentWidth / floor.pathWidth >= .6f, "Path joints need more cross-path samples than the old64px bands");
+        if (floor.usesPavingBands()) {
+            for (var band : floor.bands)
+                assertTrue(art.path.contentWidth / (band.maxX() - band.minX()) >= .4f,
+                    "Approved broad paving retains the existing128px painting across each band");
+        } else assertTrue(art.path.contentWidth / floor.pathWidth >= .6f,
+            "Legacy radial paths retain their original cross-path density");
         var source = ImageIO.read(root().resolve("art-source/crypt-floor-clarity/" + art.curb.file).toFile());
         int transparent = 0, stone = 0;
         for (int y = 0; y < source.getHeight(); y++) for (int x = 0; x < source.getWidth(); x++) {

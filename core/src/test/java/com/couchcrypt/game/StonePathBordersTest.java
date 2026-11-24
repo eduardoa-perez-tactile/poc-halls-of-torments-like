@@ -1,8 +1,6 @@
 package com.couchcrypt.game;
 
 import com.badlogic.gdx.utils.JsonReader;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -65,8 +63,15 @@ class StonePathBordersTest {
     }
 
     private static ArenaFloorLayout floor() throws Exception {
-        Path file = Path.of("../assets/arena/crypt-floor.json");
-        if (!Files.exists(file)) file = Path.of("assets/arena/crypt-floor.json");
-        return new ArenaFloorLayout(new JsonReader().parse(Files.readString(file)));
+        // Curbstones belong to the retained radial fixture; the shipped band
+        // layout intentionally uses plain flush paving without extra borders.
+        return new ArenaFloorLayout(new JsonReader().parse("""
+            {"version":1,"worldSize":[2400,1800],"center":[0,0],
+             "medallionDiameter":600,"pathWidth":200,"materialRepeat":200,"fieldRepeat":120,
+             "paths":[{"id":"e","to":[1200,0]},{"id":"ne","to":[1200,900]},
+                      {"id":"n","to":[0,900]},{"id":"nw","to":[-1200,900]},
+                      {"id":"w","to":[-1200,0]},{"id":"sw","to":[-1200,-900]},
+                      {"id":"s","to":[0,-900]},{"id":"se","to":[1200,-900]}],"wear":[]}
+            """));
     }
 }

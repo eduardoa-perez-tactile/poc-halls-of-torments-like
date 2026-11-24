@@ -134,6 +134,140 @@ class PaintedBorderArtTest {
             "Every overlapping X-end slice must follow Y-end slices, including the last four-pixel column");
     }
 
+    @Test void fullPaintingsMeetOuterWallFacesWithoutDoubleCountingTheirThickness() throws Exception {
+        GameplayAtlas atlas = atlas();
+        PaintedBorderArt art = new PaintedBorderArt(json("assets/art/painted-borders.json"), atlas, null);
+        ArenaLayout layout = new ArenaLayout(json("assets/arena/crypt-layout.json"), atlas);
+        var scene = art.place(layout, atlas);
+        float minX = Float.POSITIVE_INFINITY, maxX = Float.NEGATIVE_INFINITY;
+        float minY = Float.POSITIVE_INFINITY, maxY = Float.NEGATIVE_INFINITY;
+        for (var run : layout.wallRuns) {
+            if (run.alongX()) {
+                minY = Math.min(minY, run.y() - run.thickness() * .5f);
+                maxY = Math.max(maxY, run.y() + run.thickness() * .5f);
+            } else {
+                minX = Math.min(minX, run.x() - run.thickness() * .5f);
+                maxX = Math.max(maxX, run.x() + run.thickness() * .5f);
+            }
+        }
+        for (var run : layout.wallRuns) {
+            var painting = run.alongX() ? art.x : art.y;
+            PaintedBorderArt.Quad first = null, last = null;
+            for (var q : scene.quads) if (q.painting == painting
+                && (run.alongX() ? q.worldY == run.y() : q.worldX == run.x())) {
+                if (first == null || q.sourceLeft < first.sourceLeft) first = q;
+                if (last == null || q.sourceRight > last.sourceRight) last = q;
+            }
+            assertNotNull(first); assertNotNull(last);
+            // Source ground-footprint vertices go through the same cached transform
+            // as the stone paint. Use their actual endpoint pieces, rather than
+            // extrapolating an entire wall from a tiny storage rectangle.
+            float half = painting.footprintWidth * .5f;
+            float[] left = point(first, painting.pivotX - half, painting.pivotY);
+            float[] right = point(last, painting.pivotX + half, painting.pivotY);
+            float outerSpan = run.alongX() ? maxX - minX : maxY - minY;
+            assertEquals(outerSpan * .70710678f, right[0] - left[0], .001f,
+                "Painted endcaps must stop at the adjoining outer faces, without an extra wall thickness");
+        }
+        for (var q : scene.quads) if (q.painting == art.corner) {
+            float footprint = q.painting.footprintWidth * q.drawScale;
+            assertEquals((art.x.worldThickness + art.y.worldThickness) * .70710678f, footprint, .001f,
+                "A low junction backing must fit the two wall thicknesses, not project outside as a post");
+            assertTrue(q.drawScale < art.corner.scale, "The original larger support remains only as low backing");
+        }
+    }
+
+    @Test void bothEndsAtEveryCornerKeepOneFaceOrderAndTheBackingBehindThem() throws Exception {
+        GameplayAtlas atlas = atlas();
+        PaintedBorderArt art = new PaintedBorderArt(json("assets/art/painted-borders.json"), atlas, null);
+        ArenaLayout layout = new ArenaLayout(json("assets/arena/crypt-layout.json"), atlas);
+        var scene = art.place(layout, atlas);
+        int checked = 0;
+        for (var placement : layout.placements) if (placement.wall && placement.region.equals("buttress")) {
+            float latestX = Float.NEGATIVE_INFINITY, earliestY = Float.POSITIVE_INFINITY;
+            float junctionLeft = Float.POSITIVE_INFINITY, junctionRight = Float.NEGATIVE_INFINITY;
+            int xPieces = 0, yPieces = 0, backingPieces = 0;
+            int xLayer = -1, yLayer = -1;
+            for (var q : scene.quads) if (q.painting == art.corner && q.worldX == placement.x && q.worldY == placement.y) {
+                junctionLeft = Math.min(junctionLeft, q.minX); junctionRight = Math.max(junctionRight, q.maxX);
+            }
+            for (var q : scene.quads) {
+                if (q.painting == art.x && Math.abs(q.worldY - placement.y) < .01f
+                    && q.minX < junctionRight && q.maxX > junctionLeft) {
+                    latestX = Math.max(latestX, q.sortDepth);
+                    if (xLayer != -1) assertEquals(xLayer, q.renderLayer);
+                    xLayer = q.renderLayer; xPieces++;
+                }
+                if (q.painting == art.y && Math.abs(q.worldX - placement.x) < .01f
+                    && q.minX < junctionRight && q.maxX > junctionLeft) {
+                    earliestY = Math.min(earliestY, q.sortDepth);
+                    if (yLayer != -1) assertEquals(yLayer, q.renderLayer);
+                    yLayer = q.renderLayer; yPieces++;
+                }
+                if (q.painting == art.corner && q.worldX == placement.x && q.worldY == placement.y) {
+                    assertEquals(PaintedBorderArt.CORNER_LAYER, q.renderLayer); backingPieces++;
+                }
+            }
+            assertTrue(xPieces >= 2 && yPieces >= 2,
+                "Check all source rows whose drawn wall ends actually intersect the junction at " + placement.id);
+            assertEquals(art.corner.pieces.length, backingPieces);
+            assertTrue(PaintedBorderArt.CORNER_LAYER < xLayer && PaintedBorderArt.CORNER_LAYER < yLayer);
+            if (xLayer == yLayer) assertTrue(latestX < earliestY, "Wall face order changed at " + placement.id);
+            else if (placement.y > 0) assertTrue(xLayer < yLayer, "The north wall must precede the west wall");
+            else assertTrue(yLayer < xLayer, "The east wall must precede the south wall");
+            checked++;
+        }
+        assertEquals(4, checked);
+    }
+
+    @Test void boundaryPlanesKeepAllStorageColumnsOutsideTheCompleteInteriorPass() throws Exception {
+        GameplayAtlas atlas = atlas();
+        PaintedBorderArt art = new PaintedBorderArt(json("assets/art/painted-borders.json"), atlas, null);
+        JsonValue document = json("assets/arena/crypt-layout.json");
+        ArenaLayout layout = new ArenaLayout(document, atlas);
+        var scene = art.place(layout, atlas);
+        ArenaLayout.Placement gate = null;
+        for (var p : layout.placements) if (p.region.equals("sealed-gate")) gate = p;
+        assertNotNull(gate, "The approved layout has one entrance against its rear wall");
+        var frame = atlas.frames[atlas.regions.get("sealed-gate").frame()];
+        float rootX = (gate.x - gate.y) * .70710678f;
+        float left = rootX + frame.left * gate.scale;
+        float right = rootX + (frame.left + frame.width) * gate.scale;
+        float attachedWallY = Float.NaN;
+        for (var run : layout.wallRuns) if (run.alongX() && run.y() > gate.y) attachedWallY = run.y();
+        assertTrue(Float.isFinite(attachedWallY));
+
+        int leftColumns = 0, rightColumns = 0, backColumns = 0, frontColumns = 0;
+        for (var q : scene.quads) {
+            if (q.painting == art.corner) {
+                assertEquals(PaintedBorderArt.CORNER_LAYER, q.renderLayer);
+                continue;
+            }
+            float side = q.painting == art.x ? q.worldY : q.worldX;
+            if (side > 0) {
+                assertEquals(PaintedBorderArt.BACK_WALL_LAYER, q.renderLayer);
+                assertTrue(q.renderLayer < PaintedBorderArt.INTERIOR_LAYER,
+                    "Every north/east storage column must draw before the full actor body, regardless of its depth");
+                backColumns++;
+            } else {
+                assertEquals(PaintedBorderArt.FRONT_WALL_LAYER, q.renderLayer);
+                assertTrue(q.renderLayer > PaintedBorderArt.INTERIOR_LAYER,
+                    "Every south/west storage column must draw after actors as one foreground plane");
+                frontColumns++;
+            }
+            boolean attached = q.painting == art.x && q.worldY == attachedWallY && q.minX < right && q.maxX > left;
+            if (attached) {
+                assertTrue(q.renderLayer < PaintedBorderArt.INTERIOR_LAYER,
+                    "No adjoining storage row may cut in front of either gate upright");
+                if (q.minX < rootX) leftColumns++;
+                if (q.maxX > rootX) rightColumns++;
+            }
+        }
+        assertTrue(leftColumns >= 2 && rightColumns >= 2, "Check both uprights and every storage row");
+        assertEquals(art.x.pieces.length + art.y.pieces.length, backColumns);
+        assertEquals(art.x.pieces.length + art.y.pieces.length, frontColumns);
+    }
+
     private static BufferedImage[] pages(GameplayAtlas atlas) throws Exception {
         BufferedImage[] pages = new BufferedImage[atlas.pages.length];
         for (int i = 0; i < pages.length; i++) pages[i] = ImageIO.read(root().resolve("assets/art/" + atlas.pages[i].file()).toFile());

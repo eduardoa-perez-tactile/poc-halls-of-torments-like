@@ -828,9 +828,9 @@ public final class CryptLobby extends ApplicationAdapter {
     private int arenaPreviewIndex = -1;
     private void previewArenaLandmark() {
         arenaPreviewIndex = (arenaPreviewIndex + 1) % 8;
-        float x = switch (arenaPreviewIndex) { case 0 -> -750f; case 1 -> 600f; case 2 -> 770f;
+        float x = switch (arenaPreviewIndex) { case 0, 1 -> 0f; case 2 -> 600f;
             case 3 -> -1100f; case 4, 5 -> 1100f; case 6 -> -1100f; default -> 0f; };
-        float y = switch (arenaPreviewIndex) { case 0 -> 430f; case 1 -> 610f; case 2 -> -490f;
+        float y = switch (arenaPreviewIndex) { case 0 -> 650f; case 1 -> -440f; case 2 -> 0f;
             case 3, 5 -> -780f; case 4, 6 -> 780f; default -> 0f; };
         world.debugSceneryView(x, y);
         arena.resetCameras();

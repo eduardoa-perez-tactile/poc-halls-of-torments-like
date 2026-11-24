@@ -1,5 +1,17 @@
 # Continuous painted arena borders
 
+The 24 November formal-layout correction removes the legacy tile-foundation skirt,
+so these paintings now form the only visible perimeter. Whole-painting scale fits
+the actual adjoining outer-face span; it no longer adds an extra wall thickness
+to that span. Corner backing fits the 36×36 junction instead of projecting a 50×50
+post beyond it. End-region depth uses the entire source interval, covering every
+storage row and narrow terminal column at all four corners. North/east wall planes
+draw before the complete interior pass, south/west planes draw afterward and
+corner backing precedes both. This keeps rear columns behind both gate uprights
+and prevents atlas storage cuts from slicing an actor vertically. Source PNGs,
+UVs, neighbour collars and texture storage remain unchanged. The following record
+describes the original 23 November integration.
+
 The user approved the painted camera-scale proposal on 2026-11-23. This replaces
 the independently capped wall fragments that showed visible repeat seams. The
 intermediate stretched material-surface experiment was rejected and is not used.

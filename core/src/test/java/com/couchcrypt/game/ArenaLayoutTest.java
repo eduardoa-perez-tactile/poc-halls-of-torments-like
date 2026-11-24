@@ -47,7 +47,7 @@ class ArenaLayoutTest {
             assertEquals(36f, run.thickness());
             assertEquals(0f, run.alongX() ? run.x() : run.y());
         }
-        assertTrue(landmarks >= 12 && landmarks <= 32, "The room needs grouped landmarks, not a floor full of clutter");
+        assertEquals(16, landmarks, "Only the approved gate, sanctuary, burial rows and ruined colonnade are placed");
     }
 
     @Test void invalidLandmarkChangesCannotSilentlyAddCollidersOrFillTheCentralCourt() throws Exception {
@@ -67,7 +67,7 @@ class ArenaLayoutTest {
         missing.get("wallRuns").get(0).get("region").set(new JsonValue("missing-wall"));
         assertThrows(IllegalArgumentException.class, () -> new ArenaLayout(missing, atlas));
         JsonValue duplicate = layout();
-        JsonValue members = duplicate.get("landmarks").get(0).get("members");
+        JsonValue members = duplicate.get("landmarks").get(1).get("members");
         members.get(1).get("id").set(new JsonValue(members.get(0).getString("id")));
         assertThrows(IllegalArgumentException.class, () -> new ArenaLayout(duplicate, atlas));
         JsonValue runaway = layout();

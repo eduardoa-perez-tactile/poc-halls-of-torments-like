@@ -12,6 +12,7 @@ import java.util.ArrayList;
 /** Whole painted wall runs, split only for storage in already resident atlas pages. */
 public final class PaintedBorderArt {
     public static final int MAX_PIECES = 256, MAX_SCENERY = 512;
+    public static final int CORNER_LAYER = 0, BACK_WALL_LAYER = 1, INTERIOR_LAYER = 2, FRONT_WALL_LAYER = 3;
     private static final float ISO_X = .70710678f, ISO_Y = .35355339f;
     public final Painting x, y, corner;
     private final Texture[] textures;
@@ -122,25 +123,32 @@ public final class PaintedBorderArt {
                 Painting painting = run.alongX() ? x : y;
                 if (Math.abs(run.length() - painting.worldLength) > .1f
                     || Math.abs(run.thickness() - painting.worldThickness) > .1f) throw invalid("wall footprint differs from painting");
-                // Reach the adjoining outer wall face, rather than stopping at the fighting-floor bounds.
+                // The span already includes both adjoining half-thicknesses. Adding this
+                // painting's thickness again grows both wall ends past their junctions.
                 float span = run.alongX() ? maxX - minX : maxY - minY;
-                float drawScale = painting.scale * (span + painting.worldThickness)
+                float drawScale = painting.scale * span
                     / (painting.worldLength + painting.worldThickness);
                 float lowDepth = (run.alongX() ? run.y() + minCenterX : run.x() + minCenterY) * ISO_Y;
                 float highDepth = (run.alongX() ? run.y() + maxCenterX : run.x() + maxCenterY) * ISO_Y;
-                add(result, painting, run.x(), run.y(), run.alongX(), false, drawScale, lowDepth, highDepth, atlas);
+                int layer = (run.alongX() ? run.y() : run.x()) > 0 ? BACK_WALL_LAYER : FRONT_WALL_LAYER;
+                add(result, painting, run.x(), run.y(), run.alongX(), false, drawScale, lowDepth, highDepth,
+                    layer, atlas);
             }
             int corners = 0;
+            // The old 50x50 support is backing for a 36x36 junction, not a taller
+            // free-standing corner post. Keep its proportions while fitting that footprint.
+            float cornerScale = corner.scale * Math.min(x.worldThickness, y.worldThickness) / corner.worldThickness;
             for (var p : layout.placements) if (p.wall && p.region.equals("buttress")) {
-                add(result, corner, p.x, p.y, true, true, corner.scale, 0f, 0f, atlas); corners++;
+                add(result, corner, p.x, p.y, true, true, cornerScale, 0f, 0f, CORNER_LAYER, atlas); corners++;
             }
             if (corners != 4 || result.size() > MAX_SCENERY) throw invalid("corner or scenery pool");
             quads = result.toArray(new Quad[0]);
         }
         private void add(ArrayList<Quad> result, Painting painting, float rootX, float rootY,
-                         boolean alongX, boolean fixedDepth, float drawScale, float lowDepth, float highDepth, GameplayAtlas atlas) {
+                         boolean alongX, boolean fixedDepth, float drawScale, float lowDepth, float highDepth,
+                         int layer, GameplayAtlas atlas) {
             for (Piece piece : painting.pieces) {
-                result.add(new Quad(painting, piece, rootX, rootY, alongX, fixedDepth, drawScale, lowDepth, highDepth, atlas));
+                result.add(new Quad(painting, piece, rootX, rootY, alongX, fixedDepth, drawScale, lowDepth, highDepth, layer, atlas));
             }
         }
         public void draw(SpriteBatch batch, int index) {
@@ -159,12 +167,16 @@ public final class PaintedBorderArt {
     public static final class Quad {
         public final Painting painting;
         public final Piece piece;
+        /** Complete boundary planes sort around the interior, never by arbitrary atlas column centres. */
+        public final int renderLayer;
         public final float worldX, worldY, sortDepth, drawScale, minX, minY, maxX, maxY;
         public final float sourceLeft, sourceRight;
         public final float[] vertices = new float[20];
         private Quad(Painting painting, Piece piece, float rootX, float rootY, boolean alongX,
-                     boolean fixedDepth, float drawScale, float lowDepth, float highDepth, GameplayAtlas atlas) {
+                     boolean fixedDepth, float drawScale, float lowDepth, float highDepth,
+                     int layer, GameplayAtlas atlas) {
             this.painting = painting; this.piece = piece;
+            renderLayer = layer;
             this.drawScale = drawScale;
             sourceLeft = piece.coreX; sourceRight = piece.coreX + piece.coreWidth;
             float sourceCenterX = (sourceLeft + sourceRight) * .5f;
@@ -172,11 +184,16 @@ public final class PaintedBorderArt {
             worldX = rootX + (alongX ? along : 0); worldY = rootY + (alongX ? 0 : -along);
             // The small corner painting is backing for the meeting wall ends, not a foreground post.
             float depth = (worldX + worldY) * ISO_Y;
-            float axisPosition = alongX ? worldX - rootX : worldY - rootY;
-            // Atlas cut widths must never decide which of two intersecting wall faces is on top.
-            if (!fixedDepth && Math.abs(axisPosition) > painting.worldLength * .5f - 150f)
-                depth = (axisPosition < 0 ? lowDepth : highDepth) + (alongX ? -1f : 1f);
-            sortDepth = depth + (fixedDepth ? (painting.worldLength + painting.worldThickness) * ISO_Y : 0f);
+            float startAlong = (sourceLeft - painting.pivotX) * drawScale / ISO_X;
+            float endAlong = (sourceRight - painting.pivotX) * drawScale / ISO_X;
+            float minAlong = alongX ? startAlong : -endAlong;
+            float maxAlong = alongX ? endAlong : -startAlong;
+            // Assign the complete overlapping end region, not a storage rectangle's
+            // centre: a narrower final atlas column must not reverse the wall faces.
+            float endRegion = painting.worldLength * .5f - 150f;
+            if (!fixedDepth && (minAlong < -endRegion || maxAlong > endRegion))
+                depth = (minAlong < -endRegion ? lowDepth : highDepth) + (alongX ? -1f : 1f);
+            depth += fixedDepth ? (painting.worldLength + painting.worldThickness) * ISO_Y : 0f;
             float rootScreenX = (rootX - rootY) * ISO_X, rootScreenY = (rootX + rootY) * ISO_Y;
             vertex(0, sourceLeft, piece.coreY + piece.coreHeight, rootScreenX, rootScreenY, atlas);
             vertex(5, sourceLeft, piece.coreY, rootScreenX, rootScreenY, atlas);
@@ -184,6 +201,7 @@ public final class PaintedBorderArt {
             vertex(15, sourceRight, piece.coreY + piece.coreHeight, rootScreenX, rootScreenY, atlas);
             minX = Math.min(vertices[0], vertices[15]); maxX = Math.max(vertices[0], vertices[15]);
             minY = Math.min(vertices[1], vertices[16]); maxY = Math.max(vertices[6], vertices[11]);
+            sortDepth = depth;
         }
         private void vertex(int offset, float sx, float sy, float rootX, float rootY, GameplayAtlas atlas) {
             Painting p = painting; Piece s = piece; var page = atlas.pages[s.page];

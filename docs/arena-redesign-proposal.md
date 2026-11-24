@@ -1,5 +1,73 @@
 # Implemented open crypt arena
 
+## Approved formal layout — 24 November 2026
+
+The user approved the existing-art composition in
+[`art-source/formal-crypt-layout/approved-proposal.png`](../art-source/formal-crypt-layout/approved-proposal.png),
+then requested implementation with corrected gate/altar projection and all four
+corners checked again. This replaces the four landmark clusters and radial paths
+described in the historical integration below.
+
+The fixed 2400×1800 court has one north-wall sealed entrance at (0,870), a
+240-unit-wide processional aisle through the original 600-unit engraved seal,
+and one altar at (0,-660) with guardians at (±250,-670). Two three-tomb rows at
+X=±800, Y=-430/0/430 sit on 320-unit-wide paving bands. Four broken columns at
+(±1020,±610) and two adjoining rubble groups complete the room. All sixteen
+interior props are resident artwork. The centre and broad circulation lanes stay
+open; no new collisions, movement limits, enemies or gameplay rules are added.
+
+The old foundation tile skirt and its exterior walkway are no longer submitted.
+The continuous painted walls are the sole perimeter. Whole-wall scale reaches
+the adjoining outer faces without adding the wall thickness twice. Low corner
+backings fit the 36×36 junctions; cached end-region ordering covers every source
+row at all four corners. Rear north/east walls draw before the complete interior
+pass and front south/west walls draw afterward, with corner backing behind both.
+Storage columns cannot split an actor or cut over a gate upright merely because
+their atlas cuts have different depth anchors.
+
+The gate and altar source paintings had different ground-edge slopes from the
+floor. Measured alpha contours on both axes determine a bounded vertical factor,
+Y shear and corrected ground pivot. Uprights remain vertical. Source PNGs, atlas
+packing and texture dimensions are unchanged; drawing, culling and reveal use
+the same projection. Measurements live in the two `groundProjectionCalibration`
+records in `art-source/crypt-environment-v2/environment.json`.
+
+After reconstructing the historical additive art bank, reapply these final
+metadata-only corrections with:
+
+```sh
+python3 scripts/BakeCryptEnvironment.py --projection-only --output assets/art
+```
+
+The finalizer does not repack pixels or rewrite historical source archives.
+
+### Verification
+
+Explicit JDK 21 desktop compilation and Android debug assembly passed. Focused
+layout, floor-UV/coverage, resident-pixel projection, atlas, corner/plane ordering
+and scenery-reveal checks passed. The metadata finalizer reproduces the corrected
+runtime JSON byte-for-byte; all four resident gameplay PNGs and actor metadata
+remain unchanged.
+
+The installed APK was inspected briefly on the existing Android 33 ARM64
+Television_1080p AVD at 1920×1080. Solo and split-screen captures cover the gate,
+altar, tomb rows, central court and all four corners. The first split-screen check
+exposed a rear-wall storage-column cutting through half a character; the final
+boundary-plane ordering removes that cut. No survival playthrough was performed.
+
+A final five-second quiet split-screen scenery window contained 301 frames:
+interval p95/p99/max 18.96/20.18/20.74 ms; render-callback wall p95 2.90 ms;
+147 of 300 intervals exceeded 16.7 ms and none exceeded 33.4 ms. It used 36 draws.
+GPU timing is unmeasured. Accounted texture residency including QR stayed at
+33,221,452 bytes (31.6824 MiB); retained gameplay Pixmaps stayed at zero.
+This is brief rendering evidence, not sustained physical-TV 60 FPS or a balance
+test. Evidence is ignored under `.run/approved-crypt-layout/`.
+
+The emulator is left at the normal lobby with synthetic controllers closed.
+The saved phone-reachable LAN override and relay/ADB forward remain available.
+
+## Historical integration — 23 November 2026
+
 The 2026-11-23 redesign replaces the sparse legacy prop rows with character-height ruined borders
 and coherent, authored landmark groups. The user chose an OPEN arena: decorations
 remain visual landmarks, with no new collision obstacles or navigation system.
