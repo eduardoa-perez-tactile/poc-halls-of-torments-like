@@ -112,13 +112,22 @@ public final class ResultsSummaryView {
         line.setTouchable(Touchable.disabled); return line;
     }
 
-    private static String outcomeLine(ArenaWorld world) {
-        if (world.outcome == ArenaWorld.Outcome.VICTORY) return "THE HOLLOW SOVEREIGN HAS FALLEN";
+    static String outcomeLine(ArenaWorld world) {
+        if (world.outcome == ArenaWorld.Outcome.VICTORY) return "THE GRAVE KING HAS FALLEN";
         if (world.bossSpawned && world.boss != null && world.boss.maxHealth > 0) {
-            int remaining = Math.max(1, Math.min(100, (int) Math.ceil(world.boss.health / world.boss.maxHealth * 100)));
+            int remaining = remainingHealthPercent(world.boss);
+            return "REACHED THE GRAVE KING  /  " + remaining + "% HEALTH REMAINING";
+        }
+        if (world.sovereignSpawned && world.sovereign != null && world.sovereign.maxHealth > 0) {
+            if (world.sovereignDefeated) return "THE SOVEREIGN FELL  /  THE GRAVE KING AWAITS";
+            int remaining = remainingHealthPercent(world.sovereign);
             return "REACHED THE SOVEREIGN  /  " + remaining + "% HEALTH REMAINING";
         }
         return "THE CRYPT CLAIMS ANOTHER SOUL";
+    }
+
+    private static int remainingHealthPercent(ArenaWorld.Enemy enemy) {
+        return Math.max(1, Math.min(100, (int) Math.ceil((double) enemy.health * 100 / enemy.maxHealth)));
     }
 
     private static String formatTime(float seconds) {

@@ -75,7 +75,10 @@ class PaintedBorderArtTest {
         var scene = art.place(layout, atlas);
         assertEquals(art.x.pieces.length * 2 + art.y.pieces.length * 2 + art.corner.pieces.length * 4, scene.quads.length);
         assertTrue(scene.quads.length <= PaintedBorderArt.MAX_SCENERY);
-        assertEquals(6L * 1_048_576, atlas.textureBytes);
+        long borderPages = 0;
+        for (int i = 0; i < 3; i++) borderPages += (long) atlas.pages[i].width() * atlas.pages[i].height() * 4;
+        assertEquals(6L * 1_048_576, borderPages, "Supplemental actors do not expand the borrowed border pages");
+        assertEquals(0, json("assets/art/painted-borders.json").getLong("addedTextureBytes"));
         for (var painting : new PaintedBorderArt.Painting[]{art.x, art.y}) {
             BufferedImage image = source(painting);
             JsonValue generation = json("assets/art/painted-borders.json").get("paintings").get(painting.name);

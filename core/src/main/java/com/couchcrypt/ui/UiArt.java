@@ -24,16 +24,13 @@ public final class UiArt implements Disposable {
     public static final Color PLAYER_TWO = Color.valueOf("9bc3bb");
     public static final Color BUTTON_INK = Color.valueOf("1d1710");
     public static final Color BUTTON_DISABLED_INK = Color.valueOf("554b3e");
-    // Offline exports keep full-size masters out of GPU residency. Both portrait
-    // pages together cost less than the former 1024x512 full-body page alone.
-    public final Texture heroes = load("art/adventurers-runtime.png");
+    // Approved hero identities are shared by selection, outcomes and Run Details.
+    // The obsolete full-body painting remains in source assets, outside GPU residency.
     public final Texture heroFaces = load("art/hero-portraits.png");
     public final TextureRegion wardenFace = new TextureRegion(heroFaces, 0, 0, heroFaces.getWidth() / 2, heroFaces.getHeight());
     public final TextureRegion rangerFace = new TextureRegion(heroFaces, heroFaces.getWidth() / 2, 0, heroFaces.getWidth() / 2, heroFaces.getHeight());
     public final Texture homeLogo;
     public final MenuSceneArt menuScene;
-    public final TextureRegion knight = new TextureRegion(heroes, 0, 0, heroes.getWidth() / 2, heroes.getHeight());
-    public final TextureRegion ranger = new TextureRegion(heroes, heroes.getWidth() / 2, 0, heroes.getWidth() / 2, heroes.getHeight());
     public final BitmapFont title, heading, section, body, small;
     public final Drawable pixel;
     public final Drawable panel, focusPanel, disabledPanel, scrim, goldLine;
@@ -80,8 +77,7 @@ public final class UiArt implements Disposable {
         NinePatchDrawable exitFocus = patch(focusedButtonTexture, 144, 64, 48, 20);
         exitNormal = new Button.ButtonStyle(exitPlate, exitFocus, exitPlate);
         exitFocused = new Button.ButtonStyle(exitFocus, exitFocus, exitFocus);
-        long bytes = (long) heroes.getWidth() * heroes.getHeight() * 4
-            + (long) heroFaces.getWidth() * heroFaces.getHeight() * 4 + menuScene.textureBytes + fontBank.textureBytes;
+        long bytes = (long) heroFaces.getWidth() * heroFaces.getHeight() * 4 + menuScene.textureBytes + fontBank.textureBytes;
         for (Texture texture : generated) bytes += (long) texture.getWidth() * texture.getHeight() * 4;
         textureBytes = bytes;
         long retained = menuScene.retainedPixmapBytes;
@@ -139,7 +135,7 @@ public final class UiArt implements Disposable {
 
     /** Profiling diagnostic: exercise managed file decoding/upload without replacing GL handles. */
     public void reloadFileTextures() {
-        heroes.load(heroes.getTextureData()); heroFaces.load(heroFaces.getTextureData());
+        heroFaces.load(heroFaces.getTextureData());
         fontBank.reloadFileTextures(); menuScene.reloadFileTextures();
         for (Texture texture : generated)
             if (!(texture.getTextureData() instanceof PixmapTextureData))
@@ -149,7 +145,6 @@ public final class UiArt implements Disposable {
     public Label label(String text, BitmapFont font, Color color) { return new Label(text, new Label.LabelStyle(font, color)); }
     @Override public void dispose() {
         fontBank.dispose();
-        heroes.dispose();
         heroFaces.dispose();
         menuScene.dispose();
         for (Texture texture : generated) texture.dispose();

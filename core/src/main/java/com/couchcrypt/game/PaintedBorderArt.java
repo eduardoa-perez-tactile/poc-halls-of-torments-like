@@ -82,7 +82,8 @@ public final class PaintedBorderArt {
         if (root.getInt("version") != 1 || root.getLong("addedTextureBytes") != 0
             || root.getInt("context") != 1) throw invalid("version or residency contract");
         JsonValue pages = root.require("pages");
-        if (pages.size != atlas.pages.length) throw invalid("shared atlas pages");
+        // Border storage stays on its original three pages; later actor pages are independent.
+        if (pages.size != 3 || atlas.pages.length < 3) throw invalid("shared atlas pages");
         for (int i = 0; i < pages.size; i++) {
             var p = atlas.pages[i]; var s = pages.get(i);
             if (!s.getString("file").equals(p.file()) || s.get("size").getInt(0) != p.width()
