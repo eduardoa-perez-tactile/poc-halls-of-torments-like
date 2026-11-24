@@ -25,8 +25,7 @@ public final class ArenaRenderer implements Disposable {
     private static final float SHADOW_Y = -9f, SHADOW_HEIGHT = 20f;
     private static final float ENVIRONMENT_BASE_HEIGHT = 24f;
     private static final float LEVEL_FX_SCALE = 1.6f, RECOIL_MARGIN = 30f;
-    // Cosmetic foot markers: deliberately independent of gameplay targeting/damage radii.
-    private static final float PLAYER_AURA_RADIUS = 48f, SOUL_PULSE_RADIUS = 60f;
+    private static final float SOUL_PULSE_RADIUS = 60f;
     // Keep the painted cutting trail near the weapon's scale, independent of reach upgrades.
     private static final float WARDEN_SLASH_RADIUS = 48f;
     // Fixed SE/SW/NE/NW release landmarks, in untrimmed source pixels relative to the ground root.
@@ -37,6 +36,7 @@ public final class ArenaRenderer implements Disposable {
     private final GameArt art;
     private final GameHud gameHud;
     private final EnemyRankMarkers rankMarkers;
+    private final PlayerFootRing playerFootRing;
     private final SpriteBatch batch;
     private final ShaderProgram paletteShader;
     private final SoftIris iris;
@@ -72,6 +72,7 @@ public final class ArenaRenderer implements Disposable {
         iris = new SoftIris();
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
         rankMarkers = new EnemyRankMarkers(art.pixel);
+        playerFootRing = new PlayerFootRing(art.pixel);
         floorLayout = new ArenaFloorLayout(new JsonReader().parse(Gdx.files.internal("arena/crypt-floor.json")));
         float radius = floorLayout.medallionDiameter * .5f;
         float[] engraving = EngravedFloorArt.rectangle(floorLayout.centerX - radius, floorLayout.centerY - radius,
@@ -568,16 +569,12 @@ public final class ArenaRenderer implements Disposable {
         drawAura(age, x, y, radius, EnemyAttackArt.Layer.ALL);
     }
 
-    /** A compact cosmetic foot aura; actual targeting range stays in ArenaWorld. */
+    /** Plain participant rings stay tight to the feet and independent of targeting/damage radii. */
     private void drawPlayerAuras(ArenaWorld world, OrthographicCamera camera) {
         for (ArenaWorld.Player player : world.players) {
             if (!player.active || !player.alive) continue;
-            float radius = PLAYER_AURA_RADIUS;
-            if (!visible(camera, player.x, player.y, radius)) continue;
-            participantTint(player.slot, .9f);
-            float phase = world.elapsed % art.spriteEffects.duration(SpriteEffectArt.Type.TARGET)
-                / art.spriteEffects.duration(SpriteEffectArt.Type.TARGET);
-            groundSprite(SpriteEffectArt.Type.TARGET, phase, player.x, player.y, radius, 0, SpriteEffectArt.Layer.ALL);
+            if (!visible(camera, player.x, player.y, PlayerFootRing.RADIUS)) continue;
+            playerFootRing.draw(batch, screenX(player.x, player.y), screenY(player.x, player.y), player.slot);
         }
         batch.setColor(Color.WHITE);
     }
