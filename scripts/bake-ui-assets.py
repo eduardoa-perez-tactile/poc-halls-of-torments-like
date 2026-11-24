@@ -52,11 +52,25 @@ def main():
     manifest = json.loads((args.output / 'manifest.json').read_text())
     for name, info in manifest['outputs'].items():
         path = (args.phone_output / Path(name).name if info.get('file', '').startswith('web/art/') else args.output / Path(info.get('file', name)).name)
-        assert hashlib.sha256(path.read_bytes()).hexdigest() == info['pngSha256'], name
+        expected = info.get('pngSha256', info.get('fileSha256'))
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == expected, name
         if 'rgbaSha256' in info:
-            image = Image.open(path).convert('RGBA')
-            assert image.size == (info['width'], info['height']), name
-            assert hashlib.sha256(image.tobytes()).hexdigest() == info['rgbaSha256'], name
+            if path.suffix == '.zktx':
+                import gzip, struct
+                raw = gzip.decompress(path.read_bytes())
+                assert struct.unpack('>I', raw[:4])[0] == len(raw) - 4, name
+                ktx = raw[4:]
+                assert ktx[:12] == b'\xabKTX 11\xbb\r\n\x1a\n', name
+                fields = struct.unpack('<13I', ktx[12:64])
+                assert fields == (0x04030201, 0x1401, 1, 0x1908, 0x1908, 0x1908,
+                                  info['width'], info['height'], 0, 0, 1, 1, 0), name
+                assert struct.unpack('<I', ktx[64:68])[0] == info['width'] * info['height'] * 4, name
+                pixels = ktx[68:]
+            else:
+                image = Image.open(path).convert('RGBA')
+                assert image.size == (info['width'], info['height']), name
+                pixels = image.tobytes()
+            assert hashlib.sha256(pixels).hexdigest() == info['rgbaSha256'], name
     print(f"Verified {len(manifest['outputs'])} pixel/PNG exports against original in-memory LibGDX outputs.")
 
 

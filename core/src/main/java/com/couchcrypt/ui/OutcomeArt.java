@@ -27,8 +27,8 @@ public final class OutcomeArt implements Disposable {
 
         public Titles() {
             try {
-                textures[0] = loadTitle("art/runtime-ui/victory-title.png");
-                textures[1] = loadTitle("art/runtime-ui/defeat-title.png");
+                textures[0] = loadTitle("art/runtime-ui/victory-title.zktx");
+                textures[1] = loadTitle("art/runtime-ui/defeat-title.zktx");
             } catch (RuntimeException | Error failure) {
                 dispose();
                 throw failure;
@@ -43,7 +43,7 @@ public final class OutcomeArt implements Disposable {
         private static Texture loadTitle(String path) {
             Texture loaded = new Texture(Gdx.files.internal(path), false);
             try {
-                if (loaded.getWidth() != TITLE_WIDTH || loaded.getHeight() != TITLE_HEIGHT)
+                if (!loaded.isManaged() || loaded.getWidth() != TITLE_WIDTH || loaded.getHeight() != TITLE_HEIGHT || loaded.getTextureData().isPrepared())
                     throw new GdxRuntimeException("Outcome title must retain its fixed 1024x256 layout: " + path);
                 loaded.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
                 return loaded;

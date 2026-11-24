@@ -32,6 +32,9 @@ public final class BakedUiFonts implements Disposable {
             for (JsonValue file = pageFiles.child; file != null; file = file.next) {
                 Texture texture = new Texture(Gdx.files.internal(DIRECTORY + file.asString()), false);
                 pages.add(texture);
+                if (!texture.isManaged() || texture.getWidth() != 1024 || texture.getHeight() != 1024
+                    || texture.getTextureData().isPrepared())
+                    throw new IllegalArgumentException("Baked font page must release its fixed 1024x1024 upload data");
                 texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
                 regions.add(new TextureRegion(texture));
                 bytes += (long) texture.getWidth() * texture.getHeight() * 4;

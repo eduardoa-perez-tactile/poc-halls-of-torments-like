@@ -61,7 +61,7 @@ public final class BakeUiAssets {
             List<String> pages = new ArrayList<>();
             for (int i = 0; i < packer.getPages().size; i++) {
                 String name = "font-page-" + i + ".png";
-                png(name, packer.getPages().get(i).getPixmap()); pages.add(name);
+                png(name, packer.getPages().get(i).getPixmap()); pages.add(name.replace(".png", ".zktx"));
             }
             Map<String, Object> fonts = new LinkedHashMap<>();
             for (String name : List.of("title", "heading", "section", "body", "small"))
@@ -173,14 +173,28 @@ public final class BakeUiAssets {
     }
     private static Pixmap pixels(Texture texture) { return texture.getTextureData().consumePixmap(); }
     private static void png(String name, Pixmap pixels) throws Exception {
-        PixmapIO.PNG encoder = new PixmapIO.PNG(128 * 1024);
-        encoder.setFlipY(false); encoder.setCompression(4);
-        try (var out = Files.newOutputStream(output.resolve(name))) { encoder.write(out, pixels); }
-        finally { encoder.dispose(); }
         ByteBuffer source = pixels.getPixels().duplicate(); source.position(0);
         byte[] rgba = new byte[pixels.getWidth() * pixels.getHeight() * 4]; source.get(rgba);
-        outputs.put(name, Map.of("width", pixels.getWidth(), "height", pixels.getHeight(),
-            "rgbaSha256", sha(rgba), "pngSha256", sha(Files.readAllBytes(output.resolve(name)))));
+        // Four PNGs are also HTTP assets. The TV uses lossless ready-to-upload RGBA KTX.
+        if (Set.of("panel.png", "button.png", "button-focused.png", "skill-icons.png").contains(name)) {
+            PixmapIO.PNG encoder = new PixmapIO.PNG(128 * 1024);
+            encoder.setFlipY(false); encoder.setCompression(4);
+            try (var out = Files.newOutputStream(output.resolve(name))) { encoder.write(out, pixels); }
+            finally { encoder.dispose(); }
+            outputs.put(name, Map.of("width", pixels.getWidth(), "height", pixels.getHeight(),
+                "rgbaSha256", sha(rgba), "pngSha256", sha(Files.readAllBytes(output.resolve(name)))));
+        }
+        ByteBuffer ktx = ByteBuffer.allocate(68 + rgba.length).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        ktx.put(new byte[]{(byte) 0xab,0x4b,0x54,0x58,0x20,0x31,0x31,(byte) 0xbb,0x0d,0x0a,0x1a,0x0a});
+        ktx.putInt(0x04030201).putInt(0x1401).putInt(1).putInt(0x1908).putInt(0x1908).putInt(0x1908);
+        ktx.putInt(pixels.getWidth()).putInt(pixels.getHeight()).putInt(0).putInt(0).putInt(1).putInt(1).putInt(0);
+        ktx.putInt(rgba.length).put(rgba);
+        String packed = name.replace(".png", ".zktx");
+        try (var out = new java.io.DataOutputStream(new java.util.zip.GZIPOutputStream(Files.newOutputStream(output.resolve(packed))))) {
+            out.writeInt(ktx.capacity()); out.write(ktx.array());
+        }
+        outputs.put(packed, Map.of("width", pixels.getWidth(), "height", pixels.getHeight(),
+            "rgbaSha256", sha(rgba), "fileSha256", sha(Files.readAllBytes(output.resolve(packed)))));
     }
     private static String sha(byte[] bytes) throws Exception {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));

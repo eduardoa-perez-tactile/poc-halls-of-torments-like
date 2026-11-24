@@ -18,9 +18,9 @@ public final class BuildIcons implements Disposable {
 
     public BuildIcons() {
         if (regions.length != 12) throw new IllegalStateException("Skill icon atlas requires twelve upgrades");
-        Texture loaded = new Texture(Gdx.files.internal("art/runtime-ui/skill-icons.png"), false);
+        Texture loaded = new Texture(Gdx.files.internal("art/runtime-ui/skill-icons.zktx"), false);
         try {
-            if (loaded.getWidth() != WIDTH || loaded.getHeight() != HEIGHT)
+            if (!loaded.isManaged() || loaded.getWidth() != WIDTH || loaded.getHeight() != HEIGHT || loaded.getTextureData().isPrepared())
                 throw new IllegalStateException("Skill icon atlas must retain its fixed 512x384 layout");
             loaded.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
             for (int i = 0; i < regions.length; i++)
