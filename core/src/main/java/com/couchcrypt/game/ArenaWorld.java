@@ -71,6 +71,7 @@ public final class ArenaWorld {
     private final float[] inputX = new float[2], inputY = new float[2];
     private final boolean[] pendingDodge = new boolean[2];
     private float accumulator, spawnCountdown;
+    private ActorAnimation.Facing debugSizingFacing;
     private double simulationElapsed;
     private int sharedXpRemainder;
     private int randomState, runNumber, nextCheckpoint, encounterPhase, enemySpawnSerial;
@@ -105,6 +106,7 @@ public final class ArenaWorld {
         wraithDashes = bruteSlams = hostileShotsFired = 0;
         spawnCountdown = .65f;
         runSeed = 0x5a17c9e3 ^ (++runNumber * 0x45d9f3b); randomState = runSeed;
+        debugSizingFacing = null;
         progression.reset(); equipment.reset();
         for (Player p : players) {
             p.active = p.alive = false; p.x = p.y = p.walkTime = p.reviveProgress = 0;
@@ -425,7 +427,7 @@ public final class ArenaWorld {
                 e.facingX = e.castFacingX; e.facingY = e.castFacingY;
                 updateEnemyAttack(e);
             } else {
-                faceTarget(e, target);
+                if (debugSizingFacing == null || e.stunTime <= 0) faceTarget(e, target);
                 if (isBoss(e.kind)) {
                     e.encounterPhase = e.health <= e.maxHealth * .5f ? 2 : 1;
                     if (e.kind == EnemyKind.BOSS) bossPhase = e.encounterPhase;
@@ -494,8 +496,8 @@ public final class ArenaWorld {
             case BRUTE_SLAM -> {
                 e.attackCooldown = BRUTE_ATTACK_COOLDOWN; e.attackRadius = BRUTE_SLAM_RADIUS;
                 ActorAnimation.Facing facing = ActorAnimation.facing(e.castFacingX, e.castFacingY, ActorAnimation.Facing.SE);
-                e.attackTargetX = e.x + EnemyAttackGeometry.bruteSlamX(facing, e.elite);
-                e.attackTargetY = e.y + EnemyAttackGeometry.bruteSlamY(facing, e.elite);
+                e.attackTargetX = e.x + EnemyAttackGeometry.bruteSlamX(facing, e.variant, e.elite);
+                e.attackTargetY = e.y + EnemyAttackGeometry.bruteSlamY(facing, e.variant, e.elite);
             }
             case CULTIST_CAST -> e.attackCooldown = CULTIST_ATTACK_COOLDOWN;
             default -> { }
@@ -669,6 +671,8 @@ public final class ArenaWorld {
             float distance = length(dx, dy); shot.active = true; shot.x = caster.x; shot.y = caster.y; shot.age = 0;
             // Value snapshots survive caster death and enemy-pool reuse; only drawing reads them.
             shot.casterKind = caster.kind; shot.casterElite = caster.elite;
+            shot.casterVariant = caster.variant;
+            shot.casterRenderScale = EnemySizing.renderScale(caster.kind, caster.variant, caster.elite);
             shot.launchFacingX = caster.castFacingX; shot.launchFacingY = caster.castFacingY;
             shot.vx = dx / distance * speed; shot.vy = dy / distance * speed;
             shot.ttl = 5; shot.damage = damage; shot.radius = 10; hostileShotsFired++; return;
@@ -778,7 +782,7 @@ public final class ArenaWorld {
     private static void impact(Effect fx, Enemy enemy, float actual, boolean critical) {
         if (fx == null) return;
         fx.radius = enemy.radius; fx.amount = actual; fx.critical = critical;
-        fx.enemyKind = enemy.kind; fx.elite = enemy.elite;
+        fx.enemyKind = enemy.kind; fx.elite = enemy.elite; fx.enemyVariant = enemy.variant;
         fx.dirX = enemy.hitDirectionX; fx.dirY = enemy.hitDirectionY;
     }
 
@@ -873,7 +877,8 @@ public final class ArenaWorld {
         if (anchor == null) return null;
         for (Enemy e : enemies) {
             if (e.active) continue;
-            e.radius = isBoss(kind) ? 54 : kind == EnemyKind.BRUTE ? 31 : kind == EnemyKind.WRAITH ? 17 : 20;
+            EnemyVariant variant = EnemyVariant.forSpawn(kind, runSeed, enemySpawnSerial);
+            e.radius = EnemySizing.groundRadius(kind, variant, elite);
             boolean safe = false;
             for (int attempt = 0; attempt < 12 && !safe; attempt++) {
                 float direction = angle + attempt * 2.3999632f;
@@ -885,7 +890,7 @@ public final class ArenaWorld {
             }
             if (!safe) return null; // Skip a reinforcement rather than materializing on either player.
             e.kind = kind; e.elite = elite;
-            e.variant = EnemyVariant.forSpawn(kind, runSeed, enemySpawnSerial++);
+            e.variant = variant; enemySpawnSerial++;
             e.soulPercent = timeline.isFullRun() && livingPlayerCount() > 1 ? 82 : 100;
             float health = switch (kind) { case WRAITH -> 18; case BRUTE -> 95; case CULTIST -> 35; case BOSS -> 1100; case SOVEREIGN -> 450; default -> 32; };
             ArenaTimeline.Phase phase = timeline.phase(timeline.phaseIndex(elapsed));
@@ -914,6 +919,7 @@ public final class ArenaWorld {
     /** Profile-only scenery inspection: preserve the run/build while giving the camera a quiet view. */
     public void debugSceneryView(float x, float y) {
         if (outcome != Outcome.RUNNING || choicePending()) return;
+        debugSizingFacing = null;
         for (Enemy enemy : enemies) enemy.active = false;
         for (Bolt bolt : bolts) bolt.active = false;
         for (Shot shot : shots) shot.active = false;
@@ -927,6 +933,64 @@ public final class ArenaWorld {
             player.y = clamp(y, -HALF_HEIGHT + PLAYER_RADIUS, HALF_HEIGHT - PLAYER_RADIUS);
             player.invulnerable = 0f; // The cleared, quiet scene needs no blinking inspection shield.
         }
+    }
+
+    /** Profile-only size proof: four species, each Original / variant / elite, with a hero reference. */
+    public void debugEnemySizeLineup(ActorAnimation.Facing facing) {
+        if (outcome != Outcome.RUNNING || choicePending() || bossSpawned || activePlayerCount() == 0) return;
+        debugSceneryView(0, 0);
+        debugSizingFacing = facing; spawnCountdown = 30;
+        float dx = facing == ActorAnimation.Facing.NE ? 1 : facing == ActorAnimation.Facing.SW ? -1 : 0;
+        float dy = facing == ActorAnimation.Facing.NW ? 1 : facing == ActorAnimation.Facing.SE ? -1 : 0;
+        Player anchor = players[0].active && players[0].alive ? players[0] : players[1];
+        for (Player player : players) if (player.active && player.alive) {
+            player.health = equipment.maxHealth(player); player.attackCooldown = player.auraCooldown = player.stormCooldown = 30;
+            player.facingX = dx; player.facingY = dy; resetPresentation(player);
+        }
+        for (int i = 0; i < 12; i++) {
+            int column = i % 4, row = i / 4;
+            EnemyKind kind = column == 0 ? EnemyKind.GHOUL : column == 1 ? EnemyKind.WRAITH
+                : column == 2 ? EnemyKind.CULTIST : EnemyKind.BRUTE;
+            EnemyVariant variant = row == 0 ? EnemyVariant.ORIGINAL
+                : kind == EnemyKind.GHOUL || kind == EnemyKind.BRUTE ? EnemyVariant.MOSS : EnemyVariant.DUSK;
+            Enemy e = spawnSizingFixture(kind, variant, row == 2, anchor);
+            if (e == null) continue;
+            float sx = -330 + column * 220, sy = -210 + row * 150;
+            e.x = .5f * (sx / .70710678f + sy / .35355339f);
+            e.y = .5f * (sy / .35355339f - sx / .70710678f);
+            e.health = e.maxHealth = 600; e.stunTime = e.attackCooldown = 30; e.spawnAge = 1;
+            e.facingX = e.castFacingX = dx; e.facingY = e.castFacingY = dy;
+        }
+        clearInputs();
+    }
+
+    /** Profile-only real elite cast; no historical waves or long survival fast-forward. */
+    public void debugSizedCultistAttack(ActorAnimation.Facing facing) {
+        if (outcome != Outcome.RUNNING || choicePending() || bossSpawned || activePlayerCount() == 0) return;
+        debugSceneryView(0, 0);
+        float dx = facing == ActorAnimation.Facing.NE ? 1 : facing == ActorAnimation.Facing.SW ? -1 : 0;
+        float dy = facing == ActorAnimation.Facing.NW ? 1 : facing == ActorAnimation.Facing.SE ? -1 : 0;
+        Player anchor = players[0].active && players[0].alive ? players[0] : players[1];
+        for (Player player : players) if (player.active && player.alive) {
+            player.health = equipment.maxHealth(player); player.invulnerable = 0;
+            player.attackCooldown = player.auraCooldown = player.stormCooldown = 30;
+        }
+        Enemy e = spawnSizingFixture(EnemyKind.CULTIST, EnemyVariant.ORIGINAL, true, anchor);
+        if (e != null) {
+            e.x = anchor.x - dx * 300; e.y = anchor.y - dy * 300;
+            e.health = e.maxHealth = 600; e.attackCooldown = 0; e.spawnAge = 1;
+            faceTarget(e, anchor);
+        }
+        clearInputs();
+    }
+
+    private Enemy spawnSizingFixture(EnemyKind kind, EnemyVariant variant, boolean elite, Player anchor) {
+        for (int attempt = 0; attempt < 64; attempt++) {
+            Enemy enemy = spawn(kind, elite, anchor, 0);
+            if (enemy == null || enemy.variant == variant) return enemy;
+            enemy.active = false; activeEnemies--;
+        }
+        return null;
     }
 
     /** Profile-only close combat fixture for brief sprite capture; normal encounters never use it. */
@@ -1080,6 +1144,7 @@ public final class ArenaWorld {
             e.active = true; e.kind = kind; e.x = x; e.y = y; e.x2 = x; e.y2 = y;
             e.angle = e.radius = e.sweep = e.dirX = e.dirY = e.amount = e.projectileFacingX = e.projectileFacingY = 0;
             e.critical = e.heroHit = e.healing = e.elite = false; e.enemyKind = null;
+            e.enemyVariant = EnemyVariant.ORIGINAL;
             e.impactKind = ImpactKind.MAGIC;
             e.ttl = e.maxTtl = duration; e.owner = owner; return e;
         }
@@ -1145,6 +1210,8 @@ public final class ArenaWorld {
     public static final class Shot {
         public boolean active, casterElite;
         public EnemyKind casterKind;
+        public EnemyVariant casterVariant = EnemyVariant.ORIGINAL;
+        public float casterRenderScale = 1f;
         public float x, y, vx, vy, ttl, age, damage, radius, launchFacingX, launchFacingY;
     }
     public static final class Hazard { public boolean active; public float x, y, radius, warning, ttl, damage; }
@@ -1156,5 +1223,6 @@ public final class ArenaWorld {
         public ImpactKind impactKind = ImpactKind.MAGIC;
         public boolean critical, heroHit, healing, elite;
         public EnemyKind enemyKind;
+        public EnemyVariant enemyVariant = EnemyVariant.ORIGINAL;
     }
 }

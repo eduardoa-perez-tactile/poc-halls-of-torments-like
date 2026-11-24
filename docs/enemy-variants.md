@@ -1,5 +1,11 @@
 # Enemy variants
 
+The later approved [size and rank hierarchy](enemy-size-hierarchy.md) adds shared
+body/footprint sizing, a bone chevron for durable Moss/Dusk variants, and a crimson
+double down-chevron with live health for elites. These cues replace the old small body scales
+and violet elite aura. The following variant statistics and material palettes
+remain unchanged.
+
 The 24 November variants reuse all existing enemy frames and attacks. Original
 enemies retain their base stats. Ghoul/Brute also spawn as Moss or Frost;
 Wraith/Cultist also spawn as Ember or Dusk. The Hollow Sovereign stays Original.
