@@ -20,6 +20,7 @@ public final class GameArt implements Disposable {
     public final long retainedPixmapBytes = 0;
     private final Texture[] pages;
     private final TextureRegion[] frames;
+    private final TextureRegion[][] materialFrames;
 
     public GameArt() {
         metadata = new GameplayAtlas(new JsonReader().parse(Gdx.files.internal("art/gameplay.json")));
@@ -45,9 +46,12 @@ public final class GameArt implements Disposable {
             groundPages[pages.length] = borders.sharedTexture();
             engravedFloor = new EngravedFloorArt(new JsonReader().parse(Gdx.files.internal("art/engraved-floor.json")), metadata, groundPages);
             frames = new TextureRegion[metadata.frames.length];
+            materialFrames = new TextureRegion[2][metadata.frames.length];
             for (int i = 0; i < frames.length; i++) {
                 GameplayAtlas.Frame frame = metadata.frames[i];
                 frames[i] = new TextureRegion(pages[frame.page], frame.x, frame.y, frame.width, frame.height);
+                materialFrames[0][i] = EnemyPalette.region(frames[i], EnemyVariant.FROST);
+                materialFrames[1][i] = EnemyPalette.region(frames[i], EnemyVariant.DUSK);
             }
             shadow = region("shadow"); glow = region("glow"); pixel = region("white"); soul = region("soul");
         } catch (RuntimeException | Error failure) {
@@ -57,6 +61,10 @@ public final class GameArt implements Disposable {
     }
 
     public TextureRegion frame(int index) { return frames[index]; }
+    public TextureRegion frame(int index, EnemyVariant variant) {
+        return variant == EnemyVariant.FROST ? materialFrames[0][index]
+            : variant == EnemyVariant.DUSK ? materialFrames[1][index] : frames[index];
+    }
     public GameplayAtlas.Actor actor(ActorAnimation.Actor actor) { return metadata.actors[actor.ordinal()]; }
     public GameplayAtlas.Region environment(String name) {
         GameplayAtlas.Region region = metadata.regions.get(name);

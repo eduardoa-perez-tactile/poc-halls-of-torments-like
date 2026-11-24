@@ -1,6 +1,10 @@
 # Gameplay art integration
 
-The 24 November enemy-colour pass keeps each regular enemy's original paint and
+The current [enemy variants](enemy-variants.md) add gameplay stat roles,
+material-selective Frost/Dusk recolouring and brighter ground attack warnings.
+They supersede the initial whole-body Frost/Dusk tints described below.
+
+The initial 24 November enemy-colour pass keeps each regular enemy's original paint and
 adds two cosmetic appearances: Moss/Frost for Ghoul and Brute, Ember/Dusk for
 Wraith and Cultist. These eight extra appearances use `EnemyVariant` RGB
 multipliers in the existing sprite batch, including authored attacks and Wraith

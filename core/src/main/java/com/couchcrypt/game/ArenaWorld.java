@@ -855,11 +855,13 @@ public final class ArenaWorld {
             } else if (timeline.isFullRun()) {
                 health *= phase.healthMultiplier() * (1 + .2f * (livingPlayerCount() - 1));
             } else health *= 1 + Math.min(elapsed / durationSeconds(), 1) * .2f;
-            e.maxHealth = e.health = health * (elite ? 4 : 1);
+            // Spawn from base values every time, so reused slots cannot compound an old variant's stats.
+            e.maxHealth = e.health = health * (elite ? 4 : 1) * e.variant.healthMultiplier;
             e.damage = kind == EnemyKind.BOSS ? 20 : kind == EnemyKind.BRUTE ? 18 : kind == EnemyKind.WRAITH ? 8 : 12;
             if (timeline.isFullRun() && kind != EnemyKind.BOSS) e.damage *= phase.damageMultiplier();
-            e.speedMultiplier = timeline.isFullRun() && kind != EnemyKind.BOSS
-                ? 1 + .2f * Math.min(elapsed / durationSeconds(), 1) : 1;
+            e.damage *= e.variant.damageMultiplier;
+            e.speedMultiplier = (timeline.isFullRun() && kind != EnemyKind.BOSS
+                ? 1 + .2f * Math.min(elapsed / durationSeconds(), 1) : 1) * e.variant.speedMultiplier;
             e.animTime = random(); e.hitFlash = e.vx = e.vy = e.stunTime = e.windup = 0; e.attackCooldown = kind == EnemyKind.BOSS ? 1.5f : 1;
             resetPresentation(e); faceTarget(e, anchor);
             e.spawnAge = 0;

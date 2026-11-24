@@ -13,6 +13,7 @@ public final class EnemyAttackArt {
     public final long textureBytes = 0, retainedPixmapBytes = 0;
     private final Metadata metadata;
     private final Part[][] parts;
+    private final Part[][] materialActors;
 
     public EnemyAttackArt(Texture[] pages) {
         metadata = new Metadata(new JsonReader().parse(Gdx.files.internal("art/enemy-attacks.json")));
@@ -21,13 +22,21 @@ public final class EnemyAttackArt {
             if (pages[i] == null || pages[i].getWidth() != metadata.pageWidths[i]
                 || pages[i].getHeight() != metadata.pageHeights[i]) throw invalid("shared page dimensions");
         parts = new Part[metadata.frames.length][Layer.values().length];
+        materialActors = new Part[2][metadata.frames.length];
         for (int i = 0; i < parts.length; i++) {
             Frame f = metadata.frames[i];
             int back = Math.max(0, Math.min(f.height, (int) Math.floor(f.pivotY) - f.top));
             parts[i][Layer.ALL.ordinal()] = part(pages[f.page], f, 0, f.height);
             parts[i][Layer.BACK.ordinal()] = part(pages[f.page], f, 0, back);
             parts[i][Layer.FRONT.ordinal()] = part(pages[f.page], f, back, f.height - back);
+            Part body = parts[i][Layer.ALL.ordinal()];
+            materialActors[0][i] = materialPart(body, EnemyVariant.FROST);
+            materialActors[1][i] = materialPart(body, EnemyVariant.DUSK);
         }
+    }
+
+    private static Part materialPart(Part source, EnemyVariant variant) {
+        return new Part(EnemyPalette.region(source.region, variant), source.left, source.bottom, source.width, source.height);
     }
 
     private static Part part(Texture texture, Frame f, int skip, int height) {
@@ -47,7 +56,15 @@ public final class EnemyAttackArt {
 
     public void drawActor(SpriteBatch batch, ArenaWorld.EnemyKind kind, ActorAnimation.Facing facing,
                           float age, float x, float y, float scale) {
-        draw(batch, actor(kind).clips[facing.ordinal()].sample(age, false), x, y, scale, Layer.ALL);
+        drawActor(batch, kind, facing, age, x, y, scale, EnemyVariant.ORIGINAL);
+    }
+
+    public void drawActor(SpriteBatch batch, ArenaWorld.EnemyKind kind, ActorAnimation.Facing facing,
+                          float age, float x, float y, float scale, EnemyVariant variant) {
+        int index = actor(kind).clips[facing.ordinal()].sample(age, false);
+        Part p = variant == EnemyVariant.FROST ? materialActors[0][index]
+            : variant == EnemyVariant.DUSK ? materialActors[1][index] : parts[index][Layer.ALL.ordinal()];
+        batch.draw(p.region, x + p.left * scale, y + p.bottom * scale, p.width * scale, p.height * scale);
     }
 
     public void drawAura(SpriteBatch batch, float age, float x, float y, float scale, Layer layer) {
