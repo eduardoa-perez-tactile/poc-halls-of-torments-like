@@ -10,9 +10,8 @@ public final class HudArt implements Disposable {
     public static final int ORB_SIZE = 128, BLOOD_INSET = 21, BLOOD_SIZE = 86;
     public static final int WIDTH = 512, HEIGHT = 352;
     // Bottom-left coordinates inside the 512x96 boss-frame canvas. Fill sits behind its alpha opening.
-    public static final float BOSS_TRACK_X = 101f, BOSS_TRACK_Y = 33f;
-    public static final float BOSS_TRACK_WIDTH = 350f, BOSS_TRACK_HEIGHT = 18f;
-    public static final float BOSS_TITLE_X = 276f, BOSS_TITLE_Y = 84f;
+    public static final float BOSS_TRACK_X = 30f, BOSS_TRACK_Y = 34f;
+    public static final float BOSS_TRACK_WIDTH = 452f, BOSS_TRACK_HEIGHT = 28f;
     public final long textureBytes = (long) WIDTH * HEIGHT * 4;
     public final long retainedPixmapBytes = 0; // File-backed managed texture restores from the small PNG.
     public final TextureRegion orbBack, orbBlood, orbReflection, orbGold, orbTeal, lowHealthGlow;
