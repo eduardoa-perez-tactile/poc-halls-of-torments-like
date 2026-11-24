@@ -1,5 +1,22 @@
 # Gameplay art integration
 
+The 24 November enemy-colour pass keeps each regular enemy's original paint and
+adds two cosmetic appearances: Moss/Frost for Ghoul and Brute, Ember/Dusk for
+Wraith and Cultist. These eight extra appearances use `EnemyVariant` RGB
+multipliers in the existing sprite batch, including authored attacks and Wraith
+dash ghosts. The boss retains its original palette; elite cues, damage flashes,
+telegraphs, projectiles and combat rules retain their existing behaviour. Each
+successful spawn assigns a stable palette from a separate cosmetic hash, without
+consuming combat randomness or tying colours to reusable enemy-pool slots. Reset
+clears palettes. This pass adds no textures, decoded Pixmaps, shaders or draw calls.
+JDK 21 desktop compilation, Android debug assembly and 20 focused existing
+animation/attack/feedback tests passed. A five-second co-op art fixture confirmed
+mixed palettes in both cameras and unchanged accounted texture use of 32,467,788
+bytes (30.96 MiB, including QR). Its 300 measured frame intervals had p95/p99/max
+18.13/19.23/20.83 ms; 131 exceeded 16.7 ms. This is a brief emulator rendering
+check, not evidence of sustained physical-TV performance. Local review media and
+logs are under ignored `.run/enemy-variants*`.
+
 The latest [engraved floor pass](engraved-crypt-floor.md) appends original paving,
 path and medallion materials into guarded spare areas of four existing pages,
 without texture growth. Run its baker after the painted border stage. Earlier

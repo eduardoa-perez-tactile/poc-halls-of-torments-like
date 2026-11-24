@@ -73,7 +73,7 @@ public final class ArenaWorld {
     private float accumulator, spawnCountdown;
     private double simulationElapsed;
     private int sharedXpRemainder;
-    private int randomState, runNumber, nextCheckpoint, encounterPhase;
+    private int randomState, runNumber, nextCheckpoint, encounterPhase, enemySpawnSerial;
     private int presentedChoiceRound;
     private Diagnostics diagnostics, diagnosticsStorage;
 
@@ -96,7 +96,7 @@ public final class ArenaWorld {
         lastUpdateSteps = 0;
         if (diagnosticsStorage != null) diagnosticsStorage.reset();
         outcome = Outcome.RUNNING; elapsed = accumulator = 0; simulationElapsed = 0; sharedXpRemainder = 0;
-        kills = souls = activeEnemies = elitesKilled = nextCheckpoint = encounterPhase = 0;
+        kills = souls = activeEnemies = elitesKilled = nextCheckpoint = encounterPhase = enemySpawnSerial = 0;
         wave = bossPhase = 1; bossSpawned = bossDefeated = false; boss = null;
         levelUpFxAge = 2; presentedChoiceRound = 0;
         swordSwings = arrowsFired = enemyDeaths = pickupsCollected = heroHits = 0;
@@ -113,7 +113,7 @@ public final class ArenaWorld {
             resetPresentation(p);
             inputX[p.slot] = inputY[p.slot] = 0; pendingDodge[p.slot] = false;
         }
-        for (Enemy e : enemies) { e.active = false; resetPresentation(e); }
+        for (Enemy e : enemies) { e.active = false; e.variant = EnemyVariant.ORIGINAL; resetPresentation(e); }
         for (Bolt b : bolts) b.active = false;
         for (Pickup p : pickups) p.active = false;
         for (Shot s : shots) s.active = false;
@@ -845,6 +845,7 @@ public final class ArenaWorld {
             }
             if (!safe) return null; // Skip a reinforcement rather than materializing on either player.
             e.kind = kind; e.elite = elite;
+            e.variant = EnemyVariant.forSpawn(kind, runSeed, enemySpawnSerial++);
             e.soulPercent = timeline.isFullRun() && livingPlayerCount() > 1 ? 82 : 100;
             float health = switch (kind) { case WRAITH -> 18; case BRUTE -> 95; case CULTIST -> 35; case BOSS -> 1100; default -> 32; };
             ArenaTimeline.Phase phase = timeline.phase(timeline.phaseIndex(elapsed));
@@ -1050,6 +1051,7 @@ public final class ArenaWorld {
         public int attackHitMask;
         private float dashDistance;
         public EnemyKind kind = EnemyKind.GHOUL;
+        public EnemyVariant variant = EnemyVariant.ORIGINAL;
         public int soulPercent = 100;
         public float x, y, health, maxHealth, animTime, hitFlash, vx, vy;
         public float hitDirectionX, hitDirectionY;
