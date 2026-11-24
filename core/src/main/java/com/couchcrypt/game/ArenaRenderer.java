@@ -25,6 +25,8 @@ public final class ArenaRenderer implements Disposable {
     private static final float SHADOW_Y = -9f, SHADOW_HEIGHT = 20f;
     private static final float ENVIRONMENT_BASE_HEIGHT = 24f;
     private static final float LEVEL_FX_SCALE = 1.6f, RECOIL_MARGIN = 30f;
+    // Cosmetic foot markers: deliberately independent of gameplay targeting/damage radii.
+    private static final float PLAYER_AURA_RADIUS = 48f, SOUL_PULSE_RADIUS = 60f;
     // Fixed SE/SW/NE/NW release landmarks, in untrimmed source pixels relative to the ground root.
     // Only the rendered origin moves; the simulation keeps its original projectile coordinates and trajectory.
     private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
@@ -116,9 +118,12 @@ public final class ArenaRenderer implements Disposable {
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
             art.engravedFloor.draw(batch, medallion);
-            drawHazards(world, camera);
-            drawAttackRanges(world, camera);
-            drawGroundMarks(world, camera);
+            // All floor effects precede the complete depth-sorted actor pass. Their painted
+            // foreground rims must never be laid over a closer enemy or the player's body.
+            drawHazards(world, camera, SpriteEffectArt.Layer.ALL);
+            drawPlayerAuras(world, camera);
+            drawGroundMarks(world, camera, SpriteEffectArt.Layer.ALL);
+            drawFootEffects(world, camera);
             drawPickups(world, camera);
             drawDust(world, camera);
             if (metrics != null) {
@@ -491,56 +496,38 @@ public final class ArenaRenderer implements Disposable {
         art.projectiles.draw(batch, type, age, x, y, scale, angle);
     }
 
-    private void drawHazards(ArenaWorld world, OrthographicCamera camera) {
+    private void drawHazards(ArenaWorld world, OrthographicCamera camera, SpriteEffectArt.Layer layer) {
         for (ArenaWorld.Hazard hazard : world.hazards) {
             if (!hazard.active || !visible(camera, hazard.x, hazard.y, hazard.radius + 50f)) continue;
-            float x = screenX(hazard.x, hazard.y), y = screenY(hazard.x, hazard.y);
             if (hazard.warning > 0f) {
                 float progress = Math.max(0f, Math.min(1f, 1f - hazard.warning));
-                batch.setColor(1f, .4f, .08f, .1f + progress * .1f);
-                batch.draw(art.glow, x - hazard.radius, y - hazard.radius * .5f,
-                    hazard.radius * 2f, hazard.radius);
-                drawWarningRing(hazard.x, hazard.y, hazard.radius, 3f, 32);
-                drawWarningRing(hazard.x, hazard.y,
-                    hazard.radius * Math.max(.04f, 1f - progress), 2f, 24);
+                batch.setColor(Color.WHITE);
+                groundSprite(SpriteEffectArt.Type.WARNING, progress, hazard.x, hazard.y, hazard.radius, 0, layer);
             } else {
-                float alpha = Math.min(1f, Math.max(0f, hazard.ttl * 3f));
-                batch.setColor(1f, .17f, .05f, alpha * .3f);
-                batch.draw(art.glow, x - hazard.radius, y - hazard.radius * .5f,
-                    hazard.radius * 2f, hazard.radius);
-                batch.setColor(1f, .62f, .25f, alpha);
-                ring(hazard.x, hazard.y, hazard.radius, 0f, 3f, 32);
+                batch.setColor(Color.WHITE);
+                groundSprite(SpriteEffectArt.Type.GROUND_IMPACT, MathUtils.clamp(1f - hazard.ttl / .3f, 0, 1),
+                    hazard.x, hazard.y, hazard.radius, 0, layer);
             }
         }
         batch.setColor(Color.WHITE);
     }
 
-    private void drawGroundMarks(ArenaWorld world, OrthographicCamera camera) {
+    private void drawGroundMarks(ArenaWorld world, OrthographicCamera camera, SpriteEffectArt.Layer layer) {
         for (ArenaWorld.Enemy enemy : world.enemies) {
             if (!enemy.active || enemy.attack == ArenaWorld.EnemyAttack.NONE) continue;
             float age = enemy.attackAge;
             if (enemy.attack == ArenaWorld.EnemyAttack.BRUTE_SLAM) {
                 if (!visible(camera, enemy.attackTargetX, enemy.attackTargetY, enemy.attackRadius + 80f)) continue;
-                if (age < ArenaWorld.BRUTE_STRIKE_END) {
-                    boolean windup = age < ArenaWorld.BRUTE_WINDUP;
-                    batch.setColor(1f, windup ? .86f : .24f, windup ? .5f : .16f, windup ? 1f : .82f);
-                    drawAura(world.elapsed, enemy.attackTargetX, enemy.attackTargetY,
-                        enemy.attackRadius, EnemyAttackArt.Layer.ALL);
-                    if (windup) drawWarningRing(enemy.attackTargetX, enemy.attackTargetY,
-                        enemy.attackRadius, 2.8f, 28);
+                if (age < ArenaWorld.BRUTE_WINDUP) {
+                    batch.setColor(Color.WHITE);
+                    groundSprite(SpriteEffectArt.Type.WARNING, age / ArenaWorld.BRUTE_WINDUP,
+                        enemy.attackTargetX, enemy.attackTargetY, enemy.attackRadius, 0, layer);
                 }
                 float strikeAge = age - ArenaWorld.BRUTE_WINDUP;
                 if (strikeAge >= 0 && strikeAge < .3f) {
-                    float progress = strikeAge / .3f;
-                    batch.setColor(1f, .74f, .42f, (1f - progress) * .8f);
-                    ring(enemy.attackTargetX, enemy.attackTargetY, 12f + 54f * progress, 0f, 2.5f, 28);
-                    for (int mote = 0; mote < 6; mote++) {
-                        float a = mote * MathUtils.PI2 / 6f, r = 12f + 50f * progress;
-                        float x = enemy.attackTargetX + MathUtils.cos(a) * r;
-                        float y = enemy.attackTargetY + MathUtils.sin(a) * r;
-                        float lift = 10f * MathUtils.sin(progress * MathUtils.PI);
-                        batch.draw(art.glow, screenX(x, y) - 4f, screenY(x, y) + lift - 2f, 8f, 4f);
-                    }
+                    batch.setColor(Color.WHITE);
+                    groundSprite(SpriteEffectArt.Type.GROUND_IMPACT, strikeAge / .3f,
+                        enemy.attackTargetX, enemy.attackTargetY, 66f, 0, layer);
                 }
             } else if (enemy.attack == ArenaWorld.EnemyAttack.WRAITH_DASH
                 && age < ArenaWorld.WRAITH_WINDUP + ArenaWorld.WRAITH_DASH_SECONDS) {
@@ -563,21 +550,7 @@ public final class ArenaRenderer implements Disposable {
                 drawWarningRune(world.elapsed, enemy.attackTargetX, enemy.attackTargetY, 18f);
             }
         }
-        for (ArenaWorld.Player player : world.players) {
-            if (!player.active || !player.alive || player.auraLevel <= 0
-                || !visible(camera, player.x, player.y, 180f)) continue;
-            batch.setColor(.32f, .85f, .78f, .3f);
-            drawAura(world.elapsed, player.x, player.y, 100f + player.auraLevel * 20f, EnemyAttackArt.Layer.ALL);
-        }
         batch.setColor(Color.WHITE);
-    }
-
-    /** A dark edge and opaque ivory core remain legible over both paving and engraving. */
-    private void drawWarningRing(float x, float y, float radius, float thickness, int segments) {
-        batch.setColor(.04f, .025f, .015f, .92f);
-        ring(x, y, radius, 0f, thickness + 3f, segments);
-        batch.setColor(1f, .91f, .55f, 1f);
-        ring(x, y, radius, 0f, thickness, segments);
     }
 
     private void drawWarningRune(float age, float x, float y, float radius) {
@@ -587,20 +560,50 @@ public final class ArenaRenderer implements Disposable {
         drawAura(age, x, y, radius, EnemyAttackArt.Layer.ALL);
     }
 
-    /** One quiet projected ground ring, using the same primary range as target acquisition. */
-    private void drawAttackRanges(ArenaWorld world, OrthographicCamera camera) {
+    /** A compact cosmetic foot aura; actual targeting range stays in ArenaWorld. */
+    private void drawPlayerAuras(ArenaWorld world, OrthographicCamera camera) {
         for (ArenaWorld.Player player : world.players) {
             if (!player.active || !player.alive) continue;
-            float radius = world.primaryAttackRange(player);
+            float radius = PLAYER_AURA_RADIUS;
             if (!visible(camera, player.x, player.y, radius)) continue;
-            // A slim dark edge keeps the understated participant colour visible on pale floor tiles.
-            batch.setColor(0, 0, 0, .12f);
-            ring(player.x, player.y, radius, 0f, 2.2f, 64);
-            if (player.slot == 0) batch.setColor(.82f, .7f, .46f, .42f);
-            else batch.setColor(.49f, .75f, .7f, .42f);
-            ring(player.x, player.y, radius, 0f, 1.15f, 64);
+            participantTint(player.slot, .9f);
+            float phase = world.elapsed % art.spriteEffects.duration(SpriteEffectArt.Type.TARGET)
+                / art.spriteEffects.duration(SpriteEffectArt.Type.TARGET);
+            groundSprite(SpriteEffectArt.Type.TARGET, phase, player.x, player.y, radius, 0, SpriteEffectArt.Layer.ALL);
         }
         batch.setColor(Color.WHITE);
+    }
+
+    private void groundSprite(SpriteEffectArt.Type type, float progress, float x, float y,
+                              float radius, float angle, SpriteEffectArt.Layer layer) {
+        art.spriteEffects.drawGround(batch, type, progress, screenX(x, y), screenY(x, y), radius, angle, layer);
+    }
+
+    private void participantTint(int owner, float alpha) {
+        if (owner == 0) batch.setColor(1f, 1f, 1f, alpha);
+        else batch.setColor(.55f, .95f, .95f, alpha);
+    }
+
+    private void drawFootEffects(ArenaWorld world, OrthographicCamera camera) {
+        for (ArenaWorld.Effect effect : world.effects) {
+            if (!effect.active || !visible(camera, effect.x, effect.y, 200f)) continue;
+            if (effect.kind != ArenaWorld.EffectKind.AURA && effect.kind != ArenaWorld.EffectKind.DODGE) continue;
+            participantTint(effect.owner, .85f);
+            if (effect.kind == ArenaWorld.EffectKind.AURA) {
+                groundSprite(SpriteEffectArt.Type.SOUL_PULSE, effectProgress(effect), effect.x, effect.y,
+                    SOUL_PULSE_RADIUS, 0, SpriteEffectArt.Layer.ALL);
+            } else {
+                art.spriteEffects.drawProjected(batch, SpriteEffectArt.Type.DODGE, effectProgress(effect),
+                    screenX(effect.x, effect.y), screenY(effect.x, effect.y),
+                    .22f * art.spriteEffects.referenceScale(SpriteEffectArt.Type.DODGE),
+                    MathUtils.atan2(effect.dirY, effect.dirX) + MathUtils.PI * .25f, SpriteEffectArt.Layer.ALL);
+            }
+        }
+        batch.setColor(Color.WHITE);
+    }
+
+    private static float effectProgress(ArenaWorld.Effect effect) {
+        return MathUtils.clamp(1f - effect.ttl / Math.max(.001f, effect.maxTtl), 0, 1);
     }
 
     private void drawAura(float age, float x, float y, float radius, EnemyAttackArt.Layer layer) {
@@ -629,28 +632,10 @@ public final class ArenaRenderer implements Disposable {
             float x = screenX(effect.x, effect.y), y = screenY(effect.x, effect.y);
             switch (effect.kind) {
                 case SLASH -> {
-                    // Spend most of the cosmetic lifetime sweeping, then let the final crescent fade.
-                    float lift = art.actor(ActorAnimation.Actor.WARDEN).worldHeight * .5f;
-                    float phase = 1f - life;
-                    float head = .18f + .82f * Math.min(1f, phase / .7f);
-                    float tail = Math.max(0f, head - .65f);
-                    float visibility = Math.min(1f, life / .3f);
-                    for (int layer = 0; layer < 2; layer++) {
-                        if (layer == 0) batch.setColor(1f, .61f, .2f, visibility * .38f);
-                        else batch.setColor(1f, .97f, .78f, visibility * .88f);
-                        float previousX = 0f, previousY = 0f;
-                        for (int segment = 0; segment <= 13; segment++) {
-                            float progress = segment / 13f;
-                            float angle = effect.angle - effect.sweep * .5f
-                                + effect.sweep * (tail + (head - tail) * progress);
-                            float wx = effect.x + MathUtils.cos(angle) * effect.radius;
-                            float wy = effect.y + MathUtils.sin(angle) * effect.radius;
-                            float sx = screenX(wx, wy), sy = screenY(wx, wy) + lift;
-                            float width = (layer == 0 ? 8f : 3.5f) * (.15f + progress * .85f) * visibility;
-                            if (segment > 0) line(previousX, previousY, sx, sy, Math.max(.6f, width));
-                            previousX = sx; previousY = sy;
-                        }
-                    }
+                    batch.setColor(Color.WHITE);
+                    // The painted crescent faces screen-down at angle zero. Rotate before projection.
+                    art.spriteEffects.drawGround(batch, SpriteEffectArt.Type.SWORD_SWEEP, effectProgress(effect),
+                        x, y + 45f, effect.radius, effect.angle + MathUtils.PI * .75f, SpriteEffectArt.Layer.ALL);
                 }
                 case HIT -> {
                     float lift = impactLift(effect);
@@ -662,80 +647,48 @@ public final class ArenaRenderer implements Disposable {
                         impactX += BOLT_ORIGIN[origin] * sourceScale;
                         impactY = y + BOLT_ORIGIN[origin + 1] * sourceScale;
                     }
-                    if (!effect.heroHit && effect.impactKind == ArenaWorld.ImpactKind.BOLT) {
-                        // The collision origin follows the projectile plane; the burst itself has no heading.
-                        projectileBurst(impactX, impactY, life, effect.critical);
-                    } else {
+                    if (!effect.heroHit && effect.impactKind == ArenaWorld.ImpactKind.SWORD) {
                         float dx = screenX(effect.dirX, effect.dirY), dy = screenY(effect.dirX, effect.dirY);
-                        float magnitude = Math.max(.001f, (float) Math.sqrt(dx * dx + dy * dy));
-                        dx /= magnitude; dy /= magnitude;
-                        if (!effect.heroHit && effect.impactKind == ArenaWorld.ImpactKind.SWORD) {
-                            float scale = 1.45f * (effect.critical ? 1.22f : 1f);
-                            float rotation = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees - 25f;
-                            batch.setColor(Color.WHITE);
-                            art.vfx.draw(batch, VfxArt.Animation.SWORD_HIT, effect.maxTtl - effect.ttl,
-                                impactX, impactY, scale, rotation, VfxArt.Layer.ALL);
-                        } else {
-                            float reach = (effect.heroHit ? 25f : 18f) * (1f - life * .55f);
-                            batch.setColor(1f, effect.heroHit ? .22f : .84f, effect.heroHit ? .12f : .58f, life);
-                            burst(x, y + lift, dx, dy, reach, effect.heroHit ? 3.5f : 2.2f, 5);
-                            batch.setColor(1f, effect.heroHit ? .3f : .92f, effect.heroHit ? .16f : .72f, life * .45f);
-                            batch.draw(art.glow, x - 18f, y + lift - 18f, 36f, 36f);
-                        }
+                        float rotation = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees - 25f;
+                        batch.setColor(Color.WHITE);
+                        art.vfx.draw(batch, VfxArt.Animation.SWORD_HIT, effect.maxTtl - effect.ttl,
+                            impactX, impactY, 1.45f * (effect.critical ? 1.22f : 1f), rotation, VfxArt.Layer.ALL);
                         if (effect.critical) {
-                            batch.setColor(1f, .92f, .57f, life * .9f);
-                            burst(impactX, impactY, dx, dy, 32f * (1f - life * .4f), 2f, 3);
+                            batch.setColor(1f, .92f, .65f, .8f);
+                            bodySprite(SpriteEffectArt.Type.CONTACT, effectProgress(effect), impactX, impactY, .13f, 0);
                         }
+                    } else {
+                        if (effect.heroHit) batch.setColor(1f, .35f, .22f, 1f);
+                        else if (effect.critical) batch.setColor(1f, .95f, .78f, 1f);
+                        else batch.setColor(Color.WHITE);
+                        // Radial artwork never receives an incoming-direction rotation or fan.
+                        bodySprite(SpriteEffectArt.Type.CONTACT, effectProgress(effect), impactX, impactY,
+                            .18f * (effect.critical ? 1.22f : 1f), 0);
                     }
                 }
                 case DEATH -> {
                     boolean spirit = effect.enemyKind == ArenaWorld.EnemyKind.WRAITH;
-                    float radius = 9f + 28f * (1f - life);
-                    if (spirit) batch.setColor(.4f, .83f, .84f, life * .42f);
-                    else batch.setColor(.72f, .62f, .44f, life * .32f);
-                    batch.draw(art.glow, x - radius, y - radius * .3f, radius * 2f, radius);
-                    for (int i = 0; i < 4; i++) {
-                        float sign = (i & 1) == 0 ? -1f : 1f;
-                        float drift = sign * radius * (.3f + i * .2f);
-                        float rise = (1f - life) * (spirit ? 58f : 22f) + i * 4f;
-                        if (spirit) {
+                    if (spirit) {
+                        for (int i = 0; i < 4; i++) {
+                            float sign = (i & 1) == 0 ? -1f : 1f;
+                            float drift = sign * (9f + 28f * (1f - life)) * (.3f + i * .2f);
+                            float rise = (1f - life) * 58f + i * 4f;
                             batch.setColor(.67f, .93f, .91f, life * .75f);
                             batch.draw(art.soul, x + drift - 3f, y + rise, 6f, 10f);
-                        } else {
-                            batch.setColor(.87f, .73f, .49f, life * .7f);
-                            line(x + drift, y + rise, x + drift + sign * 5f, y + rise + 4f * life, 2f * life + .5f);
                         }
+                    } else {
+                        batch.setColor(.95f, .77f, .48f, .65f);
+                        // The authored decay frames supply flecks, rather than drawing short lines.
+                        bodySprite(SpriteEffectArt.Type.CONTACT, .55f + .45f * effectProgress(effect),
+                            x, y + 14f, .16f, 0);
                     }
                 }
-                case AURA -> {
-                    batch.setColor(effect.owner == 0 ? 1f : .4f, .8f, .7f, life * .65f);
-                    ring(effect.x, effect.y, effect.radius * (1f - life * .2f), 0f, 2f, 28);
-                }
+                case AURA, DODGE -> { /* Floor sprites are drawn beneath every actor in drawFootEffects. */ }
                 case LIGHTNING -> {
-                    float x2 = screenX(effect.x2, effect.y2), y2 = screenY(effect.x2, effect.y2) + 24f;
-                    float dx = x2 - x, dy = y2 - (y + 32f);
-                    float length = Math.max(1f, (float) Math.sqrt(dx * dx + dy * dy));
-                    float nx = -dy / length, ny = dx / length;
-                    float previousX = x, previousY = y + 32f;
-                    batch.setColor(.66f, .86f, 1f, life);
-                    for (int segment = 1; segment <= 4; segment++) {
-                        float jag = segment == 4 ? 0f : (segment % 2 == 0 ? -9f : 9f);
-                        float sx = x + dx * segment / 4f + nx * jag;
-                        float sy = y + 32f + dy * segment / 4f + ny * jag;
-                        line(previousX, previousY, sx, sy, 2f);
-                        previousX = sx; previousY = sy;
-                    }
-                }
-                case DODGE -> {
-                    float dx = screenX(effect.dirX, effect.dirY), dy = screenY(effect.dirX, effect.dirY);
-                    float length = Math.max(.001f, (float) Math.sqrt(dx * dx + dy * dy));
-                    dx /= length; dy /= length;
-                    batch.setColor(effect.owner == 0 ? 1f : .4f, .82f, .57f, life * .55f);
-                    for (int i = -1; i <= 1; i++) {
-                        float ox = -dy * i * 7f, oy = dx * i * 7f;
-                        line(x + ox - dx * 17f, y + oy + 3f - dy * 17f,
-                            x + ox + dx * 26f * (1f - life), y + oy + 3f + dy * 26f * (1f - life), 2f * life + .6f);
-                    }
+                    batch.setColor(Color.WHITE);
+                    art.spriteEffects.drawStretch(batch, SpriteEffectArt.Type.STORM, effectProgress(effect),
+                        x, y + 32f, screenX(effect.x2, effect.y2), screenY(effect.x2, effect.y2) + 24f,
+                        .16f * art.spriteEffects.referenceScale(SpriteEffectArt.Type.STORM));
                 }
                 case COLLECT -> {
                     for (int i = 0; i < 3; i++) {
@@ -747,12 +700,12 @@ public final class ArenaRenderer implements Disposable {
                 }
                 case BLOCK -> {
                     float dx = screenX(effect.dirX, effect.dirY), dy = screenY(effect.dirX, effect.dirY);
-                    float length = Math.max(.001f, (float) Math.sqrt(dx * dx + dy * dy));
-                    dx /= length; dy /= length;
-                    float cx = x - dx * 15f, cy = y + impactLift(effect) - dy * 15f;
-                    batch.setColor(1f, .91f, .6f, life);
-                    line(cx - dy * 16f, cy + dx * 16f, cx - dx * 8f, cy - dy * 8f, 3f * life + 1f);
-                    line(cx - dx * 8f, cy - dy * 8f, cx + dy * 16f, cy - dx * 16f, 3f * life + 1f);
+                    float inverse = 1f / Math.max(.001f, (float) Math.sqrt(dx * dx + dy * dy));
+                    dx *= inverse; dy *= inverse;
+                    batch.setColor(Color.WHITE);
+                    bodySprite(SpriteEffectArt.Type.BLOCK, effectProgress(effect),
+                        x - dx * 15f, y + impactLift(effect) - dy * 15f,
+                        .3f, MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees);
                 }
             }
         }
@@ -770,35 +723,10 @@ public final class ArenaRenderer implements Disposable {
         return radius;
     }
 
-    /** Short circular impact in screen space: core flash, soft bloom, six round motes and one ring. */
-    private void projectileBurst(float x, float y, float life, boolean critical) {
-        float age = 1f - life;
-        float scale = critical ? 1.22f : 1f;
-        float radius = (8f + 24f * (float) Math.sqrt(age)) * scale;
-        float fade = life * life;
-        float glowRadius = radius + 7f * scale;
-        batch.setColor(.3f, .8f, 1f, fade * .6f);
-        batch.draw(art.glow, x - glowRadius, y - glowRadius, glowRadius * 2f, glowRadius * 2f);
-        // The bright center is gone during the latter part of the existing pooled hit's lifetime.
-        float flash = Math.max(0f, 1f - age * 3.3f);
-        float coreRadius = (5f + 8f * flash) * scale;
-        batch.setColor(.9f, 1f, 1f, flash * .95f);
-        batch.draw(art.glow, x - coreRadius, y - coreRadius, coreRadius * 2f, coreRadius * 2f);
-        batch.setColor(critical ? 1f : .6f, critical ? .92f : .94f, critical ? .65f : 1f, fade * .85f);
-        float moteRadius = (3f * life + .7f) * scale;
-        for (int i = 0; i < 6; i++) {
-            float angle = MathUtils.PI2 * i / 6f + MathUtils.PI / 6f;
-            float px = x + MathUtils.cos(angle) * radius, py = y + MathUtils.sin(angle) * radius;
-            batch.draw(art.glow, px - moteRadius, py - moteRadius, moteRadius * 2f, moteRadius * 2f);
-        }
-        batch.setColor(.65f, .96f, 1f, fade * .8f);
-        float previousX = x + radius, previousY = y;
-        for (int i = 1; i <= 24; i++) {
-            float angle = MathUtils.PI2 * i / 24f;
-            float px = x + MathUtils.cos(angle) * radius, py = y + MathUtils.sin(angle) * radius;
-            line(previousX, previousY, px, py, (.6f + 1.6f * life) * scale);
-            previousX = px; previousY = py;
-        }
+    private void bodySprite(SpriteEffectArt.Type type, float progress, float x, float y,
+                            float rawScale, float rotationDegrees) {
+        art.spriteEffects.draw(batch, type, progress, x, y,
+            rawScale * art.spriteEffects.referenceScale(type), rotationDegrees, SpriteEffectArt.Layer.ALL);
     }
 
     private float impactLift(ArenaWorld.Effect effect) {
@@ -806,36 +734,6 @@ public final class ArenaRenderer implements Disposable {
         if (effect.enemyKind == null) return 38f;
         return art.actor(ActorAnimation.actor(effect.enemyKind)).worldHeight * .5f
             * enemyScale(effect.enemyKind, effect.elite);
-    }
-
-    private void burst(float x, float y, float dx, float dy, float radius, float width, int count) {
-        for (int i = 0; i < count; i++) {
-            float angle = (i - (count - 1) * .5f) * .47f;
-            float ux = dx * MathUtils.cos(angle) - dy * MathUtils.sin(angle);
-            float uy = dx * MathUtils.sin(angle) + dy * MathUtils.cos(angle);
-            line(x + ux * radius * .2f, y + uy * radius * .2f,
-                x + ux * radius, y + uy * radius, width);
-        }
-    }
-
-    private void ring(float x, float y, float radius, float height, float thickness, int segments) {
-        float previousX = screenX(x + radius, y), previousY = screenY(x + radius, y) + height;
-        for (int segment = 1; segment <= segments; segment++) {
-            float angle = MathUtils.PI2 * segment / segments;
-            float wx = x + MathUtils.cos(angle) * radius, wy = y + MathUtils.sin(angle) * radius;
-            float sx = screenX(wx, wy), sy = screenY(wx, wy) + height;
-            line(previousX, previousY, sx, sy, thickness);
-            previousX = sx; previousY = sy;
-        }
-    }
-
-    /** Pixel-region line segments stay in the existing atlas and never allocate geometry. */
-    private void line(float x1, float y1, float x2, float y2, float thickness) {
-        float dx = x2 - x1, dy = y2 - y1;
-        float length = (float) Math.sqrt(dx * dx + dy * dy);
-        if (length < .001f) return;
-        batch.draw(art.pixel, x1, y1 - thickness * .5f, 0f, thickness * .5f,
-            length, thickness, 1f, 1f, MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees);
     }
 
     private static float enemyScale(ArenaWorld.Enemy enemy) {
