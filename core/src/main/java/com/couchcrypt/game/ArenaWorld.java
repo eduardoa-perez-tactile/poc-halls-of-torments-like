@@ -52,6 +52,7 @@ public final class ArenaWorld {
     public int kills, souls, activeEnemies, wave, elitesKilled, bossPhase, runSeed;
     public boolean bossSpawned, bossDefeated, sovereignSpawned, sovereignDefeated;
     public Enemy boss, sovereign;
+    public float sovereignDefeatedAt = -1;
     public int swordSwings, arrowsFired, enemyDeaths, pickupsCollected, heroHits;
     /** Committed combat events, consumed independently by presentation/audio; never drive game rules. */
     public int swordHits, boltHits, criticalHits, dodges, blockedHits, healsCollected, auraPulses, stormCasts;
@@ -67,6 +68,7 @@ public final class ArenaWorld {
     public final Effect[] effects = new Effect[MAX_EFFECTS];
     public final PartyProgression progression;
     public final RunEquipment equipment;
+    public final HealthDropPolicy healthDrops = new HealthDropPolicy();
     public final ArenaTimeline timeline;
     private final float[] inputX = new float[2], inputY = new float[2];
     private final boolean[] pendingDodge = new boolean[2];
@@ -100,6 +102,7 @@ public final class ArenaWorld {
         outcome = Outcome.RUNNING; elapsed = accumulator = 0; simulationElapsed = 0; sharedXpRemainder = 0;
         kills = souls = activeEnemies = elitesKilled = nextCheckpoint = encounterPhase = enemySpawnSerial = 0;
         wave = bossPhase = 1; bossSpawned = bossDefeated = sovereignSpawned = sovereignDefeated = false; boss = sovereign = null;
+        sovereignDefeatedAt = -1;
         levelUpFxAge = 2; presentedChoiceRound = 0; sovereignSkipped = false;
         swordSwings = arrowsFired = enemyDeaths = pickupsCollected = heroHits = 0;
         swordHits = boltHits = criticalHits = dodges = blockedHits = healsCollected = auraPulses = stormCasts = 0;
@@ -107,12 +110,13 @@ public final class ArenaWorld {
         spawnCountdown = .65f;
         runSeed = 0x5a17c9e3 ^ (++runNumber * 0x45d9f3b); randomState = runSeed;
         debugSizingFacing = null;
-        progression.reset(); equipment.reset();
+        progression.reset(); equipment.reset(); healthDrops.reset();
         for (Player p : players) {
             p.active = p.alive = false; p.x = p.y = p.walkTime = p.reviveProgress = 0;
             resetBuild(p); p.dodgeCooldown = p.dodgeTime = p.invulnerable = p.attackCooldown = 0;
             p.facingX = 0; p.facingY = -1; p.kills = p.revives = 0;
             p.damageDealt = p.damageTaken = 0; p.dodgeX = 0; p.dodgeY = -1;
+            p.healingFromDrops = p.healingFromRegeneration = p.healingFromSustain = 0;
             resetPresentation(p);
             inputX[p.slot] = inputY[p.slot] = 0; pendingDodge[p.slot] = false;
         }
@@ -158,6 +162,7 @@ public final class ArenaWorld {
     public void deactivatePlayer(int slot) {
         Player p = player(slot); p.active = p.alive = false; resetBuild(p);
         p.kills = p.revives = 0; p.damageDealt = p.damageTaken = 0;
+        p.healingFromDrops = p.healingFromRegeneration = p.healingFromSustain = 0;
         resetPresentation(p);
         progression.deactivatePlayer(slot); equipment.deactivatePlayer(slot); inputX[slot] = inputY[slot] = 0; pendingDodge[slot] = false;
     }
@@ -173,7 +178,7 @@ public final class ArenaWorld {
         e.hitDirectionX = e.hitDirectionY = 0;
         e.spawnAge = 1;
         e.attack = EnemyAttack.NONE; e.attackAge = 2; e.attackHitMask = 0;
-        e.encounterPhase = 1; e.bossAttackIndex = 0; e.bossVolleyPending = false;
+        e.encounterPhase = 1; e.bossAttackIndex = 0; e.bossVolleyPending = e.bossCastEnraged = false;
         e.attackStartX = e.attackStartY = e.attackTargetX = e.attackTargetY = e.attackRadius = e.dashDistance = 0;
     }
 
@@ -267,6 +272,7 @@ public final class ArenaWorld {
         elapsed = (float) simulationElapsed;
         wave = timeline.phaseIndex(elapsed) + 1;
         for (Effect e : effects) if (e.active) { e.ttl -= STEP; if (e.ttl <= 0) e.active = false; }
+        if (timeline.isFullRun()) healthDrops.update(pickups, STEP, livingPlayerCount());
         for (Player p : players) updatePlayer(p);
         updateEnemies(); updateBolts(); updateShots(); updateHazards(); updatePickups(); updateRevival();
         progression.update(STEP); equipment.update(STEP);
@@ -301,7 +307,9 @@ public final class ArenaWorld {
         float x = choosing ? 0 : inputX[p.slot], y = choosing ? 0 : inputY[p.slot], magnitude = x * x + y * y;
         if (choosing) dodge = false;
         equipment.setMoving(p, magnitude > .0025f || p.dodgeTime > 0);
+        float previousHealth = p.health;
         p.health = Math.min(equipment.maxHealth(p), p.health + equipment.regeneration(p) * STEP);
+        p.healingFromRegeneration += p.health - previousHealth;
         if (magnitude > .0025f) {
             float inverse = 1f / (float) Math.sqrt(magnitude); p.facingX = x * inverse; p.facingY = y * inverse;
         }
@@ -437,7 +445,7 @@ public final class ArenaWorld {
                         e.windup = Math.max(0, e.windup - STEP); e.vx = e.vy = 0;
                         if (e.windup <= .000001f) {
                             e.windup = 0;
-                            if (e.kind == EnemyKind.BOSS) e.releaseAge = 0;
+                            if (e.kind == EnemyKind.BOSS || e.bossVolleyPending) e.releaseAge = 0;
                             if (e.bossVolleyPending) { fireBossVolley(e); e.bossVolleyPending = false; }
                         }
                     } else if (e.attackCooldown <= 0) bossAttack(e, target);
@@ -557,7 +565,8 @@ public final class ArenaWorld {
                 e.windup = remainingWindup(CULTIST_WINDUP, e.attackAge);
                 if (previousAge + .000001f < CULTIST_WINDUP && e.attackAge + .000001f >= CULTIST_WINDUP) {
                     e.releaseAge = 0;
-                    fireShot(e, e.castFacingX, e.castFacingY, 180, e.damage);
+                    float speed = timeline.isFullRun() ? 210 + 40 * Math.min(elapsed / durationSeconds(), 1) : 180;
+                    fireShot(e, e.castFacingX, e.castFacingY, speed, e.damage);
                 }
             }
             default -> { return; }
@@ -600,9 +609,17 @@ public final class ArenaWorld {
     }
 
     private void moveEnemy(Enemy e, Player target) {
-        float dx = target.x - e.x, dy = target.y - e.y, distance = length(dx, dy);
+        float lead = timeline.isFullRun() && e.kind == EnemyKind.WRAITH && target.moving ? 120 : 0;
+        float dx = target.x + target.facingX * lead - e.x,
+            dy = target.y + target.facingY * lead - e.y, distance = length(dx, dy);
+        if (distance < .001f) { e.vx = e.vy = 0; return; }
         float speed = switch (e.kind) {
-            case WRAITH -> 112; case BRUTE -> 37; case CULTIST -> 48; case BOSS, SOVEREIGN -> e.encounterPhase == 2 ? 56 : 44; default -> 57;
+            case WRAITH -> timeline.isFullRun() ? 120 : 112;
+            case BRUTE -> timeline.isFullRun() ? 46 : 37;
+            case CULTIST -> timeline.isFullRun() ? 60 : 48;
+            case SOVEREIGN -> timeline.isFullRun() ? (e.encounterPhase == 2 ? 80 : 65) : (e.encounterPhase == 2 ? 56 : 44);
+            case BOSS -> e.encounterPhase == 2 ? 56 : 44;
+            default -> timeline.isFullRun() ? 65 : 57;
         };
         speed *= e.speedMultiplier;
         if (e.elite) speed *= 1.15f;
@@ -615,13 +632,16 @@ public final class ArenaWorld {
 
     private void bossAttack(Enemy e, Player target) {
         boolean enraged = e.encounterPhase == 2;
-        e.attackCooldown = enraged ? 2.4f : 3.4f;
+        boolean harderSovereign = timeline.isFullRun() && e.kind == EnemyKind.SOVEREIGN;
+        e.bossCastEnraged = enraged;
+        e.attackCooldown = harderSovereign ? (enraged ? 2.1f : 2.8f) : (enraged ? 2.4f : 3.4f);
         e.vx = e.vy = 0;
         if (e.kind == EnemyKind.SOVEREIGN) {
-            // The former final encounter keeps its recognizable combined attack.
-            e.windup = 1f; beginCastPresentation(e, 1f); e.releaseAge = 0;
+            // Both threats commit the same aim, with a visible full-run cast before release.
+            e.windup = 1f; beginCastPresentation(e, 1f); e.releaseAge = harderSovereign ? 1 : 0;
             groundWarning(target.x, target.y, enraged ? 150 : 125, 1f, enraged ? 28 : 22);
-            fireBossVolley(e);
+            if (harderSovereign) e.bossVolleyPending = true;
+            else fireBossVolley(e);
         } else {
             // The Grave King alternates clear attacks rather than layering both at once.
             boolean volley = (e.bossAttackIndex++ & 1) != 0;
@@ -634,12 +654,15 @@ public final class ArenaWorld {
     }
 
     private void fireBossVolley(Enemy e) {
-        boolean enraged = e.encounterPhase == 2;
+        boolean enraged = e.bossCastEnraged;
+        boolean harderSovereign = timeline.isFullRun() && e.kind == EnemyKind.SOVEREIGN;
         float angle = (float) Math.atan2(e.castFacingY, e.castFacingX);
         int count = enraged ? 7 : 5;
         for (int i = 0; i < count; i++) {
             float a = angle + (i - (count - 1) * .5f) * .22f;
-            fireShot(e, (float) Math.cos(a), (float) Math.sin(a), enraged ? 165 : 145, 15);
+            fireShot(e, (float) Math.cos(a), (float) Math.sin(a),
+                harderSovereign ? (enraged ? 250 : 220) : (enraged ? 165 : 145),
+                harderSovereign ? (enraged ? 22 : 18) : 15);
         }
     }
 
@@ -743,7 +766,11 @@ public final class ArenaWorld {
                      float directionX, float directionY) {
         if (!enemy.active) return null;
         float actual = Math.min(enemy.health, damage); players[owner].damageDealt += actual;
-        if (drains) equipment.drain(players[owner], actual);
+        if (drains) {
+            float before = players[owner].health;
+            equipment.drain(players[owner], actual);
+            players[owner].healingFromSustain += players[owner].health - before;
+        }
         enemy.health -= damage; enemy.hitFlash = .12f;
         float distance = length(directionX, directionY);
         enemy.hitDirectionX = directionX / distance; enemy.hitDirectionY = directionY / distance;
@@ -755,7 +782,9 @@ public final class ArenaWorld {
         Effect contact = fx;
         if (enemy.health > 0) return contact;
         enemy.active = false; enemy.moving = false; activeEnemies = Math.max(0, activeEnemies - 1); kills++; enemyDeaths++; players[owner].kills++;
+        float beforeKillHeal = players[owner].health;
         equipment.killHeal(players[owner]);
+        players[owner].healingFromSustain += players[owner].health - beforeKillHeal;
         fx = effect(EffectKind.DEATH, enemy.x, enemy.y, owner, .35f);
         impact(fx, enemy, actual, critical);
         if (fx != null) fx.impactKind = kind;
@@ -764,14 +793,16 @@ public final class ArenaWorld {
         int rewardHundredths = reward * enemy.soulPercent + sharedXpRemainder;
         int soulReward = rewardHundredths / 100; sharedXpRemainder = rewardHundredths % 100;
         if (soulReward > 0) drop(enemy.x, enemy.y, false, soulReward);
-        if (enemy.elite) { elitesKilled++; equipment.rewardElite(); drop(enemy.x + 14, enemy.y, true, 40); }
-        else {
-            // Keep the opening forgiving; gear sustain replaces some late-run incidental healing.
-            boolean gearedRun = timeline.isFullRun() && elapsed >= 180;
-            if (kills % (gearedRun ? 12 : 7) == 0) drop(enemy.x + 14, enemy.y, true, gearedRun ? 16 : 24);
-        }
+        if (enemy.elite) { elitesKilled++; equipment.rewardElite(); }
+        if (timeline.isFullRun()) {
+            if (!isBoss(enemy.kind)) healthDrops.defeated(pickups, enemy.elite, elapsed,
+                livingPlayerCount(), enemy.x + 14, enemy.y);
+        } else if (enemy.elite || kills % 7 == 0)
+            drop(enemy.x + 14, enemy.y, true, enemy.elite ? 40 : 24);
         if (enemy == boss && enemy.kind == EnemyKind.BOSS) bossDefeated = true;
-        if (enemy == sovereign && enemy.kind == EnemyKind.SOVEREIGN) sovereignDefeated = true;
+        if (enemy == sovereign && enemy.kind == EnemyKind.SOVEREIGN) {
+            sovereignDefeated = true; sovereignDefeatedAt = elapsed;
+        }
         return contact;
     }
 
@@ -787,12 +818,21 @@ public final class ArenaWorld {
     }
 
     private void drop(float x, float y, boolean healing, int value) {
-        for (Pickup p : pickups) if (!p.active) { p.active = true; p.x = x; p.y = y; p.healing = healing; p.value = value; return; }
+        for (Pickup p : pickups) if (!p.active) { setPickup(p, x, y, healing, value); return; }
+        if (!healing && timeline.isFullRun()) {
+            Pickup oldHeal = HealthDropPolicy.oldestHealing(pickups);
+            if (oldHeal != null) { setPickup(oldHeal, x, y, false, value); return; }
+        }
         for (Pickup p : pickups) if (p.healing == healing) {
             p.value = (int) Math.min(Integer.MAX_VALUE, (long) p.value + value);
             if (diagnostics != null) diagnostics.pickupMerges++;
             return;
         }
+    }
+
+    private static void setPickup(Pickup p, float x, float y, boolean healing, int value) {
+        p.active = true; p.x = x; p.y = y; p.healing = healing; p.value = value;
+        p.ttl = p.maxTtl = 0; p.eliteHealing = false;
     }
 
     private void updatePickups() {
@@ -812,7 +852,9 @@ public final class ArenaWorld {
                 continue;
             }
             if (pickup.healing) {
+                float before = collector.health;
                 collector.health = Math.min(equipment.maxHealth(collector), collector.health + pickup.value);
+                collector.healingFromDrops += collector.health - before;
                 healsCollected++;
             }
             else { souls += pickup.value; progression.addXp(equipment.collectedXp(collector, pickup.value)); }
@@ -859,7 +901,14 @@ public final class ArenaWorld {
         ArenaTimeline.Pattern pattern = phase.pattern();
         for (int member = 0; member < pattern.size() && activeEnemies < reinforcementLimit(); member++) {
             float offset = (member - (pattern.size() - 1) * .5f) * .3f;
-            spawn(pattern.member(member), false, anchor, angle + offset);
+            Player packAnchor = anchor;
+            if (timeline.isFullRun() && phaseIndex > 0) {
+                // Split an authored pack across approach directions instead of a single trailing clump.
+                offset = (member & 1) == 0 ? member * .12f : 2.4f + member * .12f;
+                if (pattern.member(member) == EnemyKind.WRAITH) offset += (member & 1) == 0 ? -.9f : .9f;
+                if (livingPlayerCount() > 1 && (member & 1) != 0) packAnchor = players[1 - anchor.slot];
+            }
+            spawn(pattern.member(member), false, packAnchor, angle + offset);
         }
         spawnCountdown = phase.encounterInterval()
             * (timeline.isFullRun() && livingPlayerCount() > 1 ? .82f : 1);
@@ -893,20 +942,19 @@ public final class ArenaWorld {
             e.variant = variant; enemySpawnSerial++;
             e.soulPercent = timeline.isFullRun() && livingPlayerCount() > 1 ? 82 : 100;
             float health = switch (kind) { case WRAITH -> 18; case BRUTE -> 95; case CULTIST -> 35; case BOSS -> 1100; case SOVEREIGN -> 450; default -> 32; };
-            ArenaTimeline.Phase phase = timeline.phase(timeline.phaseIndex(elapsed));
             if (isBoss(kind)) {
-                if (timeline.isFullRun()) health = kind == EnemyKind.BOSS ? 8200 : 3000;
+                if (timeline.isFullRun()) health = kind == EnemyKind.BOSS ? 8200 : 5400;
                 health *= 1 + .6f * (activePlayerCount() - 1);
             } else if (timeline.isFullRun()) {
-                health *= phase.healthMultiplier() * (1 + .2f * (livingPlayerCount() - 1));
+                health *= timeline.healthMultiplier(elapsed) * (1 + .6f * (livingPlayerCount() - 1));
             } else health *= 1 + Math.min(elapsed / durationSeconds(), 1) * .2f;
             // Spawn from base values every time, so reused slots cannot compound an old variant's stats.
             e.maxHealth = e.health = health * (elite ? 4 : 1) * e.variant.healthMultiplier;
             e.damage = isBoss(kind) ? 20 : kind == EnemyKind.BRUTE ? 18 : kind == EnemyKind.WRAITH ? 8 : 12;
-            if (timeline.isFullRun() && !isBoss(kind)) e.damage *= phase.damageMultiplier();
+            if (timeline.isFullRun() && !isBoss(kind)) e.damage *= timeline.damageMultiplier(elapsed);
             e.damage *= e.variant.damageMultiplier;
             e.speedMultiplier = (timeline.isFullRun() && !isBoss(kind)
-                ? 1 + .2f * Math.min(elapsed / durationSeconds(), 1) : 1) * e.variant.speedMultiplier;
+                ? 1 + .35f * Math.min(elapsed / durationSeconds(), 1) : 1) * e.variant.speedMultiplier;
             e.animTime = random(); e.hitFlash = e.vx = e.vy = e.stunTime = e.windup = 0; e.attackCooldown = isBoss(kind) ? 1.5f : 1;
             resetPresentation(e); faceTarget(e, anchor);
             e.spawnAge = 0;
@@ -1177,13 +1225,14 @@ public final class ArenaWorld {
         public float attackAge = 1, attackFacingX, attackFacingY = -1, hurtTime;
         public float damageMultiplier = 1, attackRateMultiplier = 1, moveMultiplier = 1, dodgeCooldownMultiplier = 1;
         public float cleaveMultiplier = 1, critChance, pickupMultiplier = 1, auraCooldown, stormCooldown, damageDealt, damageTaken;
+        public float healingFromDrops, healingFromRegeneration, healingFromSustain;
         private float dodgeX, dodgeY;
         float dodgeFacingX() { return dodgeX; }
         float dodgeFacingY() { return dodgeY; }
         private Player(int slot) { this.slot = slot; hero = slot == 0 ? Hero.WARDEN : Hero.RANGER; }
     }
     public static final class Enemy {
-        public boolean active, elite, moving;
+        public boolean active, elite, moving, bossCastEnraged;
         public int encounterPhase = 1, bossAttackIndex;
         private boolean bossVolleyPending;
         public EnemyAttack attack = EnemyAttack.NONE;
@@ -1206,7 +1255,11 @@ public final class ArenaWorld {
         public int owner, pierce;
         public long hitMask;
     }
-    public static final class Pickup { public boolean active, healing; public float x, y; public int value; }
+    public static final class Pickup {
+        public boolean active, healing, eliteHealing;
+        public float x, y, ttl, maxTtl;
+        public int value;
+    }
     public static final class Shot {
         public boolean active, casterElite;
         public EnemyKind casterKind;

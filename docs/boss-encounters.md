@@ -10,11 +10,19 @@ ordinary reinforcement, never another boss or an elite. There is no cutscene,
 portal, summon condition or dependency on killing the mini boss first.
 
 The Sovereign retains its original artwork and combined ground-warning/volley
-attack, with 3,000 health solo or 4,800 with two participating players. Waves,
+attack, with 5,400 health solo or 8,640 with two participating players after the
+approved difficulty pass. Waves,
 elite checkpoints, the arena clock and reliquaries continue during this fight.
 Its death grants souls, does not grant another equipment offer and does not end
-the run. The existing five elite plus three reliquary equipment opportunities
-remain intact.
+the run. The full-run Sovereign moves at 65/80 units/s and starts attacks every
+2.8/2.1 seconds before/after half health. Its existing one-second ground warning
+also warns the volley: five/seven shots release afterward at 220/250 units/s for
+18/22 damage, with visible gaps. Ground strikes retain 22/28 damage and 125/150-unit
+radii. Cast phase and facing are snapshotted, so crossing half health during a
+windup cannot change the warned shot count/speed/damage. The 45–75-second fight
+length is a human playtest target, not an automated balance result. SHORT keeps
+its legacy 450-health, immediate-volley development fixture. The existing five
+elite plus three reliquary equipment opportunities remain intact.
 
 The Grave King starts at 8,200 health solo or 13,120 co-op. It alternates a
 one-second ground strike warning with a locked-direction, 0.7-second windup and

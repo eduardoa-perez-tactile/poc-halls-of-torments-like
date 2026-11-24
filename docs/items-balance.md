@@ -1,8 +1,15 @@
-# Initial equipment balance pass
+# Equipment balance and unchanged sustain
 
 Equipment is run-only: six categories occupy seven positions, including two rings. Five elite rewards and caches at 1:30, 10:00 and 19:00 create at most eight personal item choices per run. Each loot round offers two items with a stored elite/reliquary source label (skills remain three choices) and shares one thirty-second host clock and timeout default; early finishers wait and queued rounds receive fresh windows. Skill choices take priority and freeze any hidden equipment countdown; equipment selection pauses combat and the arena clock, with a LOOT FOUND / CHECK YOUR PHONE TV ceremony. Keep Current Gear consumes the current loot choice without changing equipment; timeout still equips the first offer. New late joiners receive all earlier skill ranks and gear rewards as automatic defaults, with no inherited choice backlog. Future rewards retain normal 30-second personal choices. Reconnecting participants keep their existing build and pending choices.
 
 Equipment modifiers are separate from skill ranks. Replacing an item removes its complete contribution without losing acquired skills or granting a heal. Cards compare all old and new equipment contributions, including penalties; they do not claim those contributions bypass aggregate caps. Skill previews include unconditional equipment effects while conditional low-health/moving/stationary effects are described by their item. Class-specific and unavailable-ability items are filtered; arrow/pierce choices with no remaining effective capacity are excluded.
+
+The later approved arena difficulty pass supersedes the incidental health-drop
+values below: ordinary drops are 16 HP/14 kills before minute three and 12 HP/20 kills
+afterward, with 18/12-second solo/co-op generation limits, a three/four-drop floor
+cap and 35/45-second regular/elite expiry. Elite recovery is 24 HP. Healing cannot
+merge into a stored reserve. Equipment stats and sustain below remain unchanged.
+See [current encounter tuning](twenty-minute-encounters.md).
 
 ## Analytical comparisons
 
@@ -21,7 +28,8 @@ Offense starts with Executioner Mask / Quickpulse Loop; adds Swiftstitch Gloves 
 
 - Combined flat plus conditional equipment damage is capped at +60%, reduced from the initial +80% ceiling after the stationary set reached about 2.42x weapon DPS. Other ceilings include +50% attack rate, +40% movement, +120 health, +30% dodge reduction with a 0.45-second minimum cooldown, 40% damage reduction, 20% block, 75% total critical chance, and 2.75x critical damage. Friendly arrows remain at five per attack with three piercing targets; every entity pool is unchanged.
 - Regeneration caps at 1.5 health/s. Life steal and kill healing share one per-player budget replenished at two health/s (maximum reserve two); life steal also caps at 0.8 per hit and 2.5% damage. Contact retaliation cannot trigger life steal recursively, and no item healing revives a fallen player. XP gain caps at +25% and carries fractional awards; souls remain counted once, with bonus XP shared by the party.
-- The existing 24-health drop every seven kills would combine with faster killing and equipment sustain. Full-run regular healing therefore becomes 16 health per twelve kills after minute three; the opening and SHORT fixture retain 24 per seven. At one kill/s this reduces incidental generation from about 3.43 to 1.33 health/s before collection; elite healing remains 40. Actual kill/collection rates vary.
-- Ordinary enemy health/counts remain unchanged. The full-run boss increases from 6,200 to 8,200 health solo (13,120 co-op), a roughly 32% allowance for mixed equipment power. High-risk offense remains stronger; defensive and collection builds retain a longer final encounter. Short-fixture boss health is unchanged. The XP curve and level-20 cap remain unchanged; bonus XP can bring efficient builds to the cap earlier.
+- Ordinary health generation now uses 16 HP per 14 kills before minute three and 12 HP per 20 kills afterward, subject to 18/12-second solo/co-op cooldowns. Elite recovery is 24 HP. Floor caps, combat-time expiry and nonmerging values prevent stockpiling. See the current encounter document for the complete rules.
+- Ordinary enemies now use the approved arena difficulty curve; equipment modifiers and skill progression remain unchanged. Grave King health remains 8,200 solo / 13,120 co-op. Hollow Sovereign is now 5,400 / 8,640 with its revised delayed volley. The XP curve and level-20 cap remain unchanged; bonus XP can bring efficient builds to the cap earlier.
+
 
 Focused checks cover reversible modifiers, accurate upgraded health previews, class/ability eligibility, queues and timeout priority, late joining/reset IDs, damage/cadence/arrows, secondary attacks, attraction/reach, critical hits, contact retaliation, conditional power, regeneration, sustain limits, reward boundaries and late healing. No full twenty-minute simulation or gameplay balance claim is made. Human feedback and physical-TV measurements remain necessary for feel and sustained performance.

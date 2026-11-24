@@ -5,6 +5,9 @@ implementation with aligned hitboxes and attacks. Approval captures are preserve
 in `art-source/enemy-size-hierarchy/`; no enemy PNG, palette, source pose or texture
 page was regenerated.
 
+The later [difficulty pass](twenty-minute-encounters.md) adjusts enemy health,
+damage, movement and wave pressure while retaining these sizes and rank cues.
+
 ## Appearance
 
 `EnemySizing` uses the resident SE opaque body heights rather than padded canvas
@@ -15,8 +18,8 @@ ground pivots. Idle, movement and attack poses use the same multiplier.
 
 Moss gains 10% cosmetic bulk. Elites gain 22% over the normal species, replacing
 Moss bulk instead of stacking it. Dusk/Frost/Ember retain species size. The boss
-scale remains 2.2×. Existing health, damage, speed, XP, rewards, attack cadence and
-warning durations are preserved; these changes do not establish a harder run.
+scale remains 2.2×. The sizing change itself preserves health, damage, speed, XP, rewards, attack
+cadence and warning durations; the linked difficulty pass owns subsequent tuning.
 
 Normal enemies have no rank marker. Durable Moss/Dusk enemies have one outlined
 bone down-chevron. The user's follow-up rejected both crown treatments and chose

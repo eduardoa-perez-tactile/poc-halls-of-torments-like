@@ -22,8 +22,9 @@ Multipliers apply once at spawn on top of phase, co-op and elite scaling. A reus
 pool slot starts from its new kind's base values. Movement modifiers affect
 pursuit/retreat, preserving attack windups, cadence, dash distances/timing and
 projectile speeds. Damage applies to real contact/strike damage and is captured
-by Cultist projectiles, surviving caster death/reuse. Reward amounts, enemy limits
-and encounter schedules are unchanged. These are initial balance values for user
+by Cultist projectiles, surviving caster death/reuse. Base soul rewards and arrival checkpoints remain unchanged. The later
+[difficulty pass](twenty-minute-encounters.md) strengthens ordinary phase stats,
+movement and reinforcement limits while keeping these variant modifiers intact. These are initial balance values for user
 playtesting, not a proven twenty-minute difficulty curve.
 
 ## Material palettes and resources

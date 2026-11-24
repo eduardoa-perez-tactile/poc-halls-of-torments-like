@@ -90,7 +90,7 @@ class ArenaTimelineTest {
         for (int i = 0; i < timeline.phaseCount(); i++) {
             ArenaTimeline.Phase phase = timeline.phase(i);
             assertFalse(phase.name().isBlank());
-            assertTrue(phase.breatherSeconds() >= 3 && phase.breatherSeconds() <= 5);
+            assertTrue(phase.breatherSeconds() >= 2 && phase.breatherSeconds() <= 4);
             assertTrue(phase.soloEnemyLimit() <= ArenaWorld.MAX_ENEMIES - 2);
             if (phase.eliteKind() != null) checkpoints++;
         }
@@ -121,17 +121,17 @@ class ArenaTimelineTest {
     @Test void lateFixtureHasBoundedSoloCoopPressureAndSnapshotStats() {
         ArenaWorld solo = solo(ArenaTimeline.TWENTY_MINUTES);
         solo.debugStartLateEncounter();
-        assertEquals(46, solo.activeEnemies);
+        assertEquals(50, solo.activeEnemies);
         ArenaWorld coop = solo(ArenaTimeline.TWENTY_MINUTES);
         coop.activatePlayer(1); coop.players[1].attackCooldown = 1000;
         coop.debugStartLateEncounter();
-        assertEquals(58, coop.activeEnemies);
+        assertEquals(62, coop.activeEnemies);
         assertEquals(1, elites(coop));
-        assertEquals(solo.enemies[1].health * 1.2f, coop.enemies[1].health, .001f);
+        assertEquals(solo.enemies[1].health * 1.6f, coop.enemies[1].health, .001f);
         assertEquals(100, solo.enemies[1].soulPercent);
         assertEquals(82, coop.enemies[1].soulPercent);
         coop.players[1].alive = false;
-        assertEquals(46, coop.reinforcementLimit());
+        assertEquals(50, coop.reinforcementLimit());
         assertEquals(82, coop.enemies[1].soulPercent);
         assertFalse(coop.bossSpawned);
         assertTrue(coop.elapsed < 1200);
@@ -161,6 +161,86 @@ class ArenaTimelineTest {
         world.update(ArenaWorld.STEP);
         assertEquals(9, world.souls);
         assertEquals(9, world.progression.totalXp);
+    }
+
+    @Test void scheduledArrivalPressureKeepsRisingAcrossDifferentPackSizes() {
+        ArenaTimeline timeline = ArenaTimeline.TWENTY_MINUTES;
+        float previousRate = 0;
+        int previousLimit = 0;
+        for (int i = 0; i < timeline.phaseCount(); i++) {
+            ArenaTimeline.Phase phase = timeline.phase(i);
+            float rate = scheduledEnemiesPerMinute(phase);
+            assertTrue(rate > previousRate,
+                "Changing to a smaller pack must not reduce pressure at " + phase.name());
+            assertTrue(phase.soloEnemyLimit() >= previousLimit && phase.soloEnemyLimit() <= 50);
+            previousRate = rate; previousLimit = phase.soloEnemyLimit();
+        }
+        float opening = scheduledEnemiesPerMinute(timeline.phase(0));
+        float finalMinute = scheduledEnemiesPerMinute(timeline.phase(timeline.phaseCount() - 1));
+        assertTrue(opening >= 50 && opening <= 65, "The opening allows time for the initial build");
+        assertTrue(finalMinute >= 150 && finalMinute <= 175, "The last minute sustains bounded heavy reinforcement");
+        assertTrue(finalMinute > opening * 2.8f);
+        assertTrue(scheduledEnemiesPerMinute(timeline.phase(8)) > scheduledEnemiesPerMinute(timeline.phase(7)),
+            "The fifteen-minute Brute phase must not introduce the previous reinforcement slump");
+    }
+
+    @Test void fullRunStatGrowthIsContinuousAndNeverFallsAtEncounterBoundaries() {
+        ArenaTimeline timeline = ArenaTimeline.TWENTY_MINUTES;
+        float previousHealth = timeline.healthMultiplier(0), previousDamage = timeline.damageMultiplier(0);
+        for (float elapsed = .5f; elapsed <= timeline.durationSeconds(); elapsed += .5f) {
+            float health = timeline.healthMultiplier(elapsed), damage = timeline.damageMultiplier(elapsed);
+            assertTrue(health >= previousHealth && damage >= previousDamage);
+            previousHealth = health; previousDamage = damage;
+        }
+        for (int i = 1; i < timeline.phaseCount(); i++) {
+            float start = timeline.phaseStart(i);
+            assertEquals(timeline.healthMultiplier(start), timeline.healthMultiplier(start - .001f), .0001f,
+                "Enemy health must not jump when the authored pack changes");
+            assertEquals(timeline.damageMultiplier(start), timeline.damageMultiplier(start - .001f), .0001f);
+        }
+        int middle = 5;
+        float start = timeline.phaseStart(middle), halfway = start + timeline.phase(middle).durationSeconds() * .5f;
+        assertEquals(.5f, timeline.phaseProgress(halfway), .0001f);
+        assertEquals((timeline.phase(middle).healthMultiplier() + timeline.phase(middle + 1).healthMultiplier()) * .5f,
+            timeline.healthMultiplier(halfway), .0001f);
+        assertEquals((timeline.phase(middle).damageMultiplier() + timeline.phase(middle + 1).damageMultiplier()) * .5f,
+            timeline.damageMultiplier(halfway), .0001f);
+        assertEquals(0, timeline.phaseProgress(-10));
+        assertEquals(1, timeline.phaseProgress(1500));
+        assertEquals(timeline.healthMultiplier(1200), timeline.healthMultiplier(1500));
+        assertEquals(timeline.damageMultiplier(1200), timeline.damageMultiplier(1500));
+    }
+
+    @Test void tuningDoesNotMoveEliteOrBossArrivalCheckpoints() {
+        ArenaTimeline timeline = ArenaTimeline.TWENTY_MINUTES;
+        float[] checkpoints = {180, 420, 660, 900, 1080};
+        int found = 0;
+        for (int i = 0; i < timeline.phaseCount(); i++) if (timeline.phase(i).eliteKind() != null) {
+            assertEquals(checkpoints[found++], timeline.phaseStart(i));
+        }
+        assertEquals(checkpoints.length, found);
+        assertEquals(720, timeline.sovereignSeconds());
+        assertEquals(1200, timeline.durationSeconds());
+    }
+
+    @Test void shortAndCustomDevelopmentFixturesRetainTheirAuthoredStatSteps() {
+        ArenaTimeline fixture = new ArenaTimeline(
+            new ArenaTimeline.Phase("EARLY", 90, ArenaTimeline.Pattern.SWARM, 2, 18, 3, null, 1.5f, 1.2f, 20),
+            new ArenaTimeline.Phase("LATE", 90, ArenaTimeline.Pattern.HUNT, 2, 18, 3, null, 3, 2, 30));
+        assertEquals(1.5f, fixture.healthMultiplier(89));
+        assertEquals(1.2f, fixture.damageMultiplier(89));
+        assertEquals(3, fixture.healthMultiplier(90));
+        assertEquals(2, fixture.damageMultiplier(90));
+        assertEquals(180, ArenaTimeline.SHORT.durationSeconds());
+        assertEquals(108, ArenaTimeline.SHORT.sovereignSeconds(), .0001f);
+        assertEquals(2.8f, ArenaTimeline.SHORT.phase(0).encounterInterval());
+        assertEquals(2.5f, ArenaTimeline.SHORT.phase(1).encounterInterval());
+        assertEquals(2.5f, ArenaTimeline.SHORT.phase(2).encounterInterval());
+    }
+
+    private static float scheduledEnemiesPerMinute(ArenaTimeline.Phase phase) {
+        return phase.pattern().size() * 60f / phase.encounterInterval()
+            * (phase.cycleSeconds() - phase.breatherSeconds()) / phase.cycleSeconds();
     }
 
     private static ArenaWorld solo(ArenaTimeline timeline) {
