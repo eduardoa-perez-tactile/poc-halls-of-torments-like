@@ -33,6 +33,7 @@ import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.GameAudio;
 import com.couchcrypt.game.ArenaRenderer;
 import com.couchcrypt.game.ActorAnimation;
+import com.couchcrypt.game.DefeatTransition;
 import com.couchcrypt.lobby.JoinServer;
 import com.couchcrypt.lobby.LanAddress;
 import com.couchcrypt.lobby.LobbyState;
@@ -66,6 +67,8 @@ public final class CryptLobby extends ApplicationAdapter {
     private Stage stage;
     private UiArt art;
     private Image background, shade;
+    private Image defeatCover;
+    private final DefeatTransition defeatTransition = new DefeatTransition();
     private Drawable homeBackground, partyBackground;
     private JoinServer server;
     private Table content, overlay;
@@ -162,6 +165,11 @@ public final class CryptLobby extends ApplicationAdapter {
         levelUpView = new LevelUpView(art); levelUpView.setVisible(false); stage.addActor(levelUpView);
         diagnostics = art.label("", art.small, UiArt.IVORY);
         diagnostics.setPosition(105, 22); diagnostics.setVisible(false); stage.addActor(diagnostics);
+        defeatCover = new Image(art.pixel);
+        defeatCover.setBounds(0, 0, 1920, 1080);
+        defeatCover.setColor(0, 0, 0, 0);
+        defeatCover.setTouchable(Touchable.enabled);
+        defeatCover.setVisible(false); stage.addActor(defeatCover);
         host = config.advertisedHost();
         if (host == null) host = LanAddress.find().stream().findFirst().orElse(null);
         startupStage = profileStartup("initialUi", startupStage);
@@ -454,6 +462,7 @@ public final class CryptLobby extends ApplicationAdapter {
 
     private void startSession() {
         if (state.snapshot(System.currentTimeMillis()).connected() < 1 || server == null || host == null) return;
+        defeatTransition.reset(); defeatCover.setVisible(false);
         world.reset(); hudState.reset(); finalWarning = false; notifiedLevel = 1; notifiedReliquaries = 0;
         notifiedWave = 1; notifiedEliteKills = 0;
         bossAnnounced = sovereignAnnounced = enrageAnnounced = hudPreview = false;
@@ -586,6 +595,15 @@ public final class CryptLobby extends ApplicationAdapter {
 
     /** Profiling-only sample data for reviewing both end screens without playing a full run. */
     private void previewResults(boolean victory) {
+        defeatTransition.reset(); defeatCover.setVisible(false);
+        if (!victory) {
+            // Keep the current arena/build for the transition fixture, without a scene jump before death.
+            if (screen != Screen.SESSION) showSession();
+            for (var player : world.players) if (player.active) { player.alive = false; player.health = 0; }
+            world.outcome = ArenaWorld.Outcome.DEFEAT;
+            beginDefeatTransition();
+            return;
+        }
         boolean first = world.players[0].active, second = world.players[1].active;
         world.reset();
         for (int i = 0; i < 2; i++) if (i == 0 ? first : second) {
@@ -605,6 +623,12 @@ public final class CryptLobby extends ApplicationAdapter {
         world.bossDefeated = victory;
         world.outcome = victory ? ArenaWorld.Outcome.VICTORY : ArenaWorld.Outcome.DEFEAT;
         showResults();
+    }
+
+    private void beginDefeatTransition() {
+        world.clearInputs();
+        defeatTransition.begin();
+        defeatCover.setVisible(true); defeatCover.toFront();
     }
 
     private void prepareResults() {
@@ -866,6 +890,7 @@ public final class CryptLobby extends ApplicationAdapter {
     }
 
     private boolean key(int key) {
+        if (defeatTransition.active()) return true;
         if (key == Input.Keys.END && config.profile()) {
             toggleFontParityOverlay(); return true;
         }
@@ -1142,7 +1167,7 @@ public final class CryptLobby extends ApplicationAdapter {
         long now = System.currentTimeMillis();
         for (int i = 0; i < 2; i++) state.readControls(i, controls[i], now);
         syncChoices();
-        if (screen == Screen.SESSION && overlay == null && hostActive) {
+        if (screen == Screen.SESSION && overlay == null && hostActive && !defeatTransition.active()) {
             boolean disconnected = false;
             for (int i = 0; i < 2; i++) disconnected |= world.players[i].active && !controls[i].connected;
             if (disconnected) showPause();
@@ -1192,7 +1217,15 @@ public final class CryptLobby extends ApplicationAdapter {
                 announceLevelUp();
                 hudState.update(delta);
                 updateCombatNotices();
-                if (world.outcome != ArenaWorld.Outcome.RUNNING) showResults();
+                if (world.outcome == ArenaWorld.Outcome.DEFEAT) beginDefeatTransition();
+                else if (world.outcome == ArenaWorld.Outcome.VICTORY) showResults();
+            }
+        }
+        if (defeatTransition.active()) {
+            defeatTransition.update(delta, hostActive);
+            if (defeatTransition.needsResults()) {
+                showResults();
+                defeatTransition.resultsShown();
             }
         }
         syncChoices();
@@ -1244,13 +1277,19 @@ public final class CryptLobby extends ApplicationAdapter {
         }
         ScreenUtils.clear(0.025f, 0.035f, 0.04f, 1);
         if (screen == Screen.SESSION) arena.render(world, hudState,
-            overlay != null || world.choicePending() ? 0f : delta, !world.choicePending());
+            overlay != null || world.choicePending() || defeatTransition.active() ? 0f : delta,
+            defeatTransition.active() || !world.choicePending());
         if (frameMetrics != null) {
             frameMetrics.endStage(FrameMetrics.ARENA);
             frameMetrics.beginStage(FrameMetrics.UI);
         }
         stage.getViewport().apply(); stage.act(delta);
         if (fontParityOverlay != null) fontParityOverlay.toFront();
+        defeatCover.setVisible(defeatTransition.active());
+        if (defeatTransition.active()) {
+            defeatCover.setColor(0, 0, 0, defeatTransition.opacity());
+            defeatCover.toFront();
+        }
         stage.draw();
         if (frameMetrics != null) {
             frameMetrics.endStage(FrameMetrics.UI);
@@ -1272,7 +1311,7 @@ public final class CryptLobby extends ApplicationAdapter {
         if (frameMetrics != null) frameMetrics.reset();
         hostActive = false; state.setHostActive(false);
         if (audio != null) audio.stop();
-        if (screen == Screen.SESSION && overlay == null) showPause();
+        if (screen == Screen.SESSION && overlay == null && !defeatTransition.active()) showPause();
     }
     @Override public void resume() {
         if (frameMetrics != null) frameMetrics.reset();

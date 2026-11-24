@@ -63,3 +63,19 @@ are visible. The ring has no fill, glow or spikes and reuses the existing pixel.
 Warden's cosmetic slash now lasts 0.38 seconds instead of 0.18, spending 70% of that
 window sweeping and the rest fading. A new swing replaces an old same-player trail
 at high haste; damage, attack cadence and committed aim remain unchanged.
+
+## Simple permanent foot rings (2026-11-24)
+
+The user rejected the ornate permanent aura after inspecting the native capture.
+`PlayerFootRing` now draws one plain thin fixed 52×26 logical-unit ellipse around
+each living player's feet: gold for Player 1, teal for Player 2. The stroke is 1.2
+world units, including two small antialiasing fringes. Its 64 cached segments use
+the resident white texel, with 22,272 bytes of reusable CPU geometry and no added
+textures, retained Pixmaps or frame-loop allocations. The ring stays stationary,
+with no ornaments, glow, rotation or pulse, and draws in the existing ground pass
+beneath every actor. Targeting/damage radii and the approved Soul Circle/Dodge
+sprites remain unchanged. All existing runtime artwork is preserved.
+
+Native co-op capture confirms the gold/teal rings stay flat and tight around both
+heroes. Current build/transition/performance evidence is recorded in
+[Defeat verification](end-screens.md#defeat-fade-verification).

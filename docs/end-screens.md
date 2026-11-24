@@ -28,6 +28,19 @@ grouped digits and fit their allocated statistic width. Phone result status carr
 an additive outcome field, shows Victory or Defeat, keeps gameplay controls hidden
 and leaves shared navigation with the remote. Leaving Results clears the outcome.
 
+## Defeat transition (2026-11-24)
+
+Whole-party defeat now holds the frozen arena for 350 ms, fades to black over 550 ms,
+swaps to the existing Defeat results at full black, then reveals them over 650 ms.
+The transition clock latches once, waits for the actual results swap and freezes
+while the app is backgrounded. Remote activation/navigation and touch-through
+are blocked until the reveal completes; Try Again resets the clock for the next
+run. Combat, choice timers and scenery stay frozen during the final arena hold.
+One downed co-op participant still uses the normal revival flow; Victory is
+unchanged. A single resident-white-pixel stage cover supplies the fade with no
+new texture, framebuffer, artwork or per-frame allocation. Profile F8 now defeats
+the current party for a short presentation check without replacing its arena/build.
+
 ## Focused verification
 
 JDK 21 desktop compilation and Android debug packaging passed. Focused Java checks
@@ -43,3 +56,23 @@ The summary backing was visually checked in both outcomes. These checks do not
 establish physical-TV viewing-distance readability, gameplay balance or sustained
 60 FPS. No survival playthrough was run. Ignored captures are under
 `.run/end-screen-verification/` and `.run/end-screen-details-check/`.
+
+### Defeat-fade verification
+
+JDK 21 compiled desktop classes and the Android debug APK. 29 focused tests passed
+for the new transition clock, defeat/revival simulation, audio routing, HUD and
+result presentation. The installed APK was captured in native 1920×1080 co-op:
+plain foot rings, fallen-party hold, fade to black and Defeat reveal. An OK press
+immediately after result publication stayed blocked during reveal; Try Again
+worked afterward and restored a fresh controllable session. A five-second silent
+Android screenrecord preview and original extracted frames are under ignored
+`.run/simple-auras-defeat/`. The app returned to the normal lobby with its existing
+LAN QR host/relay intact; temporary controllers and capture processes were closed.
+
+A ten-second moving co-op fixture produced one 302-frame report inside measurement
+markers: interval p95/p99/max 18.20/19.14/20.47 ms and render-callback wall p95/p99/max
+9.77/12.91/19.96 ms, 147 intervals above 16.7 ms and none above 33.4 ms. Combined accounted
+GPU textures remain 33,221,452 bytes (31.6824 MiB); gameplay retains zero Pixmaps.
+GPU duration is unmeasured, and physical-TV performance/readability still needs
+human checking. Arena difficulty, equipment sustain and all runtime art files
+remain byte-for-byte unchanged by this presentation pass.
