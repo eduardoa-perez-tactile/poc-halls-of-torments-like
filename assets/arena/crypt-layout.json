@@ -69,60 +69,27 @@
   ],
   "landmarks": [
     {
-      "id": "fallen-choir",
+      "id": "north-gate",
       "at": [
-        -750,
-        430
+        0,
+        870
       ],
       "members": [
         {
-          "id": "tomb-a",
-          "region": "sarcophagus-x",
+          "id": "sealed-entrance",
+          "region": "sealed-gate",
           "offset": [
-            -90,
-            -90
+            0,
+            0
           ]
-        },
-        {
-          "id": "tomb-b",
-          "region": "sarcophagus-x",
-          "offset": [
-            90,
-            70
-          ]
-        },
-        {
-          "id": "column",
-          "region": "broken-column",
-          "offset": [
-            -170,
-            140
-          ]
-        },
-        {
-          "id": "fragments",
-          "region": "rubble",
-          "offset": [
-            -120,
-            20
-          ]
-        },
-        {
-          "id": "low-rubble",
-          "region": "rubble",
-          "offset": [
-            155,
-            -105
-          ],
-          "sizeScale": 0.65
         }
       ]
     },
     {
-      "id": "sanctum",
+      "id": "south-sanctum",
       "at": [
-        600,
-        610
+        0,
+        -660
       ],
       "members": [
         {
@@ -131,131 +98,146 @@
           "offset": [
             0,
             0
-          ],
-          "sizeScale": 0.8
+          ]
         },
         {
           "id": "guardian-left",
           "region": "guardian",
           "offset": [
-            -170,
-            45
+            -250,
+            -10
           ]
         },
         {
           "id": "guardian-right",
           "region": "guardian",
           "offset": [
-            170,
-            45
+            250,
+            -10
           ]
-        },
-        {
-          "id": "column-base",
-          "region": "broken-column",
-          "offset": [
-            -220,
-            -80
-          ],
-          "sizeScale": 0.7
         }
       ]
     },
     {
-      "id": "sealed-crypt",
+      "id": "west-burial-row",
       "at": [
-        770,
-        -490
+        -800,
+        0
       ],
       "members": [
         {
-          "id": "gate",
-          "region": "sealed-gate",
-          "offset": [
-            60,
-            -210
-          ]
-        },
-        {
-          "id": "tomb",
+          "id": "tomb-1",
           "region": "sarcophagus-y",
           "offset": [
-            -140,
-            10
+            0,
+            -430
           ]
         },
         {
-          "id": "guardian",
-          "region": "guardian",
+          "id": "tomb-2",
+          "region": "sarcophagus-y",
           "offset": [
-            210,
-            -150
+            0,
+            0
           ]
         },
         {
-          "id": "offering",
-          "region": "altar",
+          "id": "tomb-3",
+          "region": "sarcophagus-y",
           "offset": [
-            -120,
-            -70
-          ],
-          "sizeScale": 0.5
-        },
-        {
-          "id": "fragments",
-          "region": "rubble",
-          "offset": [
-            50,
-            50
+            0,
+            430
           ]
         }
       ]
     },
     {
-      "id": "broken-gallery",
+      "id": "east-burial-row",
       "at": [
-        -720,
-        -570
+        800,
+        0
       ],
       "members": [
         {
-          "id": "column-a",
-          "region": "broken-column",
+          "id": "tomb-1",
+          "region": "sarcophagus-y",
           "offset": [
-            -170,
-            -70
+            0,
+            -430
           ]
         },
         {
-          "id": "column-b",
-          "region": "broken-column",
+          "id": "tomb-2",
+          "region": "sarcophagus-y",
           "offset": [
-            -20,
-            90
+            0,
+            0
           ]
         },
         {
-          "id": "column-c",
+          "id": "tomb-3",
+          "region": "sarcophagus-y",
+          "offset": [
+            0,
+            430
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ruined-colonnade",
+      "at": [
+        0,
+        0
+      ],
+      "members": [
+        {
+          "id": "column-west-south",
           "region": "broken-column",
           "offset": [
-            160,
-            -50
+            -1020,
+            -610
           ]
         },
         {
-          "id": "rubble-a",
+          "id": "column-west-north",
+          "region": "broken-column",
+          "offset": [
+            -1020,
+            610
+          ]
+        },
+        {
+          "id": "column-east-south",
+          "region": "broken-column",
+          "offset": [
+            1020,
+            -610
+          ]
+        },
+        {
+          "id": "column-east-north",
+          "region": "broken-column",
+          "offset": [
+            1020,
+            610
+          ]
+        },
+        {
+          "id": "west-fragments",
           "region": "rubble",
           "offset": [
-            -65,
-            -80
-          ]
+            -990,
+            460
+          ],
+          "sizeScale": 0.65
         },
         {
-          "id": "rubble-b",
+          "id": "east-fragments",
           "region": "rubble",
           "offset": [
-            80,
-            95
+            990,
+            -460
           ],
           "sizeScale": 0.65
         }

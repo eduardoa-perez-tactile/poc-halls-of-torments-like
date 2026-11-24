@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ArenaFloorLayoutTest {
     @Test void clippedRepeatCellsStayInsideTheArenaAndKeepTheirOriginalMaterialCoordinates() throws Exception {
-        ArenaFloorLayout floor = new ArenaFloorLayout(source());
+        ArenaFloorLayout floor = new ArenaFloorLayout(radialSource());
         assertEquals(8, floor.paths.length);
         assertTrue(floor.pathCells.length > 8 && floor.pathCells.length <= ArenaFloorLayout.MAX_CELLS);
         float[] areaByPath = new float[floor.paths.length];
@@ -40,6 +40,43 @@ class ArenaFloorLayoutTest {
         }
     }
 
+    @Test void approvedPavingBandsCoverTheirRectanglesWithoutExtraSpokesOrStretchedEndSlabs() throws Exception {
+        ArenaFloorLayout floor = new ArenaFloorLayout(source());
+        assertTrue(floor.usesPavingBands());
+        assertEquals(0, floor.paths.length);
+        assertEquals(3, floor.bands.length);
+        assertEquals(23, floor.pathCells.length);
+        float[] area = new float[floor.bands.length];
+        float[] nextY = new float[floor.bands.length];
+        for (int i = 0; i < floor.bands.length; i++) nextY[i] = floor.bands[i].minY();
+        for (var cell : floor.pathCells) {
+            var band = floor.bands[cell.pathIndex];
+            assertEquals(4, cell.vertexCount);
+            assertEquals(nextY[cell.pathIndex], cell.vertices[1], .001f, "No gap between paving slabs");
+            nextY[cell.pathIndex] = cell.vertices[9];
+            assertTrue(signedArea(cell.vertices) > 0);
+            area[cell.pathIndex] += signedArea(cell.vertices);
+            for (int vertex = 0; vertex < cell.vertices.length; vertex += 4) {
+                float x = cell.vertices[vertex], y = cell.vertices[vertex + 1];
+                assertTrue(x >= band.minX() && x <= band.maxX());
+                assertTrue(y >= band.minY() && y <= band.maxY());
+                assertEquals(.1f + .8f * (x - band.minX()) / (band.maxX() - band.minX()),
+                    cell.vertices[vertex + 2], .00001f,
+                    "The source crop must preserve the complete world-space paving width");
+                assertEquals((y - band.minY() - cell.repeatStart) / floor.materialRepeat,
+                    cell.vertices[vertex + 3], .00001f);
+            }
+        }
+        for (int i = 0; i < floor.bands.length; i++) {
+            var band = floor.bands[i];
+            assertEquals(band.maxY(), nextY[i], .001f);
+            assertEquals((band.maxX() - band.minX()) * (band.maxY() - band.minY()), area[i], .5f);
+        }
+        assertEquals(-120, floor.bands[0].minX()); assertEquals(120, floor.bands[0].maxX());
+        assertEquals(-880, floor.bands[0].minY()); assertEquals(880, floor.bands[0].maxY());
+        assertEquals(120, floor.fieldRepeat); assertEquals(200, floor.materialRepeat);
+    }
+
     @Test void quietWearIsContinuousBoundedAndDoesNotTurnIntoAlternatingCellTints() throws Exception {
         ArenaFloorLayout floor = new ArenaFloorLayout(source());
         assertEquals(600f, floor.medallionDiameter);
@@ -62,17 +99,35 @@ class ArenaFloorLayoutTest {
         JsonValue badBounds = source();
         badBounds.get("worldSize").get(0).set(new JsonValue(2600L));
         assertThrows(IllegalArgumentException.class, () -> new ArenaFloorLayout(badBounds));
-        JsonValue solid = source();
+        JsonValue solid = radialSource();
         solid.get("paths").get(0).addChild("solid", new JsonValue(true));
         assertThrows(IllegalArgumentException.class, () -> new ArenaFloorLayout(solid));
-        JsonValue escaped = source();
+        JsonValue escaped = radialSource();
         escaped.get("paths").get(0).get("to").get(0).set(new JsonValue(1201L));
         assertThrows(IllegalArgumentException.class, () -> new ArenaFloorLayout(escaped));
         JsonValue runaway = source();
         runaway.get("materialRepeat").set(new JsonValue(.1));
         assertThrows(IllegalArgumentException.class, () -> new ArenaFloorLayout(runaway));
-        JsonValue duplicate = source();
+        JsonValue duplicate = radialSource();
         duplicate.get("paths").get(1).get("id").set(new JsonValue("east"));
+        assertThrows(IllegalArgumentException.class, () -> new ArenaFloorLayout(duplicate));
+    }
+
+    @Test void invalidBandsCannotOverlapEscapeTheFloorOrAddCollision() throws Exception {
+        JsonValue escaped = source();
+        escaped.get("bands").get(0).get("to").get(1).set(new JsonValue(901L));
+        assertThrows(IllegalArgumentException.class, () -> new ArenaFloorLayout(escaped));
+        JsonValue reversed = source();
+        reversed.get("bands").get(0).get("to").get(0).set(new JsonValue(-121L));
+        assertThrows(IllegalArgumentException.class, () -> new ArenaFloorLayout(reversed));
+        JsonValue overlap = source();
+        overlap.get("bands").get(1).get("to").get(0).set(new JsonValue(0L));
+        assertThrows(IllegalArgumentException.class, () -> new ArenaFloorLayout(overlap));
+        JsonValue solid = source();
+        solid.get("bands").get(0).addChild("solid", new JsonValue(true));
+        assertThrows(IllegalArgumentException.class, () -> new ArenaFloorLayout(solid));
+        JsonValue duplicate = source();
+        duplicate.get("bands").get(1).get("id").set(new JsonValue("processional-aisle"));
         assertThrows(IllegalArgumentException.class, () -> new ArenaFloorLayout(duplicate));
     }
 
@@ -87,5 +142,18 @@ class ArenaFloorLayoutTest {
         Path file = Path.of("../assets/arena/crypt-floor.json");
         if (!Files.exists(file)) file = Path.of("assets/arena/crypt-floor.json");
         return new JsonReader().parse(Files.readString(file));
+    }
+
+    private static JsonValue radialSource() throws Exception {
+        JsonValue root = source();
+        root.remove("bands"); root.remove("pavingMode");
+        root.get("pathWidth").set(new JsonValue(200L));
+        root.addChild("paths", new JsonReader().parse("""
+            [{"id":"east","to":[1200,0]}, {"id":"north-east","to":[1200,900]},
+             {"id":"north","to":[0,900]}, {"id":"north-west","to":[-1200,900]},
+             {"id":"west","to":[-1200,0]}, {"id":"south-west","to":[-1200,-900]},
+             {"id":"south","to":[0,-900]}, {"id":"south-east","to":[1200,-900]}]
+            """));
+        return root;
     }
 }

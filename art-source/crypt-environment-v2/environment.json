@@ -343,7 +343,7 @@
       ],
       "pivot": [
         64,
-        92
+        83.713726
       ],
       "projectedFootprintWidth": 124,
       "footprintWorldX": 90,
@@ -365,6 +365,42 @@
           30
         ],
         "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      },
+      "renderScaleY": 1.171725225,
+      "renderShearY": -0.048908202,
+      "groundProjectionCalibration": {
+        "method": "least-squares alpha>=32 bottom contour over each visible ground edge; source normalized PNG pixels, top-left Y down",
+        "fitCoordinates": "trimmed alpha-bound PNG coordinates; add normalization.offset for source-canvas positions",
+        "edgeXWindowsInclusive": [
+          [
+            8,
+            80
+          ],
+          [
+            94,
+            118
+          ]
+        ],
+        "sourceSlopesDown": [
+          0.3849808712822411,
+          -0.4684615384615385
+        ],
+        "sourceInterceptsDown": [
+          46.26632111563619,
+          120.33692307692309
+        ],
+        "targetSlopesDown": [
+          0.5,
+          -0.5
+        ],
+        "mapping": "relativeYup=sourceYup*renderScaleY+sourceX*renderShearY; uniform footprint scale follows",
+        "groundPivotMethod": "front edge at pivot X must meet the near footprint face after both projection factors",
+        "originalPivot": [
+          64,
+          92
+        ],
+        "sourcePixelsChanged": false,
+        "sourceFootprintChanged": false
       }
     },
     "guardian": {
@@ -471,7 +507,7 @@
       ],
       "pivot": [
         64,
-        165
+        163.306965
       ],
       "projectedFootprintWidth": 124,
       "footprintWorldX": 250,
@@ -493,6 +529,42 @@
           60
         ],
         "resample": "proportional Lanczos; no mirror, rotation, recolour, alpha mask or repaint"
+      },
+      "renderScaleY": 1.097381943,
+      "renderShearY": 0.09692754,
+      "groundProjectionCalibration": {
+        "method": "least-squares alpha>=32 bottom contour over each visible ground edge; source normalized PNG pixels, top-left Y down",
+        "fitCoordinates": "trimmed alpha-bound PNG coordinates; add normalization.offset for source-canvas positions",
+        "edgeXWindowsInclusive": [
+          [
+            26,
+            116
+          ],
+          [
+            2,
+            14
+          ]
+        ],
+        "sourceSlopesDown": [
+          -0.36730371078197177,
+          0.5439560439560439
+        ],
+        "sourceInterceptsDown": [
+          135.49614588310243,
+          120.72527472527473
+        ],
+        "targetSlopesDown": [
+          -0.5,
+          0.5
+        ],
+        "mapping": "relativeYup=sourceYup*renderScaleY+sourceX*renderShearY; uniform footprint scale follows",
+        "groundPivotMethod": "front edge at pivot X must meet the near footprint face after both projection factors",
+        "originalPivot": [
+          64,
+          165
+        ],
+        "sourcePixelsChanged": false,
+        "sourceFootprintChanged": false
       }
     }
   }

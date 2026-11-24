@@ -9,10 +9,13 @@ public final class ArenaFloorLayout {
     public static final int MAX_PATHS = 12, MAX_CELLS = 128, MAX_CELL_VERTICES = 8;
     public final float centerX, centerY, medallionDiameter, pathWidth, materialRepeat, fieldRepeat;
     public final Path[] paths;
+    public final Band[] bands;
     public final Cell[] pathCells;
     private final Wear[] wear;
 
     public record Path(String id, float endX, float endY, float unitX, float unitY, float length) {}
+    /** Fixed rectangular paving; the painted inner width spans X and slabs repeat along Y. */
+    public record Band(String id, float minX, float minY, float maxX, float maxY) {}
 
     /** Convex clipped polygon, counter-clockwise; each vertex is world X/Y then normalized material U/V. */
     public static final class Cell {
@@ -43,20 +46,42 @@ public final class ArenaFloorLayout {
             || Math.abs(centerY) + medallionDiameter * .5f > ArenaWorld.HALF_HEIGHT)
             throw invalid("medallion exceeds the floor");
 
-        JsonValue authoredPaths = root.require("paths");
+        String pavingMode = root.getString("pavingMode", "paths");
+        if (!pavingMode.equals("paths") && !pavingMode.equals("bands")) throw invalid("paving mode");
+        boolean bandMode = pavingMode.equals("bands");
+        JsonValue authoredPaths = root.require(bandMode ? "bands" : "paths");
         if (!authoredPaths.isArray() || authoredPaths.size < 1 || authoredPaths.size > MAX_PATHS)
-            throw invalid("bounded path count required");
-        paths = new Path[authoredPaths.size];
+            throw invalid("bounded paving count required");
+        paths = new Path[bandMode ? 0 : authoredPaths.size];
+        bands = new Band[bandMode ? authoredPaths.size : 0];
         ArrayList<Cell> cells = new ArrayList<>(80);
         HashSet<String> ids = new HashSet<>();
         int index = 0;
         for (JsonValue entry = authoredPaths.child; entry != null; entry = entry.next) {
             String id = entry.getString("id");
+            if (id.isBlank() || !ids.add(id) || entry.getBoolean("solid", false))
+                throw invalid("paving id or movement override");
+            if (bandMode) {
+                float[] from = pair(entry, "from"), to = pair(entry, "to");
+                if (from[0] >= to[0] || from[1] >= to[1]
+                    || from[0] < -ArenaWorld.HALF_WIDTH || to[0] > ArenaWorld.HALF_WIDTH
+                    || from[1] < -ArenaWorld.HALF_HEIGHT || to[1] > ArenaWorld.HALF_HEIGHT)
+                    throw invalid("paving band bounds");
+                Band band = new Band(id, from[0], from[1], to[0], to[1]);
+                for (int prior = 0; prior < index; prior++) {
+                    Band other = bands[prior];
+                    if (band.minX() < other.maxX() && band.maxX() > other.minX()
+                        && band.minY() < other.maxY() && band.maxY() > other.minY())
+                        throw invalid("overlapping paving bands");
+                }
+                bands[index] = band;
+                buildBandCells(cells, index++, band);
+                continue;
+            }
             float[] end = pair(entry, "to");
             float dx = end[0] - centerX, dy = end[1] - centerY;
             float length = (float) Math.hypot(dx, dy);
-            if (id.isBlank() || !ids.add(id) || entry.getBoolean("solid", false)
-                || Math.abs(end[0]) > ArenaWorld.HALF_WIDTH || Math.abs(end[1]) > ArenaWorld.HALF_HEIGHT
+            if (Math.abs(end[0]) > ArenaWorld.HALF_WIDTH || Math.abs(end[1]) > ArenaWorld.HALF_HEIGHT
                 || length <= medallionDiameter * .5f || length > 3000)
                 throw invalid("path id, endpoint or movement override");
             Path path = new Path(id, end[0], end[1], dx / length, dy / length, length);
@@ -75,6 +100,26 @@ public final class ArenaFloorLayout {
                 throw invalid("wear centre outside the floor");
             wear[index++] = new Wear(at[0], at[1], number(entry, "radius", 180, 900),
                 number(entry, "delta", -.06f, .04f));
+        }
+    }
+
+    /** Bands use their painted edges directly, without separate path curbstones. */
+    public boolean usesPavingBands() { return bands.length > 0; }
+
+    private void buildBandCells(ArrayList<Cell> result, int bandIndex, Band band) {
+        float length = band.maxY() - band.minY();
+        int count = (int) Math.ceil(length / materialRepeat);
+        for (int i = 0; i < count; i++) {
+            if (result.size() >= MAX_CELLS) throw invalid("paving band cell pool");
+            float start = i * materialRepeat, end = Math.min(length, start + materialRepeat);
+            float y0 = band.minY() + start, y1 = band.minY() + end;
+            float v1 = (end - start) / materialRepeat;
+            // The proposal crops painted side margins in source space, then maps
+            // that inner painting over the complete authored band footprint.
+            result.add(new Cell(bandIndex, start, new float[]{
+                band.minX(), y0, .1f, 0, band.maxX(), y0, .9f, 0,
+                band.maxX(), y1, .9f, v1, band.minX(), y1, .1f, v1
+            }));
         }
     }
 

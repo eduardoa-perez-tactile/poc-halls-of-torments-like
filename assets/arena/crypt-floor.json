@@ -1,27 +1,85 @@
 {
   "version": 1,
-  "worldSize": [2400, 1800],
-  "center": [0, 0],
+  "worldSize": [
+    2400,
+    1800
+  ],
+  "center": [
+    0,
+    0
+  ],
   "medallionDiameter": 600,
-  "pathWidth": 200,
+  "pathWidth": 240,
   "materialRepeat": 200,
   "fieldRepeat": 120,
-  "paths": [
-    {"id": "east", "to": [1200, 0]},
-    {"id": "north-east", "to": [1200, 900]},
-    {"id": "north", "to": [0, 900]},
-    {"id": "north-west", "to": [-1200, 900]},
-    {"id": "west", "to": [-1200, 0]},
-    {"id": "south-west", "to": [-1200, -900]},
-    {"id": "south", "to": [0, -900]},
-    {"id": "south-east", "to": [1200, -900]}
+  "pavingMode": "bands",
+  "bands": [
+    {
+      "id": "processional-aisle",
+      "from": [
+        -120,
+        -880
+      ],
+      "to": [
+        120,
+        880
+      ]
+    },
+    {
+      "id": "west-burial-strip",
+      "from": [
+        -960,
+        -650
+      ],
+      "to": [
+        -640,
+        650
+      ]
+    },
+    {
+      "id": "east-burial-strip",
+      "from": [
+        640,
+        -650
+      ],
+      "to": [
+        960,
+        650
+      ]
+    }
   ],
   "wear": [
-    {"at": [-760, 470], "radius": 460, "delta": -0.035},
-    {"at": [650, 610], "radius": 390, "delta": -0.025},
-    {"at": [780, -490], "radius": 420, "delta": -0.04},
-    {"at": [-730, -560], "radius": 410, "delta": -0.03},
-    {"at": [-220, 680], "radius": 340, "delta": 0.018},
-    {"at": [260, -690], "radius": 350, "delta": 0.02}
+    {
+      "at": [
+        -800,
+        0
+      ],
+      "radius": 440,
+      "delta": -0.035
+    },
+    {
+      "at": [
+        800,
+        0
+      ],
+      "radius": 440,
+      "delta": -0.035
+    },
+    {
+      "at": [
+        0,
+        -670
+      ],
+      "radius": 300,
+      "delta": -0.025
+    },
+    {
+      "at": [
+        0,
+        740
+      ],
+      "radius": 260,
+      "delta": 0.018
+    }
   ]
 }

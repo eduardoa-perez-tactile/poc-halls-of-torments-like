@@ -146,7 +146,37 @@ def bake(archive:Path, output:Path):
     return report
 
 
+def apply_projection_calibration(output:Path):
+    """Final metadata-only step, after the additive floor/border/actor bakes.
+
+    Those historical bake archives retain their original baseline hashes. Keep
+    them reproducible, then apply the measured architecture correction to the
+    completed bank without repacking or changing any PNG.
+    """
+    sources=json.loads((ROOT/'art-source/crypt-environment-v2/environment.json').read_text())
+    target=output/'gameplay.json';gameplay=json.loads(target.read_text())
+    for name in ('altar','sealed-gate'):
+        calibration=sources['regions'][name];region=gameplay['regions'][name]
+        frame=gameplay['frames'][region['frame']]
+        if frame['source']!=calibration['sourceSize'] or any(
+                region[key]!=calibration[key] for key in ('footprintWorldX','footprintWorldY')):
+            raise ValueError('Projection calibration belongs to different source geometry: '+name)
+        sy=calibration['renderScaleY'];shear=calibration['renderShearY']
+        if not .85<=sy<=1.2 or not -.1<=shear<=.1:
+            raise ValueError('Unbounded projection correction: '+name)
+        frame['pivot']=calibration['pivot']
+        region['renderScaleY']=sy;region['renderShearY']=shear
+    target.write_text(json.dumps(gameplay,indent=2)+'\n')
+    print('Applied measured gate/altar projection metadata; no PNGs changed.')
+
+
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--source',type=Path,default=ARCHIVE);parser.add_argument('--output',type=Path,default=ROOT/'assets/art');args=parser.parse_args();bake(args.source,args.output)
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--source',type=Path,default=ARCHIVE)
+    parser.add_argument('--output',type=Path,default=ROOT/'assets/art')
+    parser.add_argument('--projection-only',action='store_true',help='Apply final gate/altar metadata calibration to a completed bank, without repacking pixels')
+    args=parser.parse_args()
+    if args.projection_only:apply_projection_calibration(args.output)
+    else:bake(args.source,args.output)
 
 if __name__=='__main__':main()

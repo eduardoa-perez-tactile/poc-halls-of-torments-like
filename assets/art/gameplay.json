@@ -4558,7 +4558,7 @@
       ],
       "pivot": [
         64,
-        92
+        83.713726
       ],
       "rect": [
         130,
@@ -4642,7 +4642,7 @@
       ],
       "pivot": [
         64,
-        165
+        163.306965
       ],
       "rect": [
         2,
@@ -6401,7 +6401,9 @@
       "worldHeight": 185.216357,
       "footprintWidth": 124.0,
       "footprintWorldX": 90,
-      "footprintWorldY": 200
+      "footprintWorldY": 200,
+      "renderScaleY": 1.171725225,
+      "renderShearY": -0.048908202
     },
     "guardian": {
       "frame": 216,
@@ -6429,7 +6431,9 @@
       "worldHeight": 328.462505,
       "footprintWidth": 124.0,
       "footprintWorldX": 250,
-      "footprintWorldY": 50
+      "footprintWorldY": 50,
+      "renderScaleY": 1.097381943,
+      "renderShearY": 0.09692754
     },
     "shadow": {
       "frame": 220,

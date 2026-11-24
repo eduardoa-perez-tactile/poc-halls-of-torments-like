@@ -8,11 +8,20 @@ engraved medallion, open arena, combat bounds and gameplay remain unchanged.
 
 ## Current placement
 
-`assets/arena/crypt-floor.json` authors the central 600-unit medallion, eight
-200-unit-wide paving spokes, a 120-unit field repeat and six quiet wear zones.
+The approved formal crypt layout of 24 November supersedes the eight spokes and
+separate curbstones. `assets/arena/crypt-floor.json` now authors a central 600-unit
+medallion, one 240-unit-wide processional aisle and two 320-unit-wide burial strips.
+Paving spans each band's width and repeats every 200 units along its length, with
+partial final slabs cropped rather than stretched. All three bands are flush,
+render-only and cached once. The field still repeats every 120 units; wear follows
+the fixed burial/shrine groups. The legacy exterior foundation skirt is no longer
+drawn, leaving only the continuous painted-wall perimeter.
+
 The medallion remains a true ground-plane circle projected to a 2:1 ellipse;
 a 45-degree rotation aligns the flourish with screen axes. It stays flush and
 uses ordinary alpha before hazards, targeting rings, pickups and actors.
+
+## Historical floor-art integration
 
 The field has roughly four clearly painted stone courses per repeat, avoiding
 many weak joints compressed into a small texture. Its 64×64 material at a
