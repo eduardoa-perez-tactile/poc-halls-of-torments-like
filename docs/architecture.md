@@ -57,3 +57,9 @@ All 48 original equipment illustrations share one file-backed managed 1024×768 
 
 
 Fresh participation applies all earlier skill/item entitlements once using bounded class-rank and equipment sequences. Eight gear grants occupy at most seven positions; the final default replaces the earlier boots. No inherited offers are created. Gear initializes before skills and fresh health is filled after both defaults. The active-participant guard preserves reconnect health, build, IDs and timers. LobbyState retains participating disconnected slots for the current run until removal or leaving the run; lobby-only reservations retain their 45-second expiry. A cached starterBuild count pair supplies the nonblocking phone confirmation. Future rewards retain normal 30-second offers and skill priority. No new textures, pools, scheduling layer or per-frame build layouts.
+
+The shared offline font page is now 1024×768 RGBA (3 MiB), with original glyph
+geometry and two-pixel sampling gutters relocated losslessly. All five fonts
+still borrow one managed texture. Root metadata declares page dimensions and
+load-time checks validate glyph bounds. Combined texture headroom is 1.0363 MiB;
+see docs/texture-headroom.md for exact-pixel/layout proof and native tolerance.

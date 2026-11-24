@@ -25,16 +25,20 @@ public final class BakedUiFonts implements Disposable {
         long bytes = 0;
         try {
             JsonValue root = new JsonReader().parse(Gdx.files.internal(DIRECTORY + "fonts.json"));
+            int pageWidth = root.getInt("pageWidth", 1024);
+            int pageHeight = root.getInt("pageHeight", 1024);
+            if (pageWidth != 1024 || (pageHeight != 768 && pageHeight != 1024))
+                throw new IllegalArgumentException("Unexpected bounded font atlas dimensions");
             JsonValue pageFiles = root.require("pages");
-            if (!pageFiles.isArray() || pageFiles.size == 0)
-                throw new IllegalArgumentException("Baked UI fonts require atlas pages");
+            if (!pageFiles.isArray() || pageFiles.size != 1)
+                throw new IllegalArgumentException("Baked UI fonts require one shared atlas page");
             Array<TextureRegion> regions = new Array<>(pageFiles.size);
             for (JsonValue file = pageFiles.child; file != null; file = file.next) {
                 Texture texture = new Texture(Gdx.files.internal(DIRECTORY + file.asString()), false);
                 pages.add(texture);
-                if (!texture.isManaged() || texture.getWidth() != 1024 || texture.getHeight() != 1024
+                if (!texture.isManaged() || texture.getWidth() != pageWidth || texture.getHeight() != pageHeight
                     || texture.getTextureData().isPrepared())
-                    throw new IllegalArgumentException("Baked font page must release its fixed 1024x1024 upload data");
+                    throw new IllegalArgumentException("Baked font page must release its declared bounded upload data");
                 texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
                 regions.add(new TextureRegion(texture));
                 bytes += (long) texture.getWidth() * texture.getHeight() * 4;
@@ -42,12 +46,7 @@ public final class BakedUiFonts implements Disposable {
             JsonValue definitions = root.require("fonts");
             for (int i = 0; i < NAMES.length; i++) {
                 BitmapFontData data = readData(definitions.require(NAMES[i]));
-                for (Glyph[] glyphPage : data.glyphs) {
-                    if (glyphPage == null) continue;
-                    for (Glyph glyph : glyphPage)
-                        if (glyph != null && glyph.page >= pages.size)
-                            throw new IllegalArgumentException("Glyph page outside baked UI atlas: " + glyph.id);
-                }
+                validateGlyphBounds(data, pages.first().getWidth(), pages.first().getHeight(), pages.size);
                 // Full untrimmed page regions let BitmapFont calculate UVs without
                 // clipping metrics. The same ordered texture pages serve all fonts.
                 fonts[i] = new BitmapFont(data, regions, false);
@@ -120,6 +119,28 @@ public final class BakedUiFonts implements Disposable {
                 throw new IllegalArgumentException("Missing-glyph reference is not defined: " + id);
         }
         return data;
+    }
+
+    /** Preserve metrics while rejecting ink that would sample beyond its padded page. */
+    static void validateGlyphBounds(BitmapFontData data, int width, int height, int pageCount) {
+        if (width <= 0 || height <= 0 || pageCount <= 0)
+            throw new IllegalArgumentException("Baked font atlas dimensions must be positive");
+        for (Glyph[] glyphPage : data.glyphs) {
+            if (glyphPage == null) continue;
+            for (Glyph glyph : glyphPage) {
+                if (glyph == null) continue;
+                if (glyph.page < 0 || glyph.page >= pageCount)
+                    throw new IllegalArgumentException("Glyph page outside baked UI atlas: " + glyph.id);
+                if (glyph.width < 0 || glyph.height < 0)
+                    throw new IllegalArgumentException("Negative baked glyph dimensions: " + glyph.id);
+                // Space has a synthetic width for layout but no sampled pixels.
+                if (glyph.width == 0 || glyph.height == 0) continue;
+                if (glyph.srcX < 2 || glyph.srcY < 2
+                    || (long) glyph.srcX + glyph.width + 2 > width
+                    || (long) glyph.srcY + glyph.height + 2 > height)
+                    throw new IllegalArgumentException("Glyph exceeds baked UI atlas sampling gutter: " + glyph.id);
+            }
+        }
     }
 
     private static char[] chars(JsonValue value) {

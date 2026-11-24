@@ -63,6 +63,43 @@ class BakedUiFontsTest {
         assertThrows(IllegalArgumentException.class, () -> BakedUiFonts.readData(kerning));
     }
 
+    @Test void validatesTrimmedPageSamplingGuttersWithoutChangingSpaceOrLayout() {
+        BitmapFontData data = BakedUiFonts.readData(definition());
+        data.getGlyph('V').page = 0;
+        var glyph = data.getGlyph('A');
+        glyph.srcX = 1012; glyph.srcY = 746;
+        // Ink ends at (1022,766), retaining both outer gutter pixels.
+        assertDoesNotThrow(() -> BakedUiFonts.validateGlyphBounds(data, 1024, 768, 1));
+        assertEquals(0, data.getGlyph(' ').srcX);
+        assertEquals(8, data.getGlyph(' ').width);
+        assertEquals(8, data.getGlyph(' ').xadvance);
+        GlyphRun run = new GlyphRun();
+        data.getGlyphs(run, "AV A", 0, 4, null);
+        assertEquals(18f, run.xAdvances.get(1));
+        assertEquals(12f, run.xAdvances.get(3));
+
+        glyph.srcY++;
+        assertThrows(IllegalArgumentException.class, () -> BakedUiFonts.validateGlyphBounds(data, 1024, 768, 1));
+        glyph.srcY--;
+        glyph.srcX++;
+        assertThrows(IllegalArgumentException.class, () -> BakedUiFonts.validateGlyphBounds(data, 1024, 768, 1));
+    }
+
+    @Test void rejectsInvalidPageAndOverflowingRectanglesRatherThanWrappingCoordinates() {
+        BitmapFontData data = BakedUiFonts.readData(definition());
+        assertThrows(IllegalArgumentException.class, () -> BakedUiFonts.validateGlyphBounds(data, 1024, 768, 1));
+        data.getGlyph('V').page = 0;
+        var glyph = data.getGlyph('A');
+        glyph.srcX = Integer.MAX_VALUE;
+        glyph.width = 10;
+        assertThrows(IllegalArgumentException.class, () -> BakedUiFonts.validateGlyphBounds(data, 1024, 768, 1));
+        glyph.srcX = 1;
+        assertThrows(IllegalArgumentException.class, () -> BakedUiFonts.validateGlyphBounds(data, 1024, 768, 1));
+        glyph.srcX = 4;
+        glyph.height = -1;
+        assertThrows(IllegalArgumentException.class, () -> BakedUiFonts.validateGlyphBounds(data, 1024, 768, 1));
+    }
+
     private static JsonValue definition() {
         return new JsonReader().parse("""
             {"metrics":{"name":"fixture","flipped":false,
