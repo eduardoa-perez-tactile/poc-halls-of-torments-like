@@ -16,6 +16,7 @@ class ArenaTimelineTest {
         world.update(ArenaWorld.STEP);
         assertFalse(world.bossSpawned);
         assertTrue(world.timeRemaining() > 1000);
+        finishChoices(world); // The boundary jump also legitimately earns a timed reliquary.
         world.elapsed = timeline.durationSeconds() - ArenaWorld.STEP;
         world.update(ArenaWorld.STEP);
         assertTrue(world.bossSpawned);
@@ -29,6 +30,7 @@ class ArenaTimelineTest {
         world.elapsed = 660; world.update(ArenaWorld.STEP);
         assertEquals(7, world.wave);
         assertEquals(3, elites(world));
+        finishChoices(world);
         world.update(ArenaWorld.STEP);
         assertEquals(3, elites(world));
         world.elapsed = 1080; world.update(ArenaWorld.STEP);
@@ -60,6 +62,7 @@ class ArenaTimelineTest {
         ArenaWorld world = solo(new ArenaTimeline(new ArenaTimeline.Phase(10, ArenaTimeline.Pattern.SWARM, 2, 2, 1, null)));
         world.elapsed = 1.1f; world.update(.1f);
         assertEquals(0, world.activeEnemies);
+        finishChoices(world); // This ten-second fixture earns its first timed cache at 0.75 seconds.
         world.elapsed = 2; advanceToFirstPack(world);
         assertEquals(3, world.activeEnemies);
     }
@@ -106,6 +109,7 @@ class ArenaTimelineTest {
         world.activeEnemies = ArenaWorld.MAX_ENEMIES;
         world.elapsed = 180; world.update(ArenaWorld.STEP);
         assertEquals(0, elites(world));
+        finishChoices(world);
         world.enemies[0].active = false; world.activeEnemies--;
         world.update(ArenaWorld.STEP);
         assertEquals(1, elites(world));
@@ -143,6 +147,7 @@ class ArenaTimelineTest {
             enemy.kind = ArenaWorld.EnemyKind.GHOUL; enemy.soulPercent = 82;
             world.activeEnemies = 1; world.players[0].attackCooldown = 0;
             world.update(ArenaWorld.STEP);
+            finishChoices(world); // Level-ups pause later kills until both personal choices resolve.
         }
         assertEquals(82, world.souls);
         assertEquals(82, world.progression.totalXp);
@@ -172,5 +177,24 @@ class ArenaTimelineTest {
         int count = 0;
         for (ArenaWorld.Enemy enemy : world.enemies) if (enemy.active && enemy.elite) count++;
         return count;
+    }
+
+    private static void finishChoices(ArenaWorld world) {
+        for (int round = 0; round < PartyProgression.MAX_LEVEL + RunEquipment.MAX_REWARDS && world.choicePending(); round++) {
+            if (world.levelUpPending()) {
+                for (int slot = 0; slot < world.players.length; slot++) {
+                    PartyProgression.Offer offer = world.progression.offers[slot];
+                    if (world.players[slot].active && offer.pending)
+                        assertTrue(world.progression.choose(slot, offer.id, 0));
+                }
+            } else {
+                for (int slot = 0; slot < world.players.length; slot++) {
+                    RunEquipment.Offer offer = world.equipment.offers[slot];
+                    if (world.players[slot].active && offer.pending)
+                        assertTrue(world.equipment.choose(slot, offer.id, -1)); // Keep the fixture's base equipment.
+                }
+            }
+        }
+        assertFalse(world.choicePending(), "Resolve all earned party rounds before continuing combat assertions");
     }
 }

@@ -33,6 +33,7 @@ public final class ArenaRenderer implements Disposable {
     private final GameArt art;
     private final GameHud gameHud;
     private final SpriteBatch batch;
+    private final ShaderProgram paletteShader;
     private final FrameMetrics metrics;
     // One bounded static mesh; both cameras reuse the same floor, paths and wear colours.
     private final SpriteCache floorCache = createFloorCache();
@@ -60,7 +61,8 @@ public final class ArenaRenderer implements Disposable {
 
     public ArenaRenderer(GameArt gameArt, UiArt uiArt, BuildIcons buildIcons, HudArt hudArt, FrameMetrics frameMetrics) {
         metrics = frameMetrics;
-        batch = metrics == null ? new SpriteBatch(1800) : new ProfileBatch();
+        paletteShader = EnemyPalette.createShader();
+        batch = metrics == null ? new SpriteBatch(1800, paletteShader) : new ProfileBatch(paletteShader);
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
         floorLayout = new ArenaFloorLayout(new JsonReader().parse(Gdx.files.internal("arena/crypt-floor.json")));
         float radius = floorLayout.medallionDiameter * .5f;
@@ -169,7 +171,7 @@ public final class ArenaRenderer implements Disposable {
     /** Counts arena batch selections without intercepting GL or forcing extra flushes/fences. */
     private static final class ProfileBatch extends SpriteBatch {
         int textureSelections;
-        ProfileBatch() { super(1800); }
+        ProfileBatch(ShaderProgram shader) { super(1800, shader); }
         @Override protected void switchTexture(Texture texture) {
             textureSelections++;
             super.switchTexture(texture);
@@ -498,10 +500,9 @@ public final class ArenaRenderer implements Disposable {
                 batch.setColor(1f, .4f, .08f, .1f + progress * .1f);
                 batch.draw(art.glow, x - hazard.radius, y - hazard.radius * .5f,
                     hazard.radius * 2f, hazard.radius);
-                batch.setColor(1f, .52f, .15f, .82f);
-                ring(hazard.x, hazard.y, hazard.radius, 0f, 2f, 32);
-                batch.setColor(1f, .75f, .3f, .55f);
-                ring(hazard.x, hazard.y, hazard.radius * Math.max(.04f, 1f - progress), 0f, 1.5f, 24);
+                drawWarningRing(hazard.x, hazard.y, hazard.radius, 3f, 32);
+                drawWarningRing(hazard.x, hazard.y,
+                    hazard.radius * Math.max(.04f, 1f - progress), 2f, 24);
             } else {
                 float alpha = Math.min(1f, Math.max(0f, hazard.ttl * 3f));
                 batch.setColor(1f, .17f, .05f, alpha * .3f);
@@ -522,9 +523,11 @@ public final class ArenaRenderer implements Disposable {
                 if (!visible(camera, enemy.attackTargetX, enemy.attackTargetY, enemy.attackRadius + 80f)) continue;
                 if (age < ArenaWorld.BRUTE_STRIKE_END) {
                     boolean windup = age < ArenaWorld.BRUTE_WINDUP;
-                    batch.setColor(1f, windup ? .68f : .24f, windup ? .25f : .16f, .82f);
+                    batch.setColor(1f, windup ? .86f : .24f, windup ? .5f : .16f, windup ? 1f : .82f);
                     drawAura(world.elapsed, enemy.attackTargetX, enemy.attackTargetY,
                         enemy.attackRadius, EnemyAttackArt.Layer.ALL);
+                    if (windup) drawWarningRing(enemy.attackTargetX, enemy.attackTargetY,
+                        enemy.attackRadius, 2.8f, 28);
                 }
                 float strikeAge = age - ArenaWorld.BRUTE_WINDUP;
                 if (strikeAge >= 0 && strikeAge < .3f) {
@@ -548,14 +551,16 @@ public final class ArenaRenderer implements Disposable {
                     float y = MathUtils.lerp(enemy.attackStartY, enemy.attackTargetY, along);
                     if (!visible(camera, x, y, 40f)) continue;
                     boolean windup = age < ArenaWorld.WRAITH_WINDUP;
-                    batch.setColor(1f, windup ? .68f : .28f, .25f, windup ? .55f : .3f);
-                    drawAura(world.elapsed + rune * .125f, x, y, 13f, EnemyAttackArt.Layer.ALL);
+                    if (windup) drawWarningRune(world.elapsed + rune * .125f, x, y, 13f);
+                    else {
+                        batch.setColor(1f, .28f, .25f, .3f);
+                        drawAura(world.elapsed + rune * .125f, x, y, 13f, EnemyAttackArt.Layer.ALL);
+                    }
                 }
             } else if (enemy.attack == ArenaWorld.EnemyAttack.CULTIST_CAST
                 && age >= ArenaWorld.CULTIST_WINDUP - .15f && age < ArenaWorld.CULTIST_WINDUP
                 && visible(camera, enemy.attackTargetX, enemy.attackTargetY, 50f)) {
-                batch.setColor(1f, .68f, .25f, .65f);
-                drawAura(world.elapsed, enemy.attackTargetX, enemy.attackTargetY, 18f, EnemyAttackArt.Layer.ALL);
+                drawWarningRune(world.elapsed, enemy.attackTargetX, enemy.attackTargetY, 18f);
             }
         }
         for (ArenaWorld.Player player : world.players) {
@@ -565,6 +570,21 @@ public final class ArenaRenderer implements Disposable {
             drawAura(world.elapsed, player.x, player.y, 100f + player.auraLevel * 20f, EnemyAttackArt.Layer.ALL);
         }
         batch.setColor(Color.WHITE);
+    }
+
+    /** A dark edge and opaque ivory core remain legible over both paving and engraving. */
+    private void drawWarningRing(float x, float y, float radius, float thickness, int segments) {
+        batch.setColor(.04f, .025f, .015f, .92f);
+        ring(x, y, radius, 0f, thickness + 3f, segments);
+        batch.setColor(1f, .91f, .55f, 1f);
+        ring(x, y, radius, 0f, thickness, segments);
+    }
+
+    private void drawWarningRune(float age, float x, float y, float radius) {
+        batch.setColor(.04f, .025f, .015f, .92f);
+        drawAura(age, x, y, radius + 2f, EnemyAttackArt.Layer.ALL);
+        batch.setColor(1f, .94f, .65f, 1f);
+        drawAura(age, x, y, radius, EnemyAttackArt.Layer.ALL);
     }
 
     /** One quiet projected ground ring, using the same primary range as target acquisition. */
@@ -846,8 +866,9 @@ public final class ArenaRenderer implements Disposable {
     }
 
     private void setEnemyBodyColor(ArenaWorld.Enemy enemy) {
-        // Damage feedback briefly overrides the stable cosmetic palette.
+        // Material palettes preserve luminance in the shader; ordinary tints use vertex colour.
         if (enemy.hitFlash > 0f) batch.setColor(1f, .8f, .63f, 1f);
+        else if (EnemyPalette.materialAware(enemy.variant)) batch.setColor(Color.WHITE);
         else batch.setColor(enemy.variant.red, enemy.variant.green, enemy.variant.blue, 1f);
     }
 
@@ -865,6 +886,7 @@ public final class ArenaRenderer implements Disposable {
                 drawArrival(enemy, VfxArt.Layer.BACK);
                 drawEnemyAura(enemy, EnemyAttackArt.Layer.BACK);
                 setEnemyBodyColor(enemy);
+                EnemyVariant bodyVariant = enemy.hitFlash > 0f ? EnemyVariant.ORIGINAL : enemy.variant;
                 GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(enemy.kind));
                 ActorAnimation.State state = ActorAnimation.state(enemy);
                 float recoil = MathUtils.sin(MathUtils.clamp(enemy.hitFlash / .12f, 0f, 1f) * MathUtils.PI)
@@ -877,23 +899,24 @@ public final class ArenaRenderer implements Disposable {
                         && enemy.attackAge >= ArenaWorld.WRAITH_WINDUP
                         && enemy.attackAge < ArenaWorld.WRAITH_WINDUP + ArenaWorld.WRAITH_DASH_SECONDS) {
                         for (int ghost = 2; ghost >= 1; ghost--) {
-                            batch.setColor(enemy.variant.red, enemy.variant.green, enemy.variant.blue,
-                                ghost == 1 ? .24f : .12f);
+                            float alpha = ghost == 1 ? .24f : .12f;
+                            if (EnemyPalette.materialAware(enemy.variant)) batch.setColor(1f, 1f, 1f, alpha);
+                            else batch.setColor(enemy.variant.red, enemy.variant.green, enemy.variant.blue, alpha);
                             art.enemyAttacks.drawActor(batch, enemy.kind, facing, enemy.attackAge,
                                 sx - screenX(enemy.castFacingX, enemy.castFacingY) * ghost * 18f,
                                 sy - screenY(enemy.castFacingX, enemy.castFacingY) * ghost * 18f,
-                                actor.pixelScale * scale);
+                                actor.pixelScale * scale, enemy.variant);
                         }
                         setEnemyBodyColor(enemy);
                     }
                     art.enemyAttacks.drawActor(batch, enemy.kind, facing, enemy.attackAge,
                         sx + screenX(enemy.hitDirectionX, enemy.hitDirectionY) * recoil,
-                        sy + screenY(enemy.hitDirectionX, enemy.hitDirectionY) * recoil, actor.pixelScale * scale);
+                        sy + screenY(enemy.hitDirectionX, enemy.hitDirectionY) * recoil, actor.pixelScale * scale, bodyVariant);
                 } else {
                     int frame = actor.clip(state, ActorAnimation.facing(enemy, state)).frame(ActorAnimation.phase(enemy, state));
                     drawFrameOffset(frame, enemy.x, enemy.y, actor.pixelScale * scale,
                         screenX(enemy.hitDirectionX, enemy.hitDirectionY) * recoil,
-                        screenY(enemy.hitDirectionX, enemy.hitDirectionY) * recoil);
+                        screenY(enemy.hitDirectionX, enemy.hitDirectionY) * recoil, bodyVariant);
                 }
                 drawEnemyAura(enemy, EnemyAttackArt.Layer.FRONT);
                 drawArrival(enemy, VfxArt.Layer.FRONT);
@@ -1052,8 +1075,12 @@ public final class ArenaRenderer implements Disposable {
     }
 
     private void drawFrameOffset(int index, float x, float y, float scale, float offsetX, float offsetY) {
+        drawFrameOffset(index, x, y, scale, offsetX, offsetY, EnemyVariant.ORIGINAL);
+    }
+
+    private void drawFrameOffset(int index, float x, float y, float scale, float offsetX, float offsetY, EnemyVariant variant) {
         GameplayAtlas.Frame frame = art.metadata.frames[index];
-        batch.draw(art.frame(index), screenX(x, y) + frame.left * scale + offsetX,
+        batch.draw(art.frame(index, variant), screenX(x, y) + frame.left * scale + offsetX,
             screenY(x, y) + frame.bottom * scale + offsetY, frame.width * scale, frame.height * scale);
     }
 
@@ -1100,5 +1127,5 @@ public final class ArenaRenderer implements Disposable {
     }
     private static float screenX(float x, float y) { return (x - y) * ISO_X; }
     private static float screenY(float x, float y) { return (x + y) * ISO_Y; }
-    @Override public void dispose() { floorCache.dispose(); batch.dispose(); }
+    @Override public void dispose() { floorCache.dispose(); batch.dispose(); paletteShader.dispose(); }
 }
