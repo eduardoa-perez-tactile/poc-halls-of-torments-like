@@ -845,6 +845,12 @@ public final class ArenaRenderer implements Disposable {
             screenX(player.x, player.y), screenY(player.x, player.y), LEVEL_FX_SCALE, 0f, layer);
     }
 
+    private void setEnemyBodyColor(ArenaWorld.Enemy enemy) {
+        // Damage feedback briefly overrides the stable cosmetic palette.
+        if (enemy.hitFlash > 0f) batch.setColor(1f, .8f, .63f, 1f);
+        else batch.setColor(enemy.variant.red, enemy.variant.green, enemy.variant.blue, 1f);
+    }
+
     private void drawSprites(ArenaWorld world, OrthographicCamera camera, int viewer) {
         for (int i = 0; i < sortCount; i++) {
             int index = indices[i];
@@ -858,9 +864,7 @@ public final class ArenaRenderer implements Disposable {
                 float scale = enemyScale(enemy);
                 drawArrival(enemy, VfxArt.Layer.BACK);
                 drawEnemyAura(enemy, EnemyAttackArt.Layer.BACK);
-                // Original painted identities retain their own colours. Damage feedback is transient.
-                if (enemy.hitFlash > 0f) batch.setColor(1f, .8f, .63f, 1f);
-                else batch.setColor(Color.WHITE);
+                setEnemyBodyColor(enemy);
                 GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(enemy.kind));
                 ActorAnimation.State state = ActorAnimation.state(enemy);
                 float recoil = MathUtils.sin(MathUtils.clamp(enemy.hitFlash / .12f, 0f, 1f) * MathUtils.PI)
@@ -873,13 +877,14 @@ public final class ArenaRenderer implements Disposable {
                         && enemy.attackAge >= ArenaWorld.WRAITH_WINDUP
                         && enemy.attackAge < ArenaWorld.WRAITH_WINDUP + ArenaWorld.WRAITH_DASH_SECONDS) {
                         for (int ghost = 2; ghost >= 1; ghost--) {
-                            batch.setColor(1f, 1f, 1f, ghost == 1 ? .24f : .12f);
+                            batch.setColor(enemy.variant.red, enemy.variant.green, enemy.variant.blue,
+                                ghost == 1 ? .24f : .12f);
                             art.enemyAttacks.drawActor(batch, enemy.kind, facing, enemy.attackAge,
                                 sx - screenX(enemy.castFacingX, enemy.castFacingY) * ghost * 18f,
                                 sy - screenY(enemy.castFacingX, enemy.castFacingY) * ghost * 18f,
                                 actor.pixelScale * scale);
                         }
-                        batch.setColor(Color.WHITE);
+                        setEnemyBodyColor(enemy);
                     }
                     art.enemyAttacks.drawActor(batch, enemy.kind, facing, enemy.attackAge,
                         sx + screenX(enemy.hitDirectionX, enemy.hitDirectionY) * recoil,
