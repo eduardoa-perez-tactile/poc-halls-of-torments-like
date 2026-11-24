@@ -79,3 +79,38 @@ sprites remain unchanged. All existing runtime artwork is preserved.
 Native co-op capture confirms the gold/teal rings stay flat and tight around both
 heroes. Current build/transition/performance evidence is recorded in
 [Defeat verification](end-screens.md#defeat-fade-verification).
+
+## Approved glowing double-ring replacement (2026-11-24)
+
+The later user-approved mockup supersedes the single thin ring above. Living
+players now have two luminous concentric rings at 26/32-world-unit radii, eight
+short radial ticks from 30.5→36.5 units, and a soft narrow gradient halo. Gold and
+teal have slightly brighter cores. The complete effect occupies 73×36.5 logical
+units and stays in the true 2:1 ground plane; radius 38 is its conservative culling
+bound. The centre remains transparent and the glow stays beneath every actor.
+
+Each draw uses 712 cached quads, with 102,528 bytes of fixed CPU array payload. The
+existing white texel supplies all colours/gradients, adding zero textures or
+retained Pixmaps; no frame-loop allocations or trigonometry are introduced.
+The same ground pass/living-player gate remains. Difficulty, actual attack
+radii, equipment sustain, Soul Circle, Dodge and the Defeat transition are
+unchanged. The approved mockup, exact built-in ImageGen prompt and provenance
+are preserved in `art-source/glowing-player-auras/`; no mockup pixels enter runtime.
+
+### Glowing-aura verification
+
+JDK 21 desktop compilation and Android debug assembly passed. Native OpenGL
+captures show both colours at the feet and deliberate enemy overlap confirms
+that bodies occlude the entire effect. The isolated renderer exercised 62 enemies
+with both players visible in both panes (four aura draws), then sampled 180 static
+frames after warm-up: renderer submission wall p50/p95/p99/max 0.641/0.819/0.903/
+0.932 ms. This excludes simulation, audio, menu UI and GPU completion; it does not
+establish sustained physical-TV 60 FPS. No textures were added and gameplay retained
+zero Pixmaps. Existing runtime artwork and all difficulty/sustain/Defeat files
+remain unchanged.
+
+The TV emulator was running a separate game, so its activity, controller server,
+LAN relay/QR configuration and existing forwards were left alone. Verification
+used a separate desktop GL process, which was closed afterward. The Android APK
+is available for playtesting; its updated rendering was not launched on that busy
+emulator. Native captures/logs are ignored under `.run/glowing-auras/`.
