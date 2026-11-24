@@ -27,8 +27,8 @@ public final class OutcomeArt implements Disposable {
 
         public Titles() {
             try {
-                textures[0] = loadTitle("art/runtime-ui/victory-title.zktx");
-                textures[1] = loadTitle("art/runtime-ui/defeat-title.zktx");
+                textures[0] = loadTitle("art/runtime-ui/victory-title.ktx");
+                textures[1] = loadTitle("art/runtime-ui/defeat-title.ktx");
             } catch (RuntimeException | Error failure) {
                 dispose();
                 throw failure;

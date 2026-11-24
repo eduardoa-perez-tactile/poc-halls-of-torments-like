@@ -38,8 +38,8 @@ public final class MenuSceneArt extends BaseDrawable implements Disposable {
         JsonValue layers = new JsonReader().parse(Gdx.files.internal("art/runtime-ui/menu-layers.json")).require("layers");
         Texture roomTexture = null, packedTexture = null;
         try {
-            roomTexture = texture("art/runtime-ui/menu-base.zktx", WIDTH, HEIGHT);
-            packedTexture = texture("art/runtime-ui/menu-atlas.zktx", ATLAS_WIDTH, ATLAS_HEIGHT);
+            roomTexture = texture("art/runtime-ui/menu-base.ktx", WIDTH, HEIGHT);
+            packedTexture = texture("art/runtime-ui/menu-atlas.ktx", ATLAS_WIDTH, ATLAS_HEIGHT);
             left = new Layer(layers.require("left"), packedTexture);
             right = new Layer(layers.require("right"), packedTexture);
             orb = new Layer(layers.require("orb"), packedTexture);

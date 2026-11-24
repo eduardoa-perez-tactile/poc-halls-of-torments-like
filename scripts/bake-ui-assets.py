@@ -47,7 +47,7 @@ def main():
         subprocess.run([str(jdk / 'bin/java'), '-Xmx768m', '-cp', str(classes) + os.pathsep + classpath,
                         'BakeUiAssets', str(args.output.resolve()), str(args.phone_output.resolve()), revision],
                        check=True, cwd=ROOT / 'assets')
-    # Verify decoded output pixels, including PNG row orientation and alpha bytes.
+    # Verify exact RGBA bytes in upload containers and decoded HTTP PNGs.
     from PIL import Image
     manifest = json.loads((args.output / 'manifest.json').read_text())
     for name, info in manifest['outputs'].items():
@@ -55,11 +55,9 @@ def main():
         expected = info.get('pngSha256', info.get('fileSha256'))
         assert hashlib.sha256(path.read_bytes()).hexdigest() == expected, name
         if 'rgbaSha256' in info:
-            if path.suffix == '.zktx':
-                import gzip, struct
-                raw = gzip.decompress(path.read_bytes())
-                assert struct.unpack('>I', raw[:4])[0] == len(raw) - 4, name
-                ktx = raw[4:]
+            if path.suffix == '.ktx':
+                import struct
+                ktx = path.read_bytes()
                 assert ktx[:12] == b'\xabKTX 11\xbb\r\n\x1a\n', name
                 fields = struct.unpack('<13I', ktx[12:64])
                 assert fields == (0x04030201, 0x1401, 1, 0x1908, 0x1908, 0x1908,
@@ -71,7 +69,7 @@ def main():
                 assert image.size == (info['width'], info['height']), name
                 pixels = image.tobytes()
             assert hashlib.sha256(pixels).hexdigest() == info['rgbaSha256'], name
-    print(f"Verified {len(manifest['outputs'])} pixel/PNG exports against original in-memory LibGDX outputs.")
+    print(f"Verified {len(manifest['outputs'])} RGBA/container/phone exports against original in-memory LibGDX outputs.")
 
 
 if __name__ == '__main__':

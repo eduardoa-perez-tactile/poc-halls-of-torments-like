@@ -40,8 +40,8 @@ public final class BakeUiAssets {
         OutcomeArt.Titles titles = new OutcomeArt.Titles();
         try {
             MenuSceneArt scene = ui.menuScene;
-            png("menu-base.png", pixels(scene.base));
-            png("menu-atlas.png", (Pixmap) field(scene, "atlasPixels"));
+            texture("menu-base.png", pixels(scene.base));
+            texture("menu-atlas.png", (Pixmap) field(scene, "atlasPixels"));
             Map<String, Object> layers = new LinkedHashMap<>();
             for (String name : List.of("left", "right", "orb")) layers.put(name, layer(field(scene, name)));
             // The original crest only retained its TextureRegion, not its normalized placement.
@@ -50,18 +50,18 @@ public final class BakeUiAssets {
                 "atlasWidth", crest.getRegionWidth(), "atlasHeight", crest.getRegionHeight(),
                 "x", 0, "y", 0, "width", 1, "height", 1));
             writeJson(output.resolve("menu-layers.json"), Map.of("layers", layers));
-            png("panel.png", pixels((Texture) field(ui, "panelTexture")));
-            png("button.png", pixels((Texture) field(ui, "buttonTexture")));
-            png("button-focused.png", pixels((Texture) field(ui, "focusedButtonTexture")));
-            png("logo.png", pixels(ui.homeLogo));
-            png("skill-icons.png", (Pixmap) field(icons, "pixels"));
-            png("victory-title.png", pixels(titles.get(true)));
-            png("defeat-title.png", pixels(titles.get(false)));
+            texture("panel.png", pixels((Texture) field(ui, "panelTexture")));
+            texture("button.png", pixels((Texture) field(ui, "buttonTexture")));
+            texture("button-focused.png", pixels((Texture) field(ui, "focusedButtonTexture")));
+            texture("logo.png", pixels(ui.homeLogo));
+            texture("skill-icons.png", (Pixmap) field(icons, "pixels"));
+            texture("victory-title.png", pixels(titles.get(true)));
+            texture("defeat-title.png", pixels(titles.get(false)));
             var packer = (PixmapPacker) field(ui, "fontPacker");
             List<String> pages = new ArrayList<>();
             for (int i = 0; i < packer.getPages().size; i++) {
                 String name = "font-page-" + i + ".png";
-                png(name, packer.getPages().get(i).getPixmap()); pages.add(name.replace(".png", ".zktx"));
+                texture(name, packer.getPages().get(i).getPixmap()); pages.add(name.replace(".png", ".ktx"));
             }
             Map<String, Object> fonts = new LinkedHashMap<>();
             for (String name : List.of("title", "heading", "section", "body", "small"))
@@ -172,7 +172,7 @@ public final class BakeUiAssets {
         Field field = object.getClass().getDeclaredField(name); field.setAccessible(true); return field.get(object);
     }
     private static Pixmap pixels(Texture texture) { return texture.getTextureData().consumePixmap(); }
-    private static void png(String name, Pixmap pixels) throws Exception {
+    private static void texture(String name, Pixmap pixels) throws Exception {
         ByteBuffer source = pixels.getPixels().duplicate(); source.position(0);
         byte[] rgba = new byte[pixels.getWidth() * pixels.getHeight() * 4]; source.get(rgba);
         // Four PNGs are also HTTP assets. The TV uses lossless ready-to-upload RGBA KTX.
@@ -189,10 +189,8 @@ public final class BakeUiAssets {
         ktx.putInt(0x04030201).putInt(0x1401).putInt(1).putInt(0x1908).putInt(0x1908).putInt(0x1908);
         ktx.putInt(pixels.getWidth()).putInt(pixels.getHeight()).putInt(0).putInt(0).putInt(1).putInt(1).putInt(0);
         ktx.putInt(rgba.length).put(rgba);
-        String packed = name.replace(".png", ".zktx");
-        try (var out = new java.io.DataOutputStream(new java.util.zip.GZIPOutputStream(Files.newOutputStream(output.resolve(packed))))) {
-            out.writeInt(ktx.capacity()); out.write(ktx.array());
-        }
+        String packed = name.replace(".png", ".ktx");
+        Files.write(output.resolve(packed), ktx.array());
         outputs.put(packed, Map.of("width", pixels.getWidth(), "height", pixels.getHeight(),
             "rgbaSha256", sha(rgba), "fileSha256", sha(Files.readAllBytes(output.resolve(packed)))));
     }

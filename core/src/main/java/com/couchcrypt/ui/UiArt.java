@@ -54,11 +54,11 @@ public final class UiArt implements Disposable {
         scrim = fill(new Color(0.015f, 0.02f, 0.025f, 0.82f));
         goldLine = fill(new Color(GOLD.r, GOLD.g, GOLD.b, 0.42f));
         // Exact former bake outputs; Android reloads from these files without retained decoded copies.
-        panelTexture = runtime("panel.zktx", 512, 512);
+        panelTexture = runtime("panel.ktx", 512, 512);
         panel = patch(panelTexture, 72, 72, 36, 36);
         // Shared bounds are essential: focused glow must not move or shrink the slab.
-        buttonTexture = runtime("button.zktx", 1024, 224);
-        focusedButtonTexture = runtime("button-focused.zktx", 1024, 224);
+        buttonTexture = runtime("button.ktx", 1024, 224);
+        focusedButtonTexture = runtime("button-focused.ktx", 1024, 224);
         NinePatchDrawable plate = patch(buttonTexture, 144, 64, 42, 20);
         NinePatchDrawable selectedPlate = patch(focusedButtonTexture, 144, 64, 42, 20);
         Drawable focusRim = bordered(Color.CLEAR, GOLD);
@@ -71,7 +71,7 @@ public final class UiArt implements Disposable {
         cardNormal = new Button.ButtonStyle(panel, focusPanel, panel);
         cardFocused = new Button.ButtonStyle(focusPanel, focusPanel, focusPanel);
         menuScene = new MenuSceneArt();
-        homeLogo = runtime("logo.zktx", 1536, 384);
+        homeLogo = runtime("logo.ktx", 1536, 384);
         NinePatchDrawable homePlate = patch(buttonTexture, 144, 64, 72, 32);
         NinePatchDrawable homeFocus = patch(focusedButtonTexture, 144, 64, 72, 32);
         homeNormal = new Button.ButtonStyle(homePlate, homeFocus, homePlate);
