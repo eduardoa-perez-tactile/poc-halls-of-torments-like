@@ -25,7 +25,7 @@ public final class GameAudio implements Disposable {
     private boolean enabled;
     private int sword, arrows, deaths, pickups, hits, level, swordHits, boltHits, criticalHits,
         dodges, blocks, heals, auras, storms, wraithDashes, bruteSlams, hostileShots, starts, variation;
-    private boolean boss;
+    private boolean boss, sovereign;
     private ArenaWorld.Outcome outcome;
 
     public GameAudio() {
@@ -73,7 +73,7 @@ public final class GameAudio implements Disposable {
         if (world.outcome != outcome && world.outcome != ArenaWorld.Outcome.RUNNING) {
             stop();
             play(world.outcome == ArenaWorld.Outcome.VICTORY ? VICTORY : DEFEAT, .48f, 5, 0);
-        } else if (world.bossSpawned && !boss) {
+        } else if ((world.bossSpawned && !boss) || (world.sovereignSpawned && !sovereign)) {
             stop(); play(BOSS, .48f, 5, 0);
         } else if (world.progression.level != level) {
             stop(); play(LEVEL, .42f, 5, 0);
@@ -107,7 +107,7 @@ public final class GameAudio implements Disposable {
         dodges = world.dodges; blocks = world.blockedHits; heals = world.healsCollected;
         auras = world.auraPulses; storms = world.stormCasts;
         wraithDashes = world.wraithDashes; bruteSlams = world.bruteSlams; hostileShots = world.hostileShotsFired;
-        boss = world.bossSpawned; outcome = world.outcome;
+        boss = world.bossSpawned; sovereign = world.sovereignSpawned; outcome = world.outcome;
     }
 
     private void play(int cue, float volume, int priority, float gate) {

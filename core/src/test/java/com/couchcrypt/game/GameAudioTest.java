@@ -11,6 +11,22 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Real event-routing checks with a fake native mixer; no GL context or device audio is required. */
 class GameAudioTest {
+    @Test void eachBossGetsOneArrivalCueEvenWhenSovereignSurvivesIntoFinale() {
+        Mixer mixer = new Mixer(); ArenaWorld world = new ArenaWorld();
+        try (Fixture f = new Fixture(mixer, world, true)) {
+            world.sovereignSpawned = true;
+            f.audio.update(world, .016f);
+            f.audio.update(world, .25f);
+            assertEquals(List.of("boss"), mixer.played);
+            world.bossSpawned = true;
+            f.audio.update(world, .016f);
+            f.audio.update(world, .25f);
+            assertEquals(List.of("boss", "boss"), mixer.played);
+            f.audio.reset(world); f.audio.update(world, .016f);
+            assertEquals(2, mixer.played.size(), "Restoring a live encounter must not replay arrival cues");
+        }
+    }
+
     @Test void bothWeaponsAreAudibleAndGatedEventsNeverReplayLater() {
         Mixer mixer = new Mixer(); ArenaWorld world = new ArenaWorld();
         try (Fixture f = new Fixture(mixer, world, true)) {

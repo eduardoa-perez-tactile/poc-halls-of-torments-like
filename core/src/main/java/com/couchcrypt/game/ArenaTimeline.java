@@ -38,7 +38,7 @@ public final class ArenaTimeline {
                 || !Float.isFinite(encounterInterval) || encounterInterval <= 0
                 || !Float.isFinite(cycleSeconds) || cycleSeconds <= 0
                 || !Float.isFinite(breatherSeconds) || breatherSeconds < 0 || breatherSeconds >= cycleSeconds
-                || eliteKind == ArenaWorld.EnemyKind.BOSS)
+                || ArenaWorld.isBoss(eliteKind))
                 throw new IllegalArgumentException("Invalid encounter phase");
         }
         public boolean breathing(float phaseElapsed) { return phaseElapsed % cycleSeconds >= cycleSeconds - breatherSeconds; }
@@ -79,6 +79,8 @@ public final class ArenaTimeline {
     public int phaseCount() { return phases.size(); }
     public Phase phase(int index) { return phases.get(index); }
     public float durationSeconds() { return duration; }
+    /** Twelve minutes in production, proportionally shortened only in development fixtures. */
+    public float sovereignSeconds() { return duration * .6f; }
 
     public int phaseIndex(float elapsed) {
         float end = 0;

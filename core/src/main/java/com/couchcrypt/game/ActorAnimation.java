@@ -2,7 +2,7 @@ package com.couchcrypt.game;
 
 /** Allocation-free presentation selection. Reading it never advances simulation. */
 public final class ActorAnimation {
-    public enum Actor { WARDEN, RANGER, GHOUL, WRAITH, BRUTE, CULTIST, SOVEREIGN }
+    public enum Actor { WARDEN, RANGER, GHOUL, WRAITH, BRUTE, CULTIST, SOVEREIGN, GRAVE_KING }
     public enum Facing { SE, SW, NE, NW }
     public enum State { IDLE, MOVE, ATTACK, DODGE, HIT, DOWNED, WINDUP }
     public static final float SWORD_SECONDS = .18f, SHOT_SECONDS = .30f, RELEASE_SECONDS = .18f;
@@ -27,7 +27,8 @@ public final class ActorAnimation {
             case WRAITH -> Actor.WRAITH;
             case BRUTE -> Actor.BRUTE;
             case CULTIST -> Actor.CULTIST;
-            case BOSS -> Actor.SOVEREIGN;
+            case SOVEREIGN -> Actor.SOVEREIGN;
+            case BOSS -> Actor.GRAVE_KING;
         };
     }
 
@@ -58,7 +59,8 @@ public final class ActorAnimation {
 
     public static State state(ArenaWorld.Enemy enemy) {
         if (enemy.attack != ArenaWorld.EnemyAttack.NONE) return enemy.windup > 0 ? State.WINDUP : State.ATTACK;
-        if ((enemy.kind == ArenaWorld.EnemyKind.CULTIST || enemy.kind == ArenaWorld.EnemyKind.BOSS)
+        if ((enemy.kind == ArenaWorld.EnemyKind.CULTIST || enemy.kind == ArenaWorld.EnemyKind.BOSS
+            || enemy.kind == ArenaWorld.EnemyKind.SOVEREIGN)
             && enemy.releaseAge < RELEASE_SECONDS) return State.ATTACK;
         if (enemy.windup > 0) return State.WINDUP;
         // Hovering cloth can move without implying that a stunned ghost travels.

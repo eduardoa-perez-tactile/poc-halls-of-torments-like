@@ -27,6 +27,8 @@ public final class ArenaRenderer implements Disposable {
     private static final float LEVEL_FX_SCALE = 1.6f, RECOIL_MARGIN = 30f;
     // Cosmetic foot markers: deliberately independent of gameplay targeting/damage radii.
     private static final float PLAYER_AURA_RADIUS = 48f, SOUL_PULSE_RADIUS = 60f;
+    // Keep the painted cutting trail near the weapon's scale, independent of reach upgrades.
+    private static final float WARDEN_SLASH_RADIUS = 48f;
     // Fixed SE/SW/NE/NW release landmarks, in untrimmed source pixels relative to the ground root.
     // Only the rendered origin moves; the simulation keeps its original projectile coordinates and trajectory.
     private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
@@ -462,17 +464,22 @@ public final class ArenaRenderer implements Disposable {
     private void drawShots(ArenaWorld world, OrthographicCamera camera) {
         for (ArenaWorld.Shot shot : world.shots) {
             if (!shot.active) continue;
-            boolean boss = shot.casterKind == ArenaWorld.EnemyKind.BOSS;
+            boolean graveKing = shot.casterKind == ArenaWorld.EnemyKind.BOSS;
+            boolean sovereign = shot.casterKind == ArenaWorld.EnemyKind.SOVEREIGN;
+            boolean boss = graveKing || sovereign;
             ActorAnimation.Facing facing = ActorAnimation.facing(shot.launchFacingX,
                 shot.launchFacingY, ActorAnimation.Facing.SE);
             int origin = facing.ordinal() * 2;
-            float scale = art.actor(boss ? ActorAnimation.Actor.SOVEREIGN : ActorAnimation.Actor.CULTIST).pixelScale
-                * enemyScale(boss ? ArenaWorld.EnemyKind.BOSS : ArenaWorld.EnemyKind.CULTIST, shot.casterElite);
+            float scale = art.actor(ActorAnimation.actor(shot.casterKind)).pixelScale
+                * enemyScale(shot.casterKind, shot.casterElite);
             // The launch pose is a value snapshot: turning, death and pool reuse cannot move a missile's emitter.
-            float ox = boss ? SOVEREIGN_ORIGIN[origin] : art.enemyAttacks.muzzleX(ArenaWorld.EnemyKind.CULTIST, facing);
-            float oy = boss ? SOVEREIGN_ORIGIN[origin + 1] : art.enemyAttacks.muzzleY(ArenaWorld.EnemyKind.CULTIST, facing);
+            float ox = sovereign ? SOVEREIGN_ORIGIN[origin] : graveKing ? 0f
+                : art.enemyAttacks.muzzleX(ArenaWorld.EnemyKind.CULTIST, facing);
+            float oy = sovereign ? SOVEREIGN_ORIGIN[origin + 1] : graveKing ? 36f
+                : art.enemyAttacks.muzzleY(ArenaWorld.EnemyKind.CULTIST, facing);
             float x = screenX(shot.x, shot.y) + ox * scale;
-            float y = screenY(shot.x, shot.y) + oy * scale;
+            float y = screenY(shot.x, shot.y) + oy * scale
+                + (graveKing ? graveKingHover(world.elapsed - shot.age) : 0f);
             drawMagicProjectile(camera, boss ? MagicProjectileArt.Type.SOVEREIGN : MagicProjectileArt.Type.CULTIST,
                 shot.age, x, y, shot.vx, shot.vy, boss ? 1.5f : 1.15f);
         }
@@ -612,8 +619,8 @@ public final class ArenaRenderer implements Disposable {
     }
 
     private void drawEnemyAura(ArenaWorld.Enemy enemy, EnemyAttackArt.Layer layer) {
-        if (enemy.elite || enemy.kind == ArenaWorld.EnemyKind.BOSS) {
-            boolean boss = enemy.kind == ArenaWorld.EnemyKind.BOSS;
+        if (enemy.elite || enemy.kind == ArenaWorld.EnemyKind.BOSS || enemy.kind == ArenaWorld.EnemyKind.SOVEREIGN) {
+            boolean boss = enemy.kind == ArenaWorld.EnemyKind.BOSS || enemy.kind == ArenaWorld.EnemyKind.SOVEREIGN;
             batch.setColor(boss ? 1f : .72f, boss ? .26f : .47f, boss ? .18f : 1f, .56f);
             drawAura(enemy.animTime, enemy.x, enemy.y, Math.max(32f, enemy.radius + 12f), layer);
         }
@@ -635,7 +642,7 @@ public final class ArenaRenderer implements Disposable {
                     batch.setColor(Color.WHITE);
                     // The painted crescent faces screen-down at angle zero. Rotate before projection.
                     art.spriteEffects.drawGround(batch, SpriteEffectArt.Type.SWORD_SWEEP, effectProgress(effect),
-                        x, y + 45f, effect.radius, effect.angle + MathUtils.PI * .75f, SpriteEffectArt.Layer.ALL);
+                        x, y + 45f, WARDEN_SLASH_RADIUS, effect.angle + MathUtils.PI * .75f, SpriteEffectArt.Layer.ALL);
                 }
                 case HIT -> {
                     float lift = impactLift(effect);
@@ -741,7 +748,7 @@ public final class ArenaRenderer implements Disposable {
     }
 
     private static float enemyScale(ArenaWorld.EnemyKind kind, boolean elite) {
-        float scale = kind == ArenaWorld.EnemyKind.BOSS ? 2.2f
+        float scale = kind == ArenaWorld.EnemyKind.BOSS || kind == ArenaWorld.EnemyKind.SOVEREIGN ? 2.2f
             : kind == ArenaWorld.EnemyKind.BRUTE ? 1.4f
             : kind == ArenaWorld.EnemyKind.WRAITH ? .82f : 1f;
         return scale * (elite ? 1.18f : 1f);
@@ -749,6 +756,11 @@ public final class ArenaRenderer implements Disposable {
 
     private static float spawnScale(ArenaWorld.Enemy enemy) {
         return Math.min(1.8f, 1.4f * enemyScale(enemy));
+    }
+
+    /** Visual lift uses the paused combat clock; collision and ground sorting never hover. */
+    private static float graveKingHover(float combatTime) {
+        return 18f + MathUtils.sin(combatTime * 2.2f) * 3.5f;
     }
 
     private void drawArrival(ArenaWorld.Enemy enemy, VfxArt.Layer layer) {
@@ -788,7 +800,8 @@ public final class ArenaRenderer implements Disposable {
                 GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(enemy.kind));
                 ActorAnimation.State state = ActorAnimation.state(enemy);
                 float recoil = MathUtils.sin(MathUtils.clamp(enemy.hitFlash / .12f, 0f, 1f) * MathUtils.PI)
-                    * (enemy.kind == ArenaWorld.EnemyKind.BOSS ? 1.5f : enemy.kind == ArenaWorld.EnemyKind.BRUTE ? 4f : 8f);
+                    * (enemy.kind == ArenaWorld.EnemyKind.BOSS || enemy.kind == ArenaWorld.EnemyKind.SOVEREIGN ? 1.5f
+                        : enemy.kind == ArenaWorld.EnemyKind.BRUTE ? 4f : 8f);
                 // This short reaction moves only the paint. Ground root, shadow, sort and collision stay fixed.
                 if (enemy.attack != ArenaWorld.EnemyAttack.NONE) {
                     ActorAnimation.Facing facing = ActorAnimation.facing(enemy, state);
@@ -814,7 +827,8 @@ public final class ArenaRenderer implements Disposable {
                     int frame = actor.clip(state, ActorAnimation.facing(enemy, state)).frame(ActorAnimation.phase(enemy, state));
                     drawFrameOffset(frame, enemy.x, enemy.y, actor.pixelScale * scale,
                         screenX(enemy.hitDirectionX, enemy.hitDirectionY) * recoil,
-                        screenY(enemy.hitDirectionX, enemy.hitDirectionY) * recoil, bodyVariant);
+                        screenY(enemy.hitDirectionX, enemy.hitDirectionY) * recoil
+                            + (enemy.kind == ArenaWorld.EnemyKind.BOSS ? graveKingHover(world.elapsed) : 0f), bodyVariant);
                 }
                 drawEnemyAura(enemy, EnemyAttackArt.Layer.FRONT);
                 drawArrival(enemy, VfxArt.Layer.FRONT);
@@ -1001,7 +1015,7 @@ public final class ArenaRenderer implements Disposable {
     private static boolean visibleActor(OrthographicCamera camera, float x, float y,
                                         GameplayAtlas.Actor actor, float scale) {
         // Include a small shadow/elite-bar margin around the precomputed complete action envelope.
-        float above = actor.maxAbove * scale + 12f;
+        float above = actor.maxAbove * scale + (actor.id == ActorAnimation.Actor.GRAVE_KING ? 34f : 12f);
         if (actor.id == ActorAnimation.Actor.WARDEN || actor.id == ActorAnimation.Actor.RANGER)
             above = Math.max(above, REVIVE_BAR_Y + REVIVE_BAR_HEIGHT);
         return visible(camera, x, y, Math.max(40f, actor.maxLeft * scale) + RECOIL_MARGIN,

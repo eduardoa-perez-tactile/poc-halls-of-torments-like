@@ -1,6 +1,6 @@
 # Twenty-minute encounter targets
 
-The normal run now uses `ArenaTimeline.TWENTY_MINUTES`. The timer counts down 20 minutes of active simulation, then starts the Hollow Sovereign encounter. Victory requires killing the boss. Pauses and disconnects retain the existing simulation freeze. `SHORT` remains the explicit three-minute development fixture; it is not a player-facing mode.
+The normal run uses `ArenaTimeline.TWENTY_MINUTES`. Hollow Sovereign spawns as a mini boss at 12:00 elapsed combat time; waves and the clock continue. At 20:00 the Grave King arrives, even if the mini survives. Victory requires killing the Grave King. Pauses, phone choices and disconnects retain the existing simulation freeze. `SHORT` remains the explicit three-minute development fixture, with the mini at 1:48; it is not a player-facing mode. See [two-boss behavior and art](boss-encounters.md).
 
 | Active time | Phase / composition | Checkpoint |
 | --- | --- | --- |
@@ -10,13 +10,13 @@ The normal run now uses `ArenaTimeline.TWENTY_MINUTES`. The timer counts down 20
 | 5:00–7:00 | Choir of Ash: cultist formation | — |
 | 7:00–9:00 | Broken Ranks: brute/cultist siege | Cultist elite |
 | 9:00–11:00 | Wraith Procession: mobile hunters | — |
-| 11:00–13:00 | Sovereign's Guard: mixed siege | Brute elite |
+| 11:00–13:00 | Sovereign's Guard: mixed siege | Brute elite at 11:00; Sovereign mini boss at 12:00 |
 | 13:00–15:00 | The Closing Circle: all four regular kinds | — |
 | 15:00–16:30 | Dread Reinforcements: brute pressure | Cultist elite |
 | 16:30–18:00 | Last Vigil: cultist formation | — |
 | 18:00–19:00 | The Hollow Host: combined assault | Brute elite |
 | 19:00–20:00 | Before the Throne: combined assault | — |
-| 20:00 onward | Hollow Sovereign and limited reinforcements | Kill required |
+| 20:00 onward | Grave King and limited reinforcements | Grave King kill required |
 
 Regular packs contain three to five enemies. Reinforcement intervals progress from 3.5 to 2.1 seconds, with a 4–5 second reinforcement breather in each 24-second cycle. Existing enemies continue fighting during breathers. Phase changes allow 1.4 seconds before the next regular pack. Temporarily blocked checkpoint spawns retry without duplicating their elite.
 

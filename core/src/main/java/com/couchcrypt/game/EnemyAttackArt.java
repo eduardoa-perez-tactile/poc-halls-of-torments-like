@@ -177,7 +177,8 @@ public final class EnemyAttackArt {
             JsonValue actorList = array(json, "actors", 3);
             for (JsonValue entry = actorList.child; entry != null; entry = entry.next) {
                 ArenaWorld.EnemyKind kind = ArenaWorld.EnemyKind.valueOf(entry.getString("kind"));
-                if (kind == ArenaWorld.EnemyKind.GHOUL || kind == ArenaWorld.EnemyKind.BOSS || actors[kind.ordinal()] != null)
+                if (kind == ArenaWorld.EnemyKind.GHOUL || kind == ArenaWorld.EnemyKind.BOSS
+                    || kind == ArenaWorld.EnemyKind.SOVEREIGN || actors[kind.ordinal()] != null)
                     throw invalid("actor set");
                 actors[kind.ordinal()] = new Actor(entry, frames);
             }

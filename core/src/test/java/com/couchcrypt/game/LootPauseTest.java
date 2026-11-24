@@ -103,13 +103,13 @@ class LootPauseTest {
         ArenaWorld world = party(); var gear = world.equipment; gear.grantReward();
         assertTrue(gear.choose(0, gear.offers[0].id, -1)); gear.updateChoices(4);
         int id = gear.offers[1].id;
-        var first = gear.offers[1].options[0]; var second = gear.offers[1].options[1]; var third = gear.offers[1].options[2];
+        assertEquals(2, gear.offers[1].options.length);
+        var first = gear.offers[1].options[0]; var second = gear.offers[1].options[1];
         var player = world.players[1]; player.health = 73; player.dodgeCooldown = .7f;
         world.activatePlayer(1); // Reconciliation of the same reserved participant must be a no-op.
         assertTrue(gear.offers[1].pending); assertEquals(id, gear.offers[1].id);
         assertEquals(26, gear.choiceSecondsLeft()); assertEquals(26, gear.offers[1].secondsLeft);
         assertSame(first, gear.offers[1].options[0]); assertSame(second, gear.offers[1].options[1]);
-        assertSame(third, gear.offers[1].options[2]);
         assertEquals(73, player.health); assertEquals(.7f, player.dodgeCooldown);
         assertEquals(0, gear.appliedCount(1)); assertEquals(0, world.progression.appliedUpgradeCount(1));
     }

@@ -99,7 +99,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private HeroSelectionView heroChooser;
     private final ArenaWorld.Hero[] selectedHeroes = {ArenaWorld.Hero.WARDEN, ArenaWorld.Hero.RANGER};
     private int notifiedWave = 1, notifiedEliteKills;
-    private boolean bossAnnounced, enrageAnnounced, hudPreview;
+    private boolean bossAnnounced, sovereignAnnounced, enrageAnnounced, hudPreview;
     private final LobbyState.Controls[] controls = {new LobbyState.Controls(), new LobbyState.Controls()};
     private final long[] generations = new long[2];
     private final LobbyState.UpgradeRequest[] upgradeRequests = {new LobbyState.UpgradeRequest(), new LobbyState.UpgradeRequest()};
@@ -454,11 +454,12 @@ public final class CryptLobby extends ApplicationAdapter {
     private void startSession() {
         if (state.snapshot(System.currentTimeMillis()).connected() < 1 || server == null || host == null) return;
         world.reset(); hudState.reset(); finalWarning = false; notifiedLevel = 1; notifiedReliquaries = 0;
-        notifiedWave = 1; notifiedEliteKills = 0; bossAnnounced = enrageAnnounced = hudPreview = false;
+        notifiedWave = 1; notifiedEliteKills = 0;
+        bossAnnounced = sovereignAnnounced = enrageAnnounced = hudPreview = false;
         for (int i = 0; i < 2; i++) { previouslyAlive[i] = false; lowHealthNotified[i] = false; }
         reconcilePlayers();
         audio.reset(world);
-        hudState.notify("THE DESCENT BEGINS", "Survive the waves, then defeat the Hollow Sovereign.", ArenaHudState.Tone.INFO, 4f);
+        hudState.notify("THE DESCENT BEGINS", "Face the Sovereign at twelve minutes, then defeat the Grave King.", ArenaHudState.Tone.INFO, 4f);
         arena.resetCameras();
         showSession();
         publishProgression();
@@ -699,7 +700,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private boolean partyScreen() { return screen == Screen.LOBBY || screen == Screen.INVITE; }
 
     private void help() {
-        modal("Answer the call", "1. Connect one or two phones to the same Wi-Fi as the TV.\n\n2. Open the lobby and scan its QR code with your phone.\n\n3. Start solo, or connect a second phone for co-op.\n\nChoose a hero on the TV. Move with the phone joystick and tap Dodge. Attacks are automatic. Shared XP grants personal phone upgrades. Stay near a fallen ally to revive them. Survive the waves, then defeat the Sovereign.\n\nA companion can also join later: press Back to pause, then choose Invite Player 2.",
+        modal("Answer the call", "1. Connect one or two phones to the same Wi-Fi as the TV.\n\n2. Open the lobby and scan its QR code with your phone.\n\n3. Start solo, or connect a second phone for co-op.\n\nChoose a hero on the TV. Move with the phone joystick and tap Dodge. Attacks are automatic. Shared XP grants personal phone upgrades. Stay near a fallen ally to revive them. The Hollow Sovereign arrives at twelve minutes. Survive twenty minutes, then defeat the Grave King.\n\nA companion can also join later: press Back to pause, then choose Invite Player 2.",
             new String[]{"BACK"}, new Runnable[]{this::closeModal});
     }
 
@@ -931,8 +932,12 @@ public final class CryptLobby extends ApplicationAdapter {
             && (key == Input.Keys.F7 || key == Input.Keys.F8)) {
             previewResults(key == Input.Keys.F7); return true;
         }
-        if (key == Input.Keys.F6 && config.profile() && screen == Screen.SESSION && overlay == null) {
-            world.debugStartBoss(); syncEncounterHud(); return true;
+        if ((key == Input.Keys.F6 || key == Input.Keys.FORWARD_DEL) && config.profile() && screen == Screen.SESSION && overlay == null) {
+            // Delete also works with Android key injection without opening its letter-entry keyboard.
+            if (key == Input.Keys.FORWARD_DEL || Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT))
+                world.debugStartSovereign();
+            else world.debugStartBoss();
+            hudPreview = false; syncEncounterHud(); return true;
         }
         if (key == Input.Keys.F4 && config.profile() && screen == Screen.SESSION && !world.bossSpawned) {
             hudPreview = !hudPreview; syncEncounterHud(); return true;
@@ -1057,9 +1062,11 @@ public final class CryptLobby extends ApplicationAdapter {
     }
 
     private void syncEncounterHud() {
-        if (world.bossSpawned && !world.bossDefeated && world.boss != null && world.boss.active)
-            hudState.setBoss("THE HOLLOW SOVEREIGN", world.bossPhase == 2 ? "ENRAGED" : "PHASE I", world.boss.health, world.boss.maxHealth);
-        else if (hudPreview) hudState.setBoss("THE HOLLOW SOVEREIGN", "HUD PREVIEW", 720, 1000);
+        ArenaWorld.Enemy encounter = world.activeBoss();
+        if (encounter != null)
+            hudState.setBoss(ArenaWorld.bossName(encounter), encounter.encounterPhase == 2 ? "ENRAGED" : "PHASE I",
+                encounter.health, encounter.maxHealth);
+        else if (hudPreview) hudState.setBoss("THE GRAVE KING", "HUD PREVIEW", 720, 1000);
         else hudState.clearBoss();
     }
 
@@ -1078,13 +1085,17 @@ public final class CryptLobby extends ApplicationAdapter {
             notifiedEliteKills = world.elitesKilled;
             hudState.notify("ELITE SLAIN  /  CLAIM ITS SOULS", "", ArenaHudState.Tone.SUCCESS, 3f);
         }
+        if (world.sovereignSpawned && !sovereignAnnounced) {
+            sovereignAnnounced = true; hudPreview = false;
+            hudState.notify("THE HOLLOW SOVEREIGN AWAKENS", "", ArenaHudState.Tone.WARNING, 4f);
+        }
         if (world.bossSpawned && !bossAnnounced) {
             bossAnnounced = true; hudPreview = false;
-            hudState.notify("THE HOLLOW SOVEREIGN AWAKENS", "", ArenaHudState.Tone.WARNING, 4f);
+            hudState.notify("THE GRAVE KING AWAKENS", "", ArenaHudState.Tone.WARNING, 4f);
         }
         if (world.bossPhase == 2 && !enrageAnnounced) {
             enrageAnnounced = true;
-            hudState.notify("THE SOVEREIGN IS ENRAGED", "", ArenaHudState.Tone.WARNING, 3f);
+            hudState.notify("THE GRAVE KING IS ENRAGED", "", ArenaHudState.Tone.WARNING, 3f);
         }
         for (int i = 0; i < 2; i++) {
             var player = world.players[i];
@@ -1105,7 +1116,7 @@ public final class CryptLobby extends ApplicationAdapter {
         }
         if (!finalWarning && !world.bossSpawned && world.timeRemaining() <= 30 && world.outcome == ArenaWorld.Outcome.RUNNING) {
             finalWarning = true;
-            hudState.notify("THE SOVEREIGN ARRIVES IN 30s", "", ArenaHudState.Tone.WARNING, 4f);
+            hudState.notify("THE GRAVE KING ARRIVES IN 30s", "", ArenaHudState.Tone.WARNING, 4f);
         }
     }
 

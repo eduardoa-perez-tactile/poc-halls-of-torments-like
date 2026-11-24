@@ -20,7 +20,7 @@ public final class ArenaWorld {
             this.moveSpeed = moveSpeed; this.attackRange = attackRange; this.dodgeCooldown = dodgeCooldown;
         }
     }
-    public enum EnemyKind { GHOUL, WRAITH, BRUTE, CULTIST, BOSS }
+    public enum EnemyKind { GHOUL, WRAITH, BRUTE, CULTIST, BOSS, SOVEREIGN }
     public enum EnemyAttack { NONE, WRAITH_DASH, BRUTE_SLAM, CULTIST_CAST }
     public static final float WRAITH_WINDUP = .5f, WRAITH_DASH_SECONDS = .25f, WRAITH_ATTACK_SECONDS = 1.3f;
     public static final float WRAITH_ATTACK_RANGE = 240f, WRAITH_DASH_RANGE = 285f, WRAITH_ATTACK_COOLDOWN = 2.6f;
@@ -50,8 +50,8 @@ public final class ArenaWorld {
     /** Cosmetic time: advances during host-owned choice updates, never moves combat. */
     public float levelUpFxAge = 2;
     public int kills, souls, activeEnemies, wave, elitesKilled, bossPhase, runSeed;
-    public boolean bossSpawned, bossDefeated;
-    public Enemy boss;
+    public boolean bossSpawned, bossDefeated, sovereignSpawned, sovereignDefeated;
+    public Enemy boss, sovereign;
     public int swordSwings, arrowsFired, enemyDeaths, pickupsCollected, heroHits;
     /** Committed combat events, consumed independently by presentation/audio; never drive game rules. */
     public int swordHits, boltHits, criticalHits, dodges, blockedHits, healsCollected, auraPulses, stormCasts;
@@ -75,6 +75,7 @@ public final class ArenaWorld {
     private int sharedXpRemainder;
     private int randomState, runNumber, nextCheckpoint, encounterPhase, enemySpawnSerial;
     private int presentedChoiceRound;
+    private boolean sovereignSkipped;
     private Diagnostics diagnostics, diagnosticsStorage;
 
     public ArenaWorld() { this(ArenaTimeline.SHORT); }
@@ -97,8 +98,8 @@ public final class ArenaWorld {
         if (diagnosticsStorage != null) diagnosticsStorage.reset();
         outcome = Outcome.RUNNING; elapsed = accumulator = 0; simulationElapsed = 0; sharedXpRemainder = 0;
         kills = souls = activeEnemies = elitesKilled = nextCheckpoint = encounterPhase = enemySpawnSerial = 0;
-        wave = bossPhase = 1; bossSpawned = bossDefeated = false; boss = null;
-        levelUpFxAge = 2; presentedChoiceRound = 0;
+        wave = bossPhase = 1; bossSpawned = bossDefeated = sovereignSpawned = sovereignDefeated = false; boss = sovereign = null;
+        levelUpFxAge = 2; presentedChoiceRound = 0; sovereignSkipped = false;
         swordSwings = arrowsFired = enemyDeaths = pickupsCollected = heroHits = 0;
         swordHits = boltHits = criticalHits = dodges = blockedHits = healsCollected = auraPulses = stormCasts = 0;
         wraithDashes = bruteSlams = hostileShotsFired = 0;
@@ -170,6 +171,7 @@ public final class ArenaWorld {
         e.hitDirectionX = e.hitDirectionY = 0;
         e.spawnAge = 1;
         e.attack = EnemyAttack.NONE; e.attackAge = 2; e.attackHitMask = 0;
+        e.encounterPhase = 1; e.bossAttackIndex = 0; e.bossVolleyPending = false;
         e.attackStartX = e.attackStartY = e.attackTargetX = e.attackTargetY = e.attackRadius = e.dashDistance = 0;
     }
 
@@ -224,6 +226,19 @@ public final class ArenaWorld {
     public int waveCount() { return timeline.phaseCount(); }
     public float timeRemaining() { return Math.max(0, durationSeconds() - elapsed); }
 
+    /** Presentation reads one live encounter: the final boss takes priority when both survive. */
+    public Enemy activeBoss() {
+        if (bossSpawned && !bossDefeated && boss != null && boss.active) return boss;
+        if (sovereignSpawned && !sovereignDefeated && sovereign != null && sovereign.active) return sovereign;
+        return null;
+    }
+
+    public static String bossName(Enemy enemy) {
+        return enemy != null && enemy.kind == EnemyKind.SOVEREIGN ? "THE HOLLOW SOVEREIGN" : "THE GRAVE KING";
+    }
+
+    public static boolean isBoss(EnemyKind kind) { return kind == EnemyKind.BOSS || kind == EnemyKind.SOVEREIGN; }
+
     void beginLevelUpFx(int round) {
         if (round == presentedChoiceRound) return;
         presentedChoiceRound = round; levelUpFxAge = 0;
@@ -256,7 +271,8 @@ public final class ArenaWorld {
         boolean living = false; for (Player p : players) living |= p.active && p.alive;
         if (!living) { outcome = Outcome.DEFEAT; return; }
         if (bossDefeated) { outcome = Outcome.VICTORY; return; }
-        if (elapsed >= durationSeconds() - .0001f && !bossSpawned) debugStartBoss();
+        if (elapsed >= timeline.sovereignSeconds() - .0001f && !sovereignSpawned && !sovereignSkipped) spawnSovereign();
+        if (elapsed >= durationSeconds() - .0001f && !bossSpawned) spawnFinalBoss();
         if (!bossSpawned) {
             while (nextCheckpoint < timeline.phaseCount() && elapsed >= timeline.phaseStart(nextCheckpoint)) {
                 EnemyKind elite = timeline.phase(nextCheckpoint).eliteKind();
@@ -338,8 +354,8 @@ public final class ArenaWorld {
                     p.slot, true, critical, ImpactKind.SWORD, ex, ey);
                 swordHits++;
                 if (e.active) {
-                    e.stunTime = Math.max(e.stunTime, e.kind == EnemyKind.BOSS ? .02f : .16f);
-                    float knockback = e.kind == EnemyKind.BOSS ? 3 : e.kind == EnemyKind.BRUTE ? 12 : 25;
+                    e.stunTime = Math.max(e.stunTime, isBoss(e.kind) ? .02f : .16f);
+                    float knockback = isBoss(e.kind) ? 3 : e.kind == EnemyKind.BRUTE ? 12 : 25;
                     knockbackEnemy(e, ex / distance * knockback, ey / distance * knockback);
                 }
             }
@@ -410,12 +426,20 @@ public final class ArenaWorld {
                 updateEnemyAttack(e);
             } else {
                 faceTarget(e, target);
-                if (e.kind == EnemyKind.BOSS) {
-                    bossPhase = e.health <= e.maxHealth * .5f ? 2 : 1;
-                    if (e.attackCooldown <= 0) bossAttack(e, target);
+                if (isBoss(e.kind)) {
+                    e.encounterPhase = e.health <= e.maxHealth * .5f ? 2 : 1;
+                    if (e.kind == EnemyKind.BOSS) bossPhase = e.encounterPhase;
                     if (e.windup > 0) {
+                        // A cast commits its aim; moving players cannot redirect the warned volley.
+                        e.facingX = e.castFacingX; e.facingY = e.castFacingY;
                         e.windup = Math.max(0, e.windup - STEP); e.vx = e.vy = 0;
-                    } else if (e.stunTime <= 0) moveEnemy(e, target);
+                        if (e.windup <= .000001f) {
+                            e.windup = 0;
+                            if (e.kind == EnemyKind.BOSS) e.releaseAge = 0;
+                            if (e.bossVolleyPending) { fireBossVolley(e); e.bossVolleyPending = false; }
+                        }
+                    } else if (e.attackCooldown <= 0) bossAttack(e, target);
+                    else if (e.stunTime <= 0) moveEnemy(e, target);
                 } else if (e.stunTime <= 0 && e.attackCooldown <= 0 && attackInRange(e, target)) {
                     beginEnemyAttack(e, target);
                 } else if (e.stunTime <= 0) moveEnemy(e, target);
@@ -423,7 +447,7 @@ public final class ArenaWorld {
             e.moving = e.x != previousX || e.y != previousY;
             if (e.moving) e.moveTime += STEP;
             // Wraith/Brute damage is exclusively the telegraphed strike, including during recovery.
-            if (e.kind == EnemyKind.GHOUL || e.kind == EnemyKind.BOSS
+            if (e.kind == EnemyKind.GHOUL || isBoss(e.kind)
                 || e.kind == EnemyKind.CULTIST && e.attack == EnemyAttack.NONE)
                 for (Player p : players) if (e.active && p.active && p.alive
                     && distanceSquared(p.x, p.y, e.x, e.y) < square(PLAYER_RADIUS + e.radius))
@@ -576,7 +600,7 @@ public final class ArenaWorld {
     private void moveEnemy(Enemy e, Player target) {
         float dx = target.x - e.x, dy = target.y - e.y, distance = length(dx, dy);
         float speed = switch (e.kind) {
-            case WRAITH -> 112; case BRUTE -> 37; case CULTIST -> 48; case BOSS -> bossPhase == 2 ? 56 : 44; default -> 57;
+            case WRAITH -> 112; case BRUTE -> 37; case CULTIST -> 48; case BOSS, SOVEREIGN -> e.encounterPhase == 2 ? 56 : 44; default -> 57;
         };
         speed *= e.speedMultiplier;
         if (e.elite) speed *= 1.15f;
@@ -588,17 +612,32 @@ public final class ArenaWorld {
     }
 
     private void bossAttack(Enemy e, Player target) {
-        e.windup = 1f;
-        e.attackCooldown = bossPhase == 2 ? 2.4f : 3.4f;
-        beginCastPresentation(e, 1f);
-        e.releaseAge = 0;
-        // A marked ground impact plus slow, dodgeable bolts; the boss never teleports on top of players.
-        groundWarning(target.x, target.y, bossPhase == 2 ? 150 : 125, 1f, bossPhase == 2 ? 28 : 22);
-        float angle = (float) Math.atan2(target.y - e.y, target.x - e.x);
-        int count = bossPhase == 2 ? 7 : 5;
+        boolean enraged = e.encounterPhase == 2;
+        e.attackCooldown = enraged ? 2.4f : 3.4f;
+        e.vx = e.vy = 0;
+        if (e.kind == EnemyKind.SOVEREIGN) {
+            // The former final encounter keeps its recognizable combined attack.
+            e.windup = 1f; beginCastPresentation(e, 1f); e.releaseAge = 0;
+            groundWarning(target.x, target.y, enraged ? 150 : 125, 1f, enraged ? 28 : 22);
+            fireBossVolley(e);
+        } else {
+            // The Grave King alternates clear attacks rather than layering both at once.
+            boolean volley = (e.bossAttackIndex++ & 1) != 0;
+            e.windup = volley ? .7f : 1f;
+            beginCastPresentation(e, e.windup);
+            e.releaseAge = 1;
+            e.bossVolleyPending = volley;
+            if (!volley) groundWarning(target.x, target.y, enraged ? 150 : 125, 1f, enraged ? 28 : 22);
+        }
+    }
+
+    private void fireBossVolley(Enemy e) {
+        boolean enraged = e.encounterPhase == 2;
+        float angle = (float) Math.atan2(e.castFacingY, e.castFacingX);
+        int count = enraged ? 7 : 5;
         for (int i = 0; i < count; i++) {
             float a = angle + (i - (count - 1) * .5f) * .22f;
-            fireShot(e, (float) Math.cos(a), (float) Math.sin(a), bossPhase == 2 ? 165 : 145, 15);
+            fireShot(e, (float) Math.cos(a), (float) Math.sin(a), enraged ? 165 : 145, 15);
         }
     }
 
@@ -716,7 +755,7 @@ public final class ArenaWorld {
         fx = effect(EffectKind.DEATH, enemy.x, enemy.y, owner, .35f);
         impact(fx, enemy, actual, critical);
         if (fx != null) fx.impactKind = kind;
-        int reward = enemy.kind == EnemyKind.BOSS ? 20 : enemy.elite ? 8 : enemy.kind == EnemyKind.BRUTE ? 3 : enemy.kind == EnemyKind.CULTIST ? 2 : 1;
+        int reward = enemy.kind == EnemyKind.BOSS ? 20 : enemy.kind == EnemyKind.SOVEREIGN ? 8 : enemy.elite ? 8 : enemy.kind == EnemyKind.BRUTE ? 3 : enemy.kind == EnemyKind.CULTIST ? 2 : 1;
         // Snapshot party scaling at spawn; late joining cannot alter souls already on the floor.
         int rewardHundredths = reward * enemy.soulPercent + sharedXpRemainder;
         int soulReward = rewardHundredths / 100; sharedXpRemainder = rewardHundredths % 100;
@@ -727,7 +766,8 @@ public final class ArenaWorld {
             boolean gearedRun = timeline.isFullRun() && elapsed >= 180;
             if (kills % (gearedRun ? 12 : 7) == 0) drop(enemy.x + 14, enemy.y, true, gearedRun ? 16 : 24);
         }
-        if (enemy == boss) bossDefeated = true;
+        if (enemy == boss && enemy.kind == EnemyKind.BOSS) bossDefeated = true;
+        if (enemy == sovereign && enemy.kind == EnemyKind.SOVEREIGN) sovereignDefeated = true;
         return contact;
     }
 
@@ -833,7 +873,7 @@ public final class ArenaWorld {
         if (anchor == null) return null;
         for (Enemy e : enemies) {
             if (e.active) continue;
-            e.radius = kind == EnemyKind.BOSS ? 54 : kind == EnemyKind.BRUTE ? 31 : kind == EnemyKind.WRAITH ? 17 : 20;
+            e.radius = isBoss(kind) ? 54 : kind == EnemyKind.BRUTE ? 31 : kind == EnemyKind.WRAITH ? 17 : 20;
             boolean safe = false;
             for (int attempt = 0; attempt < 12 && !safe; attempt++) {
                 float direction = angle + attempt * 2.3999632f;
@@ -847,22 +887,22 @@ public final class ArenaWorld {
             e.kind = kind; e.elite = elite;
             e.variant = EnemyVariant.forSpawn(kind, runSeed, enemySpawnSerial++);
             e.soulPercent = timeline.isFullRun() && livingPlayerCount() > 1 ? 82 : 100;
-            float health = switch (kind) { case WRAITH -> 18; case BRUTE -> 95; case CULTIST -> 35; case BOSS -> 1100; default -> 32; };
+            float health = switch (kind) { case WRAITH -> 18; case BRUTE -> 95; case CULTIST -> 35; case BOSS -> 1100; case SOVEREIGN -> 450; default -> 32; };
             ArenaTimeline.Phase phase = timeline.phase(timeline.phaseIndex(elapsed));
-            if (kind == EnemyKind.BOSS) {
-                if (timeline.isFullRun()) health = 8200;
+            if (isBoss(kind)) {
+                if (timeline.isFullRun()) health = kind == EnemyKind.BOSS ? 8200 : 3000;
                 health *= 1 + .6f * (activePlayerCount() - 1);
             } else if (timeline.isFullRun()) {
                 health *= phase.healthMultiplier() * (1 + .2f * (livingPlayerCount() - 1));
             } else health *= 1 + Math.min(elapsed / durationSeconds(), 1) * .2f;
             // Spawn from base values every time, so reused slots cannot compound an old variant's stats.
             e.maxHealth = e.health = health * (elite ? 4 : 1) * e.variant.healthMultiplier;
-            e.damage = kind == EnemyKind.BOSS ? 20 : kind == EnemyKind.BRUTE ? 18 : kind == EnemyKind.WRAITH ? 8 : 12;
-            if (timeline.isFullRun() && kind != EnemyKind.BOSS) e.damage *= phase.damageMultiplier();
+            e.damage = isBoss(kind) ? 20 : kind == EnemyKind.BRUTE ? 18 : kind == EnemyKind.WRAITH ? 8 : 12;
+            if (timeline.isFullRun() && !isBoss(kind)) e.damage *= phase.damageMultiplier();
             e.damage *= e.variant.damageMultiplier;
-            e.speedMultiplier = (timeline.isFullRun() && kind != EnemyKind.BOSS
+            e.speedMultiplier = (timeline.isFullRun() && !isBoss(kind)
                 ? 1 + .2f * Math.min(elapsed / durationSeconds(), 1) : 1) * e.variant.speedMultiplier;
-            e.animTime = random(); e.hitFlash = e.vx = e.vy = e.stunTime = e.windup = 0; e.attackCooldown = kind == EnemyKind.BOSS ? 1.5f : 1;
+            e.animTime = random(); e.hitFlash = e.vx = e.vy = e.stunTime = e.windup = 0; e.attackCooldown = isBoss(kind) ? 1.5f : 1;
             resetPresentation(e); faceTarget(e, anchor);
             e.spawnAge = 0;
             e.active = true; activeEnemies++; return e;
@@ -940,8 +980,37 @@ public final class ArenaWorld {
     public void debugStartBoss() {
         if (bossSpawned || outcome != Outcome.RUNNING || activePlayerCount() == 0) return;
         elapsed = Math.max(elapsed, durationSeconds()); wave = timeline.phaseCount();
-        if (activeEnemies >= MAX_ENEMIES) for (Enemy e : enemies) if (e.active) { e.active = false; activeEnemies--; break; }
-        boss = spawn(EnemyKind.BOSS, false); bossSpawned = boss != null; bossPhase = 1;
+        if (!sovereignSpawned) sovereignSkipped = true; // Isolate the final fixture from unearned history.
+        spawnFinalBoss();
+    }
+
+    /** Developer fixture: jump to the twelve-minute miniboss without advancing a full run. */
+    public void debugStartSovereign() {
+        if (sovereignSpawned || outcome != Outcome.RUNNING || activePlayerCount() == 0) return;
+        elapsed = Math.max(elapsed, timeline.sovereignSeconds()); wave = timeline.phaseIndex(elapsed) + 1;
+        sovereignSkipped = false; spawnSovereign();
+    }
+
+    private void reserveBossSlot() {
+        if (activeEnemies < MAX_ENEMIES) return;
+        // Required encounters may replace one ordinary reinforcement, never the other boss or an elite.
+        for (Enemy e : enemies) if (e.active && !isBoss(e.kind) && !e.elite) {
+            e.active = false; activeEnemies--; return;
+        }
+    }
+
+    private void spawnSovereign() {
+        if (sovereignSpawned) return;
+        reserveBossSlot();
+        Enemy spawned = spawn(EnemyKind.SOVEREIGN, false);
+        if (spawned != null) { sovereign = spawned; sovereignSpawned = true; }
+    }
+
+    private void spawnFinalBoss() {
+        if (bossSpawned) return;
+        reserveBossSlot();
+        Enemy spawned = spawn(EnemyKind.BOSS, false);
+        if (spawned != null) { boss = spawned; bossSpawned = true; bossPhase = 1; }
     }
 
     /** Profile fixture: bounded late-run density, with no survival fast-forward or historical elites. */
@@ -951,6 +1020,8 @@ public final class ArenaWorld {
         wave = timeline.phaseIndex(elapsed) + 1; encounterPhase = wave - 1;
         nextCheckpoint = wave; spawnCountdown = 1.4f;
         bossSpawned = bossDefeated = false; boss = null; bossPhase = 1;
+        // This late fixture deliberately omits historical encounters, including the Sovereign.
+        sovereignSpawned = sovereignDefeated = false; sovereign = null; sovereignSkipped = true;
         for (Enemy enemy : enemies) enemy.active = false;
         for (Shot shot : shots) shot.active = false;
         for (Bolt bolt : bolts) bolt.active = false;
@@ -1048,6 +1119,8 @@ public final class ArenaWorld {
     }
     public static final class Enemy {
         public boolean active, elite, moving;
+        public int encounterPhase = 1, bossAttackIndex;
+        private boolean bossVolleyPending;
         public EnemyAttack attack = EnemyAttack.NONE;
         public float attackAge = 2, attackStartX, attackStartY, attackTargetX, attackTargetY, attackRadius;
         public int attackHitMask;

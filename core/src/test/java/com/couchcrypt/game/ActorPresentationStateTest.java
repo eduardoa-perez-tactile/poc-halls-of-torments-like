@@ -138,7 +138,7 @@ class ActorPresentationStateTest {
         enemy(world, 1, ArenaWorld.EnemyKind.GHOUL, 500, 100);
         ArenaWorld.Enemy cultist = enemy(world, 2, ArenaWorld.EnemyKind.CULTIST, 600, 0);
         cultist.attackCooldown = 0;
-        ArenaWorld.Enemy boss = enemy(world, 3, ArenaWorld.EnemyKind.BOSS, 800, 100);
+        ArenaWorld.Enemy boss = enemy(world, 3, ArenaWorld.EnemyKind.SOVEREIGN, 800, 100);
         boss.attackCooldown = 0;
         shotAtPlayer(world); world.setInput(0, 0, 1, false); world.update(ArenaWorld.STEP);
         assertEquals(0, player.attackAge); assertTrue(player.hurtTime > 0);
@@ -208,7 +208,7 @@ class ActorPresentationStateTest {
         assertEquals(1, previous.releaseAge);
     }
 
-    @Test void cultistCastLocksItsDelayedReleaseAndBossBoltsStillStartImmediately() {
+    @Test void cultistCastLocksItsDelayedReleaseAndSovereignBoltsStillStartImmediately() {
         ArenaWorld world = solo(ArenaWorld.Hero.WARDEN); world.players[0].attackCooldown = 10;
         ArenaWorld.Enemy cultist = enemy(world, 0, ArenaWorld.EnemyKind.CULTIST, 350, 0);
         cultist.attackCooldown = 0; world.update(ArenaWorld.STEP);
@@ -224,11 +224,11 @@ class ActorPresentationStateTest {
         assertEquals(0, world.shots[0].vy, EPSILON);
 
         ArenaWorld bossWorld = solo(ArenaWorld.Hero.WARDEN); bossWorld.players[0].attackCooldown = 10;
-        bossWorld.debugStartBoss(); bossWorld.boss.attackCooldown = 0;
+        bossWorld.debugStartSovereign(); bossWorld.sovereign.attackCooldown = 0;
         bossWorld.update(ArenaWorld.STEP);
-        assertEquals(0, bossWorld.boss.castAge); assertEquals(1, bossWorld.boss.castDuration);
-        assertEquals(0, bossWorld.boss.releaseAge);
-        assertTrue(bossWorld.boss.windup > 0); assertEquals(5, activeShots(bossWorld));
+        assertEquals(0, bossWorld.sovereign.castAge); assertEquals(1, bossWorld.sovereign.castDuration);
+        assertEquals(0, bossWorld.sovereign.releaseAge);
+        assertTrue(bossWorld.sovereign.windup > 0); assertEquals(5, activeShots(bossWorld));
         assertTrue(bossWorld.hazards[0].active); assertTrue(bossWorld.hazards[0].warning > .9f);
         assertEquals(100, bossWorld.players[0].health);
     }
@@ -247,7 +247,7 @@ class ActorPresentationStateTest {
         assertEquals(cultist.castFacingX, aimX); assertEquals(cultist.castFacingY, aimY);
 
         cultist.active = false; world.activeEnemies--;
-        ArenaWorld.Enemy boss = enemy(world, 0, ArenaWorld.EnemyKind.BOSS, 350, 200);
+        ArenaWorld.Enemy boss = enemy(world, 0, ArenaWorld.EnemyKind.SOVEREIGN, 350, 200);
         boss.elite = false; boss.attackCooldown = 10;
         world.update(ArenaWorld.STEP);
         assertEquals(ArenaWorld.EnemyKind.CULTIST, shot.casterKind,
@@ -256,7 +256,7 @@ class ActorPresentationStateTest {
         assertEquals(aimX, shot.launchFacingX); assertEquals(aimY, shot.launchFacingY);
 
         shot.active = false; boss.attackCooldown = 0; world.update(ArenaWorld.STEP);
-        assertTrue(shot.active); assertEquals(ArenaWorld.EnemyKind.BOSS, shot.casterKind);
+        assertTrue(shot.active); assertEquals(ArenaWorld.EnemyKind.SOVEREIGN, shot.casterKind);
         assertFalse(shot.casterElite); assertEquals(15, shot.damage);
         assertEquals(boss.castFacingX, shot.launchFacingX); assertEquals(boss.castFacingY, shot.launchFacingY);
         assertNotEquals(aimY, shot.launchFacingY);

@@ -82,9 +82,9 @@ class ArenaWorldDiagnosticsTest {
         assertEquals(0, measured.diagnostics().pickupMerges);
     }
 
-    @Test void reportsFullHostilePoolsAtTheBossAttack() {
-        ArenaWorld world = solo(); world.setDiagnosticsEnabled(true); world.debugStartBoss();
-        world.players[0].attackCooldown = 10; world.boss.attackCooldown = 0;
+    @Test void reportsFullHostilePoolsAtTheSovereignAttack() {
+        ArenaWorld world = solo(); world.setDiagnosticsEnabled(true); world.debugStartSovereign();
+        world.players[0].attackCooldown = 10; world.sovereign.attackCooldown = 0;
         for (ArenaWorld.Shot shot : world.shots) { shot.active = true; shot.x = -1000; shot.y = -800; shot.ttl = 10; }
         for (ArenaWorld.Hazard hazard : world.hazards) { hazard.active = true; hazard.warning = 10; hazard.ttl = 11; }
         world.update(ArenaWorld.STEP);

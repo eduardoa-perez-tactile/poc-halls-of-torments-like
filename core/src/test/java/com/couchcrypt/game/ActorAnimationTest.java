@@ -60,20 +60,36 @@ class ActorAnimationTest {
         assertEquals(ActorAnimation.Facing.SW, ActorAnimation.facing(caster, ActorAnimation.State.MOVE));
     }
 
-    @Test void bossImmediateReleaseAndRemainingWarningUseDistinctPoses() {
+    @Test void sovereignImmediateReleaseAndRemainingWarningUseDistinctPoses() {
         ArenaWorld world = new ArenaWorld(); world.activatePlayer(0); world.players[0].attackCooldown = 10;
         // Keep the arena clock at its start: jumping to the finale would also
         // grant timed loot and correctly pause this short pose-transition fixture.
-        world.boss = world.enemies[0]; world.boss.active = world.bossSpawned = true;
-        world.boss.kind = ArenaWorld.EnemyKind.BOSS; world.boss.x = 500;
-        world.boss.health = world.boss.maxHealth = 1100; world.activeEnemies = 1;
+        ArenaWorld.Enemy sovereign = world.enemies[0]; sovereign.active = true;
+        sovereign.kind = ArenaWorld.EnemyKind.SOVEREIGN; sovereign.x = 500;
+        sovereign.health = sovereign.maxHealth = 1100; world.activeEnemies = 1;
         world.update(ArenaWorld.STEP);
-        assertEquals(ActorAnimation.State.ATTACK, ActorAnimation.state(world.boss));
-        assertEquals(0, ActorAnimation.phase(world.boss, ActorAnimation.State.ATTACK));
+        assertEquals(ActorAnimation.Actor.SOVEREIGN, ActorAnimation.actor(sovereign.kind));
+        assertEquals(ActorAnimation.State.ATTACK, ActorAnimation.state(sovereign));
+        assertEquals(0, ActorAnimation.phase(sovereign, ActorAnimation.State.ATTACK));
         for (int tick = 0; tick < 12; tick++) world.update(ArenaWorld.STEP);
-        assertTrue(world.boss.windup > 0);
-        assertEquals(ActorAnimation.State.WINDUP, ActorAnimation.state(world.boss));
+        assertTrue(sovereign.windup > 0);
+        assertEquals(ActorAnimation.State.WINDUP, ActorAnimation.state(sovereign));
         assertTrue(world.hazards[0].warning > 0);
+        assertEquals(100, world.players[0].health);
+    }
+
+    @Test void graveKingUsesItsOwnArtAndShowsCastBeforeProjectileRelease() {
+        ArenaWorld world = new ArenaWorld(); world.activatePlayer(0); world.players[0].attackCooldown = 10;
+        ArenaWorld.Enemy king = world.enemies[0]; king.active = true;
+        king.kind = ArenaWorld.EnemyKind.BOSS; king.x = 500;
+        king.health = king.maxHealth = 1100; king.bossAttackIndex = 1; world.activeEnemies = 1;
+        world.update(ArenaWorld.STEP);
+        assertEquals(ActorAnimation.Actor.GRAVE_KING, ActorAnimation.actor(king.kind));
+        assertEquals(ActorAnimation.State.WINDUP, ActorAnimation.state(king));
+        assertEquals(0, world.hostileShotsFired);
+        for (int tick = 0; tick < 44; tick++) world.update(ArenaWorld.STEP);
+        assertEquals(ActorAnimation.State.ATTACK, ActorAnimation.state(king));
+        assertTrue(world.hostileShotsFired > 0);
         assertEquals(100, world.players[0].health);
     }
 }

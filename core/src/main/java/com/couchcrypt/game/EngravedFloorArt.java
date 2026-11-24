@@ -63,13 +63,13 @@ public final class EngravedFloorArt {
         if (root.getInt("version") != 1 || root.getLong("addedTextureBytes") != 0 || root.getInt("context") != 1)
             throw invalid("shared residency contract");
         JsonValue pages = root.require("pages");
-        if (pages.size != atlas.pages.length + 1) throw invalid("page count");
+        if (pages.size != 4 || atlas.pages.length < 3) throw invalid("page count");
         pageWidths = new int[pages.size]; pageHeights = new int[pages.size];
         for (int i = 0; i < pages.size; i++) {
             JsonValue p = pages.get(i); int[] size = array(p, "size", 2);
-            String file = i < atlas.pages.length ? atlas.pages[i].file() : "arena-border.png";
-            int w = i < atlas.pages.length ? atlas.pages[i].width() : 512;
-            int h = i < atlas.pages.length ? atlas.pages[i].height() : 256;
+            String file = i < 3 ? atlas.pages[i].file() : "arena-border.png";
+            int w = i < 3 ? atlas.pages[i].width() : 512;
+            int h = i < 3 ? atlas.pages[i].height() : 256;
             if (!p.getString("file").equals(file) || size[0] != w || size[1] != h) throw invalid("borrowed page");
             pageWidths[i] = w; pageHeights[i] = h;
         }

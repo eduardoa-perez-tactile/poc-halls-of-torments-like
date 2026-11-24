@@ -18,7 +18,7 @@ public enum EnemyVariant {
 
     /** A separate spawn hash avoids extra combat random draws or tying variants to reusable pool slots. */
     static EnemyVariant forSpawn(ArenaWorld.EnemyKind kind, int seed, int serial) {
-        if (kind == ArenaWorld.EnemyKind.BOSS) return ORIGINAL;
+        if (kind == ArenaWorld.EnemyKind.BOSS || kind == ArenaWorld.EnemyKind.SOVEREIGN) return ORIGINAL;
         int hash = seed ^ (serial * 0x45d9f3b) ^ (kind.ordinal() * 0x27d4eb2d);
         hash = (hash ^ (hash >>> 16)) * 0x45d9f3b;
         int palette = Math.floorMod(hash ^ (hash >>> 16), 3);
@@ -26,7 +26,7 @@ public enum EnemyVariant {
         return switch (kind) {
             case GHOUL, BRUTE -> palette == 1 ? MOSS : FROST;
             case WRAITH, CULTIST -> palette == 1 ? EMBER : DUSK;
-            case BOSS -> ORIGINAL;
+            case BOSS, SOVEREIGN -> ORIGINAL;
         };
     }
 }
