@@ -143,13 +143,24 @@ class BaselineSummaryTest(unittest.TestCase):
 
     def test_cli_keeps_defaults_and_bounds_warmup(self):
         parser = capture.parser_for_capture()
-        args = parser.parse_args(['--host', '127.0.0.1', '--forward-port', '12345'])
+        args = parser.parse_args(['--host', '192.168.1.50', '--forward-port', '12345'])
         self.assertFalse(args.moving_input)
         self.assertFalse(args.system_trace)
         self.assertEqual(0, args.warmup_seconds)
         self.assertEqual(capture.ROOT / '.run', args.output_dir)
         with mock.patch('sys.stderr'), self.assertRaises(SystemExit):
-            parser.parse_args(['--host', '127.0.0.1', '--forward-port', '12345', '--warmup-seconds', '11'])
+            parser.parse_args(['--host', '192.168.1.50', '--forward-port', '12345', '--warmup-seconds', '11'])
+
+    def test_capture_rejects_phone_unreachable_hosts_before_any_device_work(self):
+        parser = capture.parser_for_capture()
+        for host in ('10.0.2.2', '10.0.2.15', '127.0.0.1', '0.0.0.0', '169.254.1.2', '224.0.0.1', 'localhost', '::1'):
+            with self.subTest(host=host), mock.patch('sys.stderr'), mock.patch.object(capture.subprocess, 'run') as device:
+                with self.assertRaises(SystemExit):
+                    parser.parse_args(['--host', host, '--forward-port', '12345'])
+                device.assert_not_called()
+        for host in ('192.168.14.248', '10.1.2.3', '172.16.1.2'):
+            with self.subTest(host=host):
+                self.assertEqual(host, parser.parse_args(['--host', host, '--forward-port', '12345']).host)
 
     def test_surface_layer_quoting_and_no_clear(self):
         command = mock.Mock(side_effect=['SurfaceView[com.couchcrypt.tv/Activity](BLAST)#3\n', '16666666\n1 2 3\n'])
