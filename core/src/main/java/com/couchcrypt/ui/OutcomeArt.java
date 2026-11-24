@@ -10,7 +10,7 @@ import com.badlogic.gdx.utils.GdxRuntimeException;
 /** Lazy outcome backdrop with a borrowed, startup-prewarmed managed title. */
 public final class OutcomeArt implements Disposable {
     private static final int BACKDROP_WIDTH = 1536, BACKDROP_HEIGHT = 864;
-    private static final int TITLE_WIDTH = 1024, TITLE_HEIGHT = 256, TITLE_PADDING = 8;
+    private static final int TITLE_WIDTH = 1024, TITLE_HEIGHT = 256;
     public final boolean victory;
     public final Texture backdrop, title;
     public final long textureBytes = 1536L * 864 * 4;
@@ -18,20 +18,17 @@ public final class OutcomeArt implements Disposable {
     private final Pixmap backdropPixels;
     private boolean disposed;
 
-    /** Both small wordmarks are prepared before the first frame to avoid transition-time alpha scans. */
+    /** Both normalized file-backed wordmarks are uploaded before the first frame. */
     public static final class Titles implements Disposable {
         public final long textureBytes = 2L * TITLE_WIDTH * TITLE_HEIGHT * 4;
-        public final long retainedPixmapBytes = textureBytes;
+        public final long retainedPixmapBytes = 0; // Managed textures restore from their normalized files.
         private final Texture[] textures = new Texture[2];
-        private final Pixmap[] pixels = new Pixmap[2];
         private boolean disposed;
 
         public Titles() {
             try {
-                pixels[0] = bakeTitle("art/end-victory-title.png");
-                textures[0] = texture(pixels[0]);
-                pixels[1] = bakeTitle("art/end-defeat-title.png");
-                textures[1] = texture(pixels[1]);
+                textures[0] = loadTitle("art/runtime-ui/victory-title.png");
+                textures[1] = loadTitle("art/runtime-ui/defeat-title.png");
             } catch (RuntimeException | Error failure) {
                 dispose();
                 throw failure;
@@ -43,11 +40,24 @@ public final class OutcomeArt implements Disposable {
             return textures[victory ? 0 : 1];
         }
 
+        private static Texture loadTitle(String path) {
+            Texture loaded = new Texture(Gdx.files.internal(path), false);
+            try {
+                if (loaded.getWidth() != TITLE_WIDTH || loaded.getHeight() != TITLE_HEIGHT)
+                    throw new GdxRuntimeException("Outcome title must retain its fixed 1024x256 layout: " + path);
+                loaded.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+                return loaded;
+            } catch (RuntimeException | Error failure) { loaded.dispose(); throw failure; }
+        }
+
+        public void reloadFileTextures() {
+            for (Texture texture : textures) texture.load(texture.getTextureData());
+        }
+
         @Override public void dispose() {
             if (disposed) return;
             disposed = true;
             for (Texture value : textures) if (value != null) value.dispose();
-            for (Pixmap value : pixels) if (value != null) value.dispose();
         }
     }
 
@@ -177,39 +187,6 @@ public final class OutcomeArt implements Disposable {
             else height = Math.max(1, Math.round(width * (float) BACKDROP_HEIGHT / BACKDROP_WIDTH));
             output.drawPixmap(source, (source.getWidth() - width) / 2, (source.getHeight() - height) / 2,
                 width, height, 0, 0, BACKDROP_WIDTH, BACKDROP_HEIGHT);
-            return output;
-        } catch (RuntimeException | Error failure) {
-            if (output != null) output.dispose();
-            throw failure;
-        } finally { source.dispose(); }
-    }
-
-    private static Pixmap bakeTitle(String path) {
-        Pixmap source = new Pixmap(Gdx.files.internal(path));
-        Pixmap output = null;
-        try {
-            source.setBlending(Pixmap.Blending.None);
-            int left = source.getWidth(), top = source.getHeight(), right = -1, bottom = -1;
-            for (int y = 0; y < source.getHeight(); y++) for (int x = 0; x < source.getWidth(); x++) {
-                int alpha = source.getPixel(x, y) & 255;
-                if (alpha < 8) source.drawPixel(x, y, 0);
-                if (alpha < 64) continue;
-                left = Math.min(left, x); right = Math.max(right, x);
-                top = Math.min(top, y); bottom = Math.max(bottom, y);
-            }
-            if (right < left || bottom < top) throw new GdxRuntimeException("Empty outcome title: " + path);
-            left = Math.max(0, left - 4); top = Math.max(0, top - 4);
-            right = Math.min(source.getWidth() - 1, right + 4);
-            bottom = Math.min(source.getHeight() - 1, bottom + 4);
-            int width = right - left + 1, height = bottom - top + 1;
-            float scale = Math.min((TITLE_WIDTH - TITLE_PADDING * 2f) / width,
-                (TITLE_HEIGHT - TITLE_PADDING * 2f) / height);
-            int targetWidth = Math.max(1, Math.min(TITLE_WIDTH - TITLE_PADDING * 2, Math.round(width * scale)));
-            int targetHeight = Math.max(1, Math.min(TITLE_HEIGHT - TITLE_PADDING * 2, Math.round(height * scale)));
-            output = new Pixmap(TITLE_WIDTH, TITLE_HEIGHT, Pixmap.Format.RGBA8888);
-            output.setBlending(Pixmap.Blending.None); output.setFilter(Pixmap.Filter.BiLinear);
-            output.drawPixmap(source, left, top, width, height,
-                (TITLE_WIDTH - targetWidth) / 2, (TITLE_HEIGHT - targetHeight) / 2, targetWidth, targetHeight);
             return output;
         } catch (RuntimeException | Error failure) {
             if (output != null) output.dispose();

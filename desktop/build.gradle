@@ -12,3 +12,8 @@ run {
     workingDir = rootProject.file('assets')
     if (System.getProperty('os.name').toLowerCase().contains('mac')) jvmArgs '-XstartOnFirstThread'
 }
+
+// Offline asset baker uses the project's resolved native libraries, without a GL window.
+tasks.register('uiBakeClasspath') {
+    doLast { println sourceSets.main.runtimeClasspath.asPath }
+}

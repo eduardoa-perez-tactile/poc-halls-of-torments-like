@@ -856,6 +856,13 @@ public final class CryptLobby extends ApplicationAdapter {
     }
 
     private boolean key(int key) {
+        if (key == Input.Keys.INSERT && config.profile()) {
+            long begin = System.nanoTime();
+            art.reloadFileTextures(); buildIcons.reloadFileTexture(); outcomeTitles.reloadFileTextures();
+            Gdx.app.log("UiReload", "Managed UI file reload wallNs=" + (System.nanoTime() - begin)
+                + " gpuTextureBytes=" + residentArtBytes() + " retainedPixmapBytes=" + residentPixmapBytes());
+            return true;
+        }
         // Profiling capture boundary only: exclude fixture/warm-up work without changing the run.
         if (key == Input.Keys.PAGE_DOWN && frameMetrics != null) {
             frameMetrics.reset();
