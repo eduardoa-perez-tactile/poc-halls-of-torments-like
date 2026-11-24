@@ -3,6 +3,7 @@
 import argparse
 import base64
 import hashlib
+import ipaddress
 import json
 import math
 import os
@@ -176,10 +177,25 @@ class Phone:
         self.worker.join(timeout=1)
 
 
+def phone_reachable_host(value):
+    """--host is persisted by Android; local test transports must never become the QR host."""
+    try:
+        address = ipaddress.IPv4Address(value)
+    except ipaddress.AddressValueError as failure:
+        raise argparse.ArgumentTypeError('Use the existing relay LAN IPv4 address shown in the TV QR.') from failure
+    if (address.is_loopback or address.is_unspecified or address.is_link_local or address.is_multicast
+            or address in ipaddress.IPv4Network('10.0.2.0/24')):
+        raise argparse.ArgumentTypeError(
+            'Use the computer\'s relay LAN IPv4, not loopback or the emulator-only 10.0.2.x subnet. '
+            '--host is saved as the phone QR address; --forward-port supplies the local test connection.')
+    return str(address)
+
+
 def parser_for_capture():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--serial', default='emulator-5554')
-    parser.add_argument('--host', required=True, help='Existing relay LAN IPv4 used by the TV QR')
+    parser.add_argument('--host', required=True, type=phone_reachable_host,
+                        help='Existing relay LAN IPv4 used by the TV QR (persisted by Android)')
     parser.add_argument('--forward-port', type=int, required=True, help='Existing ADB localhost forward to TV8787')
     parser.add_argument('--fixture', choices=['lobby', 'boss-solo', 'boss-coop', 'late-coop', 'items-coop', 'art-solo', 'art-coop', 'results'], default='boss-coop')
     parser.add_argument('--seconds', type=int, default=20, choices=range(5, 31), metavar='5..30')
