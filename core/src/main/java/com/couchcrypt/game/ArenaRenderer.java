@@ -569,7 +569,7 @@ public final class ArenaRenderer implements Disposable {
         drawAura(age, x, y, radius, EnemyAttackArt.Layer.ALL);
     }
 
-    /** Plain participant rings stay tight to the feet and independent of targeting/damage radii. */
+    /** Glowing double rings stay tight to the feet and independent of targeting/damage radii. */
     private void drawPlayerAuras(ArenaWorld world, OrthographicCamera camera) {
         for (ArenaWorld.Player player : world.players) {
             if (!player.active || !player.alive) continue;

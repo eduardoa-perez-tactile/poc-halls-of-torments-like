@@ -1,0 +1,9 @@
+{
+  "approved_date": "2026-11-24",
+  "generation_mode": "built-in image_gen",
+  "purpose": "visual proposal only",
+  "approved_mockup_sha256": "bdd78468d1fb5f89e3d9ec5d96769183740b739890f047f0c3ff65db411bc2d3",
+  "edit_target": "native co-op screenshot: .run/simple-auras-defeat/simple-foot-rings.png",
+  "style_reference": "user-attached Screenshot 2026-11-24 at 16.56.01.png",
+  "runtime_source": "cached PlayerFootRing geometry using resident white texel"
+}
