@@ -72,7 +72,9 @@ public final class JoinServer extends NanoWSD {
         LobbyState.Feedback feedback = state.feedback(slot);
         return "{\"type\":\"status\",\"connected\":" + snapshot.connected()
             + ",\"hostActive\":" + snapshot.hostActive() + ",\"phase\":\""
-            + snapshot.phase().name().toLowerCase(java.util.Locale.ROOT) + "\",\"health\":" + feedback.health()
+            + snapshot.phase().name().toLowerCase(java.util.Locale.ROOT) + "\",\"outcome\":"
+            + (snapshot.result() == null ? "null" : "\"" + snapshot.result().name().toLowerCase(java.util.Locale.ROOT) + "\"")
+            + ",\"health\":" + feedback.health()
             + ",\"maxHealth\":" + feedback.maxHealth() + ",\"dodgeCooldown\":" + feedback.dodgeCooldown()
             + ",\"alive\":" + feedback.alive() + ",\"progression\":" + progressionJson(slot)
             + ",\"equipment\":" + equipmentJson(slot) + ",\"catchUp\":null"

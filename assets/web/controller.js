@@ -176,7 +176,7 @@
     const wasSession = phase === 'session' && hostActive;
     phase = data.phase; hostActive = data.hostActive; alive = data.alive !== false;
     const activeSession = phase === 'session' && hostActive;
-    title.textContent = data.phase === 'level_up' ? 'Level up' : data.phase === 'loot' ? 'Loot found' : data.phase === 'paused' || data.phase === 'invite' ? 'Paused' : data.phase === 'results' ? 'Round complete' : 'You have a place';
+    title.textContent = data.phase === 'level_up' ? 'Level up' : data.phase === 'loot' ? 'Loot found' : data.phase === 'paused' || data.phase === 'invite' ? 'Paused' : data.phase === 'results' ? (data.outcome === 'victory' ? 'Victory' : data.outcome === 'defeat' ? 'Defeat' : 'Round complete') : 'You have a place';
     if (wasSession !== activeSession) releaseControls();
     setUpgradeOffer(data.progression, data.equipment);
     const granted = data.starterBuild;
@@ -300,13 +300,13 @@
         heartbeat = setInterval(() => { if (current.readyState === WebSocket.OPEN) current.send('{"type":"ping"}'); }, 2000);
       } else if (data.type === 'status') {
         setControlScreen(data);
-        party.textContent = ['level_up', 'loot'].includes(data.phase) ? 'Waiting for your companion' : data.connected === 2 ? 'Both souls are here' : data.phase === 'invite' ? 'Waiting for your companion' : 'Ready for a solo descent';
+        party.textContent = data.phase === 'results' ? (data.connected === 2 ? 'Both controllers connected' : 'Your controller is connected') : ['level_up', 'loot'].includes(data.phase) ? 'Waiting for your companion' : data.connected === 2 ? 'Both souls are here' : data.phase === 'invite' ? 'Waiting for your companion' : 'Ready for a solo descent';
         const descriptions = {
           lobby: 'Connected. Your host can start solo or gather a companion.',
           session: '',
           level_up: data.progression?.upgrade ? 'Combat is paused. Choose your upgrade below.' : 'Combat is paused. Your choice is complete.',
           loot: data.equipment ? 'Combat is paused. Choose your equipment below.' : 'Combat is paused. Your choice is complete.',
-          results: 'Look at the TV.',
+          results: 'Look at the TV for your run summary. Your host chooses what happens next with the remote.',
           paused: 'Look at the TV.',
           invite: 'Look at the TV.'
         };

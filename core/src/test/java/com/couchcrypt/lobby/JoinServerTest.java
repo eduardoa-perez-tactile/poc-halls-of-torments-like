@@ -21,6 +21,26 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JoinServerTest {
+    @Test void resultStatusReportsTheOutcomeAndClearsItOnReplay() throws Exception {
+        var state = new LobbyState(); var server = new JoinServer(0, state, Map.of()); server.open();
+        try (var http = HttpClient.newHttpClient()) {
+            var listener = new Client();
+            var socket = http.newWebSocketBuilder().buildAsync(URI.create("ws://127.0.0.1:"
+                + server.getListeningPort() + "/socket?room=" + server.room()), listener).get(3, TimeUnit.SECONDS);
+            listener.expect("joined");
+            state.publishResult(true);
+            JsonValue status;
+            do { status = listener.expect("status"); } while (!status.getString("phase").equals("results"));
+            assertEquals("victory", status.getString("outcome"));
+            state.publishResult(false);
+            do { status = listener.expect("status"); } while (!"defeat".equals(status.getString("outcome", null)));
+            state.setPhase(LobbyState.Phase.SESSION);
+            do { status = listener.expect("status"); } while (!status.getString("phase").equals("session"));
+            assertTrue(status.get("outcome").isNull());
+            socket.abort();
+        } finally { server.stop(); }
+    }
+
     @Test void lootStatusAllowsEquipmentChoiceWithoutGameplayInput() throws Exception {
         var state = new LobbyState(); var server = new JoinServer(0, state, Map.of()); server.open();
         try (var http = HttpClient.newHttpClient()) {

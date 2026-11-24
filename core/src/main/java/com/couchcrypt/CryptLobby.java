@@ -18,8 +18,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
-import com.badlogic.gdx.scenes.scene2d.ui.Button;
-import com.badlogic.gdx.scenes.scene2d.utils.BaseDrawable;
 import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
@@ -44,6 +42,7 @@ import com.couchcrypt.ui.MenuSceneArt;
 import com.couchcrypt.ui.BuildIcons;
 import com.couchcrypt.ui.ItemArt;
 import com.couchcrypt.ui.RunDetailsView;
+import com.couchcrypt.ui.ResultsSummaryView;
 import com.couchcrypt.ui.CharacterInfoView;
 import com.couchcrypt.ui.HeroSelectionView;
 import com.couchcrypt.ui.HeroPortraitDrawable;
@@ -91,7 +90,8 @@ public final class CryptLobby extends ApplicationAdapter {
     private ItemArt itemArt;
     private boolean resultDetails;
     private boolean equipmentDetails;
-    private RemoteButton resultDetailsLink;
+    private int resultPage;
+    private ResultsSummaryView resultSummary;
     private int characterInfoSlot, characterInfoFocus;
     private boolean characterInfoInvitation;
     private boolean characterInfoFromChooser;
@@ -225,7 +225,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private void reset(Screen next) {
         if (overlay != null) closeModal();
         screen = next; content.clearChildren(); content.setBackground((com.badlogic.gdx.scenes.scene2d.utils.Drawable) null); buttons.clear(); focus = 0;
-        resultDetailsLink = null;
+        resultSummary = null;
         if (next != Screen.RESULTS) {
             resultDetails = false;
             art.menuScene.setMood(MenuSceneArt.Mood.NEUTRAL);
@@ -584,18 +584,22 @@ public final class CryptLobby extends ApplicationAdapter {
 
     /** Profiling-only sample data for reviewing both end screens without playing a full run. */
     private void previewResults(boolean victory) {
+        boolean first = world.players[0].active, second = world.players[1].active;
         world.reset();
-        for (int i = 0; i < 2; i++) { world.setHero(i, selectedHeroes[i]); world.activatePlayer(i); }
-        world.progression.addXp(96);
+        for (int i = 0; i < 2; i++) if (i == 0 ? first : second) {
+            world.setHero(i, selectedHeroes[i]); world.activatePlayer(i);
+        }
+        previewHud(18);
         for (int i = 0; i < 2; i++) {
-            while (world.progression.offers[i].pending)
-                world.progression.choose(i, world.progression.offers[i].id, 1);
             var player = world.players[i];
-            player.kills = i == 0 ? 81 : 62; player.damageDealt = i == 0 ? 4820 : 3960;
-            player.damageTaken = i == 0 ? 154 : 112; player.revives = i == 0 ? 1 : 2;
+            if (!player.active) continue;
+            player.kills = i == 0 ? 1081 : 962; player.damageDealt = i == 0 ? 148820 : 123960;
+            player.damageTaken = i == 0 ? 854 : 712; player.revives = first && second ? i == 0 ? 1 : 2 : 0;
         }
         previewEquipment();
-        world.elapsed = 214; world.kills = 143; world.souls = 96;
+        world.debugStartBoss();
+        if (world.boss != null) world.boss.health = victory ? 0 : world.boss.maxHealth * .12f;
+        world.elapsed = 1234; world.kills = world.players[0].kills + world.players[1].kills;
         world.bossDefeated = victory;
         world.outcome = victory ? ArenaWorld.Outcome.VICTORY : ArenaWorld.Outcome.DEFEAT;
         showResults();
@@ -604,7 +608,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private void prepareResults() {
         boolean victory = world.outcome == ArenaWorld.Outcome.VICTORY;
         art.menuScene.setMood(victory ? MenuSceneArt.Mood.VICTORY : MenuSceneArt.Mood.DEFEAT);
-        state.setPhase(LobbyState.Phase.RESULTS);
+        state.publishResult(victory);
         background.setDrawable(homeBackground);
         background.setVisible(true); shade.setVisible(false);
     }
@@ -613,26 +617,11 @@ public final class CryptLobby extends ApplicationAdapter {
         reset(Screen.RESULTS); prepareResults(); resultDetails = false;
         content.pad(0);
         boolean victory = world.outcome == ArenaWorld.Outcome.VICTORY;
-        Image title = new Image(outcomeTitles.get(victory)); title.setScaling(Scaling.fit);
-        title.setTouchable(Touchable.disabled); title.setBounds(360, 790, 1200, 230); content.addActor(title);
-        Label subtitle = art.label(victory ? "THE HOLLOW SOVEREIGN HAS FALLEN" : "THE CRYPT CLAIMS ANOTHER SOUL", art.section, UiArt.IVORY);
-        subtitle.setFontScale(.88f); subtitle.setAlignment(Align.center);
-        subtitle.setBounds(240, 730, 1440, 60); content.addActor(subtitle);
-        Label summary = art.label(formatTime(world.elapsed) + "   /   LEVEL " + world.progression.level + "   /   " + world.kills + " SLAIN", art.section, UiArt.IVORY);
-        summary.setFontScale(.85f); summary.setAlignment(Align.center);
-        summary.setBounds(400, 250, 1120, 40); content.addActor(summary);
-        Table actions = new Table();
-        actions.add(resultAction(victory ? "PLAY AGAIN" : "TRY AGAIN", this::playAgain)).width(500).height(94).padRight(32);
-        actions.add(resultAction("RETURN TO LOBBY", this::showLobby)).width(500).height(94);
-        actions.setBounds(444, 126, 1032, 94); content.addActor(actions);
-        Button.ButtonStyle normal = new Button.ButtonStyle(), focused = new Button.ButtonStyle();
-        normal.up = new ResultUnderline(false); normal.down = new ResultUnderline(true);
-        focused.up = focused.down = new ResultUnderline(true);
-        resultDetailsLink = new RemoteButton(normal, focused, this::showRunDetails);
-        resultDetailsLink.pad(0); resultDetailsLink.add(art.label("RUN DETAILS", art.section, UiArt.IVORY));
-        resultDetailsLink.setBounds(800, 46, 320, 58);
-        buttons.add(resultDetailsLink); content.addActor(resultDetailsLink);
-        content.validate(); actions.validate(); setFocus(0);
+        resultSummary = ResultsSummaryView.create(art, world, outcomeTitles.get(victory),
+            this::playAgain, this::showLobby, this::showRunDetails, buttons::add);
+        content.add(resultSummary.root).grow();
+        resultSummary.updateParty(state.snapshot(System.currentTimeMillis()).connected());
+        content.validate(); setFocus(0);
     }
 
     private void playAgain() {
@@ -640,27 +629,16 @@ public final class CryptLobby extends ApplicationAdapter {
         else showLobby();
     }
 
-    private RemoteButton resultAction(String text, Runnable command) {
-        RemoteButton result = button(command);
-        result.add(art.label(text, art.section, UiArt.BUTTON_INK));
-        return result;
+    private void showRunDetails() { equipmentDetails = false; resultPage = 0; renderRunDetails(); }
+
+    private void toggleRunDetails() { equipmentDetails = !equipmentDetails; resultPage = 0; renderRunDetails(); setFocus(1); }
+
+    private void turnResultPage(int direction) {
+        resultPage = Math.max(0, Math.min(resultPage + direction, RunDetailsView.pageCount(world, equipmentDetails) - 1));
+        renderRunDetails();
+        int target = direction < 0 ? 2 : 3;
+        setFocus(buttons.get(target).isDisabled() ? (direction < 0 ? 3 : 2) : target);
     }
-
-    private final class ResultUnderline extends BaseDrawable {
-        private final boolean selected;
-        private ResultUnderline(boolean selected) { this.selected = selected; }
-        @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float x, float y, float width, float height) {
-            Color saved = batch.getColor();
-            float r = saved.r, g = saved.g, b = saved.b, a = saved.a;
-            batch.setColor(UiArt.GOLD.r, UiArt.GOLD.g, UiArt.GOLD.b, selected ? 1f : .45f);
-            art.pixel.draw(batch, x + 28, y + 2, width - 56, selected ? 4 : 1);
-            batch.setColor(r, g, b, a);
-        }
-    }
-
-    private void showRunDetails() { equipmentDetails = false; renderRunDetails(); }
-
-    private void toggleRunDetails() { equipmentDetails = !equipmentDetails; renderRunDetails(); setFocus(1); }
 
     private void renderRunDetails() {
         reset(Screen.RESULTS); prepareResults(); resultDetails = true;
@@ -669,7 +647,8 @@ public final class CryptLobby extends ApplicationAdapter {
             throw new IllegalStateException("Run details exceeds combined texture budget");
         content.setBackground(art.scrim); content.pad(0);
         content.add(RunDetailsView.create(art, world, buildIcons.regions, itemArt.regions,
-            equipmentDetails, this::toggleRunDetails, this::backToResults, buttons::add)).grow();
+            equipmentDetails, resultPage, () -> turnResultPage(-1), () -> turnResultPage(1),
+            this::toggleRunDetails, this::backToResults, buttons::add)).grow();
         content.validate(); setFocus(0);
     }
 
@@ -799,7 +778,6 @@ public final class CryptLobby extends ApplicationAdapter {
         if (heroChooser != null) heroChooser.focusChanged(focus);
         for (int i = 0; i < buttons.size(); i++) {
             RemoteButton button = buttons.get(i); button.focused(i == focus);
-            if (button == resultDetailsLink) ((Label) button.getChildren().first()).setColor(i == focus ? UiArt.GOLD : UiArt.IVORY);
         }
     }
 
@@ -1011,6 +989,8 @@ public final class CryptLobby extends ApplicationAdapter {
                 setTextButtonDisabled(start, snapshot.connected() == 0 || server == null || host == null);
                 startLabel.setText(start.isDisabled() ? "CONNECT A PHONE TO START" : snapshot.connected() == 1 ? "START SOLO" : "START CO-OP");
             }
+        } else if (screen == Screen.RESULTS && resultSummary != null) {
+            resultSummary.updateParty(snapshot.connected());
         } else if (screen == Screen.SESSION && pauseResume != null) {
             if (pauseTopology != pauseTopology(snapshot)) {
                 String previousAction = ((Label) buttons.get(focus).getChildren().first()).getText().toString();

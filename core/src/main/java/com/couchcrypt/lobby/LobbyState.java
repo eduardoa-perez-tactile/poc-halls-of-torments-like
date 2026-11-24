@@ -10,6 +10,7 @@ public final class LobbyState {
     public static final long RECONNECT_MILLIS = 45_000;
     public static final long INPUT_TIMEOUT_MILLIS = 300;
     public enum Phase { LOBBY, SESSION, LEVEL_UP, LOOT, PAUSED, INVITE, RESULTS }
+    public enum Result { VICTORY, DEFEAT }
     public record Player(int index, boolean connected, boolean reserved, int secondsLeft, long generation) {}
     public record Feedback(float health, float maxHealth, float dodgeCooldown, boolean alive) {}
     /** Reuse one instance per player on the render thread. Axes are screen right and up. */
@@ -36,7 +37,7 @@ public final class LobbyState {
         PartyProgression.CardPreview firstCard, PartyProgression.CardPreview secondCard,
         RunEquipment.RewardOrigin origin) {}
     public record StarterBuild(int skillsGranted, int equipmentGranted) {}
-    public record Snapshot(Player first, Player second, int connected, boolean hostActive, Phase phase, long revision) {}
+    public record Snapshot(Player first, Player second, int connected, boolean hostActive, Phase phase, Result result, long revision) {}
     public record Join(int slot, String token, String error) {
         static Join rejected(String reason) { return new Join(-1, null, reason); }
     }
@@ -93,6 +94,7 @@ public final class LobbyState {
     private final Slot[] slots = {new Slot(), new Slot()};
     private boolean hostActive = true;
     private Phase phase = Phase.LOBBY;
+    private Result result;
     private long revision, nextGeneration;
 
     public synchronized Join join(String token, String connection, long now) {
@@ -156,6 +158,7 @@ public final class LobbyState {
     public synchronized void setPhase(Phase next) {
         if (phase != next) {
             phase = next; clearInputs();
+            if (next != Phase.RESULTS) result = null;
             if (next != Phase.SESSION) for (Slot slot : slots) {
                 if (next != Phase.LEVEL_UP) slot.clearUpgradeRequest();
                 if (next != Phase.LOOT) slot.clearEquipmentRequest();
@@ -164,6 +167,13 @@ public final class LobbyState {
                 for (Slot slot : slots) slot.participating = false;
             revision++;
         }
+    }
+
+    /** Publish the outcome and its phase together so phones cannot observe a stale finished run. */
+    public synchronized void publishResult(boolean victory) {
+        setPhase(Phase.RESULTS);
+        Result next = victory ? Result.VICTORY : Result.DEFEAT;
+        if (result != next) { result = next; revision++; }
     }
 
     /** Only the server supplies connection identities; clients cannot choose a player index. */
@@ -374,7 +384,7 @@ public final class LobbyState {
         expire(now);
         int count = 0;
         for (Slot slot : slots) if (slot.connection != null) count++;
-        return new Snapshot(player(0, now), player(1, now), count, hostActive, phase, revision);
+        return new Snapshot(player(0, now), player(1, now), count, hostActive, phase, result, revision);
     }
 
     private Player player(int index, long now) {

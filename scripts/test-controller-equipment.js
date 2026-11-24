@@ -266,6 +266,20 @@ async function main() {
   assert.equal(get('starter-build').hidden, false, 'A gear-only default build is acknowledged');
   status({ equipment: null, starterBuild, phase: 'lobby' });
   assert.equal(get('game-controls').hidden, true); assert.equal(get('starter-build').hidden, true);
+  status({ equipment: null, phase: 'results', outcome: 'victory', connected: 2 });
+  assert.equal(get('title').textContent, 'Victory');
+  assert.equal(get('party').textContent, 'Both controllers connected');
+  assert.match(get('message').textContent, /run summary/);
+  assert.equal(get('game-controls').hidden, true); assert.equal(get('dodge').disabled, true);
+  status({ equipment: null, phase: 'results', outcome: 'defeat' });
+  assert.equal(get('title').textContent, 'Defeat');
+  assert.equal(get('party').textContent, 'Your controller is connected');
+  assert.match(get('message').textContent, /remote/);
+  status({ equipment: null, phase: 'results' });
+  assert.equal(get('title').textContent, 'Round complete', 'Missing outcome remains compatible with an older host');
+  status({ equipment: null, phase: 'lobby' });
+  assert.equal(get('title').textContent, 'You have a place');
+  assert.equal(get('party').textContent, 'Ready for a solo descent');
   console.log('Controller skill/loot pause, party waiting, defaults, acknowledgment and reconnect checks passed.');
 }
 
