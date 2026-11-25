@@ -8,6 +8,7 @@ public final class RemoteButton extends Button {
     private final ButtonStyle normal;
     private final ButtonStyle focused;
     private final Runnable command;
+    private Runnable audioFeedback;
     public RemoteButton(UiArt art, Runnable command, boolean panel) {
         this(panel ? art.cardNormal : art.normal, panel ? art.cardFocused : art.focused, command);
     }
@@ -20,10 +21,15 @@ public final class RemoteButton extends Button {
         addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, Actor actor) {
                 event.cancel();
-                if (!isDisabled()) command.run();
+                activate();
             }
         });
     }
     public void focused(boolean value) { setStyle(value ? focused : normal); }
-    public void activate() { if (!isDisabled()) command.run(); }
+    public void setAudioFeedback(Runnable feedback) { audioFeedback = feedback; }
+    public void activate() {
+        if (isDisabled()) return;
+        if (audioFeedback != null) audioFeedback.run();
+        command.run();
+    }
 }
