@@ -26,8 +26,6 @@ public final class ArenaRenderer implements Disposable {
     private static final float ENVIRONMENT_BASE_HEIGHT = 24f;
     private static final float LEVEL_FX_SCALE = 1.6f, RECOIL_MARGIN = 30f;
     private static final float SOUL_PULSE_RADIUS = 60f;
-    // Keep the painted cutting trail near the weapon's scale, independent of reach upgrades.
-    private static final float WARDEN_SLASH_RADIUS = 48f;
     // Fixed SE/SW/NE/NW release landmarks, in untrimmed source pixels relative to the ground root.
     // Only the rendered origin moves; the simulation keeps its original projectile coordinates and trajectory.
     private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
@@ -151,6 +149,7 @@ public final class ArenaRenderer implements Disposable {
             art.engravedFloor.draw(batch, medallion);
             drawChestLights(world, camera);
             skillArt.ground(batch, world);
+            drawMeleeWaves(world, camera);
             // All floor effects precede the complete depth-sorted actor pass. Their painted
             // foreground rims must never be laid over a closer enemy or the player's body.
             drawHazards(world, camera, SpriteEffectArt.Layer.ALL);
@@ -698,6 +697,19 @@ public final class ArenaRenderer implements Disposable {
         else batch.setColor(.55f, .95f, .95f, alpha);
     }
 
+    private void drawMeleeWaves(ArenaWorld world, OrthographicCamera camera) {
+        for (MeleeWave wave : world.meleeWaves) {
+            if (!wave.active || !visible(camera, wave.x, wave.y, wave.reach + 24f)) continue;
+            batch.setColor(1f, 1f, 1f, MeleeWave.fadeAlpha(wave.age));
+            // The approved master points SE (-45 degrees before Y compression).
+            // World facing adds 45 degrees; subtracting the source adds another 45.
+            art.spriteEffects.drawGround(batch, SpriteEffectArt.Type.SWORD_SWEEP, 0,
+                screenX(wave.x, wave.y), screenY(wave.x, wave.y), wave.radius(),
+                wave.angle + MathUtils.PI * .5f, SpriteEffectArt.Layer.ALL);
+        }
+        batch.setColor(Color.WHITE);
+    }
+
     private void drawFootEffects(ArenaWorld world, OrthographicCamera camera) {
         for (ArenaWorld.Effect effect : world.effects) {
             if (!effect.active || !visible(camera, effect.x, effect.y, 200f)) continue;
@@ -779,12 +791,7 @@ public final class ArenaRenderer implements Disposable {
             float life = Math.max(0f, Math.min(1f, effect.ttl / Math.max(.001f, effect.maxTtl)));
             float x = screenX(effect.x, effect.y), y = screenY(effect.x, effect.y);
             switch (effect.kind) {
-                case SLASH -> {
-                    batch.setColor(Color.WHITE);
-                    // The painted crescent faces screen-down at angle zero. Rotate before projection.
-                    art.spriteEffects.drawGround(batch, SpriteEffectArt.Type.SWORD_SWEEP, effectProgress(effect),
-                        x, y + 45f, WARDEN_SLASH_RADIUS, effect.angle + MathUtils.PI * .75f, SpriteEffectArt.Layer.ALL);
-                }
+                case SLASH -> { /* Legacy fixture kind; primary attacks use combat-owned meleeWaves. */ }
                 case HIT -> {
                     float lift = impactLift(effect);
                     float impactX = x, impactY = y + lift;

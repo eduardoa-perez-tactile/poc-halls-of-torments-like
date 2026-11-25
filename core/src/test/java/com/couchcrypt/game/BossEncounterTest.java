@@ -42,7 +42,7 @@ class BossEncounterTest {
         int rewards = world.equipment.rewardsEarned();
         sovereign.x = 80; sovereign.y = 0; sovereign.health = 1;
         world.players[0].attackCooldown = 0;
-        world.update(ArenaWorld.STEP);
+        for (int tick = 0; tick < 15 && sovereign.active; tick++) world.update(ArenaWorld.STEP);
         assertTrue(world.sovereignDefeated); assertFalse(sovereign.active);
         assertFalse(world.bossDefeated); assertEquals(ArenaWorld.Outcome.RUNNING, world.outcome);
         assertNull(world.activeBoss()); assertEquals(rewards, world.equipment.rewardsEarned());
@@ -51,7 +51,8 @@ class BossEncounterTest {
         assertEquals(0, count(world, ArenaWorld.EnemyKind.SOVEREIGN));
         world.elapsed = 1200; world.update(ArenaWorld.STEP); finishChoices(world);
         world.boss.x = 80; world.boss.y = 0; world.boss.health = 1;
-        world.players[0].attackCooldown = 0; world.update(ArenaWorld.STEP);
+        world.players[0].attackCooldown = 0;
+        for (int tick = 0; tick < 15 && world.boss.active; tick++) world.update(ArenaWorld.STEP);
         assertTrue(world.bossDefeated); assertEquals(ArenaWorld.Outcome.VICTORY, world.outcome);
     }
 

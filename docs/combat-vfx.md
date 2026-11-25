@@ -4,6 +4,71 @@ Current permanent player outlines and Dodge presentation are defined by the
 25 November range-and-afterimage update below; earlier aura approvals are retained
 as implementation history.
 
+The later Warden melee-wave replacement below supersedes the compact primary
+sword slash and its immediate damage; other earlier sections remain history.
+
+## Warden melee-wave replacement (2026-11-25)
+
+The user approved the actual generated isometric ivory/gold crescent sprite and
+authorized replacing the primary sword trail with an outward wave. Its bright
+edge travels linearly from the release point to the actual skill/equipment
+targeting reach over **240 ms**, then fades at full reach until **380 ms**.
+The existing **110-degree** cone and enemy ground hitboxes determine contact.
+Damage, critical/frost contact, sound, floating numbers, stun and knockback now
+occur as the wave reaches each enemy, rather than on the release frame. The
+damage values, targeting range, attack cadence and equipment sustain rules stay
+unchanged. The separate Reaping Stroke bonus strike and other acquired abilities
+retain their existing independent behavior.
+
+Each released wave snapshots origin, facing, reach, damage/critical modifiers
+and Frostbound effects. Moving or choosing an upgrade cannot bend, teleport or
+resize a wave already in flight. New attacks use the current build. One hit per
+enemy spawn identity prevents repeated contact and safely handles pool reuse;
+fresh enemies behind an already passed rim receive no retroactive damage.
+Eight fixed slots, four reserved per participant, keep gameplay independent of
+the optional cosmetic-effect pool and allow haste waves to finish together.
+Both cameras read the same age/state. Choice pauses and host simulation gates
+freeze expansion and damage; reconnect retains it, removal/reset clears it.
+
+`BakeMeleeWave.py` uses the approved full-reach cell, measures its ivory rim and
+fits its generated arc to the real cone on the 2:1 ground plane. One stable
+painted master scales continuously with the collision radius and fades using
+the same clock. It draws in the complete ground pass beneath actors and enemy
+warnings. The previous weapon-height slash is no longer emitted or drawn.
+The managed **512×512 RGBA / 1 MiB** sprite page now stores 65 frames instead of
+72, with no added texture bytes, retained gameplay Pixmaps, dependencies or
+frame-loop allocations. All 64 unrelated frame/gutter samples remain exact.
+Original sheets, exact ImageGen prompts, source hash and normalization details
+are preserved in `art-source/warden-melee-wave/`.
+
+### Melee-wave verification
+
+JDK 21 desktop compilation, Android debug assembly and **151 focused headless
+checks across 17 classes** passed. Coverage includes near/far contact timing,
+cone exclusions, actual acquired reach, once-only contact, pool reuse/exhaustion,
+haste overlap, co-op ownership, snapshots, choice freeze, reconnect/reset,
+overlapping target positions, feedback, rewards/chests and boss death fixtures.
+Pixel checks verify the painted leading rim against its radius and ground cone;
+an independent public-baker rebuild reproduces both production atlas files
+exactly.
+
+The user subsequently authorized a separate headless emulator check. A fresh
+temporary Android TV API 33 ARM64 AVD, **1920×1080**, booted without a window;
+the existing TV-agent emulator, its preferences and `tcp:57298 → tcp:8788`
+forward were preserved. An eight-second actual APK recording checked base and
+upgraded reach in a short solo fixture, showing the expanding rim, ground
+occlusion and contact feedback. A synthetic controller connected successfully.
+No full survival playthrough or physical-device test was run. Native evidence
+is ignored under `.run/melee-wave-headless/`.
+
+Software-rendered headless capture is not a performance acceptance test: its
+sampled solo interval p95 was 52.30–62.45 ms while recording and running alongside
+another emulator. GPU timing was unmeasured; no sustained physical-TV 60 FPS
+claim is made. Accounted textures in this capture were 32,959,308 bytes including
+the current QR. The temporary phone, forward, emulator and AVD data were removed
+after verification. The pre-existing LAN `:8787/session` probe refused connection;
+that relay was left untouched for its owning agent.
+
 The 23 November 2026 pass integrates the approved enemy-arrival and level-up sprite direction, corrects the gold ring's flat perspective and replaces the rejected small impact glint with separate, larger sword and bolt bursts. Weapon contact now combines a brief directional sprite with painted recoil, stronger attack trails and distinct sound cues. Existing damage, attack cadence, movement, Dodge distance/invulnerability and enemy collision positions are preserved.
 
 ## Art and resources

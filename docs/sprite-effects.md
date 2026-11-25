@@ -1,6 +1,14 @@
 # Original sprite combat effects
 
-Latest 24 November feedback: the Warden's sword crescent was enlarged to the
+Latest 25 November approval replaces the primary slash with the original
+isometric expanding crescent in `art-source/warden-melee-wave/`. It uses one
+normalized painted master, actual attack reach and simulation-owned damage
+contact; the bank now contains 65 frames at the same 512×512 size. See
+[the melee-wave implementation](combat-vfx.md#warden-melee-wave-replacement-2026-11-25)
+for current timing and verification. Both public sprite bakers produce this
+replacement. The following earlier art passes are retained as history.
+
+24 November feedback: the Warden's sword crescent was enlarged to the
 entire upgraded targeting radius, producing a very large, soft trail. Its paint
 now uses a fixed 48-world-unit visual radius at the existing weapon-height
 anchor. Skill/gear reach, damage, cadence, direction, 380 ms lifetime and

@@ -140,14 +140,20 @@ class ArenaTimelineTest {
     @Test void coopSoulRoundingIsConservativeAndExactAcrossManySmallRewards() {
         ArenaWorld world = solo(ArenaTimeline.TWENTY_MINUTES);
         world.activatePlayer(1); world.players[1].attackCooldown = 1000;
+        for (ArenaWorld.Player player : world.players) player.invulnerable = 1000;
         world.elapsed = 20; // A short reinforcement breather, not a survival playthrough.
         for (int i = 0; i < 100; i++) {
             ArenaWorld.Enemy enemy = world.enemies[0];
             enemy.active = true; enemy.health = 1; enemy.x = 30; enemy.y = 0;
+            enemy.spawnId++; enemy.speedMultiplier = 0; enemy.stunTime = 0;
             enemy.kind = ArenaWorld.EnemyKind.GHOUL; enemy.soulPercent = 82;
             world.activeEnemies = 1; world.players[0].attackCooldown = 0;
-            world.update(ArenaWorld.STEP);
-            finishChoices(world); // Level-ups pause later kills until both personal choices resolve.
+            int previousKills = world.kills;
+            for (int tick = 0; tick < 30 && world.kills == previousKills; tick++) {
+                world.update(ArenaWorld.STEP);
+                finishChoices(world); // Level-ups pause later kills until both personal choices resolve.
+            }
+            assertEquals(previousKills + 1, world.kills, "Each fresh controlled spawn must receive a real wave contact");
         }
         assertEquals(82, world.souls);
         assertEquals(82, world.progression.totalXp);

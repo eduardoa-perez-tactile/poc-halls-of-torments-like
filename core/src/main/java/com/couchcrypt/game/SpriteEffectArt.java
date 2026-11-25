@@ -152,13 +152,15 @@ public final class SpriteEffectArt implements Disposable {
         final boolean hasEndpoints;
         final float startX, startY, endX, endY;
         Clip(JsonValue json, Frame[] bank) {
-            frames = ints(json, "frames", 8);
-            int[] times = ints(json, "durationsMs", 8);
+            JsonValue indices = json.require("frames");
+            if (!indices.isArray() || indices.size < 1 || indices.size > 8) throw invalid("clip frame count");
+            frames = indices.asIntArray();
+            int[] times = ints(json, "durationsMs", frames.length);
             groundRadius = json.getFloat("groundRadius", 0f);
             referenceScale = json.getFloat("referenceScale");
             if (!Float.isFinite(groundRadius) || groundRadius < 0f || !Float.isFinite(referenceScale)
                 || referenceScale <= 0f || referenceScale > 32f) throw invalid("clip scales");
-            ends = new float[8]; float sum = 0f, reach = 0f;
+            ends = new float[frames.length]; float sum = 0f, reach = 0f;
             Frame first = null;
             for (int i = 0; i < frames.length; i++) {
                 if (frames[i] < 0 || frames[i] >= bank.length || times[i] <= 0 || times[i] > 1000) throw invalid("clip timing or index");
@@ -209,7 +211,8 @@ public final class SpriteEffectArt implements Disposable {
             if (!file.matches("[A-Za-z0-9_-]+\\.png") || width <= 0 || height <= 0 || width > 512 || height > 512) throw invalid("page");
             textureBytes = (long) width * height * 4;
             JsonValue list = json.require("frames");
-            if (!list.isArray() || list.size != Type.values().length * 8) throw invalid("72 frames required");
+            if (!list.isArray() || list.size < Type.values().length || list.size > Type.values().length * 8)
+                throw invalid("frame count");
             frames = new Frame[list.size];
             for (int i = 0; i < frames.length; i++) {
                 frames[i] = new Frame(list.get(i), width, height);
@@ -238,6 +241,7 @@ public final class SpriteEffectArt implements Disposable {
                 if (type == Type.STORM && !parsed.hasEndpoints) throw invalid("missing lightning endpoints");
             }
             for (Clip clip : clips) if (clip == null) throw invalid("missing animation");
+            for (boolean used : referenced) if (!used) throw invalid("unreferenced frame");
         }
     }
 
