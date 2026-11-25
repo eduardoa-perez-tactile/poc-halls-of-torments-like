@@ -4902,6 +4902,27 @@
         64,
         144
       ]
+    },
+    {
+      "page": 3,
+      "rect": [
+        464,
+        4,
+        46,
+        38
+      ],
+      "source": [
+        46,
+        38
+      ],
+      "offset": [
+        0,
+        0
+      ],
+      "pivot": [
+        23.0,
+        30.5
+      ]
     }
   ],
   "actors": [
@@ -6462,6 +6483,13 @@
       "footprintWidth": 1,
       "footprintWorldX": 1,
       "footprintWorldY": 1
+    },
+    "elite-chest": {
+      "frame": 232,
+      "worldHeight": 44,
+      "footprintWidth": 44,
+      "footprintWorldX": 48,
+      "footprintWorldY": 32
     }
   }
 }

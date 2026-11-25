@@ -45,6 +45,8 @@
 - Arena ambience/damage-number approval (2026-11-25): make drifting dust visible and add sparse slow ivory soul motes around the seal/tombs (the user corrected the initial dust-only selection to dust plus motes). Keep a fixed bounded pool, existing textures, combat-owned time and shared world positions across cameras. Keep ambience subdued beneath actors and combat warnings; no fog/fire/rain. Add compact floating actual damage numbers above enemies: ivory normal hits, slightly larger gold critical hits, short rise/fade and a separate fixed capacity to limit crowd clutter. Freeze with combat and clear on reset. See docs/combat-vfx.md.
 - Treat 60 FPS (16.7 ms per frame) and low memory consumption as requirements. Keep texture dimensions bounded, reuse resources, avoid per-frame allocations and layout rebuilds, and keep network I/O off the render thread. Measure briefly and report limitations honestly; emulator results do not guarantee performance on physical TVs.
 
+- Elite loot collection (2026-11-25): defeated elites leave stationary chests instead of opening equipment choices immediately. Either living player walks over a chest to earn one party reward with personal phone choices; keep five elite opportunities, source labels, skill priority, shared thirty-second rounds and three automatic timed reliquaries. Chests persist until collected/reset, use a separate fixed pool, and reuse resident atlas space. Late join catch-up includes collected rewards only; uncollected chests remain available to the current party.
+
 ## Working process
 
 - Work in the existing checkout. Never create or use Git worktrees or additional task checkouts for this project.

@@ -32,7 +32,7 @@ public final class ArenaRenderer implements Disposable {
     // Only the rendered origin moves; the simulation keeps its original projectile coordinates and trajectory.
     private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
     private static final float[] SOVEREIGN_ORIGIN = {37, 78, -12, 67, 18, 90, -35, 82};
-    private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PAINTED_BORDER = 3, DODGE_GHOST = 4;
+    private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PAINTED_BORDER = 3, DODGE_GHOST = 4, CHEST = 5;
     private final GameArt art;
     private final GameHud gameHud;
     private final EnemyRankMarkers rankMarkers;
@@ -54,9 +54,11 @@ public final class ArenaRenderer implements Disposable {
     private final ArenaLayout layout;
     private final PaintedBorderArt.Scene paintedBorders;
     private final GameplayAtlas.Region[] propArt;
+    private final GameplayAtlas.Region chestArt;
+    private final float chestScale;
     private final float[] environmentVertices = new float[20];
     private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + 2 * DodgeTrail.CAPACITY
-        + ArenaLayout.MAX_PLACEMENTS + PaintedBorderArt.MAX_SCENERY];
+        + ArenaLayout.MAX_PLACEMENTS + PaintedBorderArt.MAX_SCENERY + ArenaWorld.MAX_CHESTS];
     private final int[] types = new int[depths.length], indices = new int[depths.length], layers = new int[depths.length];
     private int sortCount;
     public int drawCalls;
@@ -96,6 +98,8 @@ public final class ArenaRenderer implements Disposable {
         propArt = new GameplayAtlas.Region[layout.placements.length];
         for (int i = 0; i < propArt.length; i++)
             propArt[i] = art.environment(layout.placements[i].region);
+        chestArt = art.environment("elite-chest");
+        chestScale = chestArt.worldHeight() / art.metadata.frames[chestArt.frame()].sourceHeight;
     }
 
     public void resetCameras() {
@@ -334,6 +338,10 @@ public final class ArenaRenderer implements Disposable {
 
     private void gatherSprites(ArenaWorld world, OrthographicCamera camera) {
         sortCount = 0;
+        for (int i = 0; i < world.chests.length; i++) {
+            ArenaWorld.Chest chest = world.chests[i];
+            if (chest.active && visible(camera, chest.x, chest.y, 60f)) add(CHEST, i, chest.x, chest.y);
+        }
         for (int i = 0; i < layout.placements.length; i++) {
             ArenaLayout.Placement placement = layout.placements[i];
             if (placement.wall) continue;
@@ -410,6 +418,11 @@ public final class ArenaRenderer implements Disposable {
                 x = player.x; y = player.y; width = player.alive ? 62f : 72f;
             } else if (types[i] == ENEMY) {
                 x = world.enemies[index].x; y = world.enemies[index].y; width = 44f * enemyScale(world.enemies[index]);
+            } else if (types[i] == CHEST) {
+                ArenaWorld.Chest chest = world.chests[index];
+                batch.draw(art.shadow, screenX(chest.x, chest.y) - 24f,
+                    screenY(chest.x, chest.y) - 8f, 48f, 18f);
+                continue;
             } else {
                 ArenaLayout.Placement placement = layout.placements[index];
                 if (placement.shadowWidth > 0 && placement.shadowHeight > 0)
@@ -815,6 +828,10 @@ public final class ArenaRenderer implements Disposable {
                 paintedBorders.draw(batch, index);
             } else if (types[i] == PROP) {
                 drawEnvironment(world, camera, viewer, index);
+            } else if (types[i] == CHEST) {
+                ArenaWorld.Chest chest = world.chests[index];
+                batch.setColor(Color.WHITE);
+                drawFrame(chestArt.frame(), chest.x, chest.y, chestScale);
             } else if (types[i] == DODGE_GHOST) {
                 int owner = index / DodgeTrail.CAPACITY;
                 DodgeTrail.Snapshot snapshot = world.players[owner].dodgeTrail.snapshots[index % DodgeTrail.CAPACITY];

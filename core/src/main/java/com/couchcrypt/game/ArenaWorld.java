@@ -4,6 +4,8 @@ package com.couchcrypt.game;
 public final class ArenaWorld {
     public static final float HALF_WIDTH = 1200f, HALF_HEIGHT = 900f, ROUND_SECONDS = 180f;
     public static final int MAX_ENEMIES = 64, MAX_BOLTS = 96, MAX_PICKUPS = 96;
+    public static final int MAX_CHESTS = 5;
+    public static final float CHEST_PICKUP_RADIUS = 40f, CHEST_LANDING_SECONDS = .35f;
     public static final int MAX_SHOTS = 96, MAX_HAZARDS = 12, MAX_EFFECTS = 96;
     public static final float STEP = 1f / 60f;
     /** Cosmetic sweep lifetime only; damage and attack cadence still commit immediately. */
@@ -63,6 +65,8 @@ public final class ArenaWorld {
     public final Enemy[] enemies = new Enemy[MAX_ENEMIES];
     public final Bolt[] bolts = new Bolt[MAX_BOLTS];
     public final Pickup[] pickups = new Pickup[MAX_PICKUPS];
+    /** Elite loot never competes with souls/healing for pool space and stays until collected. */
+    public final Chest[] chests = new Chest[MAX_CHESTS];
     public final Shot[] shots = new Shot[MAX_SHOTS];
     public final Hazard[] hazards = new Hazard[MAX_HAZARDS];
     public final Effect[] effects = new Effect[MAX_EFFECTS];
@@ -78,7 +82,7 @@ public final class ArenaWorld {
     private double simulationElapsed;
     private int sharedXpRemainder;
     private int randomState, runNumber, nextCheckpoint, encounterPhase, enemySpawnSerial;
-    private int presentedChoiceRound;
+    private int presentedChoiceRound, chestsDropped;
     private boolean sovereignSkipped;
     private Diagnostics diagnostics, diagnosticsStorage;
 
@@ -89,6 +93,7 @@ public final class ArenaWorld {
         for (int i = 0; i < enemies.length; i++) enemies[i] = new Enemy();
         for (int i = 0; i < bolts.length; i++) bolts[i] = new Bolt();
         for (int i = 0; i < pickups.length; i++) pickups[i] = new Pickup();
+        for (int i = 0; i < chests.length; i++) chests[i] = new Chest();
         for (int i = 0; i < shots.length; i++) shots[i] = new Shot();
         for (int i = 0; i < hazards.length; i++) hazards[i] = new Hazard();
         for (int i = 0; i < effects.length; i++) effects[i] = new Effect();
@@ -105,6 +110,7 @@ public final class ArenaWorld {
         wave = bossPhase = 1; bossSpawned = bossDefeated = sovereignSpawned = sovereignDefeated = false; boss = sovereign = null;
         sovereignDefeatedAt = -1;
         levelUpFxAge = 2; presentedChoiceRound = 0; sovereignSkipped = false;
+        chestsDropped = 0;
         swordSwings = arrowsFired = enemyDeaths = pickupsCollected = heroHits = 0;
         swordHits = boltHits = criticalHits = dodges = blockedHits = healsCollected = auraPulses = stormCasts = 0;
         wraithDashes = bruteSlams = hostileShotsFired = 0;
@@ -124,6 +130,7 @@ public final class ArenaWorld {
         for (Enemy e : enemies) { e.active = false; e.variant = EnemyVariant.ORIGINAL; resetPresentation(e); }
         for (Bolt b : bolts) b.active = false;
         for (Pickup p : pickups) p.active = false;
+        for (Chest chest : chests) { chest.active = false; chest.x = chest.y = chest.pickupDelay = 0; }
         for (Shot s : shots) s.active = false;
         for (Hazard h : hazards) h.active = false;
         for (Effect e : effects) e.active = false;
@@ -278,6 +285,7 @@ public final class ArenaWorld {
         if (timeline.isFullRun()) healthDrops.update(pickups, STEP, livingPlayerCount());
         for (Player p : players) updatePlayer(p);
         updateEnemies(); updateBolts(); updateShots(); updateHazards(); updatePickups(); updateRevival();
+        updateChests();
         progression.update(STEP); equipment.update(STEP);
         boolean living = false; for (Player p : players) living |= p.active && p.alive;
         if (!living) { outcome = Outcome.DEFEAT; return; }
@@ -803,7 +811,7 @@ public final class ArenaWorld {
         int rewardHundredths = reward * enemy.soulPercent + sharedXpRemainder;
         int soulReward = rewardHundredths / 100; sharedXpRemainder = rewardHundredths % 100;
         if (soulReward > 0) drop(enemy.x, enemy.y, false, soulReward);
-        if (enemy.elite) { elitesKilled++; equipment.rewardElite(); }
+        if (enemy.elite) { elitesKilled++; dropChest(enemy.x, enemy.y); }
         if (timeline.isFullRun()) {
             if (!isBoss(enemy.kind)) healthDrops.defeated(pickups, enemy.elite, elapsed,
                 livingPlayerCount(), enemy.x + 14, enemy.y);
@@ -843,6 +851,34 @@ public final class ArenaWorld {
     private static void setPickup(Pickup p, float x, float y, boolean healing, int value) {
         p.active = true; p.x = x; p.y = y; p.healing = healing; p.value = value;
         p.ttl = p.maxTtl = 0; p.eliteHealing = false;
+    }
+
+    private void dropChest(float x, float y) {
+        if (chestsDropped >= MAX_CHESTS) return;
+        // Five elite opportunities per run: retain a distinct slot even after collection.
+        Chest chest = chests[chestsDropped++];
+        chest.active = true; chest.x = x; chest.y = y; chest.pickupDelay = CHEST_LANDING_SECONDS;
+    }
+
+    private void updateChests() {
+        if (levelUpPending()) return;
+        for (Chest chest : chests) {
+            if (!chest.active) continue;
+            // Let the death/drop read before a player already standing at its feet collects it.
+            if (chest.pickupDelay > 0) {
+                chest.pickupDelay = Math.max(0, chest.pickupDelay - STEP);
+                continue;
+            }
+            for (Player player : players) {
+                if (!player.active || !player.alive
+                    || distanceSquared(player.x, player.y, chest.x, chest.y) > CHEST_PICKUP_RADIUS * CHEST_PICKUP_RADIUS)
+                    continue;
+                chest.active = false;
+                equipment.rewardElite();
+                // One shared round at a time, including when several chests overlap.
+                return;
+            }
+        }
     }
 
     private void updatePickups() {
@@ -991,6 +1027,23 @@ public final class ArenaWorld {
             player.y = clamp(y, -HALF_HEIGHT + PLAYER_RADIUS, HALF_HEIGHT - PLAYER_RADIUS);
             player.invulnerable = 0f; // The cleared, quiet scene needs no blinking inspection shield.
         }
+    }
+
+    /** Profile-only real elite death/drop for a brief chest rendering and contact check. */
+    public void debugEliteChestEncounter() {
+        if (outcome != Outcome.RUNNING || choicePending() || bossSpawned || livingPlayerCount() == 0
+            || chestsDropped >= MAX_CHESTS) return;
+        debugSceneryView(0, 0);
+        spawnCountdown = 30;
+        Player anchor = players[0].active && players[0].alive ? players[0] : players[1];
+        for (Player player : players) if (player.active && player.alive)
+            player.attackCooldown = player.auraCooldown = player.stormCooldown = 30;
+        Enemy elite = spawnSizingFixture(EnemyKind.BRUTE, EnemyVariant.ORIGINAL, true, anchor);
+        if (elite != null) {
+            elite.x = 100; elite.y = -100;
+            hit(elite, elite.health, anchor.slot, false);
+        }
+        clearInputs();
     }
 
     /** Profile-only size proof: four species, each Original / variant / elite, with a hero reference. */
@@ -1270,6 +1323,10 @@ public final class ArenaWorld {
         public boolean active, healing, eliteHealing;
         public float x, y, ttl, maxTtl;
         public int value;
+    }
+    public static final class Chest {
+        public boolean active;
+        public float x, y, pickupDelay;
     }
     public static final class Shot {
         public boolean active, casterElite;
