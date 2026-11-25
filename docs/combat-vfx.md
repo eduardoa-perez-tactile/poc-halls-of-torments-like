@@ -182,3 +182,52 @@ The existing TV emulator was running another game, so its activity, saved LAN
 join override (192.168.14.248:8787), relay and ADB forwards were preserved. The
 temporary desktop render process was closed. Captures/logs are ignored under
 `.run/range-dodge-preview/`; the Android APK is ready for user playtesting.
+
+## Longer escape Dodge (2026-11-25)
+
+The user's later escape feedback authorizes 25% farther Dodge travel: the movement
+multiplier increases from 3× to 3.75× effective movement speed. Duration stays
+220 ms, and cooldown/invulnerability keep their existing windows. Without speed
+modifiers, Warden travels 148.5 world units (previously 118.8) and Ranger 163.35
+(previously 130.68). Movement skills/equipment still apply normally. Normalized
+diagonals gain no extra distance and arena bounds still clamp the path. Existing
+ground art and the short frozen-pose ghost history follow the longer real path.
+
+Focused checks cover both heroes' diagonal distance, unchanged timing/cooldown,
+bounded movement and the Dodge history lifecycle. The earlier preservation of
+Dodge distance describes the presentation milestone before this separate request.
+
+## Arena life and compact damage numbers (2026-11-25)
+
+The user selected drifting dust plus sparse ivory soul motes. `ArenaAmbience`
+replaces the old nearly invisible 48-speck field with 160 slow dust specks and
+12 tiny ivory motes: six around the original seal and one beside each authored
+tomb. Startup seeds vary size, opacity, height, sway and drift. Each camera samples
+the same world positions and combat time, so all motion freezes with combat.
+Existing glow/pixel regions supply soft specks in the pre-actor pass; nothing
+adds fog, fire, rain, collision or collectible behavior. Fixed float-array payload
+is 6,784 bytes, with no added textures or frame-loop object allocation.
+
+Enemy hits now produce compact floating damage numbers. A separate 32-entry pool
+records actual health removed, including lethal overkill clipping, with critical
+identity and source position/species/render scale captured before enemy reuse.
+Numbers display rounded whole HP (positive fractions display at least 1), in
+ivory for normal hits and slightly larger gold for criticals. Each rises 24 logical
+units and fades over a 650 ms lifetime. Older entries recycle under crowd pressure;
+number capacity never consumes combat-effect slots. Numbers draw above complete
+enemy bodies with a small dark shadow and share their combat clock across cameras.
+Choice/manual/background/disconnect pauses freeze them; run reset clears them.
+Cached digits from the resident body font use a reusable vertex buffer, with no
+new textures, per-hit strings or frame-loop glyph layouts.
+
+The final combined JDK 21 desktop/Android build and 48 focused checks passed,
+including both heroes' longer Dodge and four damage-number cases for lethal
+critical snapshots, pause/reset, independent pool saturation and player damage.
+Native 1920×1080 OpenGL captures show ambience at early/later combat time and near
+tombs, plus co-op normal/critical labels above ordinary, elite and boss bodies.
+The fixed dust/mote field's crowded co-op renderer sample measured CPU submission
+p95 0.618 ms across 180 static frames; this excludes simulation/audio/GPU completion
+and does not establish sustained TV frame rate or balance. Final screenshots/logs
+remain ignored under `.run/ambient-preview/`. Temporary render processes and
+harness files were removed; the existing emulator, saved LAN host and relay were
+left unchanged. No full gameplay playthrough was run.

@@ -37,6 +37,8 @@ public final class ArenaRenderer implements Disposable {
     private final GameHud gameHud;
     private final EnemyRankMarkers rankMarkers;
     private final PlayerFootRing playerFootRing;
+    private final DamageNumberArt damageNumberArt;
+    private final ArenaAmbience ambience;
     private final SpriteBatch batch;
     private final ShaderProgram paletteShader;
     private final SoftIris iris;
@@ -74,6 +76,7 @@ public final class ArenaRenderer implements Disposable {
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
         rankMarkers = new EnemyRankMarkers(art.pixel);
         playerFootRing = new PlayerFootRing(art.pixel);
+        damageNumberArt = new DamageNumberArt(uiArt.body);
         floorLayout = new ArenaFloorLayout(new JsonReader().parse(Gdx.files.internal("arena/crypt-floor.json")));
         float radius = floorLayout.medallionDiameter * .5f;
         float[] engraving = EngravedFloorArt.rectangle(floorLayout.centerX - radius, floorLayout.centerY - radius,
@@ -88,6 +91,7 @@ public final class ArenaRenderer implements Disposable {
         floorCacheId = cacheFloor();
         hud.setToOrtho(false, HUD_WIDTH, HUD_HEIGHT);
         layout = ArenaLayout.load(art.metadata);
+        ambience = new ArenaAmbience(floorLayout, layout);
         paintedBorders = art.paintedBorders.place(layout, art.metadata);
         propArt = new GameplayAtlas.Region[layout.placements.length];
         for (int i = 0; i < propArt.length; i++)
@@ -150,6 +154,7 @@ public final class ArenaRenderer implements Disposable {
             drawBolts(world, camera);
             drawShots(world, camera);
             drawEffects(world, camera);
+            drawDamageNumbers(world, camera);
             drawEnemyRanks(world);
             batch.end();
             drawCalls += batch.renderCalls;
@@ -437,24 +442,8 @@ public final class ArenaRenderer implements Disposable {
     }
 
     private void drawDust(ArenaWorld world, OrthographicCamera camera) {
-        // A fixed world field: both panes see the same motes, and simulation pauses freeze them.
-        for (int i = 0; i < 48; i++) {
-            int hash = (i + 1) * 0x45d9f3b;
-            hash ^= hash >>> 16;
-            float x = -ArenaWorld.HALF_WIDTH + ((hash & 0xffff) / 65535f * ArenaWorld.HALF_WIDTH * 2f
-                + world.elapsed * 2f) % (ArenaWorld.HALF_WIDTH * 2f);
-            float y = -ArenaWorld.HALF_HEIGHT + (((hash >>> 16) & 0xffff) / 65535f * ArenaWorld.HALF_HEIGHT * 2f
-                + world.elapsed * .8f) % (ArenaWorld.HALF_HEIGHT * 2f);
-            float phase = ((i * .173f + world.elapsed * .045f) % 1f);
-            float height = 20f + phase * 120f;
-            float sx = screenX(x, y), sy = screenY(x, y) + height;
-            if (!visibleProjected(camera, sx, sy, 3f)) continue;
-            float alpha = .13f * Math.min(1f, Math.min(phase, 1f - phase) * 8f);
-            float size = (i & 1) == 0 ? 1f : 1.6f;
-            batch.setColor(.64f, .7f, .72f, alpha);
-            batch.draw(art.pixel, sx, sy, size, size);
-        }
-        batch.setColor(Color.WHITE);
+        // Both cameras sample one fixed world field; combat pauses freeze all ambient motion.
+        ambience.draw(batch, art, camera, world.elapsed);
     }
 
     private void drawBolts(ArenaWorld world, OrthographicCamera camera) {
@@ -660,6 +649,18 @@ public final class ArenaRenderer implements Disposable {
             rankMarkers.draw(batch, screenX(enemy.x, enemy.y), top,
                 enemy.elite, enemy.health / Math.max(1f, enemy.maxHealth));
         }
+    }
+
+    private void drawDamageNumbers(ArenaWorld world, OrthographicCamera camera) {
+        for (DamageNumbers.Entry entry : world.damageNumbers.entries) {
+            if (entry.ttl <= 0) continue;
+            GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(entry.enemyKind));
+            float x = screenX(entry.x, entry.y) + entry.offsetX;
+            float y = screenY(entry.x, entry.y) + actor.maxAbove * entry.renderScale + entry.liftPadding + entry.rise();
+            if (entry.enemyKind == ArenaWorld.EnemyKind.BOSS) y += graveKingHover(world.elapsed);
+            if (visibleProjected(camera, x, y, 48f)) damageNumberArt.draw(batch, entry, x, y);
+        }
+        batch.setColor(Color.WHITE);
     }
 
     private void drawEffects(ArenaWorld world, OrthographicCamera camera) {

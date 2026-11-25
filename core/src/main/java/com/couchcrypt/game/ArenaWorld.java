@@ -8,7 +8,7 @@ public final class ArenaWorld {
     public static final float STEP = 1f / 60f;
     /** Cosmetic sweep lifetime only; damage and attack cadence still commit immediately. */
     public static final float WARDEN_SLASH_SECONDS = .38f;
-    private static final float DODGE_DURATION = .22f, PLAYER_RADIUS = 20f;
+    private static final float DODGE_DURATION = .22f, DODGE_SPEED_MULTIPLIER = 3.75f, PLAYER_RADIUS = 20f;
     public enum Outcome { RUNNING, VICTORY, DEFEAT }
     public enum Hero {
         WARDEN(100, 28, .7f, 180, 160, 2.4f),
@@ -66,6 +66,7 @@ public final class ArenaWorld {
     public final Shot[] shots = new Shot[MAX_SHOTS];
     public final Hazard[] hazards = new Hazard[MAX_HAZARDS];
     public final Effect[] effects = new Effect[MAX_EFFECTS];
+    final DamageNumbers damageNumbers = new DamageNumbers();
     public final PartyProgression progression;
     public final RunEquipment equipment;
     public final HealthDropPolicy healthDrops = new HealthDropPolicy();
@@ -110,7 +111,7 @@ public final class ArenaWorld {
         spawnCountdown = .65f;
         runSeed = 0x5a17c9e3 ^ (++runNumber * 0x45d9f3b); randomState = runSeed;
         debugSizingFacing = null;
-        progression.reset(); equipment.reset(); healthDrops.reset();
+        progression.reset(); equipment.reset(); healthDrops.reset(); damageNumbers.clear();
         for (Player p : players) {
             p.active = p.alive = false; p.x = p.y = p.walkTime = p.reviveProgress = 0;
             resetBuild(p); p.dodgeCooldown = p.dodgeTime = p.invulnerable = p.attackCooldown = 0;
@@ -272,6 +273,7 @@ public final class ArenaWorld {
         simulationElapsed += 1.0 / 60.0;
         elapsed = (float) simulationElapsed;
         wave = timeline.phaseIndex(elapsed) + 1;
+        damageNumbers.update(STEP);
         for (Effect e : effects) if (e.active) { e.ttl -= STEP; if (e.ttl <= 0) e.active = false; }
         if (timeline.isFullRun()) healthDrops.update(pickups, STEP, livingPlayerCount());
         for (Player p : players) updatePlayer(p);
@@ -326,8 +328,8 @@ public final class ArenaWorld {
         float previousX = p.x, previousY = p.y;
         if (p.dodgeTime > 0) {
             float duration = Math.min(STEP, p.dodgeTime);
-            float nextX = clamp(p.x + p.dodgeX * speed * 3 * duration, -HALF_WIDTH + 20, HALF_WIDTH - 20);
-            float nextY = clamp(p.y + p.dodgeY * speed * 3 * duration, -HALF_HEIGHT + 20, HALF_HEIGHT - 20);
+            float nextX = clamp(p.x + p.dodgeX * speed * DODGE_SPEED_MULTIPLIER * duration, -HALF_WIDTH + 20, HALF_WIDTH - 20);
+            float nextY = clamp(p.y + p.dodgeY * speed * DODGE_SPEED_MULTIPLIER * duration, -HALF_HEIGHT + 20, HALF_HEIGHT - 20);
             // Retain real past positions/poses rather than copies attached to the current body.
             if (nextX != p.x || nextY != p.y) p.dodgeTrail.capture(p);
             p.x = nextX; p.y = nextY;
@@ -773,6 +775,7 @@ public final class ArenaWorld {
                      float directionX, float directionY) {
         if (!enemy.active) return null;
         float actual = Math.min(enemy.health, damage); players[owner].damageDealt += actual;
+        damageNumbers.record(enemy, actual, critical);
         if (drains) {
             float before = players[owner].health;
             equipment.drain(players[owner], actual);
