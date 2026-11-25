@@ -15,6 +15,43 @@ capture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(capture)
 
 
+def validate_combat_evidence(log_text, completed_cycles):
+    """A responsive controller alone is not evidence that a stress fixture actually simulated combat."""
+    parsed = capture.summarize_baseline(log_text, {'fixture': 'stability'})
+    boss_frames = [row for row in parsed['reports'] if row.get('phase') == 'COOP_BOSS']
+    boss_worlds = [row for row in parsed['diagnostics'] if row['tag'] == 'ProfileWorld' and row.get('phase') == 'COOP_BOSS']
+    runs = {}
+    for row in boss_worlds:
+        runs.setdefault(row['runSeed'], []).append(row)
+    advancing = sum(len(rows) > 1 and max(float(row['elapsed']) for row in rows)
+                    - min(float(row['elapsed']) for row in rows) >= 5 for rows in runs.values())
+    crowded_windows = sum(row.get('enemies', {}).get('frameSampledPeak', 0) >= 40 for row in boss_frames)
+    simulated_steps = sum(int(row.get('simulationStepsTotal', 0)) for row in boss_frames)
+    attacking_runs = sum(any(int(row.get('boltCollisionCandidates', 0)) + int(row.get('meleeCollisionCandidates', 0))
+                             + int(row.get('expansionCollisionCandidates', 0)) > 0 for row in rows)
+                         for rows in runs.values())
+    workers = {int(row['audioWorkers']) for row in boss_worlds if 'audioWorkers' in row}
+    handles = {int(row['audioMusicHandles']) for row in boss_worlds if 'audioMusicHandles' in row}
+    textures = [int(row['gpuTextureBytes']) for row in parsed['reports'] if 'gpuTextureBytes' in row]
+    violations = []
+    for condition, message in [
+        (completed_cycles > 0, 'No completed stress cycles'),
+        (advancing >= completed_cycles, 'Not every cycle has evidence of advancing boss combat time'),
+        (attacking_runs >= completed_cycles, 'Not every cycle has real attack collision tests'),
+        (crowded_windows >= completed_cycles, 'Insufficient high-enemy-occupancy boss windows'),
+        (simulated_steps >= completed_cycles * 600, 'Insufficient active fixed-step boss simulation'),
+        (workers == {2}, 'Audio workers failed, grew, or were not reported'),
+        (bool(handles) and max(handles) <= 1, 'Music handle ownership grew or was not reported'),
+        (bool(textures) and max(textures) <= 32 * 1_048_576, 'Texture budget exceeded or was not reported'),
+        ('FATAL EXCEPTION' not in log_text, 'Fatal Android exception recorded')]:
+        if not condition:
+            violations.append(message)
+    return {'valid': not violations, 'violations': violations, 'advancing_combat_runs': advancing,
+            'attacking_runs': attacking_runs, 'crowded_boss_windows': crowded_windows,
+            'boss_simulation_steps': simulated_steps, 'audio_worker_counts': sorted(workers),
+            'music_handle_counts': sorted(handles), 'max_texture_bytes': max(textures, default=0)}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--serial', required=True)
@@ -30,6 +67,7 @@ def main():
     sdk = Path(os.environ.get('ANDROID_HOME', Path.home() / 'Library/Android/sdk'))
     target = [str(sdk / 'platform-tools/adb'), '-s', args.serial]
     phones = []
+    retired_inputs = []
     logger = None
     report = {'requested_seconds': args.seconds, 'source': capture.source_provenance(),
               'cycles': [], 'memory': [], 'complete': False,
@@ -162,6 +200,8 @@ def main():
                 offer_id = old.latest_status['progression']['upgrade']['id']
                 phones[1] = None
                 old.close()
+                retired_inputs.append({'player': old.player, 'inputs': old.input_messages,
+                                       'active_inputs': old.active_input_messages, 'dodge_edges': old.dodge_edges})
                 until(lambda: phones[0].latest_status.get('phase') == 'paused', 'disconnect pause')
                 phones[1] = capture.Phone(args.forward_port, room, True, 1, token=token)
                 until(lambda: phones[1].joined and phones[1].latest_status is not None, 'reconnected controller')
@@ -212,7 +252,9 @@ def main():
             until(lambda: all_phase('session'), 'replay')
         report['complete'] = True
         report['elapsed_seconds'] = round(time.monotonic() - began, 2)
-        report['controllers'] = [{'inputs': phone.input_messages, 'dodge_edges': phone.dodge_edges} for phone in phones]
+        report['controllers'] = retired_inputs + [
+            {'player': phone.player, 'inputs': phone.input_messages, 'active_inputs': phone.active_input_messages,
+             'dodge_edges': phone.dodge_edges} for phone in phones]
     except BaseException as failure:
         report['error'] = str(failure)
         raise
@@ -230,11 +272,15 @@ def main():
             output.close()
         log = directory / 'game.log'
         report['fatal_exception_recorded'] = log.exists() and 'FATAL EXCEPTION' in log.read_text(errors='replace')
+        if report['complete']:
+            report['combat_validation'] = validate_combat_evidence(log.read_text(errors='replace'), len(report['cycles']))
         save()
         command('shell', 'am', 'force-stop', capture.PACKAGE)
         print('Stress capture finished; synthetic phones closed and app stopped on its explicit emulator.', flush=True)
     if report['fatal_exception_recorded']:
         raise RuntimeError('Fatal Android exception recorded; inspect game.log')
+    if not report.get('combat_validation', {}).get('valid', False):
+        raise RuntimeError('Stress capture lacks expected combat/resource evidence; inspect summary.json')
 
 
 if __name__ == '__main__':
