@@ -600,17 +600,17 @@ public final class CryptLobby extends ApplicationAdapter {
         for (int slot = 0; slot < 2; slot++) {
             if (!world.players[slot].active) continue;
             var player = slot == 0 ? snapshot.first() : snapshot.second();
-            if (message.length() > 0) message.append("\n\n");
+            if (message.length() > 0) message.append("  /  ");
             message.append(slot == 0 ? "PLAYER I" : "PLAYER II");
-            if (player.connected()) message.append("\nPhone connected");
+            if (player.connected()) message.append(" CONNECTED");
             else if (player.reserved()) {
-                message.append("\nPhone disconnected");
-                if (player.secondsLeft() > 0) message.append("\nReconnect within ").append(player.secondsLeft()).append('s');
+                message.append(" DISCONNECTED");
+                if (player.secondsLeft() > 0) message.append(" (").append(player.secondsLeft()).append("s)");
             }
-            else message.append("\nPlace released");
+            else message.append(" PLACE RELEASED");
         }
-        if (snapshot.connected() == 0) message.append("\n\nReconnect a phone to continue.");
-        else if (!canResume(snapshot)) message.append("\n\nReconnect the missing phone or remove its place.");
+        if (snapshot.connected() == 0) message.append("\nReconnect a phone to continue.");
+        else if (!canResume(snapshot)) message.append("\nReconnect the missing phone or remove its place.");
         return message.toString();
     }
 
