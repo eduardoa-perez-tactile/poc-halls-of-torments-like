@@ -31,6 +31,9 @@ import com.couchcrypt.game.GameArt;
 import com.couchcrypt.game.HudArt;
 import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.GameAudio;
+import com.couchcrypt.game.AudioSettings;
+import com.couchcrypt.game.SceneMusic;
+import com.couchcrypt.game.SoundCue;
 import com.couchcrypt.game.ArenaRenderer;
 import com.couchcrypt.game.ActorAnimation;
 import com.couchcrypt.game.DefeatTransition;
@@ -61,7 +64,7 @@ import java.util.Map;
 
 public final class CryptLobby extends ApplicationAdapter {
     private enum Screen { HOME, LOBBY, SESSION, INVITE, CHARACTER_INFO, RESULTS }
-    private enum Modal { GENERAL, PAUSE, RETURN_CONFIRM, SETTINGS_NETWORK }
+    private enum Modal { GENERAL, PAUSE, RETURN_CONFIRM, SETTINGS_NETWORK, AUDIO }
     private final GameConfig config;
     private final LobbyState state = new LobbyState();
     private Stage stage;
@@ -89,6 +92,9 @@ public final class CryptLobby extends ApplicationAdapter {
     private HudArt hudArt;
     private ArenaRenderer arena;
     private GameAudio audio;
+    private SceneMusic music;
+    private AudioSettings audioSettings;
+    private boolean audioFromPause;
     private OutcomeArt.Titles outcomeTitles;
     private BuildIcons buildIcons;
     private ItemArt itemArt;
@@ -148,7 +154,10 @@ public final class CryptLobby extends ApplicationAdapter {
         hudArt = new HudArt();
         startupStage = profileStartup("sharedTitlesIconsHud", startupStage);
         arena = new ArenaRenderer(gameArt, art, buildIcons, hudArt, frameMetrics);
+        audioSettings = new AudioSettings(Gdx.app.getPreferences("couch-crypt"));
         audio = new GameAudio();
+        audio.setVolume(audioSettings.effectsVolume());
+        music = new SceneMusic();
         startupStage = profileStartup("rendererAudio", startupStage);
         if (residentArtBytes() + 360L * 360 * 4 > 32L * 1_048_576)
             throw new IllegalStateException("Combined art and join QR exceed 32 MiB texture budget");
@@ -274,14 +283,43 @@ public final class CryptLobby extends ApplicationAdapter {
             compact ? art.exitFocused : art.homeFocused, command);
         result.pad(6, 24, 6, 24);
         result.add(art.label(text, compact ? art.section : art.heading, UiArt.BUTTON_INK));
-        buttons.add(result);
+        registerButton(result);
         return result;
     }
 
     private void settings() {
-        modal("Settings", "Sound and local phone connection.",
-            new String[]{audio.enabled() ? "SOUND: ON" : "SOUND: OFF", "NETWORK", "BACK"},
-            new Runnable[]{() -> { audio.setEnabled(!audio.enabled()); settings(); }, () -> network(true), this::closeModal});
+        modal("Settings", "Audio mix and local phone connection.",
+            new String[]{"AUDIO", "NETWORK", "BACK"},
+            new Runnable[]{() -> audioSettings(false), () -> network(true), this::closeModal});
+    }
+
+    private void audioSettings(boolean fromPause) {
+        audioFromPause = fromPause;
+        modal("Audio", "Select a volume to change it in 25% steps. 0% mutes that channel.",
+            new String[]{volumeLabel("MASTER", AudioSettings.Channel.MASTER),
+                volumeLabel("MUSIC", AudioSettings.Channel.MUSIC),
+                volumeLabel("EFFECTS", AudioSettings.Channel.EFFECTS), "BACK"},
+            new Runnable[]{() -> cycleVolume(AudioSettings.Channel.MASTER),
+                () -> cycleVolume(AudioSettings.Channel.MUSIC),
+                () -> cycleVolume(AudioSettings.Channel.EFFECTS), this::backFromAudio});
+        modalKind = Modal.AUDIO;
+    }
+
+    private String volumeLabel(String label, AudioSettings.Channel channel) {
+        return label + ": " + Math.round(audioSettings.level(channel) * 100) + "%";
+    }
+
+    private void cycleVolume(AudioSettings.Channel channel) {
+        audioSettings.cycle(channel);
+        audio.setVolume(audioSettings.effectsVolume());
+        // Update existing controls so a volume change keeps focus and does not rebuild the dialog.
+        String[] labels = {volumeLabel("MASTER", AudioSettings.Channel.MASTER),
+            volumeLabel("MUSIC", AudioSettings.Channel.MUSIC), volumeLabel("EFFECTS", AudioSettings.Channel.EFFECTS)};
+        for (int i = 0; i < labels.length; i++) ((Label) buttons.get(i).getChildren().first()).setText(labels[i]);
+    }
+
+    private void backFromAudio() {
+        if (audioFromPause) showPause(); else settings();
     }
 
     private void confirmExit() {
@@ -434,7 +472,7 @@ public final class CryptLobby extends ApplicationAdapter {
             },
             () -> showCharacterInfo(slot, heroChooser.selectedHero(), invitation, focus),
             reserved ? () -> { server.remove(slot); showPartyScreen(invitation); setFocus(slot); } : null,
-            buttons::add);
+            this::registerButton);
         overlay.add(heroChooser).width(1380);
         stage.addActor(overlay); overlay.validate(); setFocus(returnFocus);
     }
@@ -447,7 +485,7 @@ public final class CryptLobby extends ApplicationAdapter {
         // Leave the existing LOBBY/INVITE phase intact: viewing lore never changes joining or a paused run.
         content.setBackground(art.scrim); content.pad(0);
         content.add(CharacterInfoView.create(art, hero, buildIcons.regions,
-            this::backFromCharacterInfo, buttons::add)).grow();
+            this::backFromCharacterInfo, this::registerButton)).grow();
         content.validate(); setFocus(0);
     }
 
@@ -516,7 +554,8 @@ public final class CryptLobby extends ApplicationAdapter {
     }
 
     private void showPause() {
-        audio.stop();
+        audio.stopCombat();
+        music.pause();
         world.clearInputs();
         state.setPhase(LobbyState.Phase.PAUSED);
         var snapshot = state.snapshot(System.currentTimeMillis());
@@ -532,6 +571,7 @@ public final class CryptLobby extends ApplicationAdapter {
             labels.add(slot == 0 ? "REMOVE PLAYER I" : "REMOVE PLAYER II");
             actions.add(() -> confirmRemoveDisconnected(missing));
         }
+        labels.add("AUDIO"); actions.add(() -> audioSettings(true));
         labels.add("RESTART RUN"); actions.add(this::confirmRestart);
         labels.add("RETURN TO LOBBY"); actions.add(this::confirmReturnToLobby);
         modal("Paused", pauseDescription(snapshot), labels.toArray(String[]::new), actions.toArray(Runnable[]::new));
@@ -644,7 +684,7 @@ public final class CryptLobby extends ApplicationAdapter {
         content.pad(0);
         boolean victory = world.outcome == ArenaWorld.Outcome.VICTORY;
         resultSummary = ResultsSummaryView.create(art, world, outcomeTitles.get(victory),
-            this::playAgain, this::showLobby, this::showRunDetails, buttons::add);
+            this::playAgain, this::showLobby, this::showRunDetails, this::registerButton);
         content.add(resultSummary.root).grow();
         resultSummary.updateParty(state.snapshot(System.currentTimeMillis()).connected());
         content.validate(); setFocus(0);
@@ -674,7 +714,7 @@ public final class CryptLobby extends ApplicationAdapter {
         content.setBackground(art.scrim); content.pad(0);
         content.add(RunDetailsView.create(art, world, buildIcons.regions, itemArt.regions,
             equipmentDetails, resultPage, () -> turnResultPage(-1), () -> turnResultPage(1),
-            this::toggleRunDetails, this::backToResults, buttons::add)).grow();
+            this::toggleRunDetails, this::backToResults, this::registerButton)).grow();
         content.validate(); setFocus(0);
     }
 
@@ -784,9 +824,14 @@ public final class CryptLobby extends ApplicationAdapter {
         setFocus(savedFocus);
     }
 
+    private void registerButton(RemoteButton button) {
+        button.setAudioFeedback(() -> audio.play(SoundCue.UI_CONFIRM));
+        buttons.add(button);
+    }
+
     private RemoteButton button(Runnable command) { return button(false, command); }
     private RemoteButton button(boolean panel, Runnable command) {
-        RemoteButton result = new RemoteButton(art, command, panel); buttons.add(result); return result;
+        RemoteButton result = new RemoteButton(art, command, panel); registerButton(result); return result;
     }
     private RemoteButton textButton(String text, Runnable command) {
         RemoteButton result = button(command);
@@ -981,11 +1026,13 @@ public final class CryptLobby extends ApplicationAdapter {
         }
         if (key == Input.Keys.F3) { debug = !debug; diagnostics.setVisible(debug); return true; }
         if (key == Input.Keys.BACK || key == Input.Keys.ESCAPE) {
+            audio.play(SoundCue.UI_BACK);
             if (overlay != null) {
                 if (screen == Screen.RESULTS) { showLobby(); return true; }
                 if (modalKind == Modal.PAUSE) resumeSession();
                 else if (modalKind == Modal.RETURN_CONFIRM) showPause();
                 else if (modalKind == Modal.SETTINGS_NETWORK) settings();
+                else if (modalKind == Modal.AUDIO) backFromAudio();
                 else closeModal();
             } else if (screen == Screen.SESSION) showPause();
             else if (screen == Screen.CHARACTER_INFO) backFromCharacterInfo();
@@ -1001,7 +1048,7 @@ public final class CryptLobby extends ApplicationAdapter {
         if (dx == 0 && dy == 0) return false;
         if (heroChooser != null) {
             int target = heroChooser.navigate(key, focus);
-            if (target >= 0) { setFocus(target); return true; }
+            if (target >= 0) { navigateFocus(target); return true; }
         }
         RemoteButton current = buttons.get(focus);
         current.localToStageCoordinates(from.set(current.getWidth() / 2, current.getHeight() / 2));
@@ -1015,7 +1062,12 @@ public final class CryptLobby extends ApplicationAdapter {
             float score = forward + cross * 3;
             if (forward > 1 && score < best) { best = score; target = i; }
         }
-        setFocus(target); return true;
+        navigateFocus(target); return true;
+    }
+
+    private void navigateFocus(int target) {
+        if (target != focus) audio.play(SoundCue.UI_FOCUS);
+        setFocus(target);
     }
 
     private void updateStatus() {
@@ -1162,7 +1214,12 @@ public final class CryptLobby extends ApplicationAdapter {
         float rawDelta = Gdx.graphics.getDeltaTime();
         float delta = Math.min(rawDelta, 0.1f);
         int simulationSteps = 0;
-        if (frameMetrics != null) frameMetrics.beginStage(FrameMetrics.HANDOFF);
+        if (frameMetrics != null) frameMetrics.beginStage(FrameMetrics.AUDIO);
+        audio.beginFrame(delta);
+        if (frameMetrics != null) {
+            frameMetrics.endStage(FrameMetrics.AUDIO);
+            frameMetrics.beginStage(FrameMetrics.HANDOFF);
+        }
         refreshClock += delta; profileClock += delta;
         long now = System.currentTimeMillis();
         for (int i = 0; i < 2; i++) state.readControls(i, controls[i], now);
@@ -1209,7 +1266,7 @@ public final class CryptLobby extends ApplicationAdapter {
                     frameMetrics.endStage(FrameMetrics.SIMULATION);
                     frameMetrics.beginStage(FrameMetrics.AUDIO);
                 }
-                audio.update(world, delta);
+                audio.update(world);
                 if (frameMetrics != null) {
                     frameMetrics.endStage(FrameMetrics.AUDIO);
                     frameMetrics.beginStage(FrameMetrics.HANDOFF);
@@ -1231,6 +1288,11 @@ public final class CryptLobby extends ApplicationAdapter {
         syncChoices();
         if (frameMetrics != null) {
             frameMetrics.endStage(FrameMetrics.HANDOFF);
+            frameMetrics.beginStage(FrameMetrics.AUDIO);
+        }
+        updateMusic(delta);
+        if (frameMetrics != null) {
+            frameMetrics.endStage(FrameMetrics.AUDIO);
             frameMetrics.beginStage(FrameMetrics.STATUS);
         }
         if (refreshClock >= 0.2f) {
@@ -1306,22 +1368,41 @@ public final class CryptLobby extends ApplicationAdapter {
                 Gdx.app.getJavaHeap(), (screen == Screen.SESSION ? arena.drawCalls : 0) + ((SpriteBatch) stage.getBatch()).renderCalls);
         }
     }
+    private void updateMusic(float delta) {
+        boolean runScreen = screen == Screen.SESSION || screen == Screen.INVITE
+            || screen == Screen.CHARACTER_INFO && characterInfoInvitation;
+        SceneMusic.Scene scene = SceneMusic.Scene.MENU;
+        if (screen == Screen.RESULTS) scene = world.outcome == ArenaWorld.Outcome.VICTORY
+            ? SceneMusic.Scene.VICTORY : SceneMusic.Scene.DEFEAT;
+        else if (runScreen) {
+            if (world.bossSpawned && !world.bossDefeated) scene = SceneMusic.Scene.FINAL_BOSS;
+            else if (world.sovereignSpawned && !world.sovereignDefeated) scene = SceneMusic.Scene.SOVEREIGN;
+            else scene = SceneMusic.Scene.ARENA;
+        }
+        boolean suspended = !hostActive || runScreen && (screen != Screen.SESSION || overlay != null
+            || defeatTransition.active());
+        float duck = runScreen && world.choicePending() ? .25f : 1f;
+        music.update(scene, audioSettings.musicVolume() * duck, suspended, delta);
+    }
+
     @Override public void resize(int width, int height) { stage.getViewport().update(width, height, true); }
     @Override public void pause() {
         if (frameMetrics != null) frameMetrics.reset();
         hostActive = false; state.setHostActive(false);
-        if (audio != null) audio.stop();
+        if (audio != null) audio.setSuspended(true);
+        if (music != null) music.pause();
         if (screen == Screen.SESSION && overlay == null && !defeatTransition.active()) showPause();
     }
     @Override public void resume() {
         if (frameMetrics != null) frameMetrics.reset();
         hostActive = true; state.setHostActive(true);
+        if (audio != null) audio.setSuspended(false);
         if (art != null && qrImage != null) refreshQr();
     }
     @Override public void dispose() {
         if (server != null) server.stop();
         disposeQr();
-        stage.dispose(); arena.dispose(); audio.dispose();
+        stage.dispose(); arena.dispose(); audio.dispose(); music.dispose();
         if (buildIcons != null) buildIcons.dispose();
         if (itemArt != null) itemArt.dispose();
         if (outcomeTitles != null) outcomeTitles.dispose();

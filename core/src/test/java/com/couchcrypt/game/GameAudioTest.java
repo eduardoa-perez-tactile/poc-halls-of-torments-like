@@ -2,6 +2,10 @@ package com.couchcrypt.game;
 
 import com.badlogic.gdx.audio.Sound;
 import java.lang.reflect.Proxy;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioSystem;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -116,6 +120,105 @@ class GameAudioTest {
         }
     }
 
+    @Test void volumeChangesAffectLiveVoicesAndMuteDoesNotReplayConsumedEvents() {
+        Mixer mixer = new Mixer(); ArenaWorld world = new ArenaWorld();
+        try (Fixture f = new Fixture(mixer, world, true)) {
+            world.swordSwings++; f.audio.update(world, 0);
+            long voice = mixer.nextId;
+            f.audio.setVolume(.5f);
+            assertEquals(SoundCue.SWORD.volume * .5f, mixer.volumes.get(voice), .0001f);
+            f.audio.setVolume(0);
+            assertTrue(mixer.active.isEmpty());
+            world.heroHits++; f.audio.update(world, .25f);
+            f.audio.setVolume(1); f.audio.update(world, .25f);
+            assertEquals(List.of("sword"), mixer.played);
+            world.heroHits++; f.audio.update(world, .016f);
+            assertEquals("hurt", mixer.played.getLast());
+        }
+    }
+
+    @Test void menuEventsUseTheSameBoundedMixerAndAdvanceOutsideCombat() {
+        Mixer mixer = new Mixer();
+        GameAudio audio = new GameAudio(mixer.cues(), true);
+        try {
+            for (int i = 0; i < 12; i++) audio.play(SoundCue.UI_FOCUS);
+            assertEquals(List.of("ui-focus"), mixer.played);
+            audio.beginFrame(.2f);
+            assertTrue(mixer.active.isEmpty());
+            audio.play(SoundCue.UI_FOCUS);
+            audio.play(SoundCue.UI_CONFIRM);
+            audio.play(SoundCue.UI_BACK);
+            assertEquals(4, mixer.played.size());
+            audio.setSuspended(true);
+            assertTrue(mixer.active.isEmpty());
+            audio.beginFrame(.2f); audio.play(SoundCue.UI_CONFIRM);
+            assertEquals(4, mixer.played.size());
+            audio.setSuspended(false); audio.play(SoundCue.UI_CONFIRM);
+            assertEquals(5, mixer.played.size());
+        } finally { audio.dispose(); }
+    }
+
+    @Test void lootAndRealDownReviveTransitionsHaveDedicatedCuesWithoutFreshJoinNoise() {
+        Mixer mixer = new Mixer(); ArenaWorld world = new ArenaWorld();
+        world.activatePlayer(0);
+        try (Fixture f = new Fixture(mixer, world, true)) {
+            world.activatePlayer(1); f.audio.update(world, .016f);
+            assertTrue(mixer.played.isEmpty());
+            world.players[0].alive = false; f.audio.update(world, .016f);
+            assertEquals(List.of("player-down"), mixer.played);
+            world.players[0].alive = true; f.audio.update(world, .016f);
+            assertEquals("revive", mixer.played.getLast());
+            world.equipment.grantReward(); f.audio.update(world, .016f);
+            assertEquals("loot", mixer.played.getLast());
+            f.audio.reset(world); f.audio.update(world, .25f);
+            assertEquals(3, mixer.played.size());
+        }
+    }
+
+    @Test void missingOptionalCuesRemainSafeWhileOtherEffectsPlay() {
+        Mixer mixer = new Mixer(); Sound[] cues = mixer.cues();
+        cues[SoundCue.UI_FOCUS.ordinal()] = null;
+        GameAudio audio = new GameAudio(cues, true);
+        try {
+            audio.play(SoundCue.UI_FOCUS); audio.play(SoundCue.SWORD);
+            audio.setVolume(.5f); audio.beginFrame(.25f);
+            assertEquals(List.of("sword"), mixer.played);
+        } finally { audio.dispose(); }
+        assertTrue(mixer.active.isEmpty());
+    }
+
+    @Test void openingPauseStopsCombatWithoutCuttingOffItsRemoteFeedback() {
+        Mixer mixer = new Mixer();
+        GameAudio audio = new GameAudio(mixer.cues(), true);
+        try {
+            audio.play(SoundCue.SWORD); audio.play(SoundCue.UI_BACK);
+            audio.stopCombat();
+            assertEquals(List.of("ui-back"), new ArrayList<>(mixer.active.values()));
+            audio.beginFrame(.25f); audio.beginFrame(.05f);
+            assertTrue(mixer.active.isEmpty());
+            audio.play(SoundCue.UI_CONFIRM); audio.stopCombat();
+            assertEquals(List.of("ui-confirm"), new ArrayList<>(mixer.active.values()));
+        } finally { audio.dispose(); }
+    }
+
+    @Test void shippedWavDurationsFitTrackedLifetimesWithoutTruncatingAudio() throws Exception {
+        Path audio = Path.of("../assets");
+        int shipped = 0;
+        for (SoundCue cue : SoundCue.values()) {
+            Path file = audio.resolve(cue.path);
+            if (!Files.exists(file)) continue;
+            try (var stream = AudioSystem.getAudioInputStream(file.toFile())) {
+                AudioFormat format = stream.getFormat();
+                assertEquals(AudioFormat.Encoding.PCM_SIGNED, format.getEncoding());
+                assertEquals(1, format.getChannels(), file.toString());
+                double seconds = stream.getFrameLength() / format.getFrameRate();
+                assertEquals(cue.seconds, seconds, .001, "Update cue lifetime when replacing " + file);
+                shipped++;
+            }
+        }
+        assertEquals(SoundCue.values().length, shipped, "Every production cue must ship with its audio file");
+    }
+
     private static final class Fixture implements AutoCloseable {
         final GameAudio audio;
         Fixture(Mixer mixer, ArenaWorld world, boolean enabled) {
@@ -125,26 +228,26 @@ class GameAudioTest {
     }
 
     private static final class Mixer {
-        static final String[] NAMES = {"sword", "arrow", "hit", "pickup", "level", "boss", "victory", "defeat",
-            "sword-hit", "bolt-hit", "critical", "dodge", "hurt", "death", "heal", "aura", "storm", "block",
-            "wraith-dash", "brute-slam", "magic-cast"};
         final List<String> played = new ArrayList<>();
         final Map<Long, String> active = new HashMap<>();
+        final Map<Long, Float> volumes = new HashMap<>();
         int maximumActive; long nextId;
         Sound[] cues() {
-            Sound[] result = new Sound[NAMES.length];
+            Sound[] result = new Sound[SoundCue.values().length];
             for (int i = 0; i < result.length; i++) {
-                String name = NAMES[i];
+                String path = SoundCue.values()[i].path;
+                String name = path.substring(6, path.length() - 4);
                 result[i] = (Sound) Proxy.newProxyInstance(Sound.class.getClassLoader(), new Class<?>[]{Sound.class}, (proxy, method, args) -> {
                     switch (method.getName()) {
                         case "play" -> {
                             assertEquals(3, args.length);
                             assertTrue((float) args[0] > 0 && (float) args[0] <= .5f);
                             assertTrue((float) args[1] >= .96f && (float) args[1] <= 1.04f);
-                            long id = ++nextId; active.put(id, name); played.add(name);
+                            long id = ++nextId; active.put(id, name); volumes.put(id, (float) args[0]); played.add(name);
                             maximumActive = Math.max(maximumActive, active.size());
                             return id;
                         }
+                        case "setVolume" -> volumes.put((long) args[0], (float) args[1]);
                         case "stop" -> {
                             if (args == null) active.entrySet().removeIf(entry -> entry.getValue().equals(name));
                             else active.remove((long) args[0]);
