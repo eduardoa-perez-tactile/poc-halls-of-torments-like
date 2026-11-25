@@ -1,5 +1,8 @@
 # Elite loot chest
 
+This original version is retained for provenance. The brighter user-approved
+replacement and current packing source are in [v2](v2/README.md).
+
 Original chest artwork generated on 2026-11-25 using the built-in ImageGen tool.
 The exact generation prompt is in `prompt.txt`; `generated-master.png` retains
 the unmodified RGBA output. The existing crypt environment atlas was inspected

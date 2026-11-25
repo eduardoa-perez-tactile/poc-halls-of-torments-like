@@ -37,6 +37,7 @@ public final class ArenaRenderer implements Disposable {
     private final GameHud gameHud;
     private final EnemyRankMarkers rankMarkers;
     private final PlayerFootRing playerFootRing;
+    private final LootChestVfx chestVfx;
     private final DamageNumberArt damageNumberArt;
     private final ArenaAmbience ambience;
     private final SpriteBatch batch;
@@ -78,6 +79,7 @@ public final class ArenaRenderer implements Disposable {
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
         rankMarkers = new EnemyRankMarkers(art.pixel);
         playerFootRing = new PlayerFootRing(art.pixel);
+        chestVfx = new LootChestVfx(art.pixel, art.glow);
         damageNumberArt = new DamageNumberArt(uiArt.body);
         floorLayout = new ArenaFloorLayout(new JsonReader().parse(Gdx.files.internal("arena/crypt-floor.json")));
         float radius = floorLayout.medallionDiameter * .5f;
@@ -134,6 +136,7 @@ public final class ArenaRenderer implements Disposable {
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
             art.engravedFloor.draw(batch, medallion);
+            drawChestLights(world, camera);
             // All floor effects precede the complete depth-sorted actor pass. Their painted
             // foreground rims must never be laid over a closer enemy or the player's body.
             drawHazards(world, camera, SpriteEffectArt.Layer.ALL);
@@ -452,6 +455,24 @@ public final class ArenaRenderer implements Disposable {
             } else batch.draw(art.soul, x - 7f, y - 1f, 14f, 20f);
             batch.setColor(Color.WHITE);
         }
+    }
+
+    private void drawChestLights(ArenaWorld world, OrthographicCamera camera) {
+        boolean lit = false;
+        for (ArenaWorld.Chest chest : world.chests) {
+            if (!chest.active || !visible(camera, chest.x, chest.y, 75f)) continue;
+            if (!lit) {
+                batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
+                lit = true;
+            }
+            chestVfx.groundLight(batch, screenX(chest.x, chest.y), screenY(chest.x, chest.y));
+        }
+        if (!lit) return;
+        // Batch all reward lights together; restore ordinary blending before warnings/actors.
+        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        for (ArenaWorld.Chest chest : world.chests)
+            if (chest.active && visible(camera, chest.x, chest.y, 75f))
+                chestVfx.groundRim(batch, screenX(chest.x, chest.y), screenY(chest.x, chest.y));
     }
 
     private void drawDust(ArenaWorld world, OrthographicCamera camera) {
@@ -830,8 +851,11 @@ public final class ArenaRenderer implements Disposable {
                 drawEnvironment(world, camera, viewer, index);
             } else if (types[i] == CHEST) {
                 ArenaWorld.Chest chest = world.chests[index];
+                float x = screenX(chest.x, chest.y), y = screenY(chest.x, chest.y);
+                chestVfx.wisps(batch, x, y, world.elapsed, index);
                 batch.setColor(Color.WHITE);
                 drawFrame(chestArt.frame(), chest.x, chest.y, chestScale);
+                chestVfx.glints(batch, x, y, world.elapsed, index);
             } else if (types[i] == DODGE_GHOST) {
                 int owner = index / DodgeTrail.CAPACITY;
                 DodgeTrail.Snapshot snapshot = world.players[owner].dodgeTrail.snapshots[index % DodgeTrail.CAPACITY];

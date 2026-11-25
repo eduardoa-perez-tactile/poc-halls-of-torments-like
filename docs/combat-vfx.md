@@ -231,3 +231,30 @@ and does not establish sustained TV frame rate or balance. Final screenshots/log
 remain ignored under `.run/ambient-preview/`. Temporary render processes and
 harness files were removed; the existing emulator, saved LAN host and relay were
 left unchanged. No full gameplay playthrough was run.
+
+
+### Elite chest reward light (2026-11-25)
+
+The approved chest revision uses warm gold hardware, a bright lid seam and a
+compact reward light. A soft amber pool and fine broken 2:1 rim draw before
+ground hazards and the complete actor pass. Two very short wisps and five small
+ivory-gold glints draw at the chest's depth, so nearer actors cover them. The
+wisps stop within one chest height above the lid; there is no tall loot beam.
+
+`LootChestVfx` borrows the existing gameplay glow and white texel. Ring geometry
+is cached at renderer creation; a fixed five glints and two wisps per active
+chest are sampled analytically from the shared combat clock, without frame-loop
+allocations or camera-local particle state. Choices, manual pause, background
+and disconnect therefore freeze their motion. Collecting/resetting the chest
+removes its light. Chest contact, landing delay, reward sources, phone choices
+and reliquary scheduling are unchanged. Sprite provenance and the selected
+mockup are preserved in `art-source/elite-loot-chest/v2/`.
+
+JDK 21 desktop compilation and Android debug assembly passed. Twelve focused
+chest/atlas checks passed. A brief native desktop fixture verified solo/co-op
+rendering and shared collection; the full world image stayed byte-identical
+while a loot-choice clock advanced, confirming that chest VFX freeze with
+combat. All old atlas pixels outside the replacement chest patch and all other
+frame metadata were preserved; the APK was checked for the updated sprite. No
+physical-TV performance or full-run balance claim is made. The existing TV
+emulator and LAN relay were not changed.
