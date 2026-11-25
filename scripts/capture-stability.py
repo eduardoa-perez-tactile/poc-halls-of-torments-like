@@ -92,13 +92,37 @@ def main():
     def choose(kind):
         phase = 'level_up' if kind == 'upgrade' else 'loot'
         until(lambda: all_phase(phase), phase)
-        for phone in phones:
+        def offer(phone):
             status = phone.latest_status
-            offer = status['progression']['upgrade'] if kind == 'upgrade' else status['equipment']
-            if offer is None or len(offer['options']) != (3 if kind == 'upgrade' else 2):
-                raise RuntimeError('Expected personal choice cards missing')
-            phone.send(json.dumps({'type': kind, 'offerId': offer['id'], 'option': 0}))
-        until(lambda: all_phase('session'), 'party choices to resolve')
+            return status['progression']['upgrade'] if kind == 'upgrade' else status['equipment']
+        for _ in range(20):  # Pending/queued rounds remain bounded by the run's existing entitlements.
+            ids = []
+            for phone in phones:
+                card = offer(phone)
+                ids.append(card['id'] if card else None)
+                if card is None:
+                    continue  # An already acknowledged player can wait for the rest of the party.
+                if len(card['options']) != (3 if kind == 'upgrade' else 2):
+                    raise RuntimeError('Expected personal choice cards missing')
+                phone.send(json.dumps({'type': kind, 'offerId': card['id'], 'option': 0}))
+            def advanced():
+                if all_phase('session') or all_phase('loot' if kind == 'upgrade' else 'level_up'):
+                    return True
+                return all_phase(phase) and any(offer(phone) and offer(phone)['id'] != old
+                                               for phone, old in zip(phones, ids))
+            until(advanced, 'party choice acknowledgment or next queued round')
+            if not all_phase(phase):
+                return
+        raise RuntimeError('Choice rounds exceeded the bounded run entitlement count')
+
+    def ordinary_session(label):
+        # Combat can earn a choice during an ADB snapshot or just before a pause/background event.
+        for _ in range(20):
+            until(lambda: any(all_phase(phase) for phase in ('session', 'level_up', 'loot')), label)
+            if all_phase('session'):
+                return
+            choose('upgrade' if all_phase('level_up') else 'equipment')
+        raise RuntimeError('Could not drain bounded pending choices on resume')
 
     try:
         output = (directory / 'game.log').open('wb', buffering=0)
@@ -161,7 +185,7 @@ def main():
             until(lambda: all_phase('paused'), 'remote pause')
             wait(.35)
             key(4)
-            until(lambda: all_phase('session'), 'remote resume')
+            ordinary_session('remote resume')
             if cycle % 3 == 0:
                 key(3)  # Android Home; background/resume the same process.
                 until(lambda: all(phone.latest_status.get('hostActive') is False for phone in phones), 'background suspension')
@@ -169,7 +193,7 @@ def main():
                 command('shell', 'am', 'start', '-n', capture.COMPONENT)
                 until(lambda: all_phase('paused') and all(phone.latest_status.get('hostActive') for phone in phones), 'foreground pause')
                 key(4)
-                until(lambda: all_phase('session'), 'foreground resume')
+                ordinary_session('foreground resume')
             key(137 if cycle % 2 else 138)  # Existing Victory / Defeat result fixtures.
             until(lambda: all_phase('results'), 'results')
             wait(.8)  # Include the approved Defeat reveal/action gate.
