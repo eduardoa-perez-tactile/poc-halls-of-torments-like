@@ -1,0 +1,16 @@
+Use case: identity-preserve.
+Production sprite-sheet correction. Image1 is the approved creature DESIGN only. Image2 is the game's existing Brute sprite CAMERA/PROJECTION reference only. Make the creature from image1 in the elevated oblique game perspective of image2. Do not copy Brute anatomy.
+
+CRITICAL CAMERA CORRECTION: The previous attempted sheet was rejected for being FRONT-ON. DO NOT produce a frontal portrait or straight-on face. Camera is fixed above the scene looking steeply DOWN, about45degrees above the ground, orthographic isometric. We should see a LARGE UPPER SURFACE of the bone shell, its upper hemisphere dominates the sprite. The single eye and fanged mouth are on a SIDE SURFACE below that shell, facing a floor DIAGONAL, visibly foreshortened, one side of the head much nearer than the other. A down-right facing must show right side of muzzle pointing toward lower-right corner, NOT toward viewer. Think classic isometric RPG enemies viewed from above, NOT portrait busts. Face never bilaterally symmetric to camera.
+
+Creature unchanged: squat limbless floating crypt predator, broad cracked weathered ivory bone armor dome, dark brown leathery lower body, one recessed amber eye at front, huge horizontal maw and few large ivory fangs, hinged lower jaw, dark muted burgundy gums. No literal bell, clapper, chain, limb, wing, tentacle, humanoid torso or skull-head. Large dome viewed from above, compact recognizable shape.
+
+Exactly eight full-body separate sprites arranged in FOUR equal columns and TWO equal rows, TRUE transparent background. Consistent fixed camera and scale:
+Column1 southwest, face aimed diagonally DOWN-LEFT across floor. See shell top and creature's anatomical right side.
+Column2 southeast, face aimed diagonally DOWN-RIGHT across floor. See shell top and creature's anatomical left side.
+Column3 northeast, face aimed diagonally UP-RIGHT away from camera. Show shell top and back; face hidden around far side, no eye or mouth on back.
+Column4 northwest, face aimed diagonally UP-LEFT away from camera. Show shell top and back, no face on back.
+Each pair must be diagonals45degrees off screen vertical, NOT front/back straight facing camera. Fourviews separated by90degree rotations about vertical world axis. Camera stays fixed.
+
+Toprow idle with jaw mostly closed, small fang gaps. Bottomrow same orientation/body/upper shell anchor but lower jaw open for toll/lunge. Opening mouth extends a little down/forward into screen rather than facing camera. Back-row active views show only back and minor jaw edge, never a new rear face. Leave generous clear transparent gutters. Same upper shell shape and size across idle/attack. No scene, ground, shadow, VFX, ring, labels, text or frame borders. No background gradient, no fake checkerboard.
+Painted game art like reference, strong broad bone and flesh forms, simplified clean small-sprite detail, sharp silhouettes. This is production GAMEPLAY art from a raised isometric camera, NOT another cinematic concept illustration. Landscape sheet aspect2:1.

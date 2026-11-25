@@ -1,4 +1,71 @@
-# Sovereign mini boss and Grave King final encounter
+# Mourning Bell, Sovereign and Grave King encounters
+
+The 25 November 2026 addition is **the Mourning Bell at 300 elapsed combat seconds**,
+before the existing Sovereign at 720 and Grave King at 1200. Waves and the combat
+clock continue through both mini-boss fights. Only the Grave King kill wins the run.
+
+## Early encounter: Mourning Bell
+
+The approved creature is a hovering bone-shell crypt predator with one amber eye
+and a large fanged maw. Its original literal-bell concept and frontal production
+sheet were rejected. Runtime uses four elevated diagonal facings, idle/open-jaw
+poses and combat-owned hover, modest tilt and recoil. Source, prompts and rejection
+history are retained in [Mourning Bell provenance](../art-source/mourning-bell/README.md).
+
+The Bell has 1,800 HP solo / 2,880 with two participants at spawn and moves at
+70 world units/second. Late joining does not refill or rescale it. These are initial
+tuning values; a 35–50-second fight is a playtest target, not a verified duration.
+Its alternating attacks have no passive contact damage:
+
+- **Lunge:** lock facing and a bounded lane, warn for 0.85 seconds, travel up to
+  420 units over 0.4 seconds, then recover for 0.85 seconds. Swept body collision
+  deals 16 base damage once per player. Dodge crossings consume that strike.
+- **Toll:** warn for 0.9 seconds, then expand a thin annular wave from 20 to
+  260 world units over 0.75 seconds, dealing 14 base damage once per player per
+  beat. Below half health, the committed cast adds a second, separately warned
+  wave. Standing inside the wave after it passes is safe. Ground warnings and
+  waves draw below complete actors in both cameras.
+
+Arrival retries unsafe/full-pool placement using the existing 300-unit safe spawn
+rule; it can reclaim an ordinary reinforcement, never another boss or an elite.
+Death grants 12 base souls and no equipment chest. All five elite and three
+discoverable arena chest opportunities remain unchanged. HUD priority is Grave King,
+then Sovereign, then Bell when encounters overlap; surviving encounters keep their
+own health and attack state. Choice/manual/disconnect/background pauses freeze the
+encounter, animation and warning clocks together. Reset clears all Bell state.
+
+The short development timeline places the Bell at 45 seconds with 420 base HP.
+Profile-only key `5` opens a short early-boss fixture; no five-minute automated
+survival session is needed for rendering checks.
+
+### Verification of the Bell addition
+
+JDK 21 compiled desktop classes and the debug Android APK. The integrated
+combat/timeline/animation/art/audio/results/font/resource group passed 77 checks;
+after the native rendering correction and final size adjustment, the 15 affected
+Bell/size checks passed, including a new co-op wave-distance check. The Bell
+atlas `--check` passes, preserving the old pages and metadata. The offline UI bake
+verifies original glyph pixels, metrics, kerning and 40 real font layouts; an
+independent before/after comparison confirms unchanged retained font RGBA and
+glyph coordinates, with only empty bottom rows removed.
+
+Six brief actual LWJGL renderer captures exercise solo idle, lunge warning,
+lunge travel, toll warning, expanding toll and co-op second toll. All return GL
+error zero (22–42 draw calls in these fixtures). A native-only attack culling
+lookup initially exposed the absent legacy attack-art entry; culling now checks
+that bank's actor support before querying its bounds. Final captures use the
+smaller 1.7 Bell visual scale, preserving its 54-unit collision radius.
+
+Native accounting confirms 32,959,308 texture bytes including maximum QR and zero
+retained gameplay Pixmap bytes. The APK installed successfully on the existing
+TV emulator. Further emulator interaction was stopped at the user's request
+because another game shares it; no Android combat/performance pass is claimed.
+Temporary synthetic phones and the newly created Couch Crypt relay were stopped;
+the other game's service was preserved. Capture evidence is ignored under
+`.run/mourning-bell-check/`. Fight duration, balance and sustained physical-TV
+60 FPS remain human playtest requirements.
+
+## Existing later encounters
 
 The approved 24 November 2026 encounter sequence is Hollow Sovereign at **720
 elapsed combat seconds**, then Grave King at **1200 seconds**. The three-minute

@@ -2,7 +2,7 @@ package com.couchcrypt.game;
 
 /** Allocation-free presentation selection. Reading it never advances simulation. */
 public final class ActorAnimation {
-    public enum Actor { WARDEN, RANGER, GHOUL, WRAITH, BRUTE, CULTIST, SOVEREIGN, GRAVE_KING }
+    public enum Actor { WARDEN, RANGER, GHOUL, WRAITH, BRUTE, CULTIST, SOVEREIGN, GRAVE_KING, MOURNING_BELL }
     public enum Facing { SE, SW, NE, NW }
     public enum State { IDLE, MOVE, ATTACK, DODGE, HIT, DOWNED, WINDUP }
     public static final float SWORD_SECONDS = .18f, SHOT_SECONDS = .30f, RELEASE_SECONDS = .18f;
@@ -29,6 +29,7 @@ public final class ActorAnimation {
             case CULTIST -> Actor.CULTIST;
             case SOVEREIGN -> Actor.SOVEREIGN;
             case BOSS -> Actor.GRAVE_KING;
+            case MOURNING_BELL -> Actor.MOURNING_BELL;
         };
     }
 
@@ -58,6 +59,14 @@ public final class ActorAnimation {
     }
 
     public static State state(ArenaWorld.Enemy enemy) {
+        if (enemy.kind == ArenaWorld.EnemyKind.MOURNING_BELL) {
+            if (enemy.windup > 0) return State.WINDUP;
+            if ((enemy.attack == ArenaWorld.EnemyAttack.BELL_LUNGE
+                && enemy.attackAge < MourningBell.LUNGE_WINDUP + MourningBell.LUNGE_SECONDS)
+                || (enemy.attack == ArenaWorld.EnemyAttack.BELL_TOLL && enemy.releaseAge < .3f))
+                return State.ATTACK;
+            return State.IDLE;
+        }
         if (enemy.attack != ArenaWorld.EnemyAttack.NONE) return enemy.windup > 0 ? State.WINDUP : State.ATTACK;
         if ((enemy.kind == ArenaWorld.EnemyKind.CULTIST || enemy.kind == ArenaWorld.EnemyKind.BOSS
             || enemy.kind == ArenaWorld.EnemyKind.SOVEREIGN)
@@ -69,12 +78,15 @@ public final class ActorAnimation {
     }
 
     public static Facing facing(ArenaWorld.Enemy enemy, State state) {
-        if (state == State.ATTACK || state == State.WINDUP)
+        if (state == State.ATTACK || state == State.WINDUP
+            || enemy.kind == ArenaWorld.EnemyKind.MOURNING_BELL && enemy.attack != ArenaWorld.EnemyAttack.NONE)
             return facing(enemy.castFacingX, enemy.castFacingY, Facing.SE);
         return facing(enemy.facingX, enemy.facingY, Facing.SE);
     }
 
     public static float phase(ArenaWorld.Enemy enemy, State state) {
+        if (enemy.kind == ArenaWorld.EnemyKind.MOURNING_BELL)
+            return state == State.WINDUP ? enemy.castAge : state == State.ATTACK ? enemy.releaseAge : 0f;
         if (enemy.attack != ArenaWorld.EnemyAttack.NONE) return enemy.attackAge;
         return switch (state) {
             case MOVE -> enemy.kind == ArenaWorld.EnemyKind.WRAITH ? enemy.animTime

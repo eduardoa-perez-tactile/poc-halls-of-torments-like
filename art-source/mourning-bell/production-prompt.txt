@@ -1,0 +1,17 @@
+Use case: identity-preserve.
+Asset type: production enemy sprite source sheet for an isometric dark fantasy game.
+Input image: approved Mourning Bell monster concept sheet, identity/style reference. Transform this design into an isolated 4-column by 2-row sprite sheet on genuine transparent background. NO title, captions, text, scenery, paving, ground shadow, VFX or UI.
+
+Identity invariants: the compact hovering NONHUMAN crypt predator shown in the reference, weathered cracked ivory bone dome armor, dark brown leathery flesh, single recessed amber eye at the front, large horizontal fanged maw with a heavy lower jaw, limited muted burgundy gums. Preserve its broad pear-shaped weight, bone plates and recognizable face. It is an organic monster, not a literal bell, no metal bell object. No limbs, tentacles, wings, chains, robes, skull head or new appendages.
+
+Sheet layout EXACTLY four equal columns, two equal rows, eight separate full-body sprites with generous transparent margins, no overlaps, all sprites identical scale, corresponding upper-shell centre aligned between rows. Consistent elevated isometric camera looking DOWN at 30 degrees. Each column is a DISTINCT authored view of this same creature:
+Column 1 front facing southwest/down-left;
+Column 2 front facing southeast/down-right;
+Column 3 back facing northeast/up-right;
+Column 4 back facing northwest/up-left.
+Rear views MUST show the back of the bone-plated dome and rear leathery body; do NOT paint an eye or full mouth on the back. No mirrored fake fronts for rear views.
+
+Top row: idle pose, mouth almost closed but fangs visible in front views, compact hovering body.
+Bottom row: same body at same scale and anchor, active toll/lunge pose with the lower jaw opening wide in front views; restrained amber glow deep inside throat. Upper dome should remain same size/shape/location, only jaw opens downward. Rear views show subtle lower-jaw silhouette change and restrained reflected throat amber but no face. Keep motions small and feasible for runtime pose animation. Creature can be drawn with one fixed upper body and hinged jaw. Full subject remains within each cell.
+
+Style: original hand-painted game sprites matching the reference, crisp external silhouette, broad clear shading, simplified detail for readability at 70–90 pixel runtime body height. Ivory armor and amber eye must remain readable. No photoreal gloss, no black outline, no cartoon smile, no fog, no fake checkerboard, no painted backgrounds. TRUE alpha transparency. Landscape sheet with 2:1 overall aspect if possible, regular consistent grid. Exactly 8 sprites.

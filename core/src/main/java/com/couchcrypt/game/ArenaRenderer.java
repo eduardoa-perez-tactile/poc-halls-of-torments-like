@@ -418,7 +418,7 @@ public final class ArenaRenderer implements Disposable {
                 art.actor(ActorAnimation.actor(enemy.kind)), enemyScale(enemy));
             boolean arrival = enemy.spawnAge < art.vfx.duration(VfxArt.Animation.SPAWN)
                 && visible(camera, enemy.x, enemy.y, art.vfx.maxRadius(VfxArt.Animation.SPAWN) * spawnScale(enemy));
-            boolean attack = enemy.attack != ArenaWorld.EnemyAttack.NONE
+            boolean attack = enemy.attack != ArenaWorld.EnemyAttack.NONE && art.enemyAttacks.hasActor(enemy.kind)
                 && visible(camera, enemy.x, enemy.y, art.enemyAttacks.actorRadius(enemy.kind)
                     * art.actor(ActorAnimation.actor(enemy.kind)).pixelScale * enemyScale(enemy) + 20f);
             if (body || arrival || attack) add(ENEMY, i, enemy.x, enemy.y);
@@ -601,7 +601,9 @@ public final class ArenaRenderer implements Disposable {
         for (ArenaWorld.Enemy enemy : world.enemies) {
             if (!enemy.active || enemy.attack == ArenaWorld.EnemyAttack.NONE) continue;
             float age = enemy.attackAge;
-            if (enemy.attack == ArenaWorld.EnemyAttack.BRUTE_SLAM) {
+            if (enemy.kind == ArenaWorld.EnemyKind.MOURNING_BELL) {
+                drawBellGroundCues(enemy, camera);
+            } else if (enemy.attack == ArenaWorld.EnemyAttack.BRUTE_SLAM) {
                 if (!visible(camera, enemy.attackTargetX, enemy.attackTargetY, enemy.attackRadius + 80f)) continue;
                 if (age < ArenaWorld.BRUTE_WINDUP) {
                     drawWarningRune(.94f, enemy.attackTargetX, enemy.attackTargetY, enemy.attackRadius);
@@ -638,6 +640,35 @@ public final class ArenaRenderer implements Disposable {
             }
         }
         batch.setColor(Color.WHITE);
+    }
+
+    private void drawBellGroundCues(ArenaWorld.Enemy enemy, OrthographicCamera camera) {
+        if (enemy.attack == ArenaWorld.EnemyAttack.BELL_LUNGE) {
+            float age = enemy.attackAge;
+            if (age >= MourningBell.LUNGE_WINDUP + MourningBell.LUNGE_SECONDS) return;
+            boolean released = age >= MourningBell.LUNGE_WINDUP;
+            float alpha = released ? .7f * (1f - (age - MourningBell.LUNGE_WINDUP) / MourningBell.LUNGE_SECONDS) : .96f;
+            for (int arrow = 1; arrow <= 3; arrow++) {
+                float along = arrow * .25f;
+                float x = MathUtils.lerp(enemy.attackStartX, enemy.attackTargetX, along);
+                float y = MathUtils.lerp(enemy.attackStartY, enemy.attackTargetY, along);
+                if (visible(camera, x, y, 45f))
+                    enemyGroundVfx.arrow(batch, x, y, enemy.castFacingX, enemy.castFacingY, alpha, released);
+            }
+        } else if (enemy.attack == ArenaWorld.EnemyAttack.BELL_TOLL
+            && visible(camera, enemy.attackStartX, enemy.attackStartY, MourningBell.TOLL_RADIUS + 30f)) {
+            for (int beat = 0; beat < 2; beat++) {
+                if (MourningBell.tollWarning(enemy, beat))
+                    drawWarningRune(.86f, enemy.attackStartX, enemy.attackStartY, MourningBell.TOLL_RADIUS);
+                if (MourningBell.tollActive(enemy, beat)) {
+                    float progress = MathUtils.clamp((enemy.attackAge - MourningBell.tollRelease(beat))
+                        / MourningBell.TOLL_WAVE_SECONDS, 0f, 1f);
+                    playerFootRing.draw(batch, screenX(enemy.attackStartX, enemy.attackStartY),
+                        screenY(enemy.attackStartX, enemy.attackStartY), MourningBell.tollRadius(enemy, beat),
+                        1f, .75f, .43f, .96f * (1f - .5f * progress));
+                }
+            }
+        }
     }
 
     private void drawWarningRune(float alpha, float x, float y, float radius) {
@@ -713,7 +744,7 @@ public final class ArenaRenderer implements Disposable {
     private void drawEnemyRanks(ArenaWorld world) {
         for (int i = 0; i < sortCount; i++) if (types[i] == ENEMY) {
             ArenaWorld.Enemy enemy = world.enemies[indices[i]];
-            if (enemy.kind == ArenaWorld.EnemyKind.BOSS || enemy.kind == ArenaWorld.EnemyKind.SOVEREIGN
+            if (ArenaWorld.isBoss(enemy.kind)
                 || !enemy.elite && enemy.variant.healthMultiplier <= 1f) continue;
             GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(enemy.kind));
             float scale = enemyScale(enemy), top = screenY(enemy.x, enemy.y) + actor.maxAbove * scale;
@@ -735,6 +766,7 @@ public final class ArenaRenderer implements Disposable {
             float x = screenX(entry.x, entry.y) + entry.offsetX;
             float y = screenY(entry.x, entry.y) + actor.maxAbove * entry.renderScale + entry.liftPadding + entry.rise();
             if (entry.enemyKind == ArenaWorld.EnemyKind.BOSS) y += graveKingHover(world.elapsed);
+            else if (entry.enemyKind == ArenaWorld.EnemyKind.MOURNING_BELL) y += MourningBellPresentation.hover(world.elapsed);
             if (visibleProjected(camera, x, y, 48f)) damageNumberArt.draw(batch, entry, x, y);
         }
         batch.setColor(Color.WHITE);
@@ -932,10 +964,15 @@ public final class ArenaRenderer implements Disposable {
                 GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(enemy.kind));
                 ActorAnimation.State state = ActorAnimation.state(enemy);
                 float recoil = MathUtils.sin(MathUtils.clamp(enemy.hitFlash / .12f, 0f, 1f) * MathUtils.PI)
-                    * (enemy.kind == ArenaWorld.EnemyKind.BOSS || enemy.kind == ArenaWorld.EnemyKind.SOVEREIGN ? 1.5f
+                    * (ArenaWorld.isBoss(enemy.kind) ? 1.5f
                         : enemy.kind == ArenaWorld.EnemyKind.BRUTE ? 4f : 8f);
                 // This short reaction moves only the paint. Ground root, shadow, sort and collision stay fixed.
-                if (enemy.attack != ArenaWorld.EnemyAttack.NONE) {
+                if (enemy.kind == ArenaWorld.EnemyKind.MOURNING_BELL) {
+                    int frame = actor.clip(state, ActorAnimation.facing(enemy, state)).frame(ActorAnimation.phase(enemy, state));
+                    drawBellFrame(frame, enemy, actor.pixelScale * scale, world.elapsed,
+                        screenX(enemy.hitDirectionX, enemy.hitDirectionY) * recoil,
+                        screenY(enemy.hitDirectionX, enemy.hitDirectionY) * recoil);
+                } else if (enemy.attack != ArenaWorld.EnemyAttack.NONE) {
                     ActorAnimation.Facing facing = ActorAnimation.facing(enemy, state);
                     float sx = screenX(enemy.x, enemy.y), sy = screenY(enemy.x, enemy.y);
                     if (enemy.attack == ArenaWorld.EnemyAttack.WRAITH_DASH
@@ -1113,6 +1150,15 @@ public final class ArenaRenderer implements Disposable {
             screenY(x, y) + frame.bottom * scale + offsetY, frame.width * scale, frame.height * scale);
     }
 
+    private void drawBellFrame(int index, ArenaWorld.Enemy enemy, float scale, float combatTime, float recoilX, float recoilY) {
+        GameplayAtlas.Frame frame = art.metadata.frames[index];
+        float x = screenX(enemy.x, enemy.y) + recoilX;
+        float y = screenY(enemy.x, enemy.y) + MourningBellPresentation.hover(combatTime) + recoilY;
+        batch.draw(art.frame(index), x + frame.left * scale, y + frame.bottom * scale,
+            -frame.left * scale, -frame.bottom * scale, frame.width * scale, frame.height * scale,
+            1f, 1f, MourningBellPresentation.tilt(enemy));
+    }
+
     private void drawMuzzle(ArenaWorld.Player player) {
         if (player.hero != ArenaWorld.Hero.RANGER || player.attackAge >= .1f) return;
         int origin = ActorAnimation.facing(player.attackFacingX, player.attackFacingY, ActorAnimation.Facing.SE).ordinal() * 2;
@@ -1135,11 +1181,13 @@ public final class ArenaRenderer implements Disposable {
     private static boolean visibleActor(OrthographicCamera camera, float x, float y,
                                         GameplayAtlas.Actor actor, float scale) {
         // Include a small shadow/elite-bar margin around the precomputed complete action envelope.
-        float above = actor.maxAbove * scale + (actor.id == ActorAnimation.Actor.GRAVE_KING ? 34f : 12f);
+        float motionMargin = RECOIL_MARGIN + (actor.id == ActorAnimation.Actor.MOURNING_BELL ? 48f : 0f);
+        float above = actor.maxAbove * scale
+            + (actor.id == ActorAnimation.Actor.GRAVE_KING || actor.id == ActorAnimation.Actor.MOURNING_BELL ? 40f : 12f);
         if (actor.id == ActorAnimation.Actor.WARDEN || actor.id == ActorAnimation.Actor.RANGER)
             above = Math.max(above, REVIVE_BAR_Y + REVIVE_BAR_HEIGHT);
-        return visible(camera, x, y, Math.max(40f, actor.maxLeft * scale) + RECOIL_MARGIN,
-            Math.max(40f, actor.maxRight * scale) + RECOIL_MARGIN, above + RECOIL_MARGIN,
+        return visible(camera, x, y, Math.max(40f, actor.maxLeft * scale) + motionMargin,
+            Math.max(40f, actor.maxRight * scale) + motionMargin, above + RECOIL_MARGIN,
             Math.max(12f, actor.maxBelow * scale) + RECOIL_MARGIN);
     }
 

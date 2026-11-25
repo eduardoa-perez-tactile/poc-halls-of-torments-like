@@ -109,7 +109,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private HeroSelectionView heroChooser;
     private final ArenaWorld.Hero[] selectedHeroes = {ArenaWorld.Hero.WARDEN, ArenaWorld.Hero.RANGER};
     private int notifiedWave = 1, notifiedEliteKills;
-    private boolean bossAnnounced, sovereignAnnounced, enrageAnnounced, hudPreview;
+    private boolean bossAnnounced, sovereignAnnounced, bellAnnounced, enrageAnnounced, hudPreview;
     private final LobbyState.Controls[] controls = {new LobbyState.Controls(), new LobbyState.Controls()};
     private final long[] generations = new long[2];
     private final LobbyState.UpgradeRequest[] upgradeRequests = {new LobbyState.UpgradeRequest(), new LobbyState.UpgradeRequest()};
@@ -503,11 +503,11 @@ public final class CryptLobby extends ApplicationAdapter {
         defeatTransition.reset(); defeatCover.setVisible(false);
         world.reset(); hudState.reset(); finalWarning = false; notifiedLevel = 1; notifiedReliquaries = 0;
         notifiedWave = 1; notifiedEliteKills = 0;
-        bossAnnounced = sovereignAnnounced = enrageAnnounced = hudPreview = false;
+        bossAnnounced = sovereignAnnounced = bellAnnounced = enrageAnnounced = hudPreview = false;
         for (int i = 0; i < 2; i++) { previouslyAlive[i] = false; lowHealthNotified[i] = false; }
         reconcilePlayers();
         audio.reset(world);
-        hudState.notify("THE DESCENT BEGINS", "Face the Sovereign at twelve minutes, then defeat the Grave King.", ArenaHudState.Tone.INFO, 4f);
+        hudState.notify("THE DESCENT BEGINS", "Survive the Mourning Bell at five minutes, then face the Sovereign and Grave King.", ArenaHudState.Tone.INFO, 4f);
         arena.resetCameras();
         showSession();
         publishProgression();
@@ -973,6 +973,11 @@ public final class CryptLobby extends ApplicationAdapter {
             && overlay == null && !world.choicePending()) {
             world.debugSkillExpansionEncounter(); arena.resetCameras(); return true;
         }
+        if (key == Input.Keys.NUM_5 && config.profile() && screen == Screen.SESSION
+            && overlay == null && !world.choicePending()) {
+            world.profileMourningBell(); hudPreview = false;
+            arena.resetCameras(); syncEncounterHud(); return true;
+        }
         if (key == Input.Keys.F1 && config.profile() && screen == Screen.SESSION && overlay == null) {
             world.debugEnemyAttackEncounter(); return true;
         }
@@ -1182,6 +1187,10 @@ public final class CryptLobby extends ApplicationAdapter {
             notifiedEliteKills = world.elitesKilled;
             hudState.notify("ELITE SLAIN  /  COLLECT ITS CHEST", "", ArenaHudState.Tone.SUCCESS, 3f);
         }
+        if (world.bellSpawned && !bellAnnounced) {
+            bellAnnounced = true; hudPreview = false;
+            hudState.notify("THE MOURNING BELL AWAKENS", "", ArenaHudState.Tone.WARNING, 4f);
+        }
         if (world.sovereignSpawned && !sovereignAnnounced) {
             sovereignAnnounced = true; hudPreview = false;
             hudState.notify("THE HOLLOW SOVEREIGN AWAKENS", "", ArenaHudState.Tone.WARNING, 4f);
@@ -1385,6 +1394,7 @@ public final class CryptLobby extends ApplicationAdapter {
         else if (runScreen) {
             if (world.bossSpawned && !world.bossDefeated) scene = SceneMusic.Scene.FINAL_BOSS;
             else if (world.sovereignSpawned && !world.sovereignDefeated) scene = SceneMusic.Scene.SOVEREIGN;
+            else if (world.bellSpawned && !world.bellDefeated) scene = SceneMusic.Scene.SOVEREIGN;
             else scene = SceneMusic.Scene.ARENA;
         }
         boolean suspended = !hostActive || runScreen && (screen != Screen.SESSION || overlay != null

@@ -19,8 +19,8 @@ public final class GameAudio implements Disposable {
     private boolean suspended;
     private int sword, arrows, deaths, pickups, hits, level, swordHits, boltHits, criticalHits,
         dodges, blocks, heals, auras, storms, wraithDashes, bruteSlams, hostileShots, starts, variation;
-    private int loot, relics;
-    private boolean boss, sovereign;
+    private int loot, relics, bellLunges, bellTolls;
+    private boolean boss, sovereign, bell;
     private ArenaWorld.Outcome outcome;
 
     public GameAudio() {
@@ -82,7 +82,7 @@ public final class GameAudio implements Disposable {
         if (world.outcome != outcome && world.outcome != ArenaWorld.Outcome.RUNNING) {
             stop();
             play(world.outcome == ArenaWorld.Outcome.VICTORY ? VICTORY : DEFEAT);
-        } else if ((world.bossSpawned && !boss) || (world.sovereignSpawned && !sovereign)) {
+        } else if ((world.bossSpawned && !boss) || (world.sovereignSpawned && !sovereign) || (world.bellSpawned && !bell)) {
             stop(); play(BOSS);
         } else if (world.progression.level != level) {
             stop(); play(LEVEL);
@@ -95,6 +95,8 @@ public final class GameAudio implements Disposable {
             }
             if (world.heroHits != hits) play(HURT);
             if (world.dodges != dodges) play(DODGE);
+            if (world.bellTolls != bellTolls) play(BELL_TOLL);
+            if (world.bellLunges != bellLunges) play(WRAITH_DASH);
             // Actual weapon contacts get the frame budget before deaths, pickups and background abilities.
             if (world.swordHits != swordHits) play(SWORD_HIT);
             if (world.boltHits != boltHits) play(BOLT_HIT);
@@ -130,7 +132,8 @@ public final class GameAudio implements Disposable {
         dodges = world.dodges; blocks = world.blockedHits; heals = world.healsCollected;
         auras = world.auraPulses; storms = world.stormCasts;
         wraithDashes = world.wraithDashes; bruteSlams = world.bruteSlams; hostileShots = world.hostileShotsFired;
-        boss = world.bossSpawned; sovereign = world.sovereignSpawned; outcome = world.outcome;
+        bellLunges = world.bellLunges; bellTolls = world.bellTolls;
+        boss = world.bossSpawned; sovereign = world.sovereignSpawned; bell = world.bellSpawned; outcome = world.outcome;
     }
 
     /** Presentation events use the same bounded mixer as combat. Missing optional files are silent. */
