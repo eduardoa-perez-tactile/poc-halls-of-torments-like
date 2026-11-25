@@ -4,7 +4,8 @@ package com.couchcrypt.game;
 public final class ArenaWorld {
     public static final float HALF_WIDTH = 1200f, HALF_HEIGHT = 900f, ROUND_SECONDS = 180f;
     public static final int MAX_ENEMIES = 64, MAX_BOLTS = 96, MAX_PICKUPS = 96;
-    public static final int MAX_CHESTS = 5;
+    public static final int MAX_ELITE_CHESTS = 5, MAX_ARENA_CHESTS = 3;
+    public static final int MAX_CHESTS = MAX_ELITE_CHESTS + MAX_ARENA_CHESTS;
     public static final float CHEST_PICKUP_RADIUS = 40f, CHEST_LANDING_SECONDS = .35f;
     public static final int MAX_SHOTS = 96, MAX_HAZARDS = 12, MAX_EFFECTS = 96;
     public static final float STEP = 1f / 60f;
@@ -65,7 +66,7 @@ public final class ArenaWorld {
     public final Enemy[] enemies = new Enemy[MAX_ENEMIES];
     public final Bolt[] bolts = new Bolt[MAX_BOLTS];
     public final Pickup[] pickups = new Pickup[MAX_PICKUPS];
-    /** Elite loot never competes with souls/healing for pool space and stays until collected. */
+    /** Loot never competes with souls/healing for pool space and stays until collected. */
     public final Chest[] chests = new Chest[MAX_CHESTS];
     public final Shot[] shots = new Shot[MAX_SHOTS];
     public final Hazard[] hazards = new Hazard[MAX_HAZARDS];
@@ -82,7 +83,7 @@ public final class ArenaWorld {
     private double simulationElapsed;
     private int sharedXpRemainder;
     private int randomState, runNumber, nextCheckpoint, encounterPhase, enemySpawnSerial;
-    private int presentedChoiceRound, chestsDropped;
+    private int presentedChoiceRound, chestsDropped, arenaChestsPlaced, chestRandomState;
     private boolean sovereignSkipped;
     private Diagnostics diagnostics, diagnosticsStorage;
 
@@ -93,7 +94,12 @@ public final class ArenaWorld {
         for (int i = 0; i < enemies.length; i++) enemies[i] = new Enemy();
         for (int i = 0; i < bolts.length; i++) bolts[i] = new Bolt();
         for (int i = 0; i < pickups.length; i++) pickups[i] = new Pickup();
-        for (int i = 0; i < chests.length; i++) chests[i] = new Chest();
+        for (int i = 0; i < chests.length; i++) {
+            boolean elite = i < MAX_ELITE_CHESTS;
+            int arenaIndex = i - MAX_ELITE_CHESTS;
+            float fraction = arenaIndex == 0 ? .075f : arenaIndex == 1 ? .5f : .95f;
+            chests[i] = new Chest(elite, elite ? 0 : Math.round(timeline.durationSeconds() * fraction));
+        }
         for (int i = 0; i < shots.length; i++) shots[i] = new Shot();
         for (int i = 0; i < hazards.length; i++) hazards[i] = new Hazard();
         for (int i = 0; i < effects.length; i++) effects[i] = new Effect();
@@ -110,12 +116,13 @@ public final class ArenaWorld {
         wave = bossPhase = 1; bossSpawned = bossDefeated = sovereignSpawned = sovereignDefeated = false; boss = sovereign = null;
         sovereignDefeatedAt = -1;
         levelUpFxAge = 2; presentedChoiceRound = 0; sovereignSkipped = false;
-        chestsDropped = 0;
+        chestsDropped = arenaChestsPlaced = 0;
         swordSwings = arrowsFired = enemyDeaths = pickupsCollected = heroHits = 0;
         swordHits = boltHits = criticalHits = dodges = blockedHits = healsCollected = auraPulses = stormCasts = 0;
         wraithDashes = bruteSlams = hostileShotsFired = 0;
         spawnCountdown = .65f;
         runSeed = 0x5a17c9e3 ^ (++runNumber * 0x45d9f3b); randomState = runSeed;
+        chestRandomState = runSeed ^ 0x72e31b4d;
         debugSizingFacing = null;
         progression.reset(); equipment.reset(); healthDrops.reset(); damageNumbers.clear();
         for (Player p : players) {
@@ -279,6 +286,7 @@ public final class ArenaWorld {
         if (elapsed != (float) simulationElapsed) simulationElapsed = elapsed;
         simulationElapsed += 1.0 / 60.0;
         elapsed = (float) simulationElapsed;
+        placeScheduledChests();
         wave = timeline.phaseIndex(elapsed) + 1;
         damageNumbers.update(STEP);
         for (Effect e : effects) if (e.active) { e.ttl -= STEP; if (e.ttl <= 0) e.active = false; }
@@ -854,10 +862,66 @@ public final class ArenaWorld {
     }
 
     private void dropChest(float x, float y) {
-        if (chestsDropped >= MAX_CHESTS) return;
+        if (chestsDropped >= MAX_ELITE_CHESTS) return;
         // Five elite opportunities per run: retain a distinct slot even after collection.
         Chest chest = chests[chestsDropped++];
         chest.active = true; chest.x = x; chest.y = y; chest.pickupDelay = CHEST_LANDING_SECONDS;
+    }
+
+    private void placeScheduledChests() {
+        while (arenaChestsPlaced < MAX_ARENA_CHESTS) {
+            float fraction = arenaChestsPlaced == 0 ? .075f : arenaChestsPlaced == 1 ? .5f : .95f;
+            if (elapsed < durationSeconds() * fraction) return;
+            Chest chest = chests[MAX_ELITE_CHESTS + arenaChestsPlaced++];
+            placeArenaChest(chest);
+        }
+    }
+
+    private void placeArenaChest(Chest chest) {
+        float bestScore = -1, bestX = 0, bestY = 0;
+        // A separate bounded random stream must not alter attacks, crits or authored enemy packs.
+        for (int attempt = 0; attempt < 64; attempt++) {
+            float x = (chestRandom() * 2 - 1) * (HALF_WIDTH - 160);
+            float y = (chestRandom() * 2 - 1) * (HALF_HEIGHT - 160);
+            if (!chestLandmarkClear(x, y)) continue;
+            float score = chestPlacementScore(x, y);
+            if (score > bestScore) { bestScore = score; bestX = x; bestY = y; }
+            if (score >= 1) break;
+        }
+        // Deterministic, bounded fallback keeps a safe readable location even after unlucky samples.
+        if (bestScore < 1) for (int row = 0; row < 9; row++) for (int column = 0; column < 9; column++) {
+            float x = -960 + column * 240, y = -640 + row * 160;
+            if (!chestLandmarkClear(x, y)) continue;
+            float score = chestPlacementScore(x, y);
+            if (score > bestScore) { bestScore = score; bestX = x; bestY = y; }
+        }
+        chest.x = bestX; chest.y = bestY;
+        chest.pickupDelay = CHEST_LANDING_SECONDS; chest.active = true;
+    }
+
+    private float chestPlacementScore(float x, float y) {
+        float score = Float.MAX_VALUE;
+        for (Player player : players) if (player.active && player.alive)
+            score = Math.min(score, distanceSquared(x, y, player.x, player.y) / (320f * 320f));
+        for (Chest chest : chests) if (chest.active)
+            score = Math.min(score, distanceSquared(x, y, chest.x, chest.y) / (140f * 140f));
+        return score;
+    }
+
+    /** Authored render-only crypt landmarks; these clearances add no collision or navigation rules. */
+    static boolean chestLandmarkClear(float x, float y) {
+        if (Math.abs(x) < 400 && y < -500) return false; // Altar and paired guardians.
+        if (Math.abs(x) < 240 && y > 690) return false; // North gate base.
+        if (Math.abs(Math.abs(x) - 800) < 130
+            && (Math.abs(y) < 170 || Math.abs(Math.abs(y) - 430) < 170)) return false;
+        return !(Math.abs(Math.abs(x) - 1020) < 120 && Math.abs(Math.abs(y) - 610) < 150);
+    }
+
+    private float chestRandom() {
+        chestRandomState ^= chestRandomState << 13;
+        chestRandomState ^= chestRandomState >>> 17;
+        chestRandomState ^= chestRandomState << 5;
+        return (chestRandomState >>> 8) * (1f / 16777216f);
     }
 
     private void updateChests() {
@@ -874,7 +938,8 @@ public final class ArenaWorld {
                     || distanceSquared(player.x, player.y, chest.x, chest.y) > CHEST_PICKUP_RADIUS * CHEST_PICKUP_RADIUS)
                     continue;
                 chest.active = false;
-                equipment.rewardElite();
+                if ("elite".equals(chest.source)) equipment.rewardElite();
+                else equipment.rewardArenaChest(chest.scheduledSeconds);
                 // One shared round at a time, including when several chests overlap.
                 return;
             }
@@ -1032,7 +1097,7 @@ public final class ArenaWorld {
     /** Profile-only real elite death/drop for a brief chest rendering and contact check. */
     public void debugEliteChestEncounter() {
         if (outcome != Outcome.RUNNING || choicePending() || bossSpawned || livingPlayerCount() == 0
-            || chestsDropped >= MAX_CHESTS) return;
+            || chestsDropped >= MAX_ELITE_CHESTS) return;
         debugSceneryView(0, 0);
         spawnCountdown = 30;
         Player anchor = players[0].active && players[0].alive ? players[0] : players[1];
@@ -1327,6 +1392,14 @@ public final class ArenaWorld {
     public static final class Chest {
         public boolean active;
         public float x, y, pickupDelay;
+        /** Fixed slot identity: elapsed collection time can never rewrite a queued reward's origin. */
+        public final String source, sourceLabel;
+        public final int scheduledSeconds;
+        private Chest(boolean elite, int scheduledSeconds) {
+            source = elite ? "elite" : "arena-chest";
+            sourceLabel = elite ? "ELITE DEFEATED" : "CHEST DISCOVERED";
+            this.scheduledSeconds = scheduledSeconds;
+        }
     }
     public static final class Shot {
         public boolean active, casterElite;

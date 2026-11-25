@@ -16,7 +16,7 @@ class ArenaTimelineTest {
         world.update(ArenaWorld.STEP);
         assertFalse(world.bossSpawned);
         assertTrue(world.timeRemaining() > 1000);
-        finishChoices(world); // The boundary jump also legitimately earns a timed reliquary.
+        assertFalse(world.choicePending(), "A boundary jump places chests without opening item choices");
         world.elapsed = timeline.durationSeconds() - ArenaWorld.STEP;
         world.update(ArenaWorld.STEP);
         assertTrue(world.bossSpawned);

@@ -112,9 +112,9 @@ class EliteChestPickupTest {
         assertSame(pooled, world.chests[0]); assertTrue(pooled.active);
     }
 
-    @Test void chestOpportunitiesStayBoundedAndTimedReliquariesRemainAutomatic() {
+    @Test void eliteChestOpportunitiesStayBoundedAndDoNotCompeteWithDiscoveries() {
         ArenaWorld world = solo();
-        for (int i = 0; i < ArenaWorld.MAX_CHESTS + 1; i++) {
+        for (int i = 0; i < ArenaWorld.MAX_ELITE_CHESTS + 1; i++) {
             defeatElite(world, 120);
             for (ArenaWorld.Pickup pickup : world.pickups) pickup.active = false;
         }
@@ -126,11 +126,10 @@ class EliteChestPickupTest {
             assertEquals(i + 1, world.equipment.rewardsEarned());
             assertTrue(world.equipment.choose(0, world.equipment.offers[0].id, -1));
         }
-        world.elapsed = 90; world.equipment.update(ArenaWorld.STEP);
-        assertEquals(6, world.equipment.rewardsEarned()); assertEquals("reliquary", world.equipment.choiceOrigin().source());
-        world.elapsed = 600; world.equipment.update(ArenaWorld.STEP);
-        world.elapsed = 1140; world.equipment.update(ArenaWorld.STEP);
-        assertEquals(8, world.equipment.rewardsEarned());
+        world.elapsed = 1140; world.update(ArenaWorld.STEP);
+        assertEquals(5, world.equipment.rewardsEarned()); assertFalse(world.lootPending());
+        for (int i = ArenaWorld.MAX_ELITE_CHESTS; i < ArenaWorld.MAX_CHESTS; i++)
+            assertTrue(world.chests[i].active, "Each discovery retains space after all five elite drops");
     }
 
     private static ArenaWorld solo() {
