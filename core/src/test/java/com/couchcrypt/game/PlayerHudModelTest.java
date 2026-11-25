@@ -28,13 +28,23 @@ class PlayerHudModelTest {
         for (ArenaWorld.Hero hero : ArenaWorld.Hero.values()) {
             ArenaWorld world = new ArenaWorld(); world.setHero(0, hero); world.activatePlayer(0);
             for (PartyProgression.Upgrade upgrade : PartyProgression.Upgrade.values())
-                if (upgrade.supports(hero)) choose(world, 0, upgrade);
+                if (upgrade.ordinal() < RICOCHET.ordinal() && upgrade.supports(hero)) choose(world, 0, upgrade);
             choose(world, 0, POWER); choose(world, 0, POWER);
             PlayerHudModel model = new PlayerHudModel(); model.refresh(world, 0);
             if (hero == ArenaWorld.Hero.WARDEN)
                 assertBuild(model, new PartyProgression.Upgrade[]{SWEEP, POWER, HASTE, FLEET, VITALITY}, new int[]{1, 3, 1, 1, 1}, 5);
             else assertBuild(model, new PartyProgression.Upgrade[]{MULTISHOT, PIERCE, POWER, HASTE, FLEET}, new int[]{1, 1, 3, 1, 1}, 6);
         }
+    }
+
+    @Test void expandedBuildShowsEvolutionAndClassAbilityWithBoundedOverflow() {
+        ArenaWorld world = new ArenaWorld(); world.activatePlayer(0);
+        choose(world, 0, AURA); choose(world, 0, AURA); choose(world, 0, AURA);
+        choose(world, 0, BINDING_CIRCLE); choose(world, 0, SENTINEL);
+        choose(world, 0, CONSECRATION); choose(world, 0, GLAIVE); choose(world, 0, WARD);
+        PlayerHudModel model = new PlayerHudModel(); model.refresh(world, 0);
+        assertBuild(model, new PartyProgression.Upgrade[]{BINDING_CIRCLE, SENTINEL, AURA, CONSECRATION, GLAIVE},
+            new int[]{1, 1, 3, 1, 1}, 1);
     }
 
     @Test void removalAndRunResetClearPreviouslyShownSkillsWithoutReplacingStorage() {

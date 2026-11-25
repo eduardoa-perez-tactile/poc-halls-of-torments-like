@@ -215,8 +215,38 @@ async function main() {
   assert.equal(get('equipment-source').hidden, true);
   assert.equal(get('equipment-explanation').hidden, true);
   assert.equal(first.querySelector('.skill-illustration').style.backgroundImage, '', 'Skill cards restore the existing skill atlas after gear');
-  assert.equal(first.querySelector('.skill-illustration').style.backgroundSize, '');
-  const futureSkill = { ...upgrade, id: 9, level: 12, durationSeconds: 30, secondsLeft: 17.25 };
+  assert.equal(first.querySelector('.skill-illustration').style.backgroundSize, '400% 400%');
+  const newSkill = (id, icon, title, rank = 1) => ({
+    id, icon, title, rank, category: 'WEAPON', description: 'Original combat ability.',
+    headline: 'UNLOCK', before: 'NONE', after: 'NEW ABILITY'
+  });
+  const legacyBoundary = { ...upgrade, id: 7, options: [newSkill('critical', 11, 'Critical Edge'),
+    newSkill('power', 0, 'Soulfire'), newSkill('storm', 9, 'Chain Storm')] };
+  status({ equipment: null, progression: { upgrade: legacyBoundary } });
+  assert.equal(first.querySelector('.skill-illustration').style.backgroundSize, '400% 400%');
+  assert.equal(first.style.values.get('--icon-x'), '100%');
+  assert.ok(Math.abs(parseFloat(first.style.values.get('--icon-y')) - 200 / 3) < .001,
+    'The last unchanged128px icon stays in the third atlas row');
+  const expansionCards = [newSkill('ricochet', 12, 'Ricochet Bolt'),
+    newSkill('duration', 19, 'Lingering Power'), newSkill('reaping_stroke', 23, 'Reaping Stroke')];
+  const expanded = { ...upgrade, id: 8, options: expansionCards };
+  status({ equipment: null, progression: { upgrade: expanded } });
+  assert.equal(first.querySelector('.skill-illustration').style.backgroundSize, '800% 800%');
+  assert.equal(first.style.values.get('--icon-x'), '0%');
+  assert.ok(Math.abs(parseFloat(first.style.values.get('--icon-y')) - 600 / 7) < .001,
+    'First compact icon starts below the unchanged legacy cells');
+  const second = get('upgrade-option-1'), third = get('upgrade-option-2');
+  assert.equal(second.style.values.get('--icon-x'), '100%', 'Last icon in the first compact row crops its right edge');
+  assert.equal(third.style.values.get('--icon-y'), '100%', 'Last expansion row crops the bottom strip');
+  assert.ok(Math.abs(parseFloat(third.style.values.get('--icon-x')) - 300 / 7) < .001);
+  assert.equal(third.querySelector('.skill-rank').textContent, 'EVOLUTION');
+  assert.equal(third.dataset.category, 'WEAPON');
+  assert.equal(first.querySelector('.skill-rank').textContent, 'RANK 1');
+  const fallback = { ...expanded, id: 18, options: expansionCards.map(({ icon, ...card }) => card) };
+  status({ equipment: null, progression: { upgrade: fallback } });
+  assert.equal(third.querySelector('.skill-title').textContent, 'Reaping Stroke');
+  assert.equal(third.querySelector('.skill-art').hidden, false, 'Legacy payload fallback includes new skill identities');
+  const futureSkill = { ...upgrade, id: 9, level: 12, durationSeconds: 30, secondsLeft: 17.25, options: expansionCards };
   status({ equipment: null, progression: { upgrade: futureSkill }, starterBuild });
   assert.equal(get('upgrade-level').textContent, 'LEVEL 12');
   assert.equal(choices.querySelector('.upgrade-kicker').textContent, 'CHOOSE YOUR POWER');
@@ -232,6 +262,8 @@ async function main() {
   assert.equal(get('upgrade-level').textContent, 'LEVEL 12');
   assert.equal(get('upgrade-seconds').textContent, '18', 'Disconnected time does not reduce the host timer');
   assert.equal(first.disabled, true);
+  assert.equal(third.querySelector('.skill-rank').textContent, 'EVOLUTION', 'Paused reconnect preserves evolution card presentation');
+  assert.equal(third.querySelector('.skill-title').textContent, 'Reaping Stroke');
   status({ equipment: null, progression: { upgrade: futureSkill }, starterBuild });
   first.click();
   assert.equal(socket.sent.at(-1).offerId, 9, 'Reconnect preserves the offer identity');

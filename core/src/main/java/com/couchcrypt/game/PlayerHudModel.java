@@ -7,7 +7,10 @@ public final class PlayerHudModel {
     public static final int MAX_SKILLS = 5;
     private static final PartyProgression.Upgrade[] UPGRADES = PartyProgression.Upgrade.values();
     private static final PartyProgression.Upgrade[] WEAPON_TRAITS = {
-        PartyProgression.Upgrade.SWEEP, PartyProgression.Upgrade.MULTISHOT, PartyProgression.Upgrade.PIERCE
+        PartyProgression.Upgrade.SWEEP, PartyProgression.Upgrade.MULTISHOT, PartyProgression.Upgrade.PIERCE,
+        PartyProgression.Upgrade.ECHO_STORM, PartyProgression.Upgrade.BINDING_CIRCLE,
+        PartyProgression.Upgrade.SHATTER_BOLT, PartyProgression.Upgrade.REAPING_STROKE,
+        PartyProgression.Upgrade.RICOCHET, PartyProgression.Upgrade.SENTINEL
     };
 
     public final int[] iconIndices = new int[MAX_SKILLS];
@@ -22,8 +25,9 @@ public final class PlayerHudModel {
         if (slot < 0 || slot >= world.players.length || !world.players[slot].active) return;
         for (PartyProgression.Upgrade upgrade : WEAPON_TRAITS) append(world, slot, upgrade);
         for (PartyProgression.Upgrade upgrade : UPGRADES) {
-            if (upgrade != PartyProgression.Upgrade.SWEEP && upgrade != PartyProgression.Upgrade.MULTISHOT
-                && upgrade != PartyProgression.Upgrade.PIERCE) append(world, slot, upgrade);
+            boolean prioritized = false;
+            for (PartyProgression.Upgrade trait : WEAPON_TRAITS) if (upgrade == trait) { prioritized = true; break; }
+            if (!prioritized) append(world, slot, upgrade);
         }
     }
 
