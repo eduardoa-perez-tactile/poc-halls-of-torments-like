@@ -30,10 +30,12 @@ public final class GameHud {
     private final Text[] dodge = new Text[2], playerLabels = new Text[2], overflow = new Text[2], revivalStatus = new Text[2];
     private final Text[][] ranks = new Text[2][PlayerHudModel.MAX_SKILLS];
     private final Text[] allyDown = new Text[2], revival = new Text[2];
-    private final Text timer, bossName, partyLevel, lowHealth;
+    private final Text timer, bossName, partyLevel, lowHealth, relicNotice;
     private final StringBuilder builder = new StringBuilder(64);
     private final boolean[] wasActive = new boolean[2], wasAlive = new boolean[2];
     private float refresh, pulseClock;
+    private int seenRelics;
+    private float relicNoticeUntil;
 
     public GameHud(GameArt art, UiArt ui, BuildIcons buildIcons, HudArt hudArt) {
         this.art = art; this.hudArt = hudArt; icons = buildIcons.regions;
@@ -53,10 +55,12 @@ public final class GameHud {
         partyLevel = new Text(ui.small, .9f, 480f, UiArt.GOLD);
         timer = new Text(ui.section, 1.15f, 160f, UiArt.IVORY);
         bossName = new Text(ui.heading, .78f, 1240f, UiArt.IVORY);
+        relicNotice = new Text(ui.small, .9f, 750f, UiArt.IVORY);
     }
 
     public void reset() {
         refresh = pulseClock = 0;
+        seenRelics = 0; relicNoticeUntil = 0; relicNotice.set("");
         wasActive[0] = wasActive[1] = false;
         wasAlive[0] = wasAlive[1] = false;
     }
@@ -73,6 +77,12 @@ public final class GameHud {
             wasActive[slot] = world.players[slot].active; wasAlive[slot] = world.players[slot].alive;
         }
         if (refresh <= 0 || changed) { refreshText(world); refresh = .2f; }
+        if (seenRelics != world.skills.relicsCollected) {
+            seenRelics = world.skills.relicsCollected;
+            relicNoticeUntil = world.elapsed + 2.5f;
+            relicNotice.set(world.skills.lastRelicKind == SkillExpansion.RelicKind.STASIS
+                ? "STASIS  /  ENEMIES SLOWED" : "SOUL HARVEST  /  GATHERING SOULS");
+        }
         for (ArenaWorld.Player player : world.players) if (player.active) {
             boolean mirror = split && player.slot == 1;
             batch.setColor(0, 0, 0, .64f);
@@ -105,6 +115,7 @@ public final class GameHud {
         for (ArenaWorld.Player player : world.players) if (player.active)
             playerText(batch, player, world, split && player.slot == 1);
         partyLevel.center(batch, 960f, 82f);
+        if (world.elapsed < relicNoticeUntil) relicNotice.center(batch, 960f, 370f);
         if (state.bossVisible) {
             bossName.set(state.bossName);
             bossName.center(batch, 960f, 1058f);

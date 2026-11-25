@@ -965,6 +965,14 @@ public final class CryptLobby extends ApplicationAdapter {
             world.debugSizedCultistAttack(ActorAnimation.Facing.values()[enemyCastPreviewFacing++ % 4]);
             arena.resetCameras(); return true;
         }
+        if (key == Input.Keys.NUM_3 && config.profile() && screen == Screen.SESSION
+            && overlay == null && !world.choicePending()) {
+            world.debugEliteChestEncounter(); arena.resetCameras(); return true;
+        }
+        if (key == Input.Keys.NUM_4 && config.profile() && screen == Screen.SESSION
+            && overlay == null && !world.choicePending()) {
+            world.debugSkillExpansionEncounter(); arena.resetCameras(); return true;
+        }
         if (key == Input.Keys.F1 && config.profile() && screen == Screen.SESSION && overlay == null) {
             world.debugEnemyAttackEncounter(); return true;
         }
@@ -1163,7 +1171,7 @@ public final class CryptLobby extends ApplicationAdapter {
         syncEncounterHud();
         if (world.equipment.rewardsEarned() > notifiedReliquaries) {
             notifiedReliquaries = world.equipment.rewardsEarned();
-            hudState.notify("RELIQUARY FOUND  /  CHOOSE GEAR ON YOUR PHONE", "", ArenaHudState.Tone.SUCCESS, 4f);
+            hudState.notify("LOOT CLAIMED  /  CHOOSE GEAR ON YOUR PHONE", "", ArenaHudState.Tone.SUCCESS, 4f);
         }
         if (world.wave > notifiedWave && !world.bossSpawned) {
             notifiedWave = world.wave;
@@ -1172,7 +1180,7 @@ public final class CryptLobby extends ApplicationAdapter {
         }
         if (world.elitesKilled > notifiedEliteKills) {
             notifiedEliteKills = world.elitesKilled;
-            hudState.notify("ELITE SLAIN  /  CLAIM ITS SOULS", "", ArenaHudState.Tone.SUCCESS, 3f);
+            hudState.notify("ELITE SLAIN  /  COLLECT ITS CHEST", "", ArenaHudState.Tone.SUCCESS, 3f);
         }
         if (world.sovereignSpawned && !sovereignAnnounced) {
             sovereignAnnounced = true; hudPreview = false;

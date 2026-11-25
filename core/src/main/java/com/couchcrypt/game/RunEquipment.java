@@ -37,14 +37,14 @@ public final class RunEquipment {
     private final boolean[] participants = new boolean[2], moving = new boolean[2];
     private final float[] sustain = new float[2], xpRemainder = new float[2];
     private final RewardOrigin[] origins = new RewardOrigin[MAX_REWARDS];
-    private int earned, nextId, cacheIndex, eliteRewards;
+    private int earned, nextId, arenaChestRewards, eliteRewards;
     private float choiceSecondsLeft;
     private boolean resolvingTimeout;
     public final Offer[] offers = {new Offer(), new Offer()};
 
     public RunEquipment(ArenaWorld world) { this.world = world; }
     public void reset() {
-        earned = cacheIndex = eliteRewards = 0;
+        earned = arenaChestRewards = eliteRewards = 0;
         Arrays.fill(origins, null);
         choiceSecondsLeft = 0; resolvingTimeout = false;
         for (int slot = 0; slot < 2; slot++) clearPlayer(slot);
@@ -107,7 +107,13 @@ public final class RunEquipment {
         startNextRound();
     }
     public void rewardElite() {
-        if (eliteRewards < 5) { eliteRewards++; grantReward("elite", "ELITE DEFEATED", 0); }
+        if (eliteRewards < ArenaWorld.MAX_ELITE_CHESTS) { eliteRewards++; grantReward("elite", "ELITE DEFEATED", 0); }
+    }
+    public void rewardArenaChest(int scheduledSeconds) {
+        if (arenaChestRewards < ArenaWorld.MAX_ARENA_CHESTS) {
+            arenaChestRewards++;
+            grantReward("arena-chest", "CHEST DISCOVERED", scheduledSeconds);
+        }
     }
     public RewardOrigin choiceOrigin() {
         for (Offer offer : offers) if (offer.pending) return offer.origin;
@@ -115,13 +121,6 @@ public final class RunEquipment {
     }
     public void update(float delta) {
         if (!Float.isFinite(delta) || delta <= 0 || world.levelUpPending()) return;
-        float duration = world.durationSeconds();
-        while (cacheIndex < 3 && world.elapsed >= duration * (cacheIndex == 0 ? .075f : cacheIndex == 1 ? .5f : .95f)) {
-            int seconds = Math.round(duration * (cacheIndex == 0 ? .075f : cacheIndex == 1 ? .5f : .95f));
-            cacheIndex++;
-            String time = seconds / 60 + ":" + (seconds % 60 < 10 ? "0" : "") + seconds % 60;
-            grantReward("reliquary", "TIMED RELIQUARY " + time, seconds);
-        }
         for (int slot = 0; slot < 2; slot++)
             sustain[slot] = Math.min(2f, sustain[slot] + delta * 2f);
         updateChoices(delta);

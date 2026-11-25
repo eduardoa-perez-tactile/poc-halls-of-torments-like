@@ -7,9 +7,13 @@ import static com.couchcrypt.game.PartyProgression.Upgrade.*;
 
 class HeroCatalogTest {
     @Test void listsEveryLearnableSkillInStableOrderWithoutOtherClassTraits() {
-        assertEquals(List.of(POWER, HASTE, FLEET, VITALITY, EVASION, SWEEP, AURA, STORM, MAGNET, CRITICAL),
+        assertEquals(List.of(POWER, HASTE, FLEET, VITALITY, EVASION, SWEEP, AURA, STORM, MAGNET, CRITICAL,
+            SENTINEL, CONSECRATION, GLAIVE, WARD, FROST, PROJECTILE_SPEED, DURATION,
+            ECHO_STORM, BINDING_CIRCLE, REAPING_STROKE),
             HeroCatalog.profile(ArenaWorld.Hero.WARDEN).skills());
-        assertEquals(List.of(POWER, HASTE, FLEET, VITALITY, EVASION, MULTISHOT, PIERCE, AURA, STORM, MAGNET, CRITICAL),
+        assertEquals(List.of(POWER, HASTE, FLEET, VITALITY, EVASION, MULTISHOT, PIERCE, AURA, STORM, MAGNET, CRITICAL,
+            RICOCHET, CONSECRATION, GLAIVE, WARD, FROST, PROJECTILE_SPEED, DURATION,
+            ECHO_STORM, BINDING_CIRCLE, SHATTER_BOLT),
             HeroCatalog.profile(ArenaWorld.Hero.RANGER).skills());
     }
 

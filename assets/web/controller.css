@@ -38,6 +38,9 @@ footer { margin-top: 30px; font-size: 12px; }
 #dodge:disabled { opacity: .55; color: #b5b4ac; border-color: #777973; box-shadow: inset 0 0 0 6px #0c111888, 0 0 0 3px #171b1c; }
 .control-label { display: block; color: var(--player); font-size: 11px; letter-spacing: .12em; margin-top: 18px; min-height: 16px; }
 body.playing { height: 100svh; overflow: hidden; touch-action: auto; }
+/* Thumbs can land anywhere, including outside the controls or on cooldown Dodge.
+   Keep the choice view scrollable by applying this only to the gameplay surface. */
+body.playing:not(.has-upgrade) { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 body.playing main { display: flex; flex-direction: column; max-width: 1000px; width: 100%; height: 100svh; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
 body.playing header, body.playing h1, body.playing #message, body.playing #connected, body.playing #join-form, body.playing footer { display: none; }
 body.playing .connection-card { border: 0; background: none; padding: 0; }
@@ -70,7 +73,7 @@ body.playing .control-label { margin-top: 12px; font-size: 12px; }
 .upgrade-choice[data-category='MOBILITY'] { --skill-color: #82d2cb; --skill-glow: 75, 173, 167; }
 .upgrade-choice[data-category='UTILITY'] { --skill-color: #c9b1e9; --skill-glow: 160, 122, 212; }
 .skill-art { display: block; width: 100%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, rgba(var(--skill-glow), .23), transparent 70%); }
-.skill-illustration { display: block; width: 100%; height: 100%; background: url('/art/skill-icons.png') var(--icon-x, 0%) var(--icon-y, 0%) / 400% 300% no-repeat; }
+.skill-illustration { display: block; width: 100%; height: 100%; background: url('/art/skill-icons.png') var(--icon-x, 0%) var(--icon-y, 0%) / 400% 400% no-repeat; }
 .skill-copy { display: flex; flex-direction: column; min-width: 0; gap: 5px; }
 .skill-meta { display: flex; justify-content: space-between; align-items: center; gap: 4px; color: var(--skill-color); font-size: 10px; font-weight: 600; letter-spacing: .04em; }
 .skill-rank { color: #b5ad9f; white-space: nowrap; font-size: 9px; }

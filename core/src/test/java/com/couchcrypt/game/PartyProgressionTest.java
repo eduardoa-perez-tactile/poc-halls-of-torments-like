@@ -60,11 +60,11 @@ class PartyProgressionTest {
             PartyProgression progression = world.progression;
             assertEquals(19, progression.appliedUpgradeCount(1));
             assertEquals(0, progression.appliedUpgradeCount(0));
-            assertEquals(3, progression.rank(1, PartyProgression.Upgrade.POWER));
-            assertEquals(2, progression.rank(1, PartyProgression.Upgrade.VITALITY));
+            assertEquals(1, progression.rank(1, PartyProgression.Upgrade.POWER));
+            assertEquals(1, progression.rank(1, PartyProgression.Upgrade.VITALITY));
             assertEquals(3, progression.rank(1, PartyProgression.Upgrade.AURA));
-            assertEquals(2, progression.rank(1, PartyProgression.Upgrade.STORM));
-            assertTrue(progression.foundationSummary(1).contains("Soulfire 3"));
+            assertEquals(1, progression.rank(1, PartyProgression.Upgrade.STORM));
+            assertTrue(progression.foundationSummary(1).contains("Soulfire 1"));
             var foundation = progression.foundationSkills(1);
             assertEquals(19, foundation.stream().mapToInt(PartyProgression.FoundationSkill::rank).sum());
             for (var skill : foundation) {
@@ -73,9 +73,9 @@ class PartyProgressionTest {
                 assertTrue(upgrade.supports(hero)); assertEquals(progression.rank(1, upgrade), skill.rank());
             }
             assertThrows(UnsupportedOperationException.class, () -> foundation.clear());
-            assertEquals(hero == ArenaWorld.Hero.WARDEN ? 3 : 0, progression.rank(1, PartyProgression.Upgrade.SWEEP));
-            assertEquals(hero == ArenaWorld.Hero.RANGER ? 2 : 0, progression.rank(1, PartyProgression.Upgrade.MULTISHOT));
-            assertEquals(hero == ArenaWorld.Hero.RANGER ? 1 : 0, progression.rank(1, PartyProgression.Upgrade.PIERCE));
+            assertEquals(hero == ArenaWorld.Hero.WARDEN ? 4 : 0, progression.rank(1, PartyProgression.Upgrade.SWEEP));
+            assertEquals(hero == ArenaWorld.Hero.RANGER ? 1 : 0, progression.rank(1, PartyProgression.Upgrade.MULTISHOT));
+            assertEquals(hero == ArenaWorld.Hero.RANGER ? 3 : 0, progression.rank(1, PartyProgression.Upgrade.PIERCE));
             assertFalse(progression.offers[1].pending);
         }
     }
@@ -448,7 +448,7 @@ class PartyProgressionTest {
         for (ArenaWorld.Hero hero : ArenaWorld.Hero.values()) {
             for (boolean capped : new boolean[]{false, true}) {
                 for (PartyProgression.Upgrade upgrade : PartyProgression.Upgrade.values()) {
-                    if (!upgrade.supports(hero)) continue;
+                    if (!upgrade.supports(hero) || upgrade.ordinal() >= PartyProgression.Upgrade.RICOCHET.ordinal()) continue;
                     ArenaWorld world = new ArenaWorld(); world.setHero(0, hero); world.activatePlayer(0);
                     ArenaWorld.Player player = world.players[0];
                     if (capped) {
@@ -532,6 +532,7 @@ class PartyProgressionTest {
             case STORM -> (12 + p.stormLevel * 5) * p.damageMultiplier;
             case MAGNET -> p.pickupMultiplier * 100;
             case CRITICAL -> p.critChance * 100;
+            default -> throw new IllegalArgumentException("Expansion cards have dedicated preview checks");
         };
         assertEquals(actual, values.get(0), .0051f, upgrade + " displayed value");
         if (upgrade == PartyProgression.Upgrade.AURA) {

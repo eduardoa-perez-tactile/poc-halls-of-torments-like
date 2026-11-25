@@ -32,11 +32,17 @@ public final class ArenaRenderer implements Disposable {
     // Only the rendered origin moves; the simulation keeps its original projectile coordinates and trajectory.
     private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
     private static final float[] SOVEREIGN_ORIGIN = {37, 78, -12, 67, 18, 90, -35, 82};
-    private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PAINTED_BORDER = 3;
+    private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PAINTED_BORDER = 3, DODGE_GHOST = 4, CHEST = 5,
+        SENTINEL_BLADE = 6, RETURNING_GLAIVE = 7, WORLD_RELIC = 8;
     private final GameArt art;
     private final GameHud gameHud;
     private final EnemyRankMarkers rankMarkers;
     private final PlayerFootRing playerFootRing;
+    private final EnemyGroundVfx enemyGroundVfx;
+    private final LootChestVfx chestVfx;
+    private final SkillExpansionArt skillArt;
+    private final DamageNumberArt damageNumberArt;
+    private final ArenaAmbience ambience;
     private final SpriteBatch batch;
     private final ShaderProgram paletteShader;
     private final SoftIris iris;
@@ -52,8 +58,12 @@ public final class ArenaRenderer implements Disposable {
     private final ArenaLayout layout;
     private final PaintedBorderArt.Scene paintedBorders;
     private final GameplayAtlas.Region[] propArt;
+    private final GameplayAtlas.Region chestArt;
+    private final float chestScale;
     private final float[] environmentVertices = new float[20];
-    private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + ArenaLayout.MAX_PLACEMENTS + PaintedBorderArt.MAX_SCENERY];
+    private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + 2 * DodgeTrail.CAPACITY
+        + ArenaLayout.MAX_PLACEMENTS + PaintedBorderArt.MAX_SCENERY + ArenaWorld.MAX_CHESTS
+        + SkillExpansion.MAX_ORBITERS + SkillExpansion.MAX_GLAIVES + SkillExpansion.MAX_RELICS];
     private final int[] types = new int[depths.length], indices = new int[depths.length], layers = new int[depths.length];
     private int sortCount;
     public int drawCalls;
@@ -73,6 +83,10 @@ public final class ArenaRenderer implements Disposable {
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
         rankMarkers = new EnemyRankMarkers(art.pixel);
         playerFootRing = new PlayerFootRing(art.pixel);
+        enemyGroundVfx = new EnemyGroundVfx(art.pixel, art.glow);
+        chestVfx = new LootChestVfx(art.pixel, art.glow);
+        skillArt = new SkillExpansionArt(buildIcons, art.glow);
+        damageNumberArt = new DamageNumberArt(uiArt.body);
         floorLayout = new ArenaFloorLayout(new JsonReader().parse(Gdx.files.internal("arena/crypt-floor.json")));
         float radius = floorLayout.medallionDiameter * .5f;
         float[] engraving = EngravedFloorArt.rectangle(floorLayout.centerX - radius, floorLayout.centerY - radius,
@@ -87,10 +101,13 @@ public final class ArenaRenderer implements Disposable {
         floorCacheId = cacheFloor();
         hud.setToOrtho(false, HUD_WIDTH, HUD_HEIGHT);
         layout = ArenaLayout.load(art.metadata);
+        ambience = new ArenaAmbience(floorLayout, layout);
         paintedBorders = art.paintedBorders.place(layout, art.metadata);
         propArt = new GameplayAtlas.Region[layout.placements.length];
         for (int i = 0; i < propArt.length; i++)
             propArt[i] = art.environment(layout.placements[i].region);
+        chestArt = art.environment("elite-chest");
+        chestScale = chestArt.worldHeight() / art.metadata.frames[chestArt.frame()].sourceHeight;
     }
 
     public void resetCameras() {
@@ -125,6 +142,8 @@ public final class ArenaRenderer implements Disposable {
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
             art.engravedFloor.draw(batch, medallion);
+            drawChestLights(world, camera);
+            skillArt.ground(batch, world);
             // All floor effects precede the complete depth-sorted actor pass. Their painted
             // foreground rims must never be laid over a closer enemy or the player's body.
             drawHazards(world, camera, SpriteEffectArt.Layer.ALL);
@@ -149,6 +168,8 @@ public final class ArenaRenderer implements Disposable {
             drawBolts(world, camera);
             drawShots(world, camera);
             drawEffects(world, camera);
+            skillArt.followups(batch, world);
+            drawDamageNumbers(world, camera);
             drawEnemyRanks(world);
             batch.end();
             drawCalls += batch.renderCalls;
@@ -328,6 +349,10 @@ public final class ArenaRenderer implements Disposable {
 
     private void gatherSprites(ArenaWorld world, OrthographicCamera camera) {
         sortCount = 0;
+        for (int i = 0; i < world.chests.length; i++) {
+            ArenaWorld.Chest chest = world.chests[i];
+            if (chest.active && visible(camera, chest.x, chest.y, 60f)) add(CHEST, i, chest.x, chest.y);
+        }
         for (int i = 0; i < layout.placements.length; i++) {
             ArenaLayout.Placement placement = layout.placements[i];
             if (placement.wall) continue;
@@ -350,6 +375,21 @@ public final class ArenaRenderer implements Disposable {
             depths[sortCount - 1] = q.sortDepth;
             layers[sortCount - 1] = q.renderLayer;
         }
+        for (int i = 0; i < world.skills.orbiters.length; i++) {
+            SkillExpansion.OrbitBlade blade = world.skills.orbiters[i];
+            if (blade.active && visible(camera, blade.x, blade.y, 70f))
+                add(SENTINEL_BLADE, i, blade.x, blade.y);
+        }
+        for (int i = 0; i < world.skills.glaives.length; i++) {
+            SkillExpansion.Glaive glaive = world.skills.glaives[i];
+            if (glaive.active && visible(camera, glaive.x, glaive.y, 70f))
+                add(RETURNING_GLAIVE, i, glaive.x, glaive.y);
+        }
+        for (int i = 0; i < world.skills.relics.length; i++) {
+            SkillExpansion.WorldRelic relic = world.skills.relics[i];
+            if (relic.active && visible(camera, relic.x, relic.y, 65f))
+                add(WORLD_RELIC, i, relic.x, relic.y);
+        }
         for (int i = 0; i < world.enemies.length; i++) {
             ArenaWorld.Enemy enemy = world.enemies[i];
             if (!enemy.active) continue;
@@ -365,6 +405,12 @@ public final class ArenaRenderer implements Disposable {
         for (int i = 0; i < world.players.length; i++) {
             ArenaWorld.Player player = world.players[i];
             if (!player.active) continue;
+            if (player.alive) for (int ghost = 0; ghost < DodgeTrail.CAPACITY; ghost++) {
+                DodgeTrail.Snapshot snapshot = player.dodgeTrail.snapshots[ghost];
+                if (snapshot.ttl > 0 && visibleActor(camera, snapshot.x, snapshot.y,
+                    art.actor(ActorAnimation.actor(snapshot.hero)), 1f))
+                    add(DODGE_GHOST, i * DodgeTrail.CAPACITY + ghost, snapshot.x, snapshot.y);
+            }
             boolean body = visibleActor(camera, player.x, player.y,
                 art.actor(ActorAnimation.actor(player.hero)), 1f);
             boolean level = player.alive && world.levelUpFxAge < art.vfx.duration(VfxArt.Animation.LEVEL_UP)
@@ -392,12 +438,18 @@ public final class ArenaRenderer implements Disposable {
         batch.setColor(1f, 1f, 1f, .62f);
         for (int i = 0; i < sortCount; i++) {
             int index = indices[i]; float x, y, width;
-            if (types[i] == PAINTED_BORDER) continue;
+            if (types[i] == PAINTED_BORDER || types[i] == DODGE_GHOST
+                || types[i] == SENTINEL_BLADE || types[i] == RETURNING_GLAIVE || types[i] == WORLD_RELIC) continue;
             if (types[i] == PLAYER) {
                 ArenaWorld.Player player = world.players[index];
                 x = player.x; y = player.y; width = player.alive ? 62f : 72f;
             } else if (types[i] == ENEMY) {
                 x = world.enemies[index].x; y = world.enemies[index].y; width = 44f * enemyScale(world.enemies[index]);
+            } else if (types[i] == CHEST) {
+                ArenaWorld.Chest chest = world.chests[index];
+                batch.draw(art.shadow, screenX(chest.x, chest.y) - 24f,
+                    screenY(chest.x, chest.y) - 8f, 48f, 18f);
+                continue;
             } else {
                 ArenaLayout.Placement placement = layout.placements[index];
                 if (placement.shadowWidth > 0 && placement.shadowHeight > 0)
@@ -429,25 +481,27 @@ public final class ArenaRenderer implements Disposable {
         }
     }
 
-    private void drawDust(ArenaWorld world, OrthographicCamera camera) {
-        // A fixed world field: both panes see the same motes, and simulation pauses freeze them.
-        for (int i = 0; i < 48; i++) {
-            int hash = (i + 1) * 0x45d9f3b;
-            hash ^= hash >>> 16;
-            float x = -ArenaWorld.HALF_WIDTH + ((hash & 0xffff) / 65535f * ArenaWorld.HALF_WIDTH * 2f
-                + world.elapsed * 2f) % (ArenaWorld.HALF_WIDTH * 2f);
-            float y = -ArenaWorld.HALF_HEIGHT + (((hash >>> 16) & 0xffff) / 65535f * ArenaWorld.HALF_HEIGHT * 2f
-                + world.elapsed * .8f) % (ArenaWorld.HALF_HEIGHT * 2f);
-            float phase = ((i * .173f + world.elapsed * .045f) % 1f);
-            float height = 20f + phase * 120f;
-            float sx = screenX(x, y), sy = screenY(x, y) + height;
-            if (!visibleProjected(camera, sx, sy, 3f)) continue;
-            float alpha = .13f * Math.min(1f, Math.min(phase, 1f - phase) * 8f);
-            float size = (i & 1) == 0 ? 1f : 1.6f;
-            batch.setColor(.64f, .7f, .72f, alpha);
-            batch.draw(art.pixel, sx, sy, size, size);
+    private void drawChestLights(ArenaWorld world, OrthographicCamera camera) {
+        boolean lit = false;
+        for (ArenaWorld.Chest chest : world.chests) {
+            if (!chest.active || !visible(camera, chest.x, chest.y, 75f)) continue;
+            if (!lit) {
+                batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
+                lit = true;
+            }
+            chestVfx.groundLight(batch, screenX(chest.x, chest.y), screenY(chest.x, chest.y));
         }
-        batch.setColor(Color.WHITE);
+        if (!lit) return;
+        // Batch all reward lights together; restore ordinary blending before warnings/actors.
+        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        for (ArenaWorld.Chest chest : world.chests)
+            if (chest.active && visible(camera, chest.x, chest.y, 75f))
+                chestVfx.groundRim(batch, screenX(chest.x, chest.y), screenY(chest.x, chest.y));
+    }
+
+    private void drawDust(ArenaWorld world, OrthographicCamera camera) {
+        // Both cameras sample one fixed world field; combat pauses freeze all ambient motion.
+        ambience.draw(batch, art, camera, world.elapsed);
     }
 
     private void drawBolts(ArenaWorld world, OrthographicCamera camera) {
@@ -497,25 +551,26 @@ public final class ArenaRenderer implements Disposable {
         dx /= length; dy /= length;
         // The painted energy tail rotates with projected world velocity, never a screen-space target line.
         for (int ghost = 2; ghost >= 1; ghost--) {
+            float sampleAge = age - ghost * .025f;
+            if (sampleAge < 0) continue;
             batch.setColor(1f, 1f, 1f, ghost == 1 ? .2f : .09f);
-            art.projectiles.draw(batch, type, age - ghost * .025f,
-                x - dx * ghost * 9f, y - dy * ghost * 9f, scale, angle);
+            art.projectiles.draw(batch, type, sampleAge,
+                x - dx * ghost * 9f, y - dy * ghost * 9f,
+                scale * ProjectilePresentation.spawnScale(sampleAge), angle);
         }
         batch.setColor(Color.WHITE);
-        art.projectiles.draw(batch, type, age, x, y, scale, angle);
+        art.projectiles.draw(batch, type, age, x, y, scale * ProjectilePresentation.spawnScale(age), angle);
     }
 
     private void drawHazards(ArenaWorld world, OrthographicCamera camera, SpriteEffectArt.Layer layer) {
         for (ArenaWorld.Hazard hazard : world.hazards) {
             if (!hazard.active || !visible(camera, hazard.x, hazard.y, hazard.radius + 50f)) continue;
             if (hazard.warning > 0f) {
-                float progress = Math.max(0f, Math.min(1f, 1f - hazard.warning));
-                batch.setColor(Color.WHITE);
-                groundSprite(SpriteEffectArt.Type.WARNING, progress, hazard.x, hazard.y, hazard.radius, 0, layer);
+                drawWarningRune(.94f, hazard.x, hazard.y, hazard.radius);
             } else {
-                batch.setColor(Color.WHITE);
-                groundSprite(SpriteEffectArt.Type.GROUND_IMPACT, MathUtils.clamp(1f - hazard.ttl / .3f, 0, 1),
-                    hazard.x, hazard.y, hazard.radius, 0, layer);
+                float fade = MathUtils.clamp(hazard.ttl / .3f, 0, 1);
+                playerFootRing.draw(batch, screenX(hazard.x, hazard.y), screenY(hazard.x, hazard.y),
+                    hazard.radius, 1f, .63f, .38f, fade);
             }
         }
         batch.setColor(Color.WHITE);
@@ -528,53 +583,55 @@ public final class ArenaRenderer implements Disposable {
             if (enemy.attack == ArenaWorld.EnemyAttack.BRUTE_SLAM) {
                 if (!visible(camera, enemy.attackTargetX, enemy.attackTargetY, enemy.attackRadius + 80f)) continue;
                 if (age < ArenaWorld.BRUTE_WINDUP) {
-                    batch.setColor(Color.WHITE);
-                    groundSprite(SpriteEffectArt.Type.WARNING, age / ArenaWorld.BRUTE_WINDUP,
-                        enemy.attackTargetX, enemy.attackTargetY, enemy.attackRadius, 0, layer);
+                    drawWarningRune(.94f, enemy.attackTargetX, enemy.attackTargetY, enemy.attackRadius);
                 }
                 float strikeAge = age - ArenaWorld.BRUTE_WINDUP;
                 if (strikeAge >= 0 && strikeAge < .3f) {
-                    batch.setColor(Color.WHITE);
-                    groundSprite(SpriteEffectArt.Type.GROUND_IMPACT, strikeAge / .3f,
-                        enemy.attackTargetX, enemy.attackTargetY, 66f, 0, layer);
+                    playerFootRing.draw(batch, screenX(enemy.attackTargetX, enemy.attackTargetY),
+                        screenY(enemy.attackTargetX, enemy.attackTargetY), enemy.attackRadius,
+                        1f, .63f, .38f, 1f - strikeAge / .3f);
+                    enemyGroundVfx.bruteSmash(batch, enemy.attackTargetX, enemy.attackTargetY,
+                        enemy.attackRadius, strikeAge / .3f);
                 }
             } else if (enemy.attack == ArenaWorld.EnemyAttack.WRAITH_DASH
                 && age < ArenaWorld.WRAITH_WINDUP + ArenaWorld.WRAITH_DASH_SECONDS) {
-                // Three low, separate runes show the fixed lane without covering the tiles with a guide bar.
-                for (int rune = 1; rune <= 3; rune++) {
-                    float along = rune * .24f;
+                // Three compact arrows point along the fixed lane without becoming a guide bar.
+                float dx = enemy.attackTargetX - enemy.attackStartX;
+                float dy = enemy.attackTargetY - enemy.attackStartY;
+                float length = Math.max(.001f, (float) Math.sqrt(dx * dx + dy * dy));
+                dx /= length; dy /= length;
+                boolean released = age >= ArenaWorld.WRAITH_WINDUP;
+                float alpha = released ? .68f * (1f - (age - ArenaWorld.WRAITH_WINDUP)
+                    / ArenaWorld.WRAITH_DASH_SECONDS) : .96f;
+                for (int arrow = 1; arrow <= 3; arrow++) {
+                    float along = arrow * .24f;
                     float x = MathUtils.lerp(enemy.attackStartX, enemy.attackTargetX, along);
                     float y = MathUtils.lerp(enemy.attackStartY, enemy.attackTargetY, along);
                     if (!visible(camera, x, y, 40f)) continue;
-                    boolean windup = age < ArenaWorld.WRAITH_WINDUP;
-                    if (windup) drawWarningRune(world.elapsed + rune * .125f, x, y, 13f);
-                    else {
-                        batch.setColor(1f, .28f, .25f, .3f);
-                        drawAura(world.elapsed + rune * .125f, x, y, 13f, EnemyAttackArt.Layer.ALL);
-                    }
+                    enemyGroundVfx.arrow(batch, x, y, dx, dy, alpha, released);
                 }
             } else if (enemy.attack == ArenaWorld.EnemyAttack.CULTIST_CAST
                 && age >= ArenaWorld.CULTIST_WINDUP - .15f && age < ArenaWorld.CULTIST_WINDUP
                 && visible(camera, enemy.attackTargetX, enemy.attackTargetY, 50f)) {
-                drawWarningRune(world.elapsed, enemy.attackTargetX, enemy.attackTargetY, 18f);
+                drawWarningRune(.94f, enemy.attackTargetX, enemy.attackTargetY, 18f);
             }
         }
         batch.setColor(Color.WHITE);
     }
 
-    private void drawWarningRune(float age, float x, float y, float radius) {
-        batch.setColor(.04f, .025f, .015f, .92f);
-        drawAura(age, x, y, radius + 2f, EnemyAttackArt.Layer.ALL);
-        batch.setColor(1f, .94f, .65f, 1f);
-        drawAura(age, x, y, radius, EnemyAttackArt.Layer.ALL);
+    private void drawWarningRune(float alpha, float x, float y, float radius) {
+        playerFootRing.draw(batch, screenX(x, y), screenY(x, y), radius,
+            1f, .93f, .77f, alpha);
     }
 
-    /** Glowing double rings stay tight to the feet and independent of targeting/damage radii. */
+    /** One simple outline shares the primary attack's live acquisition radius. */
     private void drawPlayerAuras(ArenaWorld world, OrthographicCamera camera) {
         for (ArenaWorld.Player player : world.players) {
             if (!player.active || !player.alive) continue;
-            if (!visible(camera, player.x, player.y, PlayerFootRing.RADIUS)) continue;
-            playerFootRing.draw(batch, screenX(player.x, player.y), screenY(player.x, player.y), player.slot);
+            float radius = world.primaryAttackRange(player);
+            if (!visible(camera, player.x, player.y, radius + 3f, radius + 3f,
+                radius * .5f + 3f, radius * .5f + 3f)) continue;
+            playerFootRing.draw(batch, screenX(player.x, player.y), screenY(player.x, player.y), radius, player.slot);
         }
         batch.setColor(Color.WHITE);
     }
@@ -623,9 +680,9 @@ public final class ArenaRenderer implements Disposable {
                 batch.setColor(1f, .26f, .18f, .56f);
                 drawAura(enemy.animTime, enemy.x, enemy.y, Math.max(32f, enemy.radius + 12f), EnemyAttackArt.Layer.ALL);
             }
-            if (enemy.attack != ArenaWorld.EnemyAttack.NONE && enemy.windup > 0) {
-                batch.setColor(1f, .68f, .25f, .72f);
-                drawAura(enemy.attackAge, enemy.x, enemy.y, 29f * Math.min(1.4f, enemyScale(enemy)), EnemyAttackArt.Layer.ALL);
+            if (enemy.attack != ArenaWorld.EnemyAttack.NONE
+                && enemy.attack != ArenaWorld.EnemyAttack.WRAITH_DASH && enemy.windup > 0) {
+                drawWarningRune(.86f, enemy.x, enemy.y, 29f * Math.min(1.4f, enemyScale(enemy)));
             }
         }
         batch.setColor(Color.WHITE);
@@ -648,6 +705,18 @@ public final class ArenaRenderer implements Disposable {
             rankMarkers.draw(batch, screenX(enemy.x, enemy.y), top,
                 enemy.elite, enemy.health / Math.max(1f, enemy.maxHealth));
         }
+    }
+
+    private void drawDamageNumbers(ArenaWorld world, OrthographicCamera camera) {
+        for (DamageNumbers.Entry entry : world.damageNumbers.entries) {
+            if (entry.ttl <= 0) continue;
+            GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(entry.enemyKind));
+            float x = screenX(entry.x, entry.y) + entry.offsetX;
+            float y = screenY(entry.x, entry.y) + actor.maxAbove * entry.renderScale + entry.liftPadding + entry.rise();
+            if (entry.enemyKind == ArenaWorld.EnemyKind.BOSS) y += graveKingHover(world.elapsed);
+            if (visibleProjected(camera, x, y, 48f)) damageNumberArt.draw(batch, entry, x, y);
+        }
+        batch.setColor(Color.WHITE);
     }
 
     private void drawEffects(ArenaWorld world, OrthographicCamera camera) {
@@ -802,6 +871,28 @@ public final class ArenaRenderer implements Disposable {
                 paintedBorders.draw(batch, index);
             } else if (types[i] == PROP) {
                 drawEnvironment(world, camera, viewer, index);
+            } else if (types[i] == CHEST) {
+                ArenaWorld.Chest chest = world.chests[index];
+                float x = screenX(chest.x, chest.y), y = screenY(chest.x, chest.y);
+                chestVfx.wisps(batch, x, y, world.elapsed, index);
+                batch.setColor(Color.WHITE);
+                drawFrame(chestArt.frame(), chest.x, chest.y, chestScale);
+                chestVfx.glints(batch, x, y, world.elapsed, index);
+            } else if (types[i] == SENTINEL_BLADE) {
+                skillArt.orbiter(batch, world.skills.orbiters[index]);
+            } else if (types[i] == RETURNING_GLAIVE) {
+                skillArt.glaive(batch, world.skills.glaives[index]);
+            } else if (types[i] == WORLD_RELIC) {
+                skillArt.relic(batch, world.skills.relics[index]);
+            } else if (types[i] == DODGE_GHOST) {
+                int owner = index / DodgeTrail.CAPACITY;
+                DodgeTrail.Snapshot snapshot = world.players[owner].dodgeTrail.snapshots[index % DodgeTrail.CAPACITY];
+                GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(snapshot.hero));
+                int frame = actor.clip(snapshot.state, snapshot.facing).frame(snapshot.phase);
+                if (owner == 0) batch.setColor(1f, .9f, .75f, snapshot.alpha());
+                else batch.setColor(.65f, .95f, .95f, snapshot.alpha());
+                drawFrame(frame, snapshot.x, snapshot.y, actor.pixelScale);
+                batch.setColor(Color.WHITE);
             } else if (types[i] == ENEMY) {
                 ArenaWorld.Enemy enemy = world.enemies[index];
                 float scale = enemyScale(enemy);
@@ -858,18 +949,6 @@ public final class ArenaRenderer implements Disposable {
                     batch.setColor(Color.WHITE);
                     continue;
                 }
-                if (player.dodgeTime > 0f) {
-                    batch.setColor(index == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO);
-                    batch.draw(art.glow, sx - 47f, sy - 10f, 94f, 58f);
-                    for (int ghost = 2; ghost >= 1; ghost--) {
-                        float distance = ghost * 13f;
-                        if (index == 0) batch.setColor(1f, .82f, .58f, ghost == 1 ? .19f : .1f);
-                        else batch.setColor(.42f, .86f, .85f, ghost == 1 ? .19f : .1f);
-                        drawFrameOffset(frame, player.x, player.y, actor.pixelScale,
-                            -screenX(player.dodgeFacingX(), player.dodgeFacingY()) * distance,
-                            -screenY(player.dodgeFacingX(), player.dodgeFacingY()) * distance);
-                    }
-                }
                 drawLevelUp(world, player, VfxArt.Layer.BACK);
                 float alpha = player.invulnerable > 0f && ((int) (world.elapsed * 16f) & 1) == 0 ? .58f : 1f;
                 if (player.hurtTime > 0f) batch.setColor(1f, .57f, .44f, alpha);
@@ -881,6 +960,7 @@ public final class ArenaRenderer implements Disposable {
                     -screenY(player.attackFacingX, player.attackFacingY) * recoil);
                 drawLevelUp(world, player, VfxArt.Layer.FRONT);
                 drawMuzzle(player);
+                skillArt.ward(batch, player);
                 batch.setColor(Color.WHITE);
             }
         }
@@ -1010,12 +1090,15 @@ public final class ArenaRenderer implements Disposable {
         float x = screenX(player.x, player.y) + BOLT_ORIGIN[origin] * scale;
         float y = screenY(player.x, player.y) + BOLT_ORIGIN[origin + 1] * scale;
         float life = 1f - player.attackAge / .1f;
+        float emergence = ProjectilePresentation.spawnScale(player.attackAge);
         float dx = screenX(player.attackFacingX, player.attackFacingY), dy = screenY(player.attackFacingX, player.attackFacingY);
         float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
         batch.setColor(.48f, .88f, 1f, life * .65f);
-        batch.draw(art.glow, x - 18f, y - 18f, 36f, 36f);
+        float glowRadius = 18f * emergence;
+        batch.draw(art.glow, x - glowRadius, y - glowRadius, glowRadius * 2, glowRadius * 2);
         batch.setColor(1f, 1f, 1f, life * .85f);
-        art.projectiles.draw(batch, MagicProjectileArt.Type.RANGER, player.attackAge, x, y, .6f + life * .25f, angle);
+        art.projectiles.draw(batch, MagicProjectileArt.Type.RANGER, player.attackAge, x, y,
+            (.6f + life * .25f) * emergence, angle);
         batch.setColor(Color.WHITE);
     }
 

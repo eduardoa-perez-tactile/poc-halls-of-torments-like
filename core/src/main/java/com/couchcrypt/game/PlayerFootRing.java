@@ -5,73 +5,74 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
 
-/** Approved luminous double rings and short ticks, cached in the 2:1 ground plane. */
+/** Shared plain range/telegraph outline, projected onto the 2:1 ground plane. */
 final class PlayerFootRing {
-    static final float RADIUS = 38f; // Includes the narrow glow and outer tick ends, not a targeting radius.
-    private static final int SEGMENTS = 64, TICKS = 8;
-    private static final float[] RINGS = {26f, 32f};
-    private static final float[] EDGE = {-3f, -.9f, -.5f, .5f, .9f, 3f};
-    private static final float[] ALPHA = {0, .22f, 1, 1, .22f, 0};
-    private static final float[] TICK_RADII = {30.5f, 31.3f, 35.6f, 36.5f};
-    private static final float[] TICK_LENGTH_ALPHA = {0, 1, 1, 0};
-    private static final float[] TICK_WIDTH = {-2f, -.5f, .5f, 2f};
-    private static final float[] TICK_WIDTH_ALPHA = {0, 1, 1, 0};
-    private static final int QUADS = RINGS.length * SEGMENTS * (EDGE.length - 1) + TICKS * 9;
+    static final float STROKE_MARGIN = 1.3f;
+    private static final int SEGMENTS = 192;
+    // A 1.2-logical-unit core with small antialiasing fringes; no halo or filled centre.
+    private static final float[] EDGE = {-STROKE_MARGIN, -.6f, .6f, STROKE_MARGIN};
+    private static final float[] ALPHA = {0, 1f, 1f, 0};
     private final TextureRegion pixel;
-    private final float[] offsets = new float[QUADS * 8], vertices = new float[QUADS * 20];
-    private final float[] gold = new float[QUADS * 4], teal = new float[QUADS * 4];
+    // Unit ellipse positions and outward screen-space normals, calculated only at startup.
+    private final float[] unit = new float[SEGMENTS * 4];
+    private final float[] vertices = new float[SEGMENTS * (EDGE.length - 1) * 20];
+    private final float[] gold = new float[EDGE.length], teal = new float[EDGE.length];
+    private final float[] tint = new float[EDGE.length];
 
     PlayerFootRing(TextureRegion pixel) {
         this.pixel = pixel;
         float u = (pixel.getU() + pixel.getU2()) * .5f, v = (pixel.getV() + pixel.getV2()) * .5f;
-        int quad = 0;
-        for (float radius : RINGS) for (int band = 0; band < EDGE.length - 1; band++)
-            for (int segment = 0; segment < SEGMENTS; segment++, quad++) {
-                float a = MathUtils.PI2 * segment / SEGMENTS;
-                float b = MathUtils.PI2 * ((segment + 1) % SEGMENTS) / SEGMENTS;
-                radialPoint(quad * 4, a, radius + EDGE[band], ALPHA[band], u, v);
-                radialPoint(quad * 4 + 1, a, radius + EDGE[band + 1], ALPHA[band + 1], u, v);
-                radialPoint(quad * 4 + 2, b, radius + EDGE[band + 1], ALPHA[band + 1], u, v);
-                radialPoint(quad * 4 + 3, b, radius + EDGE[band], ALPHA[band], u, v);
-            }
-        for (int tick = 0; tick < TICKS; tick++) {
-            float angle = MathUtils.PI2 * tick / TICKS, c = MathUtils.cos(angle), s = MathUtils.sin(angle);
-            for (int length = 0; length < 3; length++) for (int width = 0; width < 3; width++, quad++) {
-                tickPoint(quad * 4, c, s, length, width, u, v);
-                tickPoint(quad * 4 + 1, c, s, length + 1, width, u, v);
-                tickPoint(quad * 4 + 2, c, s, length + 1, width + 1, u, v);
-                tickPoint(quad * 4 + 3, c, s, length, width + 1, u, v);
-            }
+        for (int segment = 0; segment < SEGMENTS; segment++) {
+            float angle = MathUtils.PI2 * segment / SEGMENTS;
+            float c = MathUtils.cos(angle), s = MathUtils.sin(angle);
+            float normalLength = (float) Math.sqrt(c * c + 4f * s * s);
+            int at = segment * 4;
+            unit[at] = c; unit[at + 1] = s * .5f;
+            unit[at + 2] = c / normalLength; unit[at + 3] = 2f * s / normalLength;
+        }
+        for (int edge = 0; edge < EDGE.length; edge++) {
+            gold[edge] = Color.toFloatBits(1f, .82f, .42f, ALPHA[edge] * .57f);
+            teal[edge] = Color.toFloatBits(.36f, .95f, .90f, ALPHA[edge] * .57f);
+        }
+        for (int at = 0; at < vertices.length; at += 5) {
+            // Ordinary UVs sample the resident white texel without an enemy palette marker.
+            vertices[at + 3] = u; vertices[at + 4] = v;
         }
     }
 
-    private void radialPoint(int vertex, float angle, float radius, float alpha, float u, float v) {
-        point(vertex, MathUtils.cos(angle) * radius, MathUtils.sin(angle) * radius, alpha, u, v);
+    void draw(SpriteBatch batch, float x, float y, float radius, int slot) {
+        draw(batch, x, y, radius, slot == 0 ? gold : teal);
     }
 
-    private void tickPoint(int vertex, float c, float s, int length, int width, float u, float v) {
-        float radius = TICK_RADII[length], tangent = TICK_WIDTH[width];
-        point(vertex, c * radius - s * tangent, s * radius + c * tangent,
-            TICK_LENGTH_ALPHA[length] * TICK_WIDTH_ALPHA[width], u, v);
+    /** Enemy warnings share the same cached geometry without borrowing player identity colours. */
+    void draw(SpriteBatch batch, float x, float y, float radius, float red, float green, float blue, float alpha) {
+        for (int edge = 0; edge < EDGE.length; edge++)
+            tint[edge] = Color.toFloatBits(red, green, blue, ALPHA[edge] * alpha);
+        draw(batch, x, y, radius, tint);
     }
 
-    private void point(int vertex, float x, float y, float alpha, float u, float v) {
-        offsets[vertex * 2] = x;
-        offsets[vertex * 2 + 1] = y * .5f;
-        gold[vertex] = Color.toFloatBits(1f, .70f + .20f * alpha, .20f + .35f * alpha, alpha);
-        teal[vertex] = Color.toFloatBits(.12f + .40f * alpha, .83f + .17f * alpha, .77f + .18f * alpha, alpha);
-        // Raw ordinary UVs sample the white texel directly; they carry no enemy palette marker.
-        vertices[vertex * 5 + 3] = u; vertices[vertex * 5 + 4] = v;
-    }
-
-    void draw(SpriteBatch batch, float x, float y, int slot) {
-        float[] colors = slot == 0 ? gold : teal;
-        for (int vertex = 0; vertex < colors.length; vertex++) {
-            int at = vertex * 5;
-            vertices[at] = x + offsets[vertex * 2];
-            vertices[at + 1] = y + offsets[vertex * 2 + 1];
-            vertices[at + 2] = colors[vertex];
+    private void draw(SpriteBatch batch, float x, float y, float radius, float[] colors) {
+        if (!Float.isFinite(radius) || radius <= 0) return;
+        // Small attack cues need fewer samples; their chord error remains below the AA fringe.
+        int segmentStep = radius <= 90f ? 4 : 1;
+        int vertex = 0;
+        for (int edge = 0; edge < EDGE.length - 1; edge++) {
+            for (int segment = 0; segment < SEGMENTS; segment += segmentStep) {
+                int next = (segment + segmentStep) % SEGMENTS;
+                point(vertex++, segment, edge, x, y, radius, colors);
+                point(vertex++, segment, edge + 1, x, y, radius, colors);
+                point(vertex++, next, edge + 1, x, y, radius, colors);
+                point(vertex++, next, edge, x, y, radius, colors);
+            }
         }
-        batch.draw(pixel.getTexture(), vertices, 0, vertices.length);
+        batch.draw(pixel.getTexture(), vertices, 0, vertex * 5);
+    }
+
+    private void point(int vertex, int segment, int edge, float x, float y, float radius, float[] colors) {
+        int at = vertex * 5, direction = segment * 4;
+        // Keep the stroke centred on the exact range while its thickness stays constant as range changes.
+        vertices[at] = x + unit[direction] * radius + unit[direction + 2] * EDGE[edge];
+        vertices[at + 1] = y + unit[direction + 1] * radius + unit[direction + 3] * EDGE[edge];
+        vertices[at + 2] = colors[edge];
     }
 }

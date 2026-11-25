@@ -22,6 +22,18 @@
   let axisX = 0, axisY = 0, dodgeEdge = false, stickPointer = null, dodgePointer = null, stickBounds;
   const keys = new Set();
 
+  function preventGameplayGesture(event) {
+    // Cover gaps and disabled controls too. Choice cards retain native scrolling/clicks.
+    if (document.body.classList.contains('playing') && !document.body.classList.contains('has-upgrade') && event.cancelable) {
+      event.preventDefault();
+    }
+  }
+  // Safari also exposes native pinch gestures; non-passive touch handlers cover
+  // browser gestures that start outside the captured joystick/Dodge pointers.
+  ['touchstart', 'touchmove', 'gesturestart', 'gesturechange', 'contextmenu'].forEach((name) => {
+    document.addEventListener(name, preventGameplayGesture, { passive: false });
+  });
+
   function canControl() { return joined && !upgradeOffer && phase === 'session' && hostActive && alive && foreground && !document.hidden && socket?.readyState === WebSocket.OPEN; }
   function sendInput() {
     if (socket?.readyState !== WebSocket.OPEN || !joined) return;
@@ -95,27 +107,36 @@
   const fallbackSkills = {
     power: [0, 'OFFENSE'], haste: [1, 'OFFENSE'], fleet: [2, 'MOBILITY'], vitality: [3, 'DEFENSE'],
     evasion: [4, 'MOBILITY'], sweep: [5, 'WEAPON'], multishot: [6, 'WEAPON'], pierce: [7, 'WEAPON'],
-    aura: [8, 'OFFENSE'], storm: [9, 'OFFENSE'], magnet: [10, 'UTILITY'], critical: [11, 'OFFENSE']
+    aura: [8, 'OFFENSE'], storm: [9, 'OFFENSE'], magnet: [10, 'UTILITY'], critical: [11, 'OFFENSE'],
+    ricochet: [12, 'WEAPON'], sentinel: [13, 'WEAPON'], consecration: [14, 'OFFENSE'], glaive: [15, 'WEAPON'],
+    ward: [16, 'DEFENSE'], frost: [17, 'OFFENSE'], projectile_speed: [18, 'WEAPON'], duration: [19, 'UTILITY'],
+    echo_storm: [20, 'OFFENSE'], binding_circle: [21, 'OFFENSE'], shatter_bolt: [22, 'WEAPON'], reaping_stroke: [23, 'WEAPON']
   };
   const categoryGlyphs = { WEAPON: '⚔︎', OFFENSE: '✦', DEFENSE: '✚', MOBILITY: '➶', UTILITY: '◎' };
   function paintSkillCard(button, option, equipment = false) {
     const fallback = fallbackSkills[option.id];
     const category = Object.hasOwn(categoryGlyphs, option.category) ? option.category : fallback?.[1] || 'OFFENSE';
-    const icon = Number.isInteger(option.icon) && option.icon >= 0 && option.icon < (equipment ? 48 : 12)
+    const icon = Number.isInteger(option.icon) && option.icon >= 0 && option.icon < (equipment ? 48 : 24)
       ? option.icon : equipment ? undefined : fallback?.[0];
     const illustrated = Number.isInteger(icon);
     button.dataset.category = category;
     button.querySelector('.skill-art').hidden = !illustrated;
     const illustration = button.querySelector('.skill-illustration');
     illustration.style.backgroundImage = equipment ? "url('/art/item-icons.png')" : '';
-    illustration.style.backgroundSize = equipment ? '800% 600%' : '';
+    const expansion = !equipment && icon >= 12;
+    const cell = equipment ? 128 : expansion ? 64 : 128;
+    const width = equipment ? 1024 : 512, height = equipment ? 768 : 512;
+    const index = expansion ? icon - 12 : icon, columns = equipment || expansion ? 8 : 4;
+    illustration.style.backgroundSize = `${width / cell * 100}% ${height / cell * 100}%`;
     if (illustrated) {
-      button.style.setProperty('--icon-x', `${icon % (equipment ? 8 : 4) / (equipment ? 7 : 3) * 100}%`);
-      button.style.setProperty('--icon-y', `${Math.floor(icon / (equipment ? 8 : 4)) / (equipment ? 5 : 2) * 100}%`);
+      const x = index % columns * cell, y = Math.floor(index / columns) * cell + (expansion ? 384 : 0);
+      button.style.setProperty('--icon-x', `${x / (width - cell) * 100}%`);
+      button.style.setProperty('--icon-y', `${y / (height - cell) * 100}%`);
     }
     button.querySelector('.skill-category').textContent = `${categoryGlyphs[category]} ${category}`;
     button.querySelector('.skill-rank').textContent = equipment && typeof option.slot === 'string'
-      ? option.slot.replaceAll('_', ' ') : Number.isSafeInteger(option.rank) && option.rank > 0 ? `RANK ${option.rank}` : '';
+      ? option.slot.replaceAll('_', ' ') : ['echo_storm', 'binding_circle', 'shatter_bolt', 'reaping_stroke'].includes(option.id)
+        ? 'EVOLUTION' : Number.isSafeInteger(option.rank) && option.rank > 0 ? `RANK ${option.rank}` : '';
     button.querySelector('.skill-title').textContent = option.title.slice(0, 64);
     const hasPreview = typeof option.headline === 'string' && typeof option.before === 'string' && typeof option.after === 'string';
     button.classList.toggle('legacy', !hasPreview);

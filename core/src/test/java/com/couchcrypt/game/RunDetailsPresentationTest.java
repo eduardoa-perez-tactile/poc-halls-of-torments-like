@@ -51,10 +51,35 @@ class RunDetailsPresentationTest {
         for (var upgrade : PartyProgression.Upgrade.values())
             if (world.progression.rank(0, upgrade) > 0) eligible++;
         assertTrue(eligible > 4, "The completed run must exercise the old compact-build cutoff");
-        assertEquals(3, RunDetailsView.pageCount(world, false));
+        int largestBuild = Math.max(skillCount(world, 0), skillCount(world, 1));
+        assertEquals((largestBuild + 3) / 4, RunDetailsView.pageCount(world, false));
         assertEquals(2, RunDetailsView.pageCount(world, true));
         world.deactivatePlayer(0);
-        assertEquals(3, RunDetailsView.pageCount(world, false), "The remaining Ranger retains every acquired skill page");
+        assertEquals((skillCount(world, 1) + 3) / 4, RunDetailsView.pageCount(world, false),
+            "The remaining Ranger retains every acquired skill page");
+    }
+
+    private static int skillCount(ArenaWorld world, int slot) {
+        int count = 0;
+        for (var upgrade : PartyProgression.Upgrade.values()) if (world.progression.rank(slot, upgrade) > 0) count++;
+        return count;
+    }
+
+    @Test void expansionDetailsReportActualStatsAndEvolutionBehaviours() {
+        ArenaWorld world = new ArenaWorld(); world.activatePlayer(0);
+        var player = world.players[0];
+        player.sentinelLevel = player.consecrationLevel = player.glaiveLevel = 3;
+        player.frostLevel = player.projectileSpeedLevel = player.durationLevel = 3;
+        player.wardLevel = 3; player.ricochetLevel = 3;
+        assertTrue(RunDetailsView.skillEffect(world, player, PartyProgression.Upgrade.SENTINEL).startsWith("4 blades; 20.0 damage"));
+        assertTrue(RunDetailsView.skillEffect(world, player, PartyProgression.Upgrade.CONSECRATION).contains("5.8s seals; cast / 1.3s; max 3"));
+        assertTrue(RunDetailsView.skillEffect(world, player, PartyProgression.Upgrade.WARD).contains("12.0s recharge"));
+        assertTrue(RunDetailsView.skillEffect(world, player, PartyProgression.Upgrade.PROJECTILE_SPEED).startsWith("+30%"));
+        assertTrue(RunDetailsView.skillEffect(world, player, PartyProgression.Upgrade.DURATION).startsWith("+45%"));
+        for (var upgrade : PartyProgression.Upgrade.values()) {
+            String description = RunDetailsView.skillEffect(world, player, upgrade);
+            assertFalse(description.isBlank()); assertFalse(description.contains("NaN"));
+        }
     }
 
     private static void equip(ArenaWorld world, String id, int position) {

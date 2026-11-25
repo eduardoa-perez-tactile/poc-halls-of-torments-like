@@ -16,7 +16,18 @@ import java.util.function.Consumer;
 
 /** Informational hero reference, laid out once using existing shared art and skill icons. */
 public final class CharacterInfoView {
+    private static final int SKILLS_PER_PAGE = 8;
     private CharacterInfoView() {}
+
+    public static int pageCount(ArenaWorld.Hero hero) {
+        return Math.max(1, (HeroCatalog.profile(hero).skills().size() + SKILLS_PER_PAGE - 1) / SKILLS_PER_PAGE);
+    }
+
+    public static java.util.List<PartyProgression.Upgrade> pageSkills(ArenaWorld.Hero hero, int page) {
+        var skills = HeroCatalog.profile(hero).skills();
+        int first = Math.max(0, Math.min(page, pageCount(hero) - 1)) * SKILLS_PER_PAGE;
+        return skills.subList(first, Math.min(skills.size(), first + SKILLS_PER_PAGE));
+    }
 
     public static Table create(UiArt art, ArenaWorld.Hero hero, TextureRegion[] skillIcons,
         Runnable back, Consumer<RemoteButton> register) {
@@ -28,13 +39,40 @@ public final class CharacterInfoView {
         Table body = new Table();
         body.add(identity(art, profile, accent)).width(490).top();
         body.add(rule(art, accent)).width(1).height(710).padLeft(38).padRight(38);
-        body.add(skills(art, profile, skillIcons)).width(1220).top();
+        Table skillColumn = new Table(); skillColumn.top().left();
+        skillColumn.add(art.label("AVAILABLE SKILLS", art.section, UiArt.IVORY)).left().padBottom(8).row();
+        skillColumn.add(art.label("Earn shared XP. Choose your own upgrades on your phone.", art.small, UiArt.MUTED))
+            .left().padBottom(24).row();
+        Table roster = new Table(); roster.top().left();
+        populateSkills(roster, art, profile, skillIcons, 0);
+        skillColumn.add(roster).width(1220).height(540).top().left();
+        body.add(skillColumn).width(1220).top();
         root.add(body).expandY().center().row();
 
         RemoteButton backButton = new RemoteButton(art, back, false);
         backButton.add(art.label("BACK TO HEROES", art.section, UiArt.BUTTON_INK));
         register.accept(backButton);
-        root.add(backButton).width(480).height(78).padTop(18);
+        Table footer = new Table();
+        int pages = pageCount(hero);
+        if (pages > 1) {
+            int[] page = {0};
+            Label pageLabel = art.label("1 / " + pages, art.body, UiArt.IVORY);
+            Runnable refresh = () -> {
+                populateSkills(roster, art, profile, skillIcons, page[0]);
+                pageLabel.setText((page[0] + 1) + " / " + pages);
+            };
+            RemoteButton previous = new RemoteButton(art, () -> { page[0] = (page[0] + pages - 1) % pages; refresh.run(); }, false);
+            previous.add(art.label("PREVIOUS", art.section, UiArt.BUTTON_INK));
+            RemoteButton next = new RemoteButton(art, () -> { page[0] = (page[0] + 1) % pages; refresh.run(); }, false);
+            next.add(art.label("NEXT", art.section, UiArt.BUTTON_INK));
+            // Register the fixed controls once; paging never leaves hidden controls in host navigation.
+            register.accept(previous); register.accept(next);
+            footer.add(previous).width(290).height(78).padRight(20);
+            footer.add(pageLabel).width(100).padRight(20);
+            footer.add(next).width(290).height(78).padRight(40);
+        }
+        footer.add(backButton).width(480).height(78);
+        root.add(footer).padTop(18);
         return root;
     }
 
@@ -81,26 +119,20 @@ public final class CharacterInfoView {
         return stat;
     }
 
-    private static Table skills(UiArt art, HeroCatalog.Profile profile, TextureRegion[] icons) {
-        Table column = new Table(); column.top().left();
-        column.add(art.label("AVAILABLE SKILLS", art.section, UiArt.IVORY)).left().padBottom(8).row();
-        column.add(art.label("Earn shared XP. Choose your own upgrades on your phone.", art.small, UiArt.MUTED))
-            .left().padBottom(24).row();
-        Table roster = new Table(); roster.top().left();
-        int rows = (profile.skills().size() + 1) / 2;
-        // Read down each column so the catalog stays in its canonical order.
-        for (int row = 0; row < rows; row++) {
+    private static void populateSkills(Table roster, UiArt art, HeroCatalog.Profile profile, TextureRegion[] icons, int page) {
+        roster.clearChildren();
+        var skills = pageSkills(profile.hero(), page);
+        // Four entries down each column, preserving canonical order across pages.
+        for (int row = 0; row < 4; row++) {
             for (int col = 0; col < 2; col++) {
-                int index = col * rows + row;
-                if (index < profile.skills().size())
-                    roster.add(skill(art, profile.skills().get(index), icons)).width(590).height(102).top();
-                else roster.add().width(590).height(102);
+                int index = col * 4 + row;
+                if (index < skills.size())
+                    roster.add(skill(art, skills.get(index), icons)).width(590).height(130).top();
+                else roster.add().width(590).height(130);
                 if (col == 0) roster.add().width(40);
             }
             roster.row();
         }
-        column.add(roster).left();
-        return column;
     }
 
     private static Table skill(UiArt art, PartyProgression.Upgrade upgrade, TextureRegion[] icons) {
@@ -111,7 +143,7 @@ public final class CharacterInfoView {
             entry.add(image).size(62).top().padRight(16);
         }
         Table copy = new Table(); copy.top().left();
-        copy.add(art.label(upgrade.title, art.body, UiArt.IVORY)).left().padBottom(6).row();
+        copy.add(art.label(upgrade.title + (upgrade.evolution() ? " / EVOLUTION" : ""), art.body, UiArt.IVORY)).left().padBottom(6).row();
         copy.add(wrapped(art, upgrade.description, art.small, UiArt.MUTED)).width(512).left();
         entry.add(copy).width(512).top().left();
         return entry;

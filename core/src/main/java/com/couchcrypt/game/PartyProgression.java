@@ -26,7 +26,19 @@ public final class PartyProgression {
         AURA("aura", "Soul Circle", "Unlock or strengthen a nearby damage aura."),
         STORM("storm", "Chain Storm", "Unlock or strengthen automatic chain strikes."),
         MAGNET("magnet", "Soul Draw", "Pickup attraction +30% of base."),
-        CRITICAL("critical", "Critical Edge", "Critical hit chance +10 percentage points.");
+        CRITICAL("critical", "Critical Edge", "Critical hit chance +10 percentage points."),
+        RICOCHET("ricochet", "Ricochet Bolt", "Redirect spent bolts toward new targets with reduced damage."),
+        SENTINEL("sentinel", "Sentinel Blades", "Orbiting blades strike nearby enemies on contact."),
+        CONSECRATION("consecration", "Consecrated Ground", "Automatically place short-lived damaging seals beneath enemies."),
+        GLAIVE("glaive", "Returning Glaive", "Throw a returning blade that hits once on each leg."),
+        WARD("ward", "Soul Ward", "Absorb one damaging hit, then recharge the protective ward."),
+        FROST("frost", "Frostbound Strikes", "Primary attacks briefly slow enemies; elites and bosses resist."),
+        PROJECTILE_SPEED("projectile_speed", "Swift Projectiles", "Projectile travel speed +10% of base; travel limits stay unchanged."),
+        DURATION("duration", "Lingering Power", "Friendly ground fields and slows last 15% longer per rank."),
+        ECHO_STORM("echo_storm", "Echo Storm", "Requires Chain Storm III. Strikes echo at their impact locations."),
+        BINDING_CIRCLE("binding_circle", "Binding Circle", "Requires Soul Circle III. Pulses briefly slow nearby enemies."),
+        SHATTER_BOLT("shatter_bolt", "Shatter Bolt", "Requires 3 bolt pierces. Final bolt impacts release a compact burst."),
+        REAPING_STROKE("reaping_stroke", "Reaping Stroke", "Requires maximum Wide Sweep. Sword attacks gain a weaker follow-up.");
 
         public final String id, title, description;
         Upgrade(String id, String title, String description) {
@@ -36,10 +48,14 @@ public final class PartyProgression {
         /** Class eligibility is independent of the current run's upgrade caps. */
         public boolean supports(ArenaWorld.Hero hero) {
             return switch (this) {
-                case SWEEP -> hero == ArenaWorld.Hero.WARDEN;
-                case MULTISHOT, PIERCE -> hero == ArenaWorld.Hero.RANGER;
+                case SWEEP, SENTINEL, REAPING_STROKE -> hero == ArenaWorld.Hero.WARDEN;
+                case MULTISHOT, PIERCE, RICOCHET, SHATTER_BOLT -> hero == ArenaWorld.Hero.RANGER;
                 default -> true;
             };
+        }
+
+        public boolean evolution() {
+            return this == ECHO_STORM || this == BINDING_CIRCLE || this == SHATTER_BOLT || this == REAPING_STROKE;
         }
     }
 
@@ -58,16 +74,16 @@ public final class PartyProgression {
 
     private static final Upgrade[] UPGRADES = Upgrade.values();
     private static final Upgrade[] WARDEN_FOUNDATION = {
-        Upgrade.POWER, Upgrade.SWEEP, Upgrade.VITALITY, Upgrade.AURA, Upgrade.HASTE, Upgrade.STORM,
-        Upgrade.POWER, Upgrade.FLEET, Upgrade.SWEEP, Upgrade.VITALITY, Upgrade.HASTE, Upgrade.AURA,
-        Upgrade.EVASION, Upgrade.CRITICAL, Upgrade.POWER, Upgrade.MAGNET,
-        Upgrade.SWEEP, Upgrade.AURA, Upgrade.STORM
+        Upgrade.POWER, Upgrade.SWEEP, Upgrade.SENTINEL, Upgrade.AURA, Upgrade.HASTE,
+        Upgrade.CONSECRATION, Upgrade.GLAIVE, Upgrade.VITALITY, Upgrade.WARD, Upgrade.FROST,
+        Upgrade.SWEEP, Upgrade.SWEEP, Upgrade.SWEEP, Upgrade.REAPING_STROKE,
+        Upgrade.AURA, Upgrade.AURA, Upgrade.BINDING_CIRCLE, Upgrade.STORM, Upgrade.DURATION
     };
     private static final Upgrade[] RANGER_FOUNDATION = {
-        Upgrade.POWER, Upgrade.MULTISHOT, Upgrade.VITALITY, Upgrade.AURA, Upgrade.HASTE, Upgrade.STORM,
-        Upgrade.POWER, Upgrade.FLEET, Upgrade.PIERCE, Upgrade.VITALITY, Upgrade.HASTE, Upgrade.AURA,
-        Upgrade.EVASION, Upgrade.CRITICAL, Upgrade.POWER, Upgrade.MAGNET,
-        Upgrade.MULTISHOT, Upgrade.AURA, Upgrade.STORM
+        Upgrade.POWER, Upgrade.MULTISHOT, Upgrade.RICOCHET, Upgrade.AURA, Upgrade.HASTE,
+        Upgrade.CONSECRATION, Upgrade.GLAIVE, Upgrade.VITALITY, Upgrade.WARD, Upgrade.FROST,
+        Upgrade.PIERCE, Upgrade.PIERCE, Upgrade.PIERCE, Upgrade.SHATTER_BOLT,
+        Upgrade.AURA, Upgrade.AURA, Upgrade.BINDING_CIRCLE, Upgrade.STORM, Upgrade.PROJECTILE_SPEED
     };
     private final ArenaWorld world;
     private final boolean[] participants = new boolean[2];
@@ -76,6 +92,7 @@ public final class PartyProgression {
     private final String[] foundations = {"", ""};
     private final List<List<FoundationSkill>> foundationSkills = Arrays.asList(List.of(), List.of());
     private final int[][] ranks = { new int[UPGRADES.length], new int[UPGRADES.length] };
+    private final int[][] evolutionLastShown = { new int[UPGRADES.length], new int[UPGRADES.length] };
     private int nextOfferId;
     private float choiceSecondsLeft;
     private boolean resolvingTimeout;
@@ -273,24 +290,65 @@ public final class PartyProgression {
         ArenaWorld.Player player = world.players[slot];
         Offer offer = offers[slot];
         int count = 0;
-        Upgrade recommended = player.health < world.equipment.maxHealth(player) * .6f && available(player, Upgrade.VITALITY)
-            ? Upgrade.VITALITY : available(player, Upgrade.POWER) ? Upgrade.POWER : Upgrade.HASTE;
-        if (available(player, recommended)) offer.options[count++] = recommended;
-        // Secondary attacks appear early; weapon-specific cards make the very first choice tangible.
-        Upgrade featured = offer.level == 3 ? Upgrade.AURA : offer.level == 4 ? Upgrade.STORM
-            : player.hero == ArenaWorld.Hero.WARDEN ? Upgrade.SWEEP
-            : (offer.level & 1) == 0 ? Upgrade.MULTISHOT : Upgrade.PIERCE;
-        if (available(player, featured) && !contains(offer, count, featured)) offer.options[count++] = featured;
-        int seed = world.runSeed ^ offer.level * 0x45d9f3b ^ slot * 0x27d4eb2d;
-        seed ^= seed >>> 16; seed *= 0x45d9f3b; seed ^= seed >>> 16;
-        int first = Math.floorMod(seed, UPGRADES.length);
-        for (int i = 0; i < UPGRADES.length && count < offer.options.length; i++) {
-            Upgrade candidate = UPGRADES[(first + i) % UPGRADES.length];
-            if (available(player, candidate) && !contains(offer, count, candidate)) offer.options[count++] = candidate;
+        // Protect an evolution slot, rotating skipped eligible evolutions so one cannot hide the others.
+        Upgrade evolution = null;
+        for (Upgrade candidate : UPGRADES)
+            if (candidate.evolution() && available(player, candidate)
+                && (evolution == null || evolutionLastShown[slot][candidate.ordinal()]
+                    < evolutionLastShown[slot][evolution.ordinal()])) evolution = candidate;
+        if (evolution != null) offer.options[count++] = evolution;
+        boolean injured = player.health < world.equipment.maxHealth(player) * .6f;
+        Upgrade recommended = injured ? Upgrade.VITALITY : offer.level <= 4 ? Upgrade.POWER : null;
+        if (recommended != null && available(player, recommended) && !contains(offer, count, recommended))
+            offer.options[count++] = recommended;
+        Upgrade featured = switch (offer.level) {
+            case 2 -> player.hero == ArenaWorld.Hero.WARDEN ? Upgrade.SWEEP : Upgrade.MULTISHOT;
+            case 3 -> Upgrade.AURA;
+            case 4 -> Upgrade.STORM;
+            case 5 -> player.hero == ArenaWorld.Hero.WARDEN ? Upgrade.SENTINEL : Upgrade.RICOCHET;
+            case 6 -> Upgrade.CONSECRATION;
+            case 7 -> Upgrade.GLAIVE;
+            case 8 -> Upgrade.WARD;
+            case 9 -> Upgrade.FROST;
+            default -> null;
+        };
+        if (featured != null && count < offer.options.length && available(player, featured)
+            && !contains(offer, count, featured)) offer.options[count++] = featured;
+        int seed = mix(world.runSeed ^ offer.level * 0x45d9f3b ^ slot * 0x27d4eb2d);
+        while (count < offer.options.length) {
+            int totalWeight = 0;
+            for (Upgrade candidate : UPGRADES)
+                if (available(player, candidate) && !contains(offer, count, candidate))
+                    totalWeight += offerWeight(slot, candidate, offer.level);
+            if (totalWeight == 0) break;
+            seed = mix(seed + 0x6d2b79f5);
+            int ticket = Math.floorMod(seed, totalWeight);
+            for (Upgrade candidate : UPGRADES) {
+                if (!available(player, candidate) || contains(offer, count, candidate)) continue;
+                ticket -= offerWeight(slot, candidate, offer.level);
+                if (ticket < 0) { offer.options[count++] = candidate; break; }
+            }
         }
         boolean complete = count == offer.options.length;
-        for (int i = 0; i < offer.cards.length; i++) offer.cards[i] = complete ? preview(slot, offer.options[i]) : null;
+        for (int i = 0; i < offer.cards.length; i++) {
+            offer.cards[i] = complete ? preview(slot, offer.options[i]) : null;
+            if (complete && offer.options[i].evolution()) evolutionLastShown[slot][offer.options[i].ordinal()] = offer.level;
+        }
         return complete;
+    }
+
+    private int offerWeight(int slot, Upgrade candidate, int offeredLevel) {
+        int rank = rank(slot, candidate);
+        // Discovery stays available; later choices increasingly support abilities already selected.
+        if (candidate.evolution()) return 12;
+        if (rank > 0) return offeredLevel <= 5 ? 3 : 10;
+        if (candidate.ordinal() >= Upgrade.RICOCHET.ordinal()) return offeredLevel <= 9 ? 7 : 3;
+        return 4;
+    }
+
+    private static int mix(int value) {
+        value ^= value >>> 16; value *= 0x45d9f3b; value ^= value >>> 16;
+        return value;
     }
 
     /** Uses the same caps as apply(), without mutating simulation or depending on the phone. */
@@ -381,9 +439,97 @@ public final class PartyProgression {
                 headline = "+" + number(next - current) + " PTS CRIT CHANCE";
                 before = number(current) + "% CRIT"; after = number(next) + "% CRIT";
             }
+            case RICOCHET -> {
+                category = "WEAPON";
+                headline = player.ricochetLevel == 0 ? "UNLOCK RICOCHETING BOLTS" : "+1 BOLT REDIRECT";
+                before = player.ricochetLevel == 0 ? "NONE" : player.ricochetLevel + " REDIRECTS / 75% EACH BOUNCE";
+                after = Math.min(3, player.ricochetLevel + 1) + " REDIRECTS / 75% EACH BOUNCE";
+            }
+            case SENTINEL -> {
+                category = "WEAPON";
+                headline = player.sentinelLevel == 0 ? "UNLOCK ORBITING BLADES" : "+1 BLADE / +4 BASE CONTACT DAMAGE";
+                before = player.sentinelLevel == 0 ? "NONE" : sentinelValues(player, player.sentinelLevel);
+                after = sentinelValues(player, Math.min(3, player.sentinelLevel + 1));
+            }
+            case CONSECRATION -> {
+                category = "OFFENSE";
+                headline = player.consecrationLevel == 0 ? "UNLOCK DAMAGING GROUND SEALS" : "+1 SEAL / FASTER, STRONGER CASTS";
+                before = player.consecrationLevel == 0 ? "NONE" : fieldValues(player, player.consecrationLevel);
+                after = fieldValues(player, Math.min(3, player.consecrationLevel + 1));
+            }
+            case GLAIVE -> {
+                category = "WEAPON";
+                headline = player.glaiveLevel == 0 ? "UNLOCK A RETURNING BLADE" : "+6 BASE DAMAGE / +40 REACH";
+                before = player.glaiveLevel == 0 ? "NONE" : glaiveValues(player, player.glaiveLevel);
+                after = glaiveValues(player, Math.min(3, player.glaiveLevel + 1));
+            }
+            case WARD -> {
+                category = "DEFENSE";
+                headline = player.wardLevel == 0 ? "UNLOCK ONE-HIT PROTECTIVE WARD" : "WARD RECHARGE -3s";
+                before = player.wardLevel == 0 ? "NONE" : "1 HIT / " + number(SkillExpansion.wardCooldown(player.wardLevel)) + "s RECHARGE";
+                after = "1 HIT / " + number(SkillExpansion.wardCooldown(Math.min(3, player.wardLevel + 1))) + "s RECHARGE";
+            }
+            case FROST -> {
+                category = "OFFENSE";
+                headline = player.frostLevel == 0 ? "PRIMARY HITS SLOW ENEMIES" : "+5 PTS SLOW / +0.25s BASE DURATION";
+                before = player.frostLevel == 0 ? "NONE" : frostValues(player, player.frostLevel);
+                after = frostValues(player, Math.min(3, player.frostLevel + 1));
+            }
+            case PROJECTILE_SPEED -> {
+                category = "WEAPON"; current = SkillExpansion.projectileSpeed(player) * 100;
+                next = (1 + .1f * Math.min(3, player.projectileSpeedLevel + 1)) * 100;
+                headline = "+10% BASE PROJECTILE SPEED";
+                before = number(current) + "% SPEED / SAME TRAVEL LIMIT";
+                after = number(next) + "% SPEED / SAME TRAVEL LIMIT";
+            }
+            case DURATION -> {
+                category = "UTILITY"; current = SkillExpansion.duration(player) * 100;
+                next = (1 + .15f * Math.min(3, player.durationLevel + 1)) * 100;
+                headline = "+15% BASE FIELD / SLOW DURATION";
+                before = number(current) + "% DURATION / FIELDS AND SLOWS";
+                after = number(next) + "% DURATION / FIELDS AND SLOWS";
+            }
+            case ECHO_STORM -> {
+                category = "OFFENSE"; headline = "EVOLVE CHAIN STORM III";
+                before = "SINGLE STRIKE PER CHAIN TARGET";
+                after = "45% ECHO / 0.3s DELAY / 42 AREA";
+            }
+            case BINDING_CIRCLE -> {
+                category = "OFFENSE"; headline = "EVOLVE SOUL CIRCLE III";
+                before = "DAMAGE PULSES";
+                after = "20% SLOW / " + number(Math.min(4, 1.1f * SkillExpansion.duration(player))) + "s / BOSS-RESISTED";
+            }
+            case SHATTER_BOLT -> {
+                category = "WEAPON"; headline = "EVOLVE 3 BOLT PIERCES";
+                before = "PIERCING BOLTS";
+                after = "FINAL HIT: 45% BURST / 65 AREA";
+            }
+            case REAPING_STROKE -> {
+                category = "WEAPON"; headline = "EVOLVE MAXIMUM WIDE SWEEP";
+                before = "ONE SWORD STRIKE";
+                after = "40% FOLLOW-UP / 0.18s DELAY";
+            }
             default -> throw new IllegalStateException("Unknown upgrade " + upgrade);
         }
         return new CardPreview(upgrade.ordinal(), rank(slot, upgrade) + 1, category, headline, before, after);
+    }
+
+    private String sentinelValues(ArenaWorld.Player player, int rank) {
+        return SkillExpansion.sentinelCount(rank) + " BLADES / "
+            + number(SkillExpansion.sentinelDamage(rank) * world.equipment.baseDamageMultiplier(player, player.damageMultiplier)) + " DMG / 0.6s";
+    }
+    private String fieldValues(ArenaWorld.Player player, int rank) {
+        return number(SkillExpansion.fieldDamage(rank) * world.equipment.baseDamageMultiplier(player, player.damageMultiplier)) + " DMG / 0.5s / "
+            + number(Math.min(8, SkillExpansion.fieldDuration(rank) * SkillExpansion.duration(player))) + "s / "
+            + SkillExpansion.fieldCount(rank) + " SEALS";
+    }
+    private String glaiveValues(ArenaWorld.Player player, int rank) {
+        return number(SkillExpansion.glaiveDamage(rank) * world.equipment.baseDamageMultiplier(player, player.damageMultiplier)) + " DMG / "
+            + number(SkillExpansion.glaiveRange(rank)) + " REACH / 3.2s";
+    }
+    private static String frostValues(ArenaWorld.Player player, int rank) {
+        return number(SkillExpansion.frostAmount(rank) * 100) + "% SLOW / "
+            + number(Math.min(4, SkillExpansion.frostDuration(rank) * SkillExpansion.duration(player))) + "s / RESISTED BY BOSSES";
     }
 
     private static String auraValues(float damage, int level) {
@@ -411,7 +557,9 @@ public final class PartyProgression {
     }
 
     private void clearRanks(int slot) {
-        for (int i = 0; i < ranks[slot].length; i++) ranks[slot][i] = 0;
+        for (int i = 0; i < ranks[slot].length; i++) {
+            ranks[slot][i] = 0; evolutionLastShown[slot][i] = 0;
+        }
     }
 
     private boolean available(ArenaWorld.Player player, Upgrade upgrade) {
@@ -429,6 +577,20 @@ public final class PartyProgression {
             case STORM -> player.stormLevel < 3;
             case MAGNET -> player.pickupMultiplier < 2.5f - .00001f;
             case CRITICAL -> player.critChance < .5f - .00001f && world.equipment.critChance(player) < .75f - .00001f;
+            case RICOCHET -> player.ricochetLevel < 3;
+            case SENTINEL -> player.sentinelLevel < 3;
+            case CONSECRATION -> player.consecrationLevel < 3;
+            case GLAIVE -> player.glaiveLevel < 3;
+            case WARD -> player.wardLevel < 3;
+            case FROST -> player.frostLevel < 3;
+            case PROJECTILE_SPEED -> player.projectileSpeedLevel < 3
+                && (player.hero == ArenaWorld.Hero.RANGER || player.glaiveLevel > 0);
+            case DURATION -> player.durationLevel < 3
+                && (player.consecrationLevel > 0 || player.frostLevel > 0 || player.bindingCircle);
+            case ECHO_STORM -> player.stormLevel >= 3 && !player.echoStorm;
+            case BINDING_CIRCLE -> player.auraLevel >= 3 && !player.bindingCircle;
+            case SHATTER_BOLT -> world.equipment.pierce(player) >= 3 && !player.shatterBolt;
+            case REAPING_STROKE -> player.cleaveMultiplier >= 1.8f - .00001f && !player.reapingStroke;
         };
     }
 
@@ -457,6 +619,18 @@ public final class PartyProgression {
             case STORM -> player.stormLevel = Math.min(3, player.stormLevel + 1);
             case MAGNET -> player.pickupMultiplier = Math.min(2.5f, player.pickupMultiplier + .3f);
             case CRITICAL -> player.critChance = Math.min(.5f, player.critChance + .1f);
+            case RICOCHET -> player.ricochetLevel = Math.min(3, player.ricochetLevel + 1);
+            case SENTINEL -> player.sentinelLevel = Math.min(3, player.sentinelLevel + 1);
+            case CONSECRATION -> player.consecrationLevel = Math.min(3, player.consecrationLevel + 1);
+            case GLAIVE -> player.glaiveLevel = Math.min(3, player.glaiveLevel + 1);
+            case WARD -> player.wardLevel = Math.min(3, player.wardLevel + 1);
+            case FROST -> player.frostLevel = Math.min(3, player.frostLevel + 1);
+            case PROJECTILE_SPEED -> player.projectileSpeedLevel = Math.min(3, player.projectileSpeedLevel + 1);
+            case DURATION -> player.durationLevel = Math.min(3, player.durationLevel + 1);
+            case ECHO_STORM -> player.echoStorm = true;
+            case BINDING_CIRCLE -> player.bindingCircle = true;
+            case SHATTER_BOLT -> player.shatterBolt = true;
+            case REAPING_STROKE -> player.reapingStroke = true;
         }
     }
 

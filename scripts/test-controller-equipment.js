@@ -10,6 +10,7 @@ class Element {
   constructor() {
     this.hidden = false; this.disabled = false; this.textContent = ''; this.dataset = {};
     this.listeners = new Map(); this.children = new Map(); this.attributes = new Map();
+    this.capturedPointers = new Set();
     const classes = new Set();
     this.classList = {
       add: (...names) => names.forEach((name) => classes.add(name)),
@@ -29,8 +30,10 @@ class Element {
     return this.children.get(selector);
   }
   setAttribute(name, value) { this.attributes.set(name, value); }
-  setPointerCapture() {}
-  hasPointerCapture() { return false; }
+  getBoundingClientRect() { return { left: 0, top: 0, width: 200, height: 200 }; }
+  setPointerCapture(id) { this.capturedPointers.add(id); }
+  hasPointerCapture(id) { return this.capturedPointers.has(id); }
+  releasePointerCapture(id) { this.capturedPointers.delete(id); }
   click() { this.listeners.get('click')?.({}); }
 }
 
@@ -40,9 +43,11 @@ async function main() {
     if (!elements.has(id)) elements.set(id, new Element());
     return elements.get(id);
   };
+  const documentEvents = new Map();
   const document = {
     getElementById: get, querySelector: get, body: new Element(), documentElement: new Element(),
-    hidden: false, visibilityState: 'visible', addEventListener() {}
+    hidden: false, visibilityState: 'visible',
+    addEventListener(name, handler, options) { documentEvents.set(name, { handler, options }); }
   };
   let now = 1000;
   const sockets = [];
@@ -74,7 +79,7 @@ async function main() {
     slot: 'RING', icon: 0, rank: 0, category: 'OFFENSE',
     headline: 'RING I: REPLACES Ashen Loop', before: '+10% DMG -5% SPD', after: '+12% DMG +5% CRIT'
   });
-  const equipment = { id: 1, secondsLeft: 27, source: 'reliquary', sourceLabel: 'TIMED RELIQUARY 1:30', sourceSeconds: 90, rewardNumber: 1, options: ['Iron Loop', 'Swift Loop'].map(option) };
+  const equipment = { id: 1, secondsLeft: 27, source: 'arena-chest', sourceLabel: 'CHEST DISCOVERED', sourceSeconds: 90, rewardNumber: 1, options: ['Iron Loop', 'Swift Loop'].map(option) };
   const upgrade = { id: 1, level: 2, secondsLeft: 28, options: ['Soulfire', 'Quickening', 'Vitality'].map(option) };
   const status = (changes = {}) => socket.receive({
     type: 'status', connected: 1, hostActive: true, phase: 'session', alive: true, dodgeCooldown: 0,
@@ -82,6 +87,16 @@ async function main() {
   });
   const choices = get('upgrade-choices');
   const first = get('upgrade-option-0');
+  const browserGestures = ['touchstart', 'touchmove', 'gesturestart', 'gesturechange', 'contextmenu'];
+  function gesture(name, target = document.body, cancelable = true) {
+    const listener = documentEvents.get(name);
+    assert.ok(listener, `${name} has a document-wide gesture guard`);
+    assert.equal(listener.options.passive, false, `${name} can cancel browser defaults`);
+    const event = { target, cancelable, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+    listener.handler(event);
+    return event.defaultPrevented;
+  }
+  browserGestures.forEach((name) => assert.equal(gesture(name), false, `Lobby retains normal ${name} behavior`));
   const starterBuild = { skillsGranted: 19, equipmentGranted: 8 };
   status({ equipment: null, starterBuild });
   assert.equal(get('game-controls').hidden, false, 'New late join immediately shows the controller');
@@ -89,6 +104,41 @@ async function main() {
   assert.equal(get('.touch-controls').inert, false);
   assert.equal(get('dodge').disabled, false);
   assert.equal(get('starter-build').hidden, false, 'A short confirmation needs no interaction');
+  browserGestures.forEach((name) => {
+    assert.equal(gesture(name), true, `Gameplay blank space suppresses ${name}`);
+    assert.equal(gesture(name, get('dodge'), false), false, `Noncancelable ${name} is left alone`);
+  });
+  status({ equipment: null, dodgeCooldown: 1 });
+  assert.equal(get('dodge').disabled, true);
+  browserGestures.forEach((name) => assert.equal(gesture(name, get('dodge')), true,
+    `Cooldown does not restore browser ${name} gestures over Dodge`));
+  status({ equipment: null });
+  const joystick = get('joystick'), dodge = get('dodge');
+  const pointer = (element, type, pointerId, clientX = 100, clientY = 100) =>
+    element.listeners.get(type)({ pointerId, clientX, clientY, preventDefault() {} });
+  pointer(joystick, 'pointerdown', 1, 150);
+  assert.ok(socket.sent.at(-1).x > 0, 'The first thumb starts movement');
+  assert.equal(joystick.hasPointerCapture(1), true);
+  pointer(dodge, 'pointerdown', 2);
+  assert.equal(socket.sent.at(-1).dodge, true, 'A second thumb can Dodge during movement');
+  assert.ok(socket.sent.at(-1).x > 0, 'Dodge preserves held movement');
+  pointer(joystick, 'pointermove', 1, 1000);
+  [...intervals.values()].filter((timer) => timer.delay === 1000 / 30).forEach((timer) => timer.handler());
+  assert.equal(socket.sent.at(-1).x, 1, 'Captured movement remains normalized outside the joystick');
+  pointer(joystick, 'pointerup', 1);
+  assert.equal(socket.sent.at(-1).x, 0);
+  assert.equal(dodge.classList.contains('pressed'), true, 'Lifting movement does not release the other thumb');
+  pointer(joystick, 'pointerdown', 3, 0);
+  assert.equal(socket.sent.at(-1).x, -1, 'Movement can restart while Dodge remains held');
+  assert.equal(socket.sent.at(-1).dodge, false, 'Restarting movement does not retrigger held Dodge');
+  pointer(joystick, 'pointercancel', 99);
+  assert.equal(joystick.classList.contains('engaged'), true, 'Another pointer cannot cancel movement');
+  pointer(joystick, 'pointercancel', 3);
+  assert.equal(socket.sent.at(-1).x, 0, 'A canceled movement pointer sends neutral input');
+  assert.equal(joystick.classList.contains('engaged'), false);
+  pointer(dodge, 'pointercancel', 2);
+  assert.equal(dodge.classList.contains('pressed'), false, 'A canceled Dodge clears its held appearance');
+  assert.equal(socket.sent.at(-1).dodge, false);
   const keyboard = (key) => windowEvents.get('keydown')({ key, target: {}, preventDefault() {} });
   keyboard('d');
   assert.equal(socket.sent.at(-1).x, 1, 'A defaulted late join can move immediately');
@@ -96,12 +146,14 @@ async function main() {
   assert.equal(socket.sent.at(-1).dodge, true, 'A defaulted late join can Dodge immediately');
   get('dodge').listeners.get('pointerup')({ pointerId: 7 });
   status({ equipment: null, starterBuild, phase: 'paused' });
+  browserGestures.forEach((name) => assert.equal(gesture(name), false, `Pause restores normal ${name} behavior`));
   assert.equal(get('starter-build').hidden, true);
   assert.equal(socket.sent.at(-1).x, 0, 'Pause still neutralizes movement');
   status({ equipment: null, starterBuild });
   assert.equal(choices.hidden, true);
   assert.equal(get('dodge').disabled, false);
   status({ progression: { upgrade }, starterBuild });
+  browserGestures.forEach((name) => assert.equal(gesture(name, first), false, `Skill cards retain ${name} behavior`));
   assert.equal(get('starter-build').hidden, true, 'Normal future choices retain the full card space');
   assert.equal(get('upgrade-level').textContent, 'LEVEL 2', 'Skill choices take priority over equipment');
   assert.equal(get('equipment-keep').hidden, true);
@@ -112,10 +164,11 @@ async function main() {
   status({ equipment: { ...equipment, options: [...equipment.options, option('Removed Third')] } });
   assert.equal(choices.hidden, true, 'A legacy three-item gear payload is rejected');
   status();
+  browserGestures.forEach((name) => assert.equal(gesture(name, first), false, `Equipment cards retain ${name} behavior`));
   assert.equal(get('upgrade-level').textContent, 'EQUIPMENT', 'Equal numeric IDs from different choice types do not reuse a skill card');
   assert.equal(get('upgrade-option-2').hidden, true, 'Equipment has exactly two visible cards');
   assert.equal(get('upgrade-option-2').disabled, true);
-  assert.equal(get('equipment-source').textContent, 'TIMED RELIQUARY 1:30');
+  assert.equal(get('equipment-source').textContent, 'CHEST DISCOVERED');
   assert.equal(get('equipment-explanation').hidden, false);
   const beforeForgedThird = socket.sent.length; get('upgrade-option-2').click();
   assert.equal(socket.sent.length, beforeForgedThird, 'A hidden third equipment option cannot send a choice');
@@ -156,14 +209,44 @@ async function main() {
   status();
   assert.equal(choices.hidden, false); assert.equal(first.disabled, false);
   assert.equal(get('upgrade-level').textContent, 'EQUIPMENT');
-  assert.equal(get('equipment-source').textContent, 'TIMED RELIQUARY 1:30', 'Reconnect restores the earned cause');
+  assert.equal(get('equipment-source').textContent, 'CHEST DISCOVERED', 'Reconnect restores the earned cause');
   status({ progression: { upgrade } });
   assert.equal(get('upgrade-option-2').hidden, false, 'Switching back to skills restores all three cards');
   assert.equal(get('equipment-source').hidden, true);
   assert.equal(get('equipment-explanation').hidden, true);
   assert.equal(first.querySelector('.skill-illustration').style.backgroundImage, '', 'Skill cards restore the existing skill atlas after gear');
-  assert.equal(first.querySelector('.skill-illustration').style.backgroundSize, '');
-  const futureSkill = { ...upgrade, id: 9, level: 12, durationSeconds: 30, secondsLeft: 17.25 };
+  assert.equal(first.querySelector('.skill-illustration').style.backgroundSize, '400% 400%');
+  const newSkill = (id, icon, title, rank = 1) => ({
+    id, icon, title, rank, category: 'WEAPON', description: 'Original combat ability.',
+    headline: 'UNLOCK', before: 'NONE', after: 'NEW ABILITY'
+  });
+  const legacyBoundary = { ...upgrade, id: 7, options: [newSkill('critical', 11, 'Critical Edge'),
+    newSkill('power', 0, 'Soulfire'), newSkill('storm', 9, 'Chain Storm')] };
+  status({ equipment: null, progression: { upgrade: legacyBoundary } });
+  assert.equal(first.querySelector('.skill-illustration').style.backgroundSize, '400% 400%');
+  assert.equal(first.style.values.get('--icon-x'), '100%');
+  assert.ok(Math.abs(parseFloat(first.style.values.get('--icon-y')) - 200 / 3) < .001,
+    'The last unchanged128px icon stays in the third atlas row');
+  const expansionCards = [newSkill('ricochet', 12, 'Ricochet Bolt'),
+    newSkill('duration', 19, 'Lingering Power'), newSkill('reaping_stroke', 23, 'Reaping Stroke')];
+  const expanded = { ...upgrade, id: 8, options: expansionCards };
+  status({ equipment: null, progression: { upgrade: expanded } });
+  assert.equal(first.querySelector('.skill-illustration').style.backgroundSize, '800% 800%');
+  assert.equal(first.style.values.get('--icon-x'), '0%');
+  assert.ok(Math.abs(parseFloat(first.style.values.get('--icon-y')) - 600 / 7) < .001,
+    'First compact icon starts below the unchanged legacy cells');
+  const second = get('upgrade-option-1'), third = get('upgrade-option-2');
+  assert.equal(second.style.values.get('--icon-x'), '100%', 'Last icon in the first compact row crops its right edge');
+  assert.equal(third.style.values.get('--icon-y'), '100%', 'Last expansion row crops the bottom strip');
+  assert.ok(Math.abs(parseFloat(third.style.values.get('--icon-x')) - 300 / 7) < .001);
+  assert.equal(third.querySelector('.skill-rank').textContent, 'EVOLUTION');
+  assert.equal(third.dataset.category, 'WEAPON');
+  assert.equal(first.querySelector('.skill-rank').textContent, 'RANK 1');
+  const fallback = { ...expanded, id: 18, options: expansionCards.map(({ icon, ...card }) => card) };
+  status({ equipment: null, progression: { upgrade: fallback } });
+  assert.equal(third.querySelector('.skill-title').textContent, 'Reaping Stroke');
+  assert.equal(third.querySelector('.skill-art').hidden, false, 'Legacy payload fallback includes new skill identities');
+  const futureSkill = { ...upgrade, id: 9, level: 12, durationSeconds: 30, secondsLeft: 17.25, options: expansionCards };
   status({ equipment: null, progression: { upgrade: futureSkill }, starterBuild });
   assert.equal(get('upgrade-level').textContent, 'LEVEL 12');
   assert.equal(choices.querySelector('.upgrade-kicker').textContent, 'CHOOSE YOUR POWER');
@@ -179,6 +262,8 @@ async function main() {
   assert.equal(get('upgrade-level').textContent, 'LEVEL 12');
   assert.equal(get('upgrade-seconds').textContent, '18', 'Disconnected time does not reduce the host timer');
   assert.equal(first.disabled, true);
+  assert.equal(third.querySelector('.skill-rank').textContent, 'EVOLUTION', 'Paused reconnect preserves evolution card presentation');
+  assert.equal(third.querySelector('.skill-title').textContent, 'Reaping Stroke');
   status({ equipment: null, progression: { upgrade: futureSkill }, starterBuild });
   first.click();
   assert.equal(socket.sent.at(-1).offerId, 9, 'Reconnect preserves the offer identity');
@@ -280,7 +365,7 @@ async function main() {
   status({ equipment: null, phase: 'lobby' });
   assert.equal(get('title').textContent, 'You have a place');
   assert.equal(get('party').textContent, 'Ready for a solo descent');
-  console.log('Controller skill/loot pause, party waiting, defaults, acknowledgment and reconnect checks passed.');
+  console.log('Controller two-thumb/gesture guards, skill/loot pause, party waiting, defaults, acknowledgment and reconnect checks passed.');
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });

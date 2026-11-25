@@ -19,7 +19,7 @@ public final class GameAudio implements Disposable {
     private boolean suspended;
     private int sword, arrows, deaths, pickups, hits, level, swordHits, boltHits, criticalHits,
         dodges, blocks, heals, auras, storms, wraithDashes, bruteSlams, hostileShots, starts, variation;
-    private int loot;
+    private int loot, relics;
     private boolean boss, sovereign;
     private ArenaWorld.Outcome outcome;
 
@@ -111,11 +111,14 @@ public final class GameAudio implements Disposable {
             if (world.swordSwings != sword) play(SWORD);
             if (world.arrowsFired != arrows) play(ARROW);
             if (world.pickupsCollected - pickups > world.healsCollected - heals) play(PICKUP);
+            if (world.skills.relicsCollected != relics)
+                play(world.skills.lastRelicKind == SkillExpansion.RelicKind.STASIS ? AURA : PICKUP);
         }
         capture(world);
     }
 
     private void capture(ArenaWorld world) {
+        relics = world.skills.relicsCollected;
         loot = world.equipment.rewardsEarned();
         for (int i = 0; i < 2; i++) {
             activePlayers[i] = world.players[i].active;
