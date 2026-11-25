@@ -14,7 +14,7 @@ class DodgeTrailTest {
         assertEquals(ActorAnimation.State.DODGE, first.state);
         assertEquals(ActorAnimation.Facing.NE, first.facing);
         assertEquals(player.hero.dodgeCooldown, player.dodgeCooldown, .0001f);
-        assertEquals(player.hero.moveSpeed * 3.75f * ArenaWorld.STEP, player.x, .0001f);
+        assertEquals(player.hero.moveSpeed * 4.25f * ArenaWorld.STEP, player.x, .0001f);
         float firstAlpha = first.alpha();
         world.update(.1f);
         assertEquals(0, first.x, "A stored ghost must not travel with its player");
@@ -26,9 +26,13 @@ class DodgeTrailTest {
         world.setInput(0, 0, 0, false);
         world.update(.1f); world.update(ArenaWorld.STEP);
         assertEquals(0, player.dodgeTime);
-        assertEquals(player.hero.moveSpeed * 3.75f * .22f, player.x, .001f);
+        assertEquals(player.hero.moveSpeed * 4.25f * .22f, player.x, .001f);
+        assertTrue(first.ttl > 0, "The oldest snapshot remains available through the complete dash");
+        assertEquals(0, first.x, "A longer history must retain the first pose until it fades");
         assertTrue(active(player) > 0, "The last ghosts fade briefly after the dash ends");
         world.update(.1f); world.update(.1f);
+        assertTrue(active(player) > 0, "The newest snapshots remain visible briefly beyond the old fade window");
+        world.update(.05f);
         assertEquals(0, active(player));
         assertEquals(DodgeTrail.CAPACITY, player.dodgeTrail.snapshots.length);
     }
@@ -60,7 +64,7 @@ class DodgeTrailTest {
         assertEquals(0, active(player));
     }
 
-    @Test void bothHeroesTravelTwentyFivePercentFartherWithTheSameEscapeWindowAndCooldown() {
+    @Test void bothHeroesTravelFartherWithTheSameEscapeWindowAndCooldown() {
         for (ArenaWorld.Hero hero : ArenaWorld.Hero.values()) {
             ArenaWorld world = new ArenaWorld(); world.setHero(0, hero); world.activatePlayer(0);
             ArenaWorld.Player player = world.players[0]; player.invulnerable = 0;
@@ -70,7 +74,7 @@ class DodgeTrailTest {
             assertEquals(hero.dodgeCooldown, player.dodgeCooldown, .0001f);
             for (int i = 0; i < 13; i++) world.update(ArenaWorld.STEP);
             float oldDistance = hero.moveSpeed * 3 * .22f;
-            assertEquals(oldDistance * 1.25f, Math.hypot(player.x, player.y), .001f);
+            assertEquals(oldDistance * (4.25f / 3f), Math.hypot(player.x, player.y), .001f);
             assertEquals(player.x, player.y, .0001f, "Diagonal input must not gain extra distance");
             assertEquals(0, player.dodgeTime);
             world.update(ArenaWorld.STEP);

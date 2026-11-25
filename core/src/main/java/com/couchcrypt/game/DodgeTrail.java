@@ -2,8 +2,8 @@ package com.couchcrypt.game;
 
 /** Small combat-clock history of actual Dodge poses; both cameras read the same snapshots. */
 final class DodgeTrail {
-    static final int CAPACITY = 4;
-    static final float LIFETIME = .18f, INTERVAL = .05f;
+    static final int CAPACITY = 6;
+    static final float LIFETIME = .24f, INTERVAL = .05f;
     final Snapshot[] snapshots = new Snapshot[CAPACITY];
     private float untilNext;
     private int next;
@@ -40,6 +40,6 @@ final class DodgeTrail {
         ActorAnimation.State state;
         ActorAnimation.Facing facing;
 
-        float alpha() { return .24f * ttl / LIFETIME; }
+        float alpha() { return .42f * ttl / LIFETIME; }
     }
 }
