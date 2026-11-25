@@ -46,6 +46,7 @@
 - Treat 60 FPS (16.7 ms per frame) and low memory consumption as requirements. Keep texture dimensions bounded, reuse resources, avoid per-frame allocations and layout rebuilds, and keep network I/O off the render thread. Measure briefly and report limitations honestly; emulator results do not guarantee performance on physical TVs.
 
 - Elite loot collection (2026-11-25): defeated elites leave stationary chests instead of opening equipment choices immediately. Either living player walks over a chest to earn one party reward with personal phone choices; keep five elite opportunities, source labels, skill priority, shared thirty-second rounds and three automatic timed reliquaries. Chests persist until collected/reset, use a separate fixed pool, and reuse resident atlas space. Late join catch-up includes collected rewards only; uncollected chests remain available to the current party.
+- Elite chest polish approval (2026-11-25): use the approved brighter treasure-chest mockup, with substantial worn-gold bands/corners and latch, mahogany/dark-metal body and fine glowing lid seam. Add a compact warm 2:1 ground light with a fine broken rim, short wisps and a few drifting ivory-gold glints. Keep effects local, beneath ground warnings/actors where appropriate, shared between cameras and frozen with combat. Preserve pickup mechanics and original source art; reuse existing resident pixels and the chest atlas space with no GPU texture growth.
 
 ## Working process
 

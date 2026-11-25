@@ -4909,11 +4909,11 @@
         464,
         4,
         46,
-        38
+        43
       ],
       "source": [
         46,
-        38
+        43
       ],
       "offset": [
         0,
@@ -4921,7 +4921,7 @@
       ],
       "pivot": [
         23.0,
-        30.5
+        35
       ]
     }
   ],
@@ -6486,7 +6486,7 @@
     },
     "elite-chest": {
       "frame": 232,
-      "worldHeight": 44,
+      "worldHeight": 52,
       "footprintWidth": 44,
       "footprintWorldX": 48,
       "footprintWorldY": 32
