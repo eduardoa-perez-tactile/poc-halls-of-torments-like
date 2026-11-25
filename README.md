@@ -2,7 +2,7 @@
 
 A LibGDX Android TV couch co-op arena survivor, using Couch Crypt as its working title. One replayable twenty-minute arena includes remote-selected Warden/Ranger heroes, escalating waves, a twelve-minute mini boss and twenty-minute final boss, shared XP, personal phone skill/equipment choices and per-player build results. Original illustrated crypt scenery, four-facing heroes/enemies, menus and combat artwork are integrated.
 
-Current playtest: **v0.4.0**, including the complete survivor skill expansion without rerolls. See [the playtest notes](docs/playtest-v0.4.0.md) and [skill reference](docs/survivor-expansion.md). Full-run balance, real-phone usability and sustained physical-TV performance remain user playtest work.
+Current playtest: **v0.5.0**, adding the approved Warden melee wave, Mourning Bell mini-boss and finished crypt gate/wall artwork to the survivor skill expansion. See [the playtest notes](docs/playtest-v0.5.0.md) and [skill reference](docs/survivor-expansion.md). Full-run balance, real-phone usability and sustained physical-TV performance remain user playtest work.
 
 ## Run on desktop
 
