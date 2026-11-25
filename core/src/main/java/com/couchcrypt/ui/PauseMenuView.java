@@ -15,7 +15,7 @@ public final class PauseMenuView {
         root.pad(40);
 
         Label title = art.label("PAUSED", art.heading, UiArt.IVORY);
-        root.add(title).left().padBottom(16).row();
+        root.add(title).center().padBottom(16).row();
         message = art.label(status, art.body, UiArt.IVORY); message.setWrap(true);
         root.add(message).width(800).left().padBottom(24).row();
 
