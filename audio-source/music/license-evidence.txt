@@ -1,0 +1,33 @@
+Publisher-page license verification on 2026-11-25.
+Each selected release page showed License(s): CC0.
+CC0 1.0 terms: https://creativecommons.org/publicdomain/zero/1.0/
+
+https://opengameart.org/content/dark-shrine-loop
+Title: Dark Shrine Loop
+Author: qubodup; original Shrine by yd
+License(s): CC0
+
+https://opengameart.org/content/menace
+Title: Menace
+Author: yd
+License(s): CC0
+
+https://opengameart.org/content/determined-pursuit-epic-orchestra-loop
+Title: Determined Pursuit
+Author: Emma_MA
+License(s): CC0
+
+https://opengameart.org/content/boss-battle-music
+Title: Epic Boss Battle [Seamlessly Looping]
+Author: Juhani Junkala (SubspaceAudio)
+License(s): CC0
+
+https://opengameart.org/content/medieval-victory-theme
+Title: Medieval: Victory Theme
+Author: RandomMind
+License(s): CC0
+
+https://opengameart.org/content/medieval-defeat-theme
+Title: Medieval: Defeat Theme
+Author: RandomMind
+License(s): CC0

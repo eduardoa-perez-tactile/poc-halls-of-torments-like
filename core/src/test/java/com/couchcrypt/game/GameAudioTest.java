@@ -194,7 +194,7 @@ class GameAudioTest {
             audio.play(SoundCue.SWORD); audio.play(SoundCue.UI_BACK);
             audio.stopCombat();
             assertEquals(List.of("ui-back"), new ArrayList<>(mixer.active.values()));
-            audio.beginFrame(.25f);
+            audio.beginFrame(.25f); audio.beginFrame(.05f);
             assertTrue(mixer.active.isEmpty());
             audio.play(SoundCue.UI_CONFIRM); audio.stopCombat();
             assertEquals(List.of("ui-confirm"), new ArrayList<>(mixer.active.values()));
@@ -216,7 +216,7 @@ class GameAudioTest {
                 shipped++;
             }
         }
-        assertTrue(shipped >= 21, "Existing placeholder effects must remain available");
+        assertEquals(SoundCue.values().length, shipped, "Every production cue must ship with its audio file");
     }
 
     private static final class Fixture implements AutoCloseable {
