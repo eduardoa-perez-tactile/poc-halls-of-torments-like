@@ -37,6 +37,7 @@ public final class ArenaRenderer implements Disposable {
     private final GameHud gameHud;
     private final EnemyRankMarkers rankMarkers;
     private final PlayerFootRing playerFootRing;
+    private final EnemyGroundVfx enemyGroundVfx;
     private final LootChestVfx chestVfx;
     private final DamageNumberArt damageNumberArt;
     private final ArenaAmbience ambience;
@@ -79,6 +80,7 @@ public final class ArenaRenderer implements Disposable {
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
         rankMarkers = new EnemyRankMarkers(art.pixel);
         playerFootRing = new PlayerFootRing(art.pixel);
+        enemyGroundVfx = new EnemyGroundVfx(art.pixel, art.glow);
         chestVfx = new LootChestVfx(art.pixel, art.glow);
         damageNumberArt = new DamageNumberArt(uiArt.body);
         floorLayout = new ArenaFloorLayout(new JsonReader().parse(Gdx.files.internal("arena/crypt-floor.json")));
@@ -542,13 +544,11 @@ public final class ArenaRenderer implements Disposable {
         for (ArenaWorld.Hazard hazard : world.hazards) {
             if (!hazard.active || !visible(camera, hazard.x, hazard.y, hazard.radius + 50f)) continue;
             if (hazard.warning > 0f) {
-                float progress = Math.max(0f, Math.min(1f, 1f - hazard.warning));
-                batch.setColor(Color.WHITE);
-                groundSprite(SpriteEffectArt.Type.WARNING, progress, hazard.x, hazard.y, hazard.radius, 0, layer);
+                drawWarningRune(.94f, hazard.x, hazard.y, hazard.radius);
             } else {
-                batch.setColor(Color.WHITE);
-                groundSprite(SpriteEffectArt.Type.GROUND_IMPACT, MathUtils.clamp(1f - hazard.ttl / .3f, 0, 1),
-                    hazard.x, hazard.y, hazard.radius, 0, layer);
+                float fade = MathUtils.clamp(hazard.ttl / .3f, 0, 1);
+                playerFootRing.draw(batch, screenX(hazard.x, hazard.y), screenY(hazard.x, hazard.y),
+                    hazard.radius, 1f, .63f, .38f, fade);
             }
         }
         batch.setColor(Color.WHITE);
@@ -561,45 +561,45 @@ public final class ArenaRenderer implements Disposable {
             if (enemy.attack == ArenaWorld.EnemyAttack.BRUTE_SLAM) {
                 if (!visible(camera, enemy.attackTargetX, enemy.attackTargetY, enemy.attackRadius + 80f)) continue;
                 if (age < ArenaWorld.BRUTE_WINDUP) {
-                    batch.setColor(Color.WHITE);
-                    groundSprite(SpriteEffectArt.Type.WARNING, age / ArenaWorld.BRUTE_WINDUP,
-                        enemy.attackTargetX, enemy.attackTargetY, enemy.attackRadius, 0, layer);
+                    drawWarningRune(.94f, enemy.attackTargetX, enemy.attackTargetY, enemy.attackRadius);
                 }
                 float strikeAge = age - ArenaWorld.BRUTE_WINDUP;
                 if (strikeAge >= 0 && strikeAge < .3f) {
-                    batch.setColor(Color.WHITE);
-                    groundSprite(SpriteEffectArt.Type.GROUND_IMPACT, strikeAge / .3f,
-                        enemy.attackTargetX, enemy.attackTargetY, 66f, 0, layer);
+                    playerFootRing.draw(batch, screenX(enemy.attackTargetX, enemy.attackTargetY),
+                        screenY(enemy.attackTargetX, enemy.attackTargetY), enemy.attackRadius,
+                        1f, .63f, .38f, 1f - strikeAge / .3f);
+                    enemyGroundVfx.bruteSmash(batch, enemy.attackTargetX, enemy.attackTargetY,
+                        enemy.attackRadius, strikeAge / .3f);
                 }
             } else if (enemy.attack == ArenaWorld.EnemyAttack.WRAITH_DASH
                 && age < ArenaWorld.WRAITH_WINDUP + ArenaWorld.WRAITH_DASH_SECONDS) {
-                // Three low, separate runes show the fixed lane without covering the tiles with a guide bar.
-                for (int rune = 1; rune <= 3; rune++) {
-                    float along = rune * .24f;
+                // Three compact arrows point along the fixed lane without becoming a guide bar.
+                float dx = enemy.attackTargetX - enemy.attackStartX;
+                float dy = enemy.attackTargetY - enemy.attackStartY;
+                float length = Math.max(.001f, (float) Math.sqrt(dx * dx + dy * dy));
+                dx /= length; dy /= length;
+                boolean released = age >= ArenaWorld.WRAITH_WINDUP;
+                float alpha = released ? .68f * (1f - (age - ArenaWorld.WRAITH_WINDUP)
+                    / ArenaWorld.WRAITH_DASH_SECONDS) : .96f;
+                for (int arrow = 1; arrow <= 3; arrow++) {
+                    float along = arrow * .24f;
                     float x = MathUtils.lerp(enemy.attackStartX, enemy.attackTargetX, along);
                     float y = MathUtils.lerp(enemy.attackStartY, enemy.attackTargetY, along);
                     if (!visible(camera, x, y, 40f)) continue;
-                    boolean windup = age < ArenaWorld.WRAITH_WINDUP;
-                    if (windup) drawWarningRune(world.elapsed + rune * .125f, x, y, 13f);
-                    else {
-                        batch.setColor(1f, .28f, .25f, .3f);
-                        drawAura(world.elapsed + rune * .125f, x, y, 13f, EnemyAttackArt.Layer.ALL);
-                    }
+                    enemyGroundVfx.arrow(batch, x, y, dx, dy, alpha, released);
                 }
             } else if (enemy.attack == ArenaWorld.EnemyAttack.CULTIST_CAST
                 && age >= ArenaWorld.CULTIST_WINDUP - .15f && age < ArenaWorld.CULTIST_WINDUP
                 && visible(camera, enemy.attackTargetX, enemy.attackTargetY, 50f)) {
-                drawWarningRune(world.elapsed, enemy.attackTargetX, enemy.attackTargetY, 18f);
+                drawWarningRune(.94f, enemy.attackTargetX, enemy.attackTargetY, 18f);
             }
         }
         batch.setColor(Color.WHITE);
     }
 
-    private void drawWarningRune(float age, float x, float y, float radius) {
-        batch.setColor(.04f, .025f, .015f, .92f);
-        drawAura(age, x, y, radius + 2f, EnemyAttackArt.Layer.ALL);
-        batch.setColor(1f, .94f, .65f, 1f);
-        drawAura(age, x, y, radius, EnemyAttackArt.Layer.ALL);
+    private void drawWarningRune(float alpha, float x, float y, float radius) {
+        playerFootRing.draw(batch, screenX(x, y), screenY(x, y), radius,
+            1f, .93f, .77f, alpha);
     }
 
     /** One simple outline shares the primary attack's live acquisition radius. */
@@ -658,9 +658,9 @@ public final class ArenaRenderer implements Disposable {
                 batch.setColor(1f, .26f, .18f, .56f);
                 drawAura(enemy.animTime, enemy.x, enemy.y, Math.max(32f, enemy.radius + 12f), EnemyAttackArt.Layer.ALL);
             }
-            if (enemy.attack != ArenaWorld.EnemyAttack.NONE && enemy.windup > 0) {
-                batch.setColor(1f, .68f, .25f, .72f);
-                drawAura(enemy.attackAge, enemy.x, enemy.y, 29f * Math.min(1.4f, enemyScale(enemy)), EnemyAttackArt.Layer.ALL);
+            if (enemy.attack != ArenaWorld.EnemyAttack.NONE
+                && enemy.attack != ArenaWorld.EnemyAttack.WRAITH_DASH && enemy.windup > 0) {
+                drawWarningRune(.86f, enemy.x, enemy.y, 29f * Math.min(1.4f, enemyScale(enemy)));
             }
         }
         batch.setColor(Color.WHITE);

@@ -258,3 +258,44 @@ combat. All old atlas pixels outside the replacement chest patch and all other
 frame metadata were preserved; the APK was checked for the updated sprite. No
 physical-TV performance or full-run balance claim is made. The existing TV
 emulator and LAN relay were not changed.
+
+## Dodge and simple enemy circles follow-up (2026-11-25)
+
+The user's follow-up extends Dodge another 13.3% from the previous build: speed
+is now 4.25× effective movement speed for the same 220 ms window. Unmodified
+Warden/Ranger travel is 168.3/185.13 world units. Cooldown and invulnerability
+duration stay unchanged; normalized diagonals and arena bounds remain in force.
+Ghost snapshots now peak at 42% opacity instead of 24% and fade over 240 ms
+instead of 180 ms. Six fixed slots retain actual past positions/poses, with no
+new textures or frame-loop allocations. They still freeze with combat and clear
+on fresh participation, removal or reset.
+
+The approved attack-range outline keeps its exact live targeting radius and
+thin 2:1 geometry, with core opacity reduced from 88% to 57%. Enemy attack alerts
+and floor-smash warnings/impacts use the same simple outline language, with
+brighter ivory warnings and warm peach impacts at their existing locked
+positions/radii. Brute impact keeps its actual 55-unit radius, replacing the
+former 66-unit cosmetic footprint. Small circles reuse 48 of the 192 cached
+directions; the colour scratch buffer adds only 16 bytes of CPU float payload.
+
+The later directional feedback replaces Wraith's three lane circles with simple
+open `>` chevrons pointing along the committed dash path. The user rejected full
+shaft/filled-head arrows and then removed the dark outlines; each marker is just
+two plain ivory strokes, without a shaft, border or filled centre. The Wraith's
+redundant foot warning circle is removed. Brute's
+actual fist strike adds a compact dust/stone-chip burst and ground shock,
+separate from the clean warning outline. All ground cues remain beneath the
+complete actor pass and freeze with combat. These presentation changes preserve
+enemy damage, attack timings, movement, targeting, boss behavior, equipment
+sustain, chest rewards and the resident texture budget.
+
+JDK 21 desktop compilation and Android debug assembly passed for the final
+plain-chevron version. Twenty-four focused Dodge/enemy-attack/Brute-geometry
+checks passed. Brief native 1920×1080 captures verified the opposing committed
+Wraith directions, compact Brute impact, stronger co-op Dodge trails and dimmed
+player range; the subsequent border removal retained that same chevron geometry
+and was compile-checked. No full survival playthrough was run. Rendering samples
+exclude full simulation/GPU completion and do not establish physical-TV 60 FPS.
+Temporary render processes/harness files were removed; proof remains ignored in
+`.run/vfx-feedback/`. The emulator, saved LAN host 192.168.14.248:8787 and existing
+relay/forwards were preserved; the LAN controller endpoint returned HTTP 200.

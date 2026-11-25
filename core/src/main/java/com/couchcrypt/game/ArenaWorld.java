@@ -11,7 +11,7 @@ public final class ArenaWorld {
     public static final float STEP = 1f / 60f;
     /** Cosmetic sweep lifetime only; damage and attack cadence still commit immediately. */
     public static final float WARDEN_SLASH_SECONDS = .38f;
-    private static final float DODGE_DURATION = .22f, DODGE_SPEED_MULTIPLIER = 3.75f, PLAYER_RADIUS = 20f;
+    private static final float DODGE_DURATION = .22f, DODGE_SPEED_MULTIPLIER = 4.25f, PLAYER_RADIUS = 20f;
     public enum Outcome { RUNNING, VICTORY, DEFEAT }
     public enum Hero {
         WARDEN(100, 28, .7f, 180, 160, 2.4f),
