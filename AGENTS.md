@@ -53,6 +53,8 @@
 
 ## Working process
 
+- Full survivor expansion authorization (2026-11-25): deliver six new combat skills (Ricochet Bolt, Sentinel Blades, Consecrated Ground, Returning Glaive, Soul Ward, Frostbound Strikes), Swift Projectiles/Lingering Power, four prerequisite-based evolutions, Soul Harvest and Stasis together. The user explicitly rejected rerolls: retain three phone cards, nineteen level-up picks and shared thirty-second windows with no extra selection controls/currencies. Preserve existing equipment sustain, eight collected-chest rewards, pause/reconnect and automatic late-join foundations. New effects use bounded combat-owned pools. The skill atlas is now one managed 512x512 RGBA page with original twelve 128px cells preserved and sixteen new 64px skill/world glyphs; combined textures with maximum QR are 33,483,596 bytes, still below 32 MiB. See docs/survivor-expansion.md and art-source/survivor-expansion/README.md. Permanent meta progression remains outside scope.
+
 - Work in the existing checkout. Never create or use Git worktrees or additional task checkouts for this project.
 - Implement the agreed feature set first, then hand the build to the user for gameplay playtesting. User feedback drives the next iteration.
 - Organize implementation into focused milestones without requiring user playtests between every internal step: project launchers, TV navigation/lobby, QR joining/reconnection, split-screen controller validation, combat, complete round, and art integration.

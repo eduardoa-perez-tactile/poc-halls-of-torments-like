@@ -1,6 +1,6 @@
 # Twenty-minute progression
 
-The normal arena uses a rising shared XP curve with the existing level-20 cap: at most 19 personal upgrades per player. Individual skill effects and caps are unchanged, including class eligibility, exact card previews and the bounded projectile counts. The three-minute development fixture retains its fast XP curve; timelines longer than that fixture use the long curve.
+The normal arena uses a rising shared XP curve with the existing level-20 cap: at most 19 personal upgrades per player. The survivor expansion adds six combat skills, two supporting stats and four prerequisite-based evolutions while retaining the original skills' effects/caps and the bounded projectile counts. See [the expansion reference](survivor-expansion.md) for tuning and offer selection. There are no rerolls. The three-minute development fixture retains its fast XP curve; timelines longer than that fixture use the long curve.
 
 | Intended checkpoint | Party level target | Cumulative collected XP |
 | --- | --- | --- |

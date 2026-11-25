@@ -13,6 +13,7 @@ import com.couchcrypt.game.ArenaWorld;
 import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.ItemCatalog;
 import com.couchcrypt.game.RunEquipment;
+import com.couchcrypt.game.SkillExpansion;
 import java.text.NumberFormat;
 import java.util.Locale;
 import java.util.function.Consumer;
@@ -197,7 +198,7 @@ public final class RunDetailsView {
         float copyWidth = width - 88;
         Table title = new Table(); title.left();
         title.add(art.label(upgrade.title, art.body, UiArt.IVORY)).left().expandX();
-        title.add(art.label("RANK " + rank, art.small, accent)).right();
+        title.add(art.label(upgrade.evolution() ? "EVOLUTION" : "RANK " + rank, art.small, accent)).right();
         copy.add(title).width(copyWidth).left().row();
         Label description = scaled(art, skillEffect(world, player, upgrade), art.body, .9f, UiArt.IVORY);
         description.setWrap(true);
@@ -224,6 +225,26 @@ public final class RunDetailsView {
                 + " damage; " + (player.stormLevel + 1) + " targets / 2s";
             case MAGNET -> signedPercent(world.equipment.pickupMultiplier(player) - 1) + "% pickup attraction";
             case CRITICAL -> "Critical chance: " + percent(world.equipment.critChance(player)) + "%";
+            case RICOCHET -> player.ricochetLevel + " redirects after piercing; 75% damage retained per bounce";
+            case SENTINEL -> SkillExpansion.sentinelCount(player.sentinelLevel) + " blades; "
+                + tenths(SkillExpansion.sentinelDamage(player.sentinelLevel) * damage) + " damage / 0.6s per contact";
+            case CONSECRATION -> tenths(SkillExpansion.fieldDamage(player.consecrationLevel) * damage)
+                + " damage / 0.5s; " + tenths(Math.min(8, SkillExpansion.fieldDuration(player.consecrationLevel) * SkillExpansion.duration(player)))
+                + "s seals; cast / " + tenths(SkillExpansion.fieldCooldown(player.consecrationLevel))
+                + "s; max " + SkillExpansion.fieldCount(player.consecrationLevel);
+            case GLAIVE -> tenths(SkillExpansion.glaiveDamage(player.glaiveLevel) * damage)
+                + " damage each way; " + Math.round(SkillExpansion.glaiveRange(player.glaiveLevel)) + " outward range";
+            case WARD -> "Absorbs one hit; " + tenths(SkillExpansion.wardCooldown(player.wardLevel)) + "s recharge";
+            case FROST -> percent(SkillExpansion.frostAmount(player.frostLevel)) + "% movement slow for "
+                + tenths(Math.min(4, SkillExpansion.frostDuration(player.frostLevel) * SkillExpansion.duration(player)))
+                + "s; elites/bosses resist";
+            case PROJECTILE_SPEED -> signedPercent(SkillExpansion.projectileSpeed(player) - 1) + "% bolt and glaive speed; range unchanged";
+            case DURATION -> signedPercent(SkillExpansion.duration(player) - 1) + "% seal and slow duration; duration caps apply";
+            case ECHO_STORM -> "Chain strikes echo after 0.3s at 45% damage in a small area";
+            case BINDING_CIRCLE -> "Soul Circle: 20% slow for " + tenths(Math.min(4, 1.1f * SkillExpansion.duration(player)))
+                + "s; elites/bosses resist";
+            case SHATTER_BOLT -> "Final bolt impacts burst for 45% damage against nearby enemies";
+            case REAPING_STROKE -> "Sword attacks repeat after 0.18s at 40% damage";
         };
     }
 

@@ -70,6 +70,11 @@ def main():
                 pixels = image.tobytes()
             assert hashlib.sha256(pixels).hexdigest() == info['rgbaSha256'], name
     print(f"Verified {len(manifest['outputs'])} RGBA/container/phone exports against original in-memory LibGDX outputs.")
+    # The original twelve icons remain the exact pinned bake; append the approved
+    # expansion afterwards so rerunning this legacy exporter cannot drop its art.
+    subprocess.run(['python3', str(ROOT / 'scripts/PackSurvivorExpansion.py'),
+                    '--output', str(args.output.resolve()), '--phone-output', str(args.phone_output.resolve())],
+                   check=True, cwd=ROOT)
 
 
 if __name__ == '__main__':

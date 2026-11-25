@@ -969,6 +969,10 @@ public final class CryptLobby extends ApplicationAdapter {
             && overlay == null && !world.choicePending()) {
             world.debugEliteChestEncounter(); arena.resetCameras(); return true;
         }
+        if (key == Input.Keys.NUM_4 && config.profile() && screen == Screen.SESSION
+            && overlay == null && !world.choicePending()) {
+            world.debugSkillExpansionEncounter(); arena.resetCameras(); return true;
+        }
         if (key == Input.Keys.F1 && config.profile() && screen == Screen.SESSION && overlay == null) {
             world.debugEnemyAttackEncounter(); return true;
         }

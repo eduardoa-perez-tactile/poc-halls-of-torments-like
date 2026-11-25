@@ -32,13 +32,15 @@ public final class ArenaRenderer implements Disposable {
     // Only the rendered origin moves; the simulation keeps its original projectile coordinates and trajectory.
     private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
     private static final float[] SOVEREIGN_ORIGIN = {37, 78, -12, 67, 18, 90, -35, 82};
-    private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PAINTED_BORDER = 3, DODGE_GHOST = 4, CHEST = 5;
+    private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PAINTED_BORDER = 3, DODGE_GHOST = 4, CHEST = 5,
+        SENTINEL_BLADE = 6, RETURNING_GLAIVE = 7, WORLD_RELIC = 8;
     private final GameArt art;
     private final GameHud gameHud;
     private final EnemyRankMarkers rankMarkers;
     private final PlayerFootRing playerFootRing;
     private final EnemyGroundVfx enemyGroundVfx;
     private final LootChestVfx chestVfx;
+    private final SkillExpansionArt skillArt;
     private final DamageNumberArt damageNumberArt;
     private final ArenaAmbience ambience;
     private final SpriteBatch batch;
@@ -60,7 +62,8 @@ public final class ArenaRenderer implements Disposable {
     private final float chestScale;
     private final float[] environmentVertices = new float[20];
     private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + 2 * DodgeTrail.CAPACITY
-        + ArenaLayout.MAX_PLACEMENTS + PaintedBorderArt.MAX_SCENERY + ArenaWorld.MAX_CHESTS];
+        + ArenaLayout.MAX_PLACEMENTS + PaintedBorderArt.MAX_SCENERY + ArenaWorld.MAX_CHESTS
+        + SkillExpansion.MAX_ORBITERS + SkillExpansion.MAX_GLAIVES + SkillExpansion.MAX_RELICS];
     private final int[] types = new int[depths.length], indices = new int[depths.length], layers = new int[depths.length];
     private int sortCount;
     public int drawCalls;
@@ -82,6 +85,7 @@ public final class ArenaRenderer implements Disposable {
         playerFootRing = new PlayerFootRing(art.pixel);
         enemyGroundVfx = new EnemyGroundVfx(art.pixel, art.glow);
         chestVfx = new LootChestVfx(art.pixel, art.glow);
+        skillArt = new SkillExpansionArt(buildIcons, art.glow);
         damageNumberArt = new DamageNumberArt(uiArt.body);
         floorLayout = new ArenaFloorLayout(new JsonReader().parse(Gdx.files.internal("arena/crypt-floor.json")));
         float radius = floorLayout.medallionDiameter * .5f;
@@ -139,6 +143,7 @@ public final class ArenaRenderer implements Disposable {
             batch.begin();
             art.engravedFloor.draw(batch, medallion);
             drawChestLights(world, camera);
+            skillArt.ground(batch, world);
             // All floor effects precede the complete depth-sorted actor pass. Their painted
             // foreground rims must never be laid over a closer enemy or the player's body.
             drawHazards(world, camera, SpriteEffectArt.Layer.ALL);
@@ -163,6 +168,7 @@ public final class ArenaRenderer implements Disposable {
             drawBolts(world, camera);
             drawShots(world, camera);
             drawEffects(world, camera);
+            skillArt.followups(batch, world);
             drawDamageNumbers(world, camera);
             drawEnemyRanks(world);
             batch.end();
@@ -369,6 +375,21 @@ public final class ArenaRenderer implements Disposable {
             depths[sortCount - 1] = q.sortDepth;
             layers[sortCount - 1] = q.renderLayer;
         }
+        for (int i = 0; i < world.skills.orbiters.length; i++) {
+            SkillExpansion.OrbitBlade blade = world.skills.orbiters[i];
+            if (blade.active && visible(camera, blade.x, blade.y, 70f))
+                add(SENTINEL_BLADE, i, blade.x, blade.y);
+        }
+        for (int i = 0; i < world.skills.glaives.length; i++) {
+            SkillExpansion.Glaive glaive = world.skills.glaives[i];
+            if (glaive.active && visible(camera, glaive.x, glaive.y, 70f))
+                add(RETURNING_GLAIVE, i, glaive.x, glaive.y);
+        }
+        for (int i = 0; i < world.skills.relics.length; i++) {
+            SkillExpansion.WorldRelic relic = world.skills.relics[i];
+            if (relic.active && visible(camera, relic.x, relic.y, 65f))
+                add(WORLD_RELIC, i, relic.x, relic.y);
+        }
         for (int i = 0; i < world.enemies.length; i++) {
             ArenaWorld.Enemy enemy = world.enemies[i];
             if (!enemy.active) continue;
@@ -417,7 +438,8 @@ public final class ArenaRenderer implements Disposable {
         batch.setColor(1f, 1f, 1f, .62f);
         for (int i = 0; i < sortCount; i++) {
             int index = indices[i]; float x, y, width;
-            if (types[i] == PAINTED_BORDER || types[i] == DODGE_GHOST) continue;
+            if (types[i] == PAINTED_BORDER || types[i] == DODGE_GHOST
+                || types[i] == SENTINEL_BLADE || types[i] == RETURNING_GLAIVE || types[i] == WORLD_RELIC) continue;
             if (types[i] == PLAYER) {
                 ArenaWorld.Player player = world.players[index];
                 x = player.x; y = player.y; width = player.alive ? 62f : 72f;
@@ -856,6 +878,12 @@ public final class ArenaRenderer implements Disposable {
                 batch.setColor(Color.WHITE);
                 drawFrame(chestArt.frame(), chest.x, chest.y, chestScale);
                 chestVfx.glints(batch, x, y, world.elapsed, index);
+            } else if (types[i] == SENTINEL_BLADE) {
+                skillArt.orbiter(batch, world.skills.orbiters[index]);
+            } else if (types[i] == RETURNING_GLAIVE) {
+                skillArt.glaive(batch, world.skills.glaives[index]);
+            } else if (types[i] == WORLD_RELIC) {
+                skillArt.relic(batch, world.skills.relics[index]);
             } else if (types[i] == DODGE_GHOST) {
                 int owner = index / DodgeTrail.CAPACITY;
                 DodgeTrail.Snapshot snapshot = world.players[owner].dodgeTrail.snapshots[index % DodgeTrail.CAPACITY];
@@ -932,6 +960,7 @@ public final class ArenaRenderer implements Disposable {
                     -screenY(player.attackFacingX, player.attackFacingY) * recoil);
                 drawLevelUp(world, player, VfxArt.Layer.FRONT);
                 drawMuzzle(player);
+                skillArt.ward(batch, player);
                 batch.setColor(Color.WHITE);
             }
         }
