@@ -32,7 +32,7 @@ public final class ArenaRenderer implements Disposable {
     // Only the rendered origin moves; the simulation keeps its original projectile coordinates and trajectory.
     private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
     private static final float[] SOVEREIGN_ORIGIN = {37, 78, -12, 67, 18, 90, -35, 82};
-    private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PAINTED_BORDER = 3;
+    private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PAINTED_BORDER = 3, DODGE_GHOST = 4;
     private final GameArt art;
     private final GameHud gameHud;
     private final EnemyRankMarkers rankMarkers;
@@ -53,7 +53,8 @@ public final class ArenaRenderer implements Disposable {
     private final PaintedBorderArt.Scene paintedBorders;
     private final GameplayAtlas.Region[] propArt;
     private final float[] environmentVertices = new float[20];
-    private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + ArenaLayout.MAX_PLACEMENTS + PaintedBorderArt.MAX_SCENERY];
+    private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + 2 * DodgeTrail.CAPACITY
+        + ArenaLayout.MAX_PLACEMENTS + PaintedBorderArt.MAX_SCENERY];
     private final int[] types = new int[depths.length], indices = new int[depths.length], layers = new int[depths.length];
     private int sortCount;
     public int drawCalls;
@@ -365,6 +366,12 @@ public final class ArenaRenderer implements Disposable {
         for (int i = 0; i < world.players.length; i++) {
             ArenaWorld.Player player = world.players[i];
             if (!player.active) continue;
+            if (player.alive) for (int ghost = 0; ghost < DodgeTrail.CAPACITY; ghost++) {
+                DodgeTrail.Snapshot snapshot = player.dodgeTrail.snapshots[ghost];
+                if (snapshot.ttl > 0 && visibleActor(camera, snapshot.x, snapshot.y,
+                    art.actor(ActorAnimation.actor(snapshot.hero)), 1f))
+                    add(DODGE_GHOST, i * DodgeTrail.CAPACITY + ghost, snapshot.x, snapshot.y);
+            }
             boolean body = visibleActor(camera, player.x, player.y,
                 art.actor(ActorAnimation.actor(player.hero)), 1f);
             boolean level = player.alive && world.levelUpFxAge < art.vfx.duration(VfxArt.Animation.LEVEL_UP)
@@ -392,7 +399,7 @@ public final class ArenaRenderer implements Disposable {
         batch.setColor(1f, 1f, 1f, .62f);
         for (int i = 0; i < sortCount; i++) {
             int index = indices[i]; float x, y, width;
-            if (types[i] == PAINTED_BORDER) continue;
+            if (types[i] == PAINTED_BORDER || types[i] == DODGE_GHOST) continue;
             if (types[i] == PLAYER) {
                 ArenaWorld.Player player = world.players[index];
                 x = player.x; y = player.y; width = player.alive ? 62f : 72f;
@@ -497,12 +504,15 @@ public final class ArenaRenderer implements Disposable {
         dx /= length; dy /= length;
         // The painted energy tail rotates with projected world velocity, never a screen-space target line.
         for (int ghost = 2; ghost >= 1; ghost--) {
+            float sampleAge = age - ghost * .025f;
+            if (sampleAge < 0) continue;
             batch.setColor(1f, 1f, 1f, ghost == 1 ? .2f : .09f);
-            art.projectiles.draw(batch, type, age - ghost * .025f,
-                x - dx * ghost * 9f, y - dy * ghost * 9f, scale, angle);
+            art.projectiles.draw(batch, type, sampleAge,
+                x - dx * ghost * 9f, y - dy * ghost * 9f,
+                scale * ProjectilePresentation.spawnScale(sampleAge), angle);
         }
         batch.setColor(Color.WHITE);
-        art.projectiles.draw(batch, type, age, x, y, scale, angle);
+        art.projectiles.draw(batch, type, age, x, y, scale * ProjectilePresentation.spawnScale(age), angle);
     }
 
     private void drawHazards(ArenaWorld world, OrthographicCamera camera, SpriteEffectArt.Layer layer) {
@@ -569,12 +579,14 @@ public final class ArenaRenderer implements Disposable {
         drawAura(age, x, y, radius, EnemyAttackArt.Layer.ALL);
     }
 
-    /** Glowing double rings stay tight to the feet and independent of targeting/damage radii. */
+    /** One simple outline shares the primary attack's live acquisition radius. */
     private void drawPlayerAuras(ArenaWorld world, OrthographicCamera camera) {
         for (ArenaWorld.Player player : world.players) {
             if (!player.active || !player.alive) continue;
-            if (!visible(camera, player.x, player.y, PlayerFootRing.RADIUS)) continue;
-            playerFootRing.draw(batch, screenX(player.x, player.y), screenY(player.x, player.y), player.slot);
+            float radius = world.primaryAttackRange(player);
+            if (!visible(camera, player.x, player.y, radius + 3f, radius + 3f,
+                radius * .5f + 3f, radius * .5f + 3f)) continue;
+            playerFootRing.draw(batch, screenX(player.x, player.y), screenY(player.x, player.y), radius, player.slot);
         }
         batch.setColor(Color.WHITE);
     }
@@ -802,6 +814,15 @@ public final class ArenaRenderer implements Disposable {
                 paintedBorders.draw(batch, index);
             } else if (types[i] == PROP) {
                 drawEnvironment(world, camera, viewer, index);
+            } else if (types[i] == DODGE_GHOST) {
+                int owner = index / DodgeTrail.CAPACITY;
+                DodgeTrail.Snapshot snapshot = world.players[owner].dodgeTrail.snapshots[index % DodgeTrail.CAPACITY];
+                GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(snapshot.hero));
+                int frame = actor.clip(snapshot.state, snapshot.facing).frame(snapshot.phase);
+                if (owner == 0) batch.setColor(1f, .9f, .75f, snapshot.alpha());
+                else batch.setColor(.65f, .95f, .95f, snapshot.alpha());
+                drawFrame(frame, snapshot.x, snapshot.y, actor.pixelScale);
+                batch.setColor(Color.WHITE);
             } else if (types[i] == ENEMY) {
                 ArenaWorld.Enemy enemy = world.enemies[index];
                 float scale = enemyScale(enemy);
@@ -857,18 +878,6 @@ public final class ArenaRenderer implements Disposable {
                         52f * Math.min(1f, player.reviveProgress / 2f), REVIVE_BAR_HEIGHT);
                     batch.setColor(Color.WHITE);
                     continue;
-                }
-                if (player.dodgeTime > 0f) {
-                    batch.setColor(index == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO);
-                    batch.draw(art.glow, sx - 47f, sy - 10f, 94f, 58f);
-                    for (int ghost = 2; ghost >= 1; ghost--) {
-                        float distance = ghost * 13f;
-                        if (index == 0) batch.setColor(1f, .82f, .58f, ghost == 1 ? .19f : .1f);
-                        else batch.setColor(.42f, .86f, .85f, ghost == 1 ? .19f : .1f);
-                        drawFrameOffset(frame, player.x, player.y, actor.pixelScale,
-                            -screenX(player.dodgeFacingX(), player.dodgeFacingY()) * distance,
-                            -screenY(player.dodgeFacingX(), player.dodgeFacingY()) * distance);
-                    }
                 }
                 drawLevelUp(world, player, VfxArt.Layer.BACK);
                 float alpha = player.invulnerable > 0f && ((int) (world.elapsed * 16f) & 1) == 0 ? .58f : 1f;
@@ -1010,12 +1019,15 @@ public final class ArenaRenderer implements Disposable {
         float x = screenX(player.x, player.y) + BOLT_ORIGIN[origin] * scale;
         float y = screenY(player.x, player.y) + BOLT_ORIGIN[origin + 1] * scale;
         float life = 1f - player.attackAge / .1f;
+        float emergence = ProjectilePresentation.spawnScale(player.attackAge);
         float dx = screenX(player.attackFacingX, player.attackFacingY), dy = screenY(player.attackFacingX, player.attackFacingY);
         float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
         batch.setColor(.48f, .88f, 1f, life * .65f);
-        batch.draw(art.glow, x - 18f, y - 18f, 36f, 36f);
+        float glowRadius = 18f * emergence;
+        batch.draw(art.glow, x - glowRadius, y - glowRadius, glowRadius * 2, glowRadius * 2);
         batch.setColor(1f, 1f, 1f, life * .85f);
-        art.projectiles.draw(batch, MagicProjectileArt.Type.RANGER, player.attackAge, x, y, .6f + life * .25f, angle);
+        art.projectiles.draw(batch, MagicProjectileArt.Type.RANGER, player.attackAge, x, y,
+            (.6f + life * .25f) * emergence, angle);
         batch.setColor(Color.WHITE);
     }
 
