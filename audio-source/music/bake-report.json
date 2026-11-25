@@ -1,0 +1,62 @@
+[
+  {
+    "name": "menu",
+    "seconds": 53.943628,
+    "bytes": 652437,
+    "sha256": "66bdd39bcda184ed12edfe63a6965477083e7f0c01384c2cc8865953a1b64640",
+    "decodedPeakDbfs": -8.231,
+    "loopBoundaryStep": 0.002986,
+    "sourceIntegratedLufs": -22.23,
+    "targetLufs": -23
+  },
+  {
+    "name": "arena",
+    "seconds": 97.565374,
+    "bytes": 1379458,
+    "sha256": "3ab6d5dc72d5e4b10c85e876a70f35e8d4b48c766e3d94f92f92d24163a95ac9",
+    "decodedPeakDbfs": -5.201,
+    "loopBoundaryStep": 0.001019,
+    "sourceIntegratedLufs": -9.79,
+    "targetLufs": -22
+  },
+  {
+    "name": "sovereign",
+    "seconds": 107.992018,
+    "bytes": 1494986,
+    "sha256": "ad0cb5c0eac7643bc6c2b1887e2620bed48030de26f032927e17e16271ab07f4",
+    "decodedPeakDbfs": -10.1,
+    "loopBoundaryStep": 0.002184,
+    "sourceIntegratedLufs": -12.79,
+    "targetLufs": -22
+  },
+  {
+    "name": "grave-king",
+    "seconds": 123.420612,
+    "bytes": 1748811,
+    "sha256": "b8a39d2d3b114ad68880c882f736f71065f28d91077ceba2c1c4a56f7c7da297",
+    "decodedPeakDbfs": -12.929,
+    "loopBoundaryStep": 0.003562,
+    "sourceIntegratedLufs": -6.92,
+    "targetLufs": -22
+  },
+  {
+    "name": "victory",
+    "seconds": 32.437506,
+    "bytes": 402055,
+    "sha256": "a8205067432730bf0ebeebfb68473acda2166ffd3b3211c82c5d3648aab3a374",
+    "decodedPeakDbfs": -11.064,
+    "loopBoundaryStep": 0.002082,
+    "sourceIntegratedLufs": -10.27,
+    "targetLufs": -22
+  },
+  {
+    "name": "defeat",
+    "seconds": 45.102449,
+    "bytes": 571630,
+    "sha256": "1a56866973cbd29ac6c05148df7e2e510966205ae3afdfe73f3da28058fa9083",
+    "decodedPeakDbfs": -11.951,
+    "loopBoundaryStep": 2e-06,
+    "sourceIntegratedLufs": -9.21,
+    "targetLufs": -22
+  }
+]

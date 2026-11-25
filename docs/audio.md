@@ -1,102 +1,110 @@
-# Audio foundation
+# Dark-fantasy audio
 
-The TV owns the mix. `GameAudio` plays short effects from simulation counters and
-explicit UI events; `SceneMusic` streams the background score. Phones remain silent
-controllers. No combat rules, timings or network messages depend on playback.
+The TV now ships a complete score and sampled effect bank. `GameAudio` owns short
+effects; `SceneMusic` owns one streamed track at a time. Phones remain silent.
+No combat rules, timings or network messages depend on playback.
 
-The repository already contains 21 original placeholder WAV effects, generated
-by `scripts/GenerateCombatAudio.py`. This foundation preserves them. It adds no
-soundtrack or newly generated effects; missing optional files produce silence.
+## Included score
 
-## Adding the score
-
-Place Ogg Vorbis files at these exact paths under `assets/`, then rebuild/restart:
-
-| Path | Plays during | Playback / fallback |
+| Runtime path under `assets/` | Scene | Source composition / author |
 | --- | --- | --- |
-| `audio/music/menu.ogg` | Home, lobby, character info | Loop; silence if absent |
-| `audio/music/arena.ogg` | Ordinary combat | Loop; silence if absent |
-| `audio/music/sovereign.ogg` | Living Hollow Sovereign | Loop; arena fallback |
-| `audio/music/grave-king.ogg` | Living Grave King, priority over Sovereign | Loop; Sovereign then arena fallback |
-| `audio/music/victory.ogg` | Victory and its Run Details | Once; menu fallback loops |
-| `audio/music/defeat.ogg` | Defeat and its Run Details | Once; menu fallback loops |
+| `audio/music/menu.ogg` | Home, lobby, character info | Dark Shrine Loop — qubodup; original Shrine by yd |
+| `audio/music/arena.ogg` | Ordinary combat | Menace — yd |
+| `audio/music/sovereign.ogg` | Living Hollow Sovereign | Determined Pursuit — Emma_MA |
+| `audio/music/grave-king.ogg` | Living Grave King, highest boss priority | Epic Boss Battle — Juhani Junkala / SubspaceAudio |
+| `audio/music/victory.ogg` | Victory and its Run Details | Medieval: Victory Theme — RandomMind |
+| `audio/music/defeat.ogg` | Defeat and its Run Details | Medieval: Defeat Theme — RandomMind |
 
-Use streaming `Music` for the score, never resident `Sound`. Only one native
-music stream is held at a time. Scene changes fade out over 0.6 seconds, release
-the old decoder, open the next track and fade in over 0.6 seconds. A fallback
-that resolves to the current track continues playing without restarting.
-A finished outcome track stays finished through Run Details, backgrounding and
-mute/unmute; leaving that scene allows it to play on a later run.
+The first four loop; outcomes play once and stay finished while browsing Run
+Details, including through backgrounding or mute/unmute. Tracks last 32–123
+seconds. Stereo 44.1 kHz Vorbis exports total **6,249,377 bytes (5.96 MiB)**.
+Menu is mastered to -23 LUFS and the other tracks to -22 LUFS, with headroom for
+combat effects and short boundary edits to avoid hard waveform steps.
 
-Manual pause, disconnect pause, Invite Player 2, and invitation character info
-pause the existing stream. Resuming continues its position. Phone skill/gear
-choices keep the current score at 25% of its configured level. The defeat
-transition pauses the score until Results appears. App backgrounding pauses
-music immediately and stops effects; returning does not resume a manually paused
-run. Music muted at 0% pauses instead of continuing inaudibly.
+A scene change fades out over 0.6 seconds, releases its decoder, then opens and
+fades in the next track over 0.6 seconds. Only one native music stream is held.
+Pause, disconnect pause, Invite and invitation character info preserve playback
+position. Phone skill/gear choices lower music to 25% of the configured level.
+The defeat transition pauses the score until Results. Backgrounding pauses
+music and stops/suppresses effects; it does not resume a paused run on return.
+Music at 0% pauses instead of continuing inaudibly.
 
-Absent/broken tracks are remembered for the app lifetime. Missing files are
-silent; decoder/setup failures are logged once and use the same fallback chain.
-Restart the app after adding or repairing a file. Stream opening occurs only at
-audible scene transitions, outside the simulation tick; decoder startup cost and
-loop boundaries still need checking with final assets on the physical TV.
+All six source releases are CC0. These are edited third-party compositions,
+not original compositions made for this game. Exact sources, authors, licenses,
+download hashes and processing steps are in
+[audio-source/music](../audio-source/music/README.md); credits also ship in
+`assets/audio/CREDITS.txt`.
 
-## Replacing or adding effects
+## Included effects
 
-`SoundCue` is the authoritative file/mixer catalog: path, duration in seconds,
-base volume, priority and minimum repeat interval. Existing effects cover weapon
-releases and contacts, critical hits, Dodge, hurt, death, healing, pickups,
-secondary abilities, enemy attacks, level-up, boss arrivals and outcomes.
-The legacy `hit.wav` remains packaged but has no active routing.
+All 27 event slots have sampled sounds. Physical blades, cloth, leather, armor,
+coins, stone/body impacts, bells and metal are layered with licensed fantasy
+swishes, shade/giant textures and a spell sound. Their recipes use trims,
+playback-speed edits, filtering and small room reflections. The old procedural
+beeps/noise have been replaced. No synthesis or DSP runs in the game loop.
 
-The following hooks are connected and await optional WAV files:
+Combat covers weapon releases/contacts, critical hits, Dodge, hurt, death,
+healing, pickups, secondary abilities and enemy attacks. Announcements cover
+level-up, boss arrivals, loot, falling/revival and outcomes. Remote focus,
+button activation and Back have small material clicks/latch sounds. `hit.wav`
+is retained for compatibility; actual weapon contacts have separate cues.
 
-| File under `assets/audio/` | Trigger |
-| --- | --- |
-| `ui-focus.wav` | A remote navigation action changes focused button |
-| `ui-confirm.wav` | A remote/touch button activates, including provided hero/results views |
-| `ui-back.wav` | Remote Back/Escape |
-| `loot.wav` | A personal equipment reward is earned |
-| `player-down.wav` | An existing participant falls while the party survives |
-| `revive.wav` | A fallen participant revives |
+The entire bank is **mono 22.05 kHz PCM16 WAV, 635,478 decoded bytes (0.606 MiB)**.
+Short actions last 0.11–0.60 seconds; announcements last up to 1.40 seconds.
+`SoundCue` defines paths, actual durations, gains, priorities and repeat gates.
+Six voices and four starts per frame bound overlap. Muted/gated/absent events
+are consumed, so resuming never replays a backlog. Menus and results also retire
+finished voices. Cosmetic combat pitch varies independently of simulation RNG;
+UI and ceremony cues retain their pitch. Missing replacement files remain safe.
 
-Use short mono PCM WAV exports. Current files use 22.05 kHz, 16-bit PCM and total
-236,146 PCM bytes. Update `SoundCue.seconds` to the actual replacement duration:
-voices are explicitly stopped after that duration, adjusted for cosmetic pitch,
-plus a 30 ms tail. UI and ceremony cues keep their original pitch; combat varies
-between 0.96 and 1.04 independently of the simulation's random stream. Keep gain
-conservative and check the combined mix on speakers; individual cue peaks do not
-establish that a crowded mix sounds clean.
+Source selections, original archive licenses, hashes and the full layer recipes
+are in [audio-source/effects](../audio-source/effects/README.md). All selected
+material is CC0; these are edited sample derivatives, not original recordings.
 
-Effects load once at startup. Six tracked voices and four starts per rendered
-frame bound overlap; important cues can replace lower-priority voices. Repeats
-are rate-limited independently. Counters are consumed even when muted, absent or
-rate-limited, so reconnect/resume/unmute never replays a backlog. Fresh joining
-and run reset do not emit false down/revive or arrival cues. Finished effects
-are retired during menus/results as well as gameplay. Missing optional effects
-are safe; present files that fail to load are logged once during startup.
-
-## Remote controls and resource limits
+## Settings and replacement
 
 Home Settings -> Audio and Pause -> Audio expose Master, Music and Effects in
-25% steps (100% wraps to 0%). Changing one row keeps its focus. Values persist in
-local `couch-crypt` preferences. Effective output is master multiplied by the
-channel volume, then the cue gain or choice duck. An old `sound=false` preference
-migrates to master mute, preserving the user's silent setup. First-use defaults
-are Master 100%, Music 65%, Effects 100%.
+25% steps; 100% wraps to mute. Focus stays on the changed row. Defaults are
+Master 100%, Music 65%, Effects 100%. The old Sound-off preference migrates to
+master mute. Effective gain is master × channel × cue gain (or choice duck).
+Live effect volumes update immediately; muted voices stop.
 
-A volume change updates live effects immediately. Muting stops those voices;
-backgrounding also suppresses UI effects. Music keeps its stream when paused or
-muted and releases it on replacement/disposal. No audio resources are allocated
-per simulation tick and no GPU textures are added. Native decoder/mixer memory
-is separate from the 32 MiB texture ceiling; real soundtrack sizes, startup cost,
-perceived loudness and physical-TV performance remain to be measured.
+Replace files at their existing paths, then rebuild/restart. Update
+`SoundCue.seconds` if an effect's duration changes, or the bounded mixer will
+stop it at the old lifetime. Optional music fallback remains:
+Sovereign -> arena; Grave King -> Sovereign -> arena; results -> looping menu.
+Missing/broken tracks are remembered until restart, with setup failures logged
+once. Source conversion and stream opening occur outside the simulation tick.
 
-## Verification
+To rebuild with the pinned offline tooling dependencies:
 
-Focused fake-backend checks cover independent weapon gates, priorities and voice
-limits, stale-event consumption, live volume changes, optional cues, menu-frame
-retirement, loot/down/revive routing, preference migration/persistence, and music
-fade/disposal/fallback/pause/completion. Desktop compilation and Android debug
-packaging also pass with JDK 21. These checks do not prove audible output or
-hardware audio-focus behavior. No soundtrack files are included yet.
+```sh
+python3 -m venv .run/audio-tools
+.run/audio-tools/bin/pip install -r audio-source/requirements.txt
+.run/audio-tools/bin/python scripts/BakeSoundEffects.py
+.run/audio-tools/bin/python scripts/BakeMusic.py
+.run/audio-tools/bin/python scripts/ValidateAudio.py
+```
+
+The legacy `GenerateCombatAudio.py` command forwards to the sampled bake.
+Selected effect masters are retained outside runtime assets. Full music masters
+are downloaded to an ignored cache with pinned source hashes. No GPU textures
+are added; native audio decoder/mixer memory is separate from the texture limit.
+
+## Verification and listening
+
+The bake checks every source hash and effect's reproducible PCM, format,
+duration, non-silence, headroom and zero-valued endpoints. The score check
+decodes all six Vorbis files and validates metadata, lengths, peak headroom,
+loop boundary steps and output receipts. Focused fake-backend tests cover
+voice caps, event routing, stale-event consumption, volume persistence/migration,
+pause/fade/disposal/fallback and completed one-shot behavior. Desktop compilation
+and Android debug packaging are checked with JDK 21.
+
+These checks do not establish how the mix sounds on TV speakers. Human review
+should check music/effects balance, repeated weapon sounds, boss contrast,
+choice ducking and pause/background behavior. A brief Android TV API 33 launch reported native MediaPlayer music and SoundPool
+UI playback, with the same music player pausing/resuming through backgrounding;
+remote Audio settings rendered correctly. The APK matched all 34 audio/credit
+files byte-for-byte. Automated waveform checks and native playback state are not
+a listening review or a sustained physical-TV performance result.

@@ -1,0 +1,31 @@
+COUCH CRYPT — AUDIO CREDITS
+Music and source sound materials: CC0 1.0 Universal.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+MUSIC (adapted/mastered for the game)
+Dark Shrine Loop — qubodup; original Shrine by yd
+https://opengameart.org/content/dark-shrine-loop
+Menace — yd
+https://opengameart.org/content/menace
+Determined Pursuit — Emma_MA
+https://opengameart.org/content/determined-pursuit-epic-orchestra-loop
+Epic Boss Battle [Seamlessly Looping] — Juhani Junkala (SubspaceAudio)
+https://opengameart.org/content/boss-battle-music
+Medieval: Victory Theme — RandomMind
+https://opengameart.org/content/medieval-victory-theme
+Medieval: Defeat Theme — RandomMind
+https://opengameart.org/content/medieval-defeat-theme
+
+EFFECT SOURCE PACKS (edited/layered for the game)
+rpg-audio — Kenney Vleugels / Kenney.nl
+https://kenney.nl/assets/rpg-audio
+impact-sounds — Kenney Vleugels / Kenney.nl
+https://kenney.nl/assets/impact-sounds
+interface-sounds — Kenney Vleugels / Kenney.nl
+https://kenney.nl/assets/interface-sounds
+oga-rpg-sound-pack — artisticdude
+https://opengameart.org/content/rpg-sound-pack
+
+Edits include trims, playback-speed changes, filtering, material layering,
+short room reflections, loudness mastering, loop overlaps and format conversion.
+Recipes, source hashes and original license records: audio-source/ in the repository.

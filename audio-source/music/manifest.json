@@ -1,0 +1,96 @@
+{
+  "retrieved": "2026-11-25",
+  "format": {
+    "codec": "libvorbis",
+    "quality": 3,
+    "sampleRate": 44100,
+    "channels": 2
+  },
+  "tracks": [
+    {
+      "name": "menu",
+      "title": "Dark Shrine Loop",
+      "author": "qubodup; original Shrine by yd",
+      "sourcePage": "https://opengameart.org/content/dark-shrine-loop",
+      "downloadUrl": "https://opengameart.org/sites/default/files/qubodup-yd-DarkShrineLoop-OpenGameArt.flac",
+      "sourceFile": "menu.flac",
+      "sourceSha256": "ff2df07dae6157c9416027fe935077348026d94ed20513f0b3c79f78a519ba0f",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "loop": true,
+      "targetLufs": -23,
+      "crossfadeSeconds": 1.5,
+      "trimTail": true
+    },
+    {
+      "name": "arena",
+      "title": "Menace",
+      "author": "yd",
+      "sourcePage": "https://opengameart.org/content/menace",
+      "downloadUrl": "https://opengameart.org/sites/default/files/Menace.ogg",
+      "sourceFile": "arena.ogg",
+      "sourceSha256": "c47cc4946945003a324ab79e8e5bed1f78bd099ce1dfcea9265d0309051c4bc3",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "loop": true,
+      "targetLufs": -22,
+      "crossfadeSeconds": 0.15
+    },
+    {
+      "name": "sovereign",
+      "title": "Determined Pursuit",
+      "author": "Emma_MA",
+      "sourcePage": "https://opengameart.org/content/determined-pursuit-epic-orchestra-loop",
+      "downloadUrl": "https://opengameart.org/sites/default/files/determined_pursuit_loop.wav",
+      "sourceFile": "sovereign.wav",
+      "sourceSha256": "e4f3be098b50213b56a60aefe60fffae79cd9f7c9008088f93c187ef1bbc856b",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "loop": true,
+      "targetLufs": -22,
+      "crossfadeSeconds": 0.008
+    },
+    {
+      "name": "grave-king",
+      "title": "Epic Boss Battle [Seamlessly Looping]",
+      "author": "Juhani Junkala (SubspaceAudio)",
+      "sourcePage": "https://opengameart.org/content/boss-battle-music",
+      "downloadUrl": "https://opengameart.org/sites/default/files/Juhani%20Junkala%20-%20Epic%20Boss%20Battle%20%5BSeamlessly%20Looping%5D.wav",
+      "sourceFile": "grave-king.wav",
+      "sourceSha256": "35f75b4381dfbb053992876f7dfc567d9fd959d61b73954d5b1cd519753e7df1",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "loop": true,
+      "targetLufs": -22,
+      "crossfadeSeconds": 0.008
+    },
+    {
+      "name": "victory",
+      "title": "Medieval: Victory Theme",
+      "author": "RandomMind",
+      "sourcePage": "https://opengameart.org/content/medieval-victory-theme",
+      "downloadUrl": "https://opengameart.org/sites/default/files/victory.wav",
+      "sourceFile": "victory.wav",
+      "sourceSha256": "91f35879d31091cdeb38721fb4d985a0e7363c0caa97d738ec879bf96e8538f4",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "loop": false,
+      "targetLufs": -22,
+      "crossfadeSeconds": 0
+    },
+    {
+      "name": "defeat",
+      "title": "Medieval: Defeat Theme",
+      "author": "RandomMind",
+      "sourcePage": "https://opengameart.org/content/medieval-defeat-theme",
+      "downloadUrl": "https://opengameart.org/sites/default/files/defeat.wav",
+      "sourceFile": "defeat.wav",
+      "sourceSha256": "832a9062921000cde7044f18838d11682c578067db0c60a124d95473bb122fc8",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "loop": false,
+      "targetLufs": -22,
+      "crossfadeSeconds": 0
+    }
+  ]
+}
