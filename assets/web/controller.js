@@ -8,7 +8,8 @@
   let lastSeen = Date.now();
   let memoryToken = '';
   const controls = byId('game-controls'), joystick = byId('joystick'), stick = byId('stick'), dodgeButton = byId('dodge');
-  const dodgeStatus = byId('dodge-status');
+  const dodgeStatus = byId('dodge-status'), movementZone = byId('movement-zone');
+  const portraitOrientation = window.matchMedia('(orientation: portrait)');
   const upgradeChoices = byId('upgrade-choices'), upgradeLevel = byId('upgrade-level'), upgradeCountdown = byId('upgrade-countdown');
   const upgradeSecondsLabel = byId('upgrade-seconds'), upgradeTimerLabel = byId('upgrade-timer-label');
   const upgradeButtons = [0, 1, 2].map((index) => byId(`upgrade-option-${index}`));
@@ -19,7 +20,7 @@
   let choiceKind = 'upgrade';
   let upgradeSelected = -1, upgradePendingSince = 0;
   let phase = 'lobby', hostActive = false, alive = true, foreground = true, sender, sequence = 0;
-  let axisX = 0, axisY = 0, dodgeEdge = false, stickPointer = null, dodgePointer = null, stickBounds;
+  let axisX = 0, axisY = 0, dodgeEdge = false, stickPointer = null, dodgePointer = null, stickBounds, stickOriginX = 0, stickOriginY = 0;
   const keys = new Set();
 
   function preventGameplayGesture(event) {
@@ -34,7 +35,7 @@
     document.addEventListener(name, preventGameplayGesture, { passive: false });
   });
 
-  function canControl() { return joined && !upgradeOffer && phase === 'session' && hostActive && alive && foreground && !document.hidden && socket?.readyState === WebSocket.OPEN; }
+  function canControl() { return portraitOrientation.matches && joined && !upgradeOffer && phase === 'session' && hostActive && alive && foreground && !document.hidden && socket?.readyState === WebSocket.OPEN; }
   function sendInput() {
     if (socket?.readyState !== WebSocket.OPEN || !joined) return;
     // Never queue movement behind a stalled network connection. The host expires it in 300ms.
@@ -48,8 +49,9 @@
     axisX = axisY = 0; dodgeEdge = false; keys.clear();
     const oldStick = stickPointer, oldDodge = dodgePointer;
     stickPointer = dodgePointer = null;
-    if (oldStick !== null && joystick.hasPointerCapture(oldStick)) joystick.releasePointerCapture(oldStick);
+    if (oldStick !== null && movementZone.hasPointerCapture(oldStick)) movementZone.releasePointerCapture(oldStick);
     if (oldDodge !== null && dodgeButton.hasPointerCapture(oldDodge)) dodgeButton.releasePointerCapture(oldDodge);
+    joystick.style.left = joystick.style.top = '';
     joystick.classList.remove('engaged'); dodgeButton.classList.remove('pressed'); paintStick(0, 0, 0);
     if (send) sendInput();
   }
@@ -71,7 +73,7 @@
       || phase === 'loot' && choiceKind === 'equipment';
   }
   function canChooseUpgrade() {
-    return joined && choicePhaseActive() && hostActive && foreground && !document.hidden && socket?.readyState === WebSocket.OPEN;
+    return portraitOrientation.matches && joined && choicePhaseActive() && hostActive && foreground && !document.hidden && socket?.readyState === WebSocket.OPEN;
   }
   function remainingUpgradeSeconds() {
     // Interpolation is display-only. Only the host resolves expiry or applies an upgrade.
@@ -215,23 +217,32 @@
   function movePointer(event) {
     if (event.pointerId !== stickPointer || !canControl()) return;
     const radius = stickBounds.width * .34;
-    let x = (event.clientX - stickBounds.left - stickBounds.width / 2) / radius;
-    let y = (stickBounds.top + stickBounds.height / 2 - event.clientY) / radius;
+    let x = (event.clientX - stickOriginX) / radius;
+    let y = (stickOriginY - event.clientY) / radius;
     const length = Math.hypot(x, y);
     if (length > 1) { x /= length; y /= length; }
     axisX = x; axisY = y; paintStick(x, y, radius); event.preventDefault();
   }
-  joystick.addEventListener('pointerdown', (event) => {
+  movementZone.addEventListener('pointerdown', (event) => {
     if (!canControl() || stickPointer !== null) return;
-    stickPointer = event.pointerId; stickBounds = joystick.getBoundingClientRect();
-    joystick.setPointerCapture(event.pointerId); joystick.classList.add('engaged'); movePointer(event); sendInput();
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    stickPointer = event.pointerId;
+    stickOriginX = event.clientX; stickOriginY = event.clientY;
+    const zone = movementZone.getBoundingClientRect();
+    // Each fresh drag starts at the thumb, even outside the previous visible ring.
+    joystick.style.left = `${stickOriginX - zone.left}px`;
+    joystick.style.top = `${stickOriginY - zone.top}px`;
+    stickBounds = joystick.getBoundingClientRect();
+    movementZone.setPointerCapture(event.pointerId); joystick.classList.add('engaged'); movePointer(event); sendInput();
   });
-  joystick.addEventListener('pointermove', movePointer);
+  movementZone.addEventListener('pointermove', movePointer);
   function endStick(event) {
     if (event.pointerId !== stickPointer) return;
-    stickPointer = null; axisX = axisY = 0; joystick.classList.remove('engaged'); paintStick(0, 0, 0); sendInput();
+    stickPointer = null; axisX = axisY = 0;
+    if (movementZone.hasPointerCapture(event.pointerId)) movementZone.releasePointerCapture(event.pointerId);
+    joystick.style.left = joystick.style.top = ''; joystick.classList.remove('engaged'); paintStick(0, 0, 0); sendInput();
   }
-  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((name) => joystick.addEventListener(name, endStick));
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((name) => movementZone.addEventListener(name, endStick));
   dodgeButton.addEventListener('pointerdown', (event) => {
     if (!canControl() || dodgeButton.disabled || dodgePointer !== null) return;
     event.preventDefault(); dodgePointer = event.pointerId; dodgeButton.setPointerCapture(event.pointerId);
@@ -259,7 +270,8 @@
   window.addEventListener('keyup', (event) => { if (keys.delete(event.key.toLowerCase())) { keyboardAxes(); sendInput(); } });
   window.addEventListener('blur', () => { foreground = false; refreshSender(); paintUpgrade(); });
   window.addEventListener('focus', () => { foreground = true; refreshSender(); paintUpgrade(); });
-  window.addEventListener('resize', () => releaseControls());
+  window.addEventListener('resize', () => { releaseControls(); refreshSender(); paintUpgrade(); });
+  portraitOrientation.addEventListener('change', () => { releaseControls(); refreshSender(); paintUpgrade(); });
 
   function token(value) {
     const key = `couch-crypt:${location.host}:${room}`;
