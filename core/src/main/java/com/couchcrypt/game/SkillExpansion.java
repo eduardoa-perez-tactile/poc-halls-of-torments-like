@@ -165,6 +165,7 @@ public final class SkillExpansion {
     }
 
     private void updateDelayed() {
+        ArenaWorld.Diagnostics diagnostics = world.diagnostics();
         for (DelayedStrike strike : delayed) {
             if (!strike.active) continue;
             ArenaWorld.Player owner = world.players[strike.owner];
@@ -176,6 +177,7 @@ public final class SkillExpansion {
                     ArenaWorld.Enemy enemy = world.enemies[i];
                     if (!enemy.active || (strike.excludedMask & 1L << i) != 0
                         && strike.excludedGenerations[i] == enemy.spawnId) continue;
+                    if (diagnostics != null) diagnostics.expansionCollisionCandidates++;
                     float dx = enemy.x - strike.x, dy = enemy.y - strike.y;
                     float range = strike.radius + (strike.kind == StrikeKind.REAP ? enemy.radius : 0);
                     if (dx * dx + dy * dy > range * range) continue;
@@ -189,6 +191,7 @@ public final class SkillExpansion {
     }
 
     private void updateOrbiters(ArenaWorld.Player player) {
+        ArenaWorld.Diagnostics diagnostics = world.diagnostics();
         int count = player.sentinelLevel > 0 ? sentinelCount(player.sentinelLevel) : 0;
         player.sentinelAngle = (player.sentinelAngle + ArenaWorld.STEP * 1.8f) % TAU;
         for (int i = 0; i < 4; i++) {
@@ -202,8 +205,9 @@ public final class SkillExpansion {
             for (int index = 0; index < world.enemies.length; index++) {
                 blade.contactClocks[index] = Math.max(0, blade.contactClocks[index] - ArenaWorld.STEP);
                 ArenaWorld.Enemy enemy = world.enemies[index];
-                if (!enemy.active || blade.contactClocks[index] > 0 && blade.contactGenerations[index] == enemy.spawnId
-                    || distanceSquared(blade.x, blade.y, enemy.x, enemy.y) > square(enemy.radius + 12)) continue;
+                if (!enemy.active || blade.contactClocks[index] > 0 && blade.contactGenerations[index] == enemy.spawnId) continue;
+                if (diagnostics != null) diagnostics.expansionCollisionCandidates++;
+                if (distanceSquared(blade.x, blade.y, enemy.x, enemy.y) > square(enemy.radius + 12)) continue;
                 blade.contactClocks[index] = sentinelInterval(); blade.contactGenerations[index] = enemy.spawnId;
                 damage(enemy, sentinelDamage(player.sentinelLevel) * world.equipment.damageMultiplier(player), player.slot,
                     ArenaWorld.ImpactKind.MAGIC, enemy.x - blade.x, enemy.y - blade.y);
@@ -230,6 +234,7 @@ public final class SkillExpansion {
     }
 
     private void updateFields() {
+        ArenaWorld.Diagnostics diagnostics = world.diagnostics();
         for (GroundField field : fields) {
             if (!field.active) continue;
             ArenaWorld.Player owner = world.players[field.owner];
@@ -238,9 +243,12 @@ public final class SkillExpansion {
             if (field.ttl <= 0) { field.active = false; continue; }
             if (field.pulseClock <= .000001f) {
                 field.pulseClock += fieldInterval();
-                for (ArenaWorld.Enemy enemy : world.enemies)
-                    if (enemy.active && distanceSquared(enemy.x, enemy.y, field.x, field.y) <= square(field.radius))
+                for (ArenaWorld.Enemy enemy : world.enemies) {
+                    if (!enemy.active) continue;
+                    if (diagnostics != null) diagnostics.expansionCollisionCandidates++;
+                    if (distanceSquared(enemy.x, enemy.y, field.x, field.y) <= square(field.radius))
                         damage(enemy, field.damage, field.owner, ArenaWorld.ImpactKind.MAGIC, enemy.x - field.x, enemy.y - field.y);
+                }
             }
         }
     }
@@ -259,6 +267,7 @@ public final class SkillExpansion {
     }
 
     private void updateGlaives() {
+        ArenaWorld.Diagnostics diagnostics = world.diagnostics();
         for (Glaive glaive : glaives) {
             if (!glaive.active) continue;
             ArenaWorld.Player owner = world.players[glaive.owner];
@@ -274,8 +283,9 @@ public final class SkillExpansion {
             glaive.y = clamp(glaive.y + glaive.vy * travel, -ArenaWorld.HALF_HEIGHT, ArenaWorld.HALF_HEIGHT);
             for (int i = 0; i < world.enemies.length; i++) {
                 ArenaWorld.Enemy enemy = world.enemies[i];
-                if (!enemy.active || glaive.hitGenerations[i] == enemy.spawnId
-                    || segmentDistanceSquared(oldX, oldY, glaive.x, glaive.y, enemy.x, enemy.y) > square(enemy.radius + 12)) continue;
+                if (!enemy.active || glaive.hitGenerations[i] == enemy.spawnId) continue;
+                if (diagnostics != null) diagnostics.expansionCollisionCandidates++;
+                if (segmentDistanceSquared(oldX, oldY, glaive.x, glaive.y, enemy.x, enemy.y) > square(enemy.radius + 12)) continue;
                 glaive.hitGenerations[i] = enemy.spawnId;
                 damage(enemy, glaive.damage, glaive.owner, ArenaWorld.ImpactKind.BOLT, glaive.vx, glaive.vy);
             }
@@ -288,13 +298,18 @@ public final class SkillExpansion {
     }
 
     private void updateRelics() {
+        ArenaWorld.Diagnostics diagnostics = world.diagnostics();
         // Five rare discoveries across either authored timeline; never share the combat/chest RNG stream.
         if (relicsPlaced < 5 && world.elapsed >= world.durationSeconds() * (.13f + relicsPlaced * .19f)) {
             WorldRelic available = null;
             for (WorldRelic relic : relics) if (!relic.active) { available = relic; break; }
-            if (available != null && placeRelic(available)) {
+            if (available == null) {
+                if (diagnostics != null) diagnostics.relicPoolBlockedTicks++;
+            } else if (placeRelic(available)) {
                 available.kind = (relicsPlaced & 1) == 0 ? RelicKind.SOUL_HARVEST : RelicKind.STASIS;
                 available.active = true; available.age = 0; relicsPlaced++;
+            } else if (diagnostics != null) {
+                diagnostics.relicPlacementMisses++;
             }
         }
         for (WorldRelic relic : relics) {

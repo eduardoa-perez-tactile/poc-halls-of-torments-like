@@ -1,6 +1,7 @@
 package com.couchcrypt.game;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
@@ -24,9 +25,10 @@ final class SkillExpansionArt {
     }
 
     /** Friendly fields stay faint and flat, before hostile warnings and all bodies. */
-    void ground(SpriteBatch batch, ArenaWorld world) {
+    void ground(SpriteBatch batch, ArenaWorld world, OrthographicCamera camera) {
         for (SkillExpansion.GroundField field : world.skills.fields) {
-            if (!field.active) continue;
+            if (!field.active || !visible(camera, sx(field.x, field.y), sy(field.x, field.y),
+                field.radius, field.radius * .5f)) continue;
             float fade = Math.min(1f, field.ttl / .45f);
             float radius = field.radius;
             accent(batch, field.owner, .32f * fade);
@@ -34,7 +36,8 @@ final class SkillExpansionArt {
                 radius * 2, radius);
         }
         for (ArenaWorld.Enemy enemy : world.enemies) {
-            if (!enemy.active || enemy.slowTime <= 0) continue;
+            if (!enemy.active || enemy.slowTime <= 0
+                || !visible(camera, sx(enemy.x, enemy.y), sy(enemy.x, enemy.y), 11f, 5.5f)) continue;
             batch.setColor(.60f, .86f, 1f, .4f * Math.min(1f, enemy.slowTime / .25f));
             batch.draw(frost, sx(enemy.x, enemy.y) - 11f, sy(enemy.x, enemy.y) - 5.5f, 22f, 11f);
         }
@@ -43,11 +46,13 @@ final class SkillExpansionArt {
             float fade = strike.fired ? MathUtils.clamp(strike.ttl / .22f, 0, 1) : .2f;
             TextureRegion glyph = strike.kind == SkillExpansion.StrikeKind.ECHO ? echo : shatter;
             float radius = Math.min(52f, strike.radius) * .70710678f;
+            if (!visible(camera, sx(strike.x, strike.y), sy(strike.x, strike.y), radius, radius * .5f)) continue;
             accent(batch, strike.owner, .6f * fade);
             batch.draw(glyph, sx(strike.x, strike.y) - radius, sy(strike.x, strike.y) - radius * .5f,
                 radius * 2, radius);
         }
-        for (SkillExpansion.WorldRelic relic : world.skills.relics) if (relic.active) {
+        for (SkillExpansion.WorldRelic relic : world.skills.relics) if (relic.active
+            && visible(camera, sx(relic.x, relic.y), sy(relic.x, relic.y), 23f, 11.5f)) {
             boolean cold = relic.kind == SkillExpansion.RelicKind.STASIS;
             batch.setColor(cold ? .40f : .76f, cold ? .77f : .90f, cold ? 1f : .55f, .25f);
             batch.draw(glow, sx(relic.x, relic.y) - 23f, sy(relic.x, relic.y) - 11.5f, 46f, 23f);
@@ -90,11 +95,13 @@ final class SkillExpansionArt {
     }
 
     /** Follow-up strike remains compact regardless of acquired reach, like the main sword trail. */
-    void followups(SpriteBatch batch, ArenaWorld world) {
+    void followups(SpriteBatch batch, ArenaWorld world, OrthographicCamera camera) {
         for (SkillExpansion.DelayedStrike strike : world.skills.delayed) {
             if (!strike.active || !strike.fired || strike.kind != SkillExpansion.StrikeKind.REAP) continue;
             float fade = MathUtils.clamp(strike.ttl / .22f, 0, 1);
             float x = strike.x + strike.dirX * 36f, y = strike.y + strike.dirY * 36f;
+            // A rotated 54-unit square fits inside this conservative half-diagonal on either axis.
+            if (!visible(camera, sx(x, y), sy(x, y) + 35f, 39f, 39f)) continue;
             accent(batch, strike.owner, .55f * fade);
             rotated(batch, reap, sx(x, y), sy(x, y) + 35f, 54f,
                 MathUtils.atan2(sy(strike.dirX, strike.dirY), sx(strike.dirX, strike.dirY)) * MathUtils.radiansToDegrees);
@@ -110,6 +117,12 @@ final class SkillExpansionArt {
     private static void accent(SpriteBatch batch, int owner, float alpha) {
         if (owner == 0) batch.setColor(1f, .90f, .69f, alpha);
         else batch.setColor(.64f, .97f, .94f, alpha);
+    }
+
+    static boolean visible(OrthographicCamera camera, float x, float y, float halfWidth, float halfHeight) {
+        // Keep one projected unit of sampling tolerance at pane edges; never crop the effect itself.
+        return Math.abs(x - camera.position.x) <= camera.viewportWidth * camera.zoom * .5f + halfWidth + 1f
+            && Math.abs(y - camera.position.y) <= camera.viewportHeight * camera.zoom * .5f + halfHeight + 1f;
     }
 
     private static float sx(float x, float y) { return (x - y) * .70710678f; }

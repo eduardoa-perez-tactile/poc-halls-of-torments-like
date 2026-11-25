@@ -12,6 +12,18 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SceneMusicTest {
+    @Test void settledMusicGainDoesNotRepeatNativeVolumeCallsUntilTheMixChanges() {
+        Streams streams = new Streams("menu"); SceneMusic music = new SceneMusic(streams);
+        try {
+            settle(music, SceneMusic.Scene.MENU, .8f);
+            Stream menu = streams.last(); int before = menu.volumeWrites;
+            for (int i = 0; i < 120; i++) music.update(SceneMusic.Scene.MENU, .8f, false, .016f);
+            assertEquals(before, menu.volumeWrites);
+            music.update(SceneMusic.Scene.MENU, .4f, false, .016f);
+            assertEquals(before + 1, menu.volumeWrites);
+            assertEquals(.4f, menu.volume, .001f);
+        } finally { music.dispose(); }
+    }
     @Test void transitionsFadeAndReleaseDecoderBeforeOpeningNext() {
         Streams streams = new Streams("menu", "arena");
         SceneMusic music = new SceneMusic(streams);
@@ -213,7 +225,7 @@ class SceneMusicTest {
         final String name;
         boolean playing, loop, disposed;
         float volume, position;
-        int plays, pauses, disposals;
+        int plays, pauses, disposals, volumeWrites;
         Music.OnCompletionListener completion;
         Stream(Streams owner, String name) {
             this.name = name;
@@ -224,6 +236,7 @@ class SceneMusicTest {
                     case "isPlaying" -> { return playing; }
                     case "setLooping" -> loop = (boolean) args[0];
                     case "setVolume" -> {
+                        volumeWrites++;
                         volume = (float) args[0];
                         assertTrue(volume >= 0 && volume <= 1);
                     }

@@ -4,6 +4,81 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ArenaWorldDiagnosticsTest {
+    @Test void countsMeleeChecksSeparatelyAndReportsItsIndependentPoolSaturation() {
+        ArenaWorld world = solo(); world.setDiagnosticsEnabled(true);
+        enemy(world, 0, 30, 1000);
+        world.update(ArenaWorld.STEP);
+        assertTrue(world.diagnostics().meleeCollisionCandidates > 0);
+        assertEquals(0, world.diagnostics().boltCollisionCandidates);
+        assertEquals(0, world.diagnostics().expansionCollisionCandidates);
+        world.reset(); world.activatePlayer(0); enemy(world, 0, 30, 1000);
+        for (int i = 0; i < MeleeWave.PER_PLAYER; i++) {
+            world.meleeWaves[i].active = true; world.meleeWaves[i].owner = 0;
+        }
+        world.update(ArenaWorld.STEP);
+        assertEquals(1, world.diagnostics().meleeAcquireMisses);
+        assertEquals(0, world.swordSwings, "Saturation cannot create another wave");
+        world.reset();
+        assertEquals(0, world.diagnostics().meleeAcquireMisses);
+        assertEquals(0, world.diagnostics().meleeCollisionCandidates);
+    }
+
+    @Test void expansionCountingIsOptInAndDoesNotChangeCombatResults() {
+        ArenaWorld measured = expansionFixture(), ordinary = expansionFixture();
+        measured.setDiagnosticsEnabled(true);
+        measured.update(ArenaWorld.STEP); ordinary.update(ArenaWorld.STEP);
+        ArenaWorld.Diagnostics counters = measured.diagnostics();
+        assertTrue(counters.expansionCollisionCandidates > 0);
+        assertEquals(0, counters.boltCollisionCandidates);
+        assertEquals(ordinary.enemies[0].health, measured.enemies[0].health);
+        assertEquals(ordinary.players[0].damageDealt, measured.players[0].damageDealt);
+        long candidates = counters.expansionCollisionCandidates;
+        measured.setDiagnosticsEnabled(false);
+        measured.update(ArenaWorld.STEP); ordinary.update(ArenaWorld.STEP);
+        assertEquals(candidates, counters.expansionCollisionCandidates);
+        assertEquals(ordinary.enemies[0].health, measured.enemies[0].health);
+        measured.setDiagnosticsEnabled(true); measured.reset();
+        assertEquals(0, counters.expansionCollisionCandidates);
+    }
+
+    @Test void delayedStrikeSaturationRetainsFixedStorageAndReportsMisses() {
+        ArenaWorld world = solo();
+        SkillExpansion.DelayedStrike first = world.skills.delayed[0];
+        for (int i = 0; i <= SkillExpansion.MAX_DELAYED; i++) world.skills.echo(0, 0, 0, 10);
+        assertEquals(1, world.skills.delayedAcquireMisses);
+        assertEquals(SkillExpansion.MAX_DELAYED, world.skills.delayed.length);
+        assertSame(first, world.skills.delayed[0]);
+        for (SkillExpansion.DelayedStrike strike : world.skills.delayed) assertTrue(strike.active);
+        world.reset();
+        assertEquals(0, world.skills.delayedAcquireMisses);
+    }
+
+    @Test void relicDiagnosticsDistinguishFullPoolFromFailedPlacementAndStopWhenDisabled() {
+        ArenaWorld world = solo(); world.setDiagnosticsEnabled(true);
+        world.elapsed = world.durationSeconds() * .14f;
+        for (SkillExpansion.WorldRelic relic : world.skills.relics) {
+            relic.active = true; relic.x = 700;
+        }
+        world.skills.update();
+        assertEquals(1, world.diagnostics().relicPoolBlockedTicks);
+        assertEquals(0, world.diagnostics().relicPlacementMisses);
+        for (SkillExpansion.WorldRelic relic : world.skills.relics) relic.active = false;
+        // Cover every candidate position in the 240–500-unit placement annulus.
+        for (int i = 0; i < world.enemies.length; i++) {
+            enemy(world, i, -437.5f + i % 8 * 125, 1000);
+            world.enemies[i].y = -437.5f + i / 8 * 125;
+        }
+        world.skills.update();
+        ArenaWorld.Diagnostics counters = world.diagnostics();
+        assertEquals(1, counters.relicPlacementMisses);
+        assertEquals(0, world.skills.relicsPlaced);
+        world.setDiagnosticsEnabled(false); world.skills.update();
+        assertEquals(1, counters.relicPlacementMisses);
+        world.setDiagnosticsEnabled(true); world.reset();
+        assertEquals(0, counters.relicPoolBlockedTicks);
+        assertEquals(0, counters.relicPlacementMisses);
+    }
+
     @Test void stepCountDescribesOnlyTheLatestUpdateIncludingEarlyReturns() {
         ArenaWorld world = solo();
         world.update(20);
@@ -69,7 +144,9 @@ class ArenaWorldDiagnosticsTest {
         ArenaWorld measured = saturatedRewardFixture(true);
         ArenaWorld ordinary = saturatedRewardFixture(false);
         measured.update(ArenaWorld.STEP); ordinary.update(ArenaWorld.STEP);
-        assertEquals(3, measured.diagnostics().effectAcquireMisses, "Slash, contact and death cannot acquire a slot");
+        assertEquals(2, measured.diagnostics().effectAcquireMisses,
+            "Contact and death cannot acquire effects; the primary wave has its own pool");
+        assertTrue(measured.meleeWaves[0].active, "Effect saturation must not suppress the separate primary wave");
         assertEquals(1, measured.diagnostics().pickupMerges);
         assertEquals(1, measured.kills);
         assertEquals(2, measured.pickups[0].value);
@@ -142,6 +219,13 @@ class ArenaWorldDiagnosticsTest {
     }
 
     private static ArenaWorld solo() { ArenaWorld world = new ArenaWorld(); world.activatePlayer(0); return world; }
+
+    private static ArenaWorld expansionFixture() {
+        ArenaWorld world = solo(); enemy(world, 0, 400, 1000);
+        world.players[0].attackCooldown = 10;
+        world.players[0].sentinelLevel = world.players[0].consecrationLevel = world.players[0].glaiveLevel = 1;
+        return world;
+    }
 
     private static void enemy(ArenaWorld world, int index, float x, float health) {
         ArenaWorld.Enemy enemy = world.enemies[index];

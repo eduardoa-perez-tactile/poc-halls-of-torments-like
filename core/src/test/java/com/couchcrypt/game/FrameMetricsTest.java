@@ -7,6 +7,28 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class FrameMetricsTest {
+    @Test void worldPoolSnapshotIncludesExpansionAndKeepsFrameSampledPeaksAfterReset() {
+        FakeClock clock = new FakeClock();
+        List<String> logs = new ArrayList<>();
+        FrameMetrics metrics = new FrameMetrics(clock, logs::add);
+        ArenaWorld world = new ArenaWorld();
+        world.meleeWaves[0].active = world.meleeWaves[1].active = true;
+        world.skills.orbiters[0].active = world.skills.fields[0].active = world.skills.glaives[0].active = true;
+        world.skills.relics[0].active = world.skills.delayed[0].active = world.chests[0].active = true;
+        metrics.beginFrame(); metrics.recordPoolCounts(world); metrics.endFrame("coop", 1, 2, 3, 4);
+        world.reset();
+        metrics.beginFrame(); metrics.recordPoolCounts(world); metrics.endFrame("coop", 1, 2, 3, 4);
+        metrics.beginFrame(); metrics.endFrame("home", 1, 2, 3, 4);
+        metrics.beginFrame(); metrics.endFrame("lobby", 1, 2, 3, 4);
+        assertEquals(2, logs.size());
+        String combat = logs.get(0), home = logs.get(1);
+        assertTrue(combat.contains("meleeWaves[last=0,frameSampledPeak=2]"), combat);
+        for (String pool : new String[]{"orbiters", "fields", "glaives", "relics", "delayedStrikes", "chests"}) {
+            assertTrue(combat.contains(pool + "[last=0,frameSampledPeak=1]"), combat);
+            assertTrue(home.contains(pool + "[last=0,frameSampledPeak=0]"), home);
+        }
+    }
+
     @Test void rendererStagesNestInsideArenaAndRenderCountsResetAcrossPhases() {
         FakeClock clock = new FakeClock();
         List<String> logs = new ArrayList<>();
