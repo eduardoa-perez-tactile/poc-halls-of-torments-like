@@ -32,8 +32,8 @@ class EnemySizingTest {
         for (var kind : ArenaWorld.EnemyKind.values()) {
             float normal = EnemySizing.renderScale(kind, EnemyVariant.ORIGINAL, false);
             if (ArenaWorld.isBoss(kind)) {
-                assertEquals(2.2f, normal);
-                assertEquals(2.2f, EnemySizing.renderScale(kind, EnemyVariant.MOSS, true));
+                assertEquals(kind == ArenaWorld.EnemyKind.MOURNING_BELL ? 1.7f : 2.2f, normal);
+                assertEquals(normal, EnemySizing.renderScale(kind, EnemyVariant.MOSS, true));
                 assertEquals(54f, EnemySizing.groundRadius(kind, EnemyVariant.MOSS, true));
                 continue;
             }

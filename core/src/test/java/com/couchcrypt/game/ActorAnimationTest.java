@@ -92,4 +92,31 @@ class ActorAnimationTest {
         assertTrue(world.hostileShotsFired > 0);
         assertEquals(100, world.players[0].health);
     }
+
+    @Test void bellWarningJawAndRecoveryUseTheSameLockedFacingAndSecondBeatResetsPoseClock() {
+        ArenaWorld world = new ArenaWorld();
+        ArenaWorld.Enemy bell = world.enemies[0]; bell.kind = ArenaWorld.EnemyKind.MOURNING_BELL;
+        bell.attack = ArenaWorld.EnemyAttack.BELL_TOLL;
+        bell.castFacingX = -1; bell.castFacingY = 0;
+        bell.facingX = 1; bell.facingY = 0;
+        bell.windup = .6f; bell.castAge = .1f;
+        bell.attackAge = MourningBell.SECOND_TOLL_WARNING_START + .1f;
+        assertEquals(ActorAnimation.Actor.MOURNING_BELL, ActorAnimation.actor(bell.kind));
+        assertEquals(ActorAnimation.State.WINDUP, ActorAnimation.state(bell));
+        assertEquals(.1f, ActorAnimation.phase(bell, ActorAnimation.State.WINDUP));
+        bell.windup = 0; bell.releaseAge = .02f;
+        assertEquals(ActorAnimation.State.ATTACK, ActorAnimation.state(bell));
+        assertEquals(.02f, ActorAnimation.phase(bell, ActorAnimation.State.ATTACK));
+        bell.releaseAge = .4f;
+        assertEquals(ActorAnimation.State.IDLE, ActorAnimation.state(bell));
+        assertEquals(ActorAnimation.Facing.SW, ActorAnimation.facing(bell, ActorAnimation.State.IDLE),
+            "Recovery cannot turn the committed cast toward new movement");
+        float attackAge = bell.attackAge, castAge = bell.castAge;
+        for (int camera = 0; camera < 2; camera++) {
+            MourningBellPresentation.hover(world.elapsed);
+            MourningBellPresentation.tilt(bell);
+            ActorAnimation.phase(bell, ActorAnimation.state(bell));
+        }
+        assertEquals(attackAge, bell.attackAge); assertEquals(castAge, bell.castAge);
+    }
 }

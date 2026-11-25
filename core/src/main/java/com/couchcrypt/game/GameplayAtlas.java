@@ -6,7 +6,7 @@ import java.util.Locale;
 
 /** Validated offline atlas metadata. It neither loads GL textures nor fits artwork. */
 public final class GameplayAtlas {
-    public static final long MAX_TEXTURE_BYTES = 6L * 1_048_576 + 512L * 256 * 4;
+    public static final long MAX_TEXTURE_BYTES = 6L * 1_048_576 + 512L * 256 * 4 + 256L * 256 * 4;
     public static final String[] REQUIRED_REGIONS = {"wall-x", "wall-x-broken", "wall-y", "wall-y-broken", "buttress", "sarcophagus-x", "sarcophagus-y",
         "altar", "guardian", "broken-column", "rubble", "sealed-gate", "shadow", "glow", "soul", "white"};
 
@@ -112,7 +112,7 @@ public final class GameplayAtlas {
                 require(ActorAnimation.State.ATTACK); require(ActorAnimation.State.DODGE);
                 require(ActorAnimation.State.HIT); require(ActorAnimation.State.DOWNED);
             } else if (id == ActorAnimation.Actor.CULTIST || id == ActorAnimation.Actor.SOVEREIGN
-                || id == ActorAnimation.Actor.GRAVE_KING) {
+                || id == ActorAnimation.Actor.GRAVE_KING || id == ActorAnimation.Actor.MOURNING_BELL) {
                 require(ActorAnimation.State.ATTACK); require(ActorAnimation.State.WINDUP);
             }
             maxLeft = left; maxRight = right; maxAbove = above; maxBelow = below;
@@ -145,7 +145,7 @@ public final class GameplayAtlas {
         if (root.getInt("version") != 1) throw invalid("Unsupported atlas version");
         if (root.getBoolean("preview", false)) throw invalid("An incomplete preview atlas cannot be loaded by the game");
         JsonValue pageList = root.require("pages");
-        if (!pageList.isArray() || pageList.size < 1 || pageList.size > 4) throw invalid("Invalid page count");
+        if (!pageList.isArray() || pageList.size < 1 || pageList.size > 5) throw invalid("Invalid page count");
         pages = new Page[pageList.size]; long bytes = 0;
         for (int i = 0; i < pages.length; i++) {
             JsonValue page = pageList.get(i); String file = page.getString("file");
@@ -154,7 +154,7 @@ public final class GameplayAtlas {
                 || size[0] > 1024 || size[1] > 1024) throw invalid("Invalid atlas page");
             pages[i] = new Page(file, size[0], size[1]); bytes += (long) size[0] * size[1] * 4;
         }
-        if (bytes > MAX_TEXTURE_BYTES) throw invalid("Gameplay atlas exceeds its 6.5 MiB envelope");
+        if (bytes > MAX_TEXTURE_BYTES) throw invalid("Gameplay atlas exceeds its 6.75 MiB envelope");
         textureBytes = bytes;
         JsonValue frameList = root.require("frames");
         if (!frameList.isArray() || frameList.size < 1 || frameList.size > 512) throw invalid("Invalid frame count");

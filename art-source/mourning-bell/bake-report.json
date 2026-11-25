@@ -1,0 +1,68 @@
+{
+  "sourceSha256": "5806ca8afe08d60e9fbe22f8b1fb44c69142ce5fc8b4d13856310f164f342746",
+  "page": "gameplay-mourning-bell.png",
+  "pageSize": [
+    256,
+    256
+  ],
+  "textureBytesAdded": 262144,
+  "frames": 8,
+  "oldFrameCount": 233,
+  "oldGameplayPageHashes": {
+    "gameplay-actors-main.png": "898bdb7ae0899a3894cd2991bc8f434edd852f1b933c8b4a2dbea6f5aa515eb9",
+    "gameplay-actors-common.png": "c523ebb5d91a8b2d1ee5e4aa62b8bd9cab42b5597da42148c4090c83c99b710f",
+    "gameplay-environment.png": "076c516cbf2c13ceb183b10f754ba647b1a01aad4a1ded29d41347558697c060",
+    "gameplay-grave-king.png": "40c449a022f2cdf299acca9cb80f8495c4124b70b357012c2914f58ff96eb958"
+  },
+  "preservedOldFramesActorsRegions": true,
+  "gutter": 2,
+  "edgeExtrusion": 2,
+  "normalization": {
+    "sourceSize": [
+      1774,
+      887
+    ],
+    "sharedFacingCrops": {
+      "SW": [
+        53,
+        26,
+        420,
+        420
+      ],
+      "SE": [
+        48,
+        25,
+        401,
+        407
+      ],
+      "NE": [
+        39,
+        28,
+        392,
+        383
+      ],
+      "NW": [
+        32,
+        31,
+        386,
+        386
+      ]
+    },
+    "globalScale": 0.20304568527918782,
+    "canvas": [
+      96,
+      96
+    ],
+    "groundPivot": [
+      48,
+      96
+    ],
+    "targetMaxHeight": 80,
+    "top": 4,
+    "boundaryRedMattePixelsCorrected": 2,
+    "isolatedMattePixelsCleared": 0,
+    "defringePolicy": "saturated red only within three source pixels of alpha<32; nearest opaque body RGB, original alpha; source unchanged",
+    "posePolicy": "one shared facing crop and placement, one global scale; no per-pose fit"
+  },
+  "checked": false
+}

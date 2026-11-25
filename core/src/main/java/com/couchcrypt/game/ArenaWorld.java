@@ -23,8 +23,8 @@ public final class ArenaWorld {
             this.moveSpeed = moveSpeed; this.attackRange = attackRange; this.dodgeCooldown = dodgeCooldown;
         }
     }
-    public enum EnemyKind { GHOUL, WRAITH, BRUTE, CULTIST, BOSS, SOVEREIGN }
-    public enum EnemyAttack { NONE, WRAITH_DASH, BRUTE_SLAM, CULTIST_CAST }
+    public enum EnemyKind { GHOUL, WRAITH, BRUTE, CULTIST, BOSS, SOVEREIGN, MOURNING_BELL }
+    public enum EnemyAttack { NONE, WRAITH_DASH, BRUTE_SLAM, CULTIST_CAST, BELL_LUNGE, BELL_TOLL }
     public static final float WRAITH_WINDUP = .5f, WRAITH_DASH_SECONDS = .25f, WRAITH_ATTACK_SECONDS = 1.3f;
     public static final float WRAITH_ATTACK_RANGE = 240f, WRAITH_DASH_RANGE = 285f, WRAITH_ATTACK_COOLDOWN = 2.6f;
     public static final float BRUTE_WINDUP = .75f, BRUTE_STRIKE_END = .95f, BRUTE_ATTACK_SECONDS = 1.45f;
@@ -53,13 +53,13 @@ public final class ArenaWorld {
     /** Cosmetic time: advances during host-owned choice updates, never moves combat. */
     public float levelUpFxAge = 2;
     public int kills, souls, activeEnemies, wave, elitesKilled, bossPhase, runSeed;
-    public boolean bossSpawned, bossDefeated, sovereignSpawned, sovereignDefeated;
-    public Enemy boss, sovereign;
+    public boolean bossSpawned, bossDefeated, sovereignSpawned, sovereignDefeated, bellSpawned, bellDefeated;
+    public Enemy boss, sovereign, bell;
     public float sovereignDefeatedAt = -1;
     public int swordSwings, arrowsFired, enemyDeaths, pickupsCollected, heroHits;
     /** Committed combat events, consumed independently by presentation/audio; never drive game rules. */
     public int swordHits, boltHits, criticalHits, dodges, blockedHits, healsCollected, auraPulses, stormCasts;
-    public int wraithDashes, bruteSlams, hostileShotsFired;
+    public int wraithDashes, bruteSlams, hostileShotsFired, bellLunges, bellTolls;
     /** Fixed steps executed by the most recent update, including choice-only steps. */
     public int lastUpdateSteps;
     public final Player[] players = {new Player(0), new Player(1)};
@@ -85,7 +85,7 @@ public final class ArenaWorld {
     private int sharedXpRemainder;
     private int randomState, runNumber, nextCheckpoint, encounterPhase, enemySpawnSerial;
     private int presentedChoiceRound, chestsDropped, arenaChestsPlaced, chestRandomState;
-    private boolean sovereignSkipped;
+    private boolean sovereignSkipped, bellSkipped;
     private Diagnostics diagnostics, diagnosticsStorage;
 
     public ArenaWorld() { this(ArenaTimeline.SHORT); }
@@ -115,13 +115,13 @@ public final class ArenaWorld {
         if (diagnosticsStorage != null) diagnosticsStorage.reset();
         outcome = Outcome.RUNNING; elapsed = accumulator = 0; simulationElapsed = 0; sharedXpRemainder = 0;
         kills = souls = activeEnemies = elitesKilled = nextCheckpoint = encounterPhase = enemySpawnSerial = 0;
-        wave = bossPhase = 1; bossSpawned = bossDefeated = sovereignSpawned = sovereignDefeated = false; boss = sovereign = null;
+        wave = bossPhase = 1; bossSpawned = bossDefeated = sovereignSpawned = sovereignDefeated = bellSpawned = bellDefeated = false; boss = sovereign = bell = null;
         sovereignDefeatedAt = -1;
-        levelUpFxAge = 2; presentedChoiceRound = 0; sovereignSkipped = false;
+        levelUpFxAge = 2; presentedChoiceRound = 0; sovereignSkipped = bellSkipped = false;
         chestsDropped = arenaChestsPlaced = 0;
         swordSwings = arrowsFired = enemyDeaths = pickupsCollected = heroHits = 0;
         swordHits = boltHits = criticalHits = dodges = blockedHits = healsCollected = auraPulses = stormCasts = 0;
-        wraithDashes = bruteSlams = hostileShotsFired = 0;
+        wraithDashes = bruteSlams = hostileShotsFired = bellLunges = bellTolls = 0;
         spawnCountdown = .65f;
         runSeed = 0x5a17c9e3 ^ (++runNumber * 0x45d9f3b); randomState = runSeed;
         chestRandomState = runSeed ^ 0x72e31b4d;
@@ -257,18 +257,20 @@ public final class ArenaWorld {
     public int waveCount() { return timeline.phaseCount(); }
     public float timeRemaining() { return Math.max(0, durationSeconds() - elapsed); }
 
-    /** Presentation reads one live encounter: the final boss takes priority when both survive. */
+    /** Presentation reads one live encounter, prioritizing final, late mini, then early mini. */
     public Enemy activeBoss() {
         if (bossSpawned && !bossDefeated && boss != null && boss.active) return boss;
         if (sovereignSpawned && !sovereignDefeated && sovereign != null && sovereign.active) return sovereign;
+        if (bellSpawned && !bellDefeated && bell != null && bell.active) return bell;
         return null;
     }
 
     public static String bossName(Enemy enemy) {
+        if (enemy != null && enemy.kind == EnemyKind.MOURNING_BELL) return "THE MOURNING BELL";
         return enemy != null && enemy.kind == EnemyKind.SOVEREIGN ? "THE HOLLOW SOVEREIGN" : "THE GRAVE KING";
     }
 
-    public static boolean isBoss(EnemyKind kind) { return kind == EnemyKind.BOSS || kind == EnemyKind.SOVEREIGN; }
+    public static boolean isBoss(EnemyKind kind) { return kind == EnemyKind.BOSS || kind == EnemyKind.SOVEREIGN || kind == EnemyKind.MOURNING_BELL; }
 
     void beginLevelUpFx(int round) {
         if (round == presentedChoiceRound) return;
@@ -307,8 +309,10 @@ public final class ArenaWorld {
         boolean living = false; for (Player p : players) living |= p.active && p.alive;
         if (!living) { outcome = Outcome.DEFEAT; return; }
         if (bossDefeated) { outcome = Outcome.VICTORY; return; }
-        if (elapsed >= timeline.sovereignSeconds() - .0001f && !sovereignSpawned && !sovereignSkipped) spawnSovereign();
+        // Higher-priority encounters claim required pool slots first after direct fixture jumps.
         if (elapsed >= durationSeconds() - .0001f && !bossSpawned) spawnFinalBoss();
+        if (elapsed >= timeline.sovereignSeconds() - .0001f && !sovereignSpawned && !sovereignSkipped) spawnSovereign();
+        if (elapsed >= timeline.bellSeconds() - .0001f && !bellSpawned && !bellSkipped) spawnBell();
         if (!bossSpawned) {
             while (nextCheckpoint < timeline.phaseCount() && elapsed >= timeline.phaseStart(nextCheckpoint)) {
                 EnemyKind elite = timeline.phase(nextCheckpoint).eliteKind();
@@ -479,13 +483,17 @@ public final class ArenaWorld {
             if (e.attack != EnemyAttack.NONE) {
                 // The target may move or change slots; an authored action never turns to chase it.
                 e.facingX = e.castFacingX; e.facingY = e.castFacingY;
-                updateEnemyAttack(e);
+                if (e.kind == EnemyKind.MOURNING_BELL) updateBellAttack(e);
+                else updateEnemyAttack(e);
             } else {
                 if (debugSizingFacing == null || e.stunTime <= 0) faceTarget(e, target);
                 if (isBoss(e.kind)) {
                     e.encounterPhase = e.health <= e.maxHealth * .5f ? 2 : 1;
                     if (e.kind == EnemyKind.BOSS) bossPhase = e.encounterPhase;
-                    if (e.windup > 0) {
+                    if (e.kind == EnemyKind.MOURNING_BELL) {
+                        if (e.attackCooldown <= 0 && e.stunTime <= 0) beginBellAttack(e, target);
+                        else if (e.stunTime <= 0) moveEnemy(e, target);
+                    } else if (e.windup > 0) {
                         // A cast commits its aim; moving players cannot redirect the warned volley.
                         e.facingX = e.castFacingX; e.facingY = e.castFacingY;
                         e.windup = Math.max(0, e.windup - STEP); e.vx = e.vy = 0;
@@ -503,7 +511,7 @@ public final class ArenaWorld {
             e.moving = e.x != previousX || e.y != previousY;
             if (e.moving) e.moveTime += STEP;
             // Wraith/Brute damage is exclusively the telegraphed strike, including during recovery.
-            if (e.kind == EnemyKind.GHOUL || isBoss(e.kind)
+            if (e.kind == EnemyKind.GHOUL || isBoss(e.kind) && e.kind != EnemyKind.MOURNING_BELL
                 || e.kind == EnemyKind.CULTIST && e.attack == EnemyAttack.NONE)
                 for (Player p : players) if (e.active && p.active && p.alive
                     && distanceSquared(p.x, p.y, e.x, e.y) < square(PLAYER_RADIUS + e.radius))
@@ -622,7 +630,84 @@ public final class ArenaWorld {
         }
     }
 
+    private static void beginBellAttack(Enemy e, Player target) {
+        e.attack = (e.bossAttackIndex++ & 1) == 0 ? EnemyAttack.BELL_LUNGE : EnemyAttack.BELL_TOLL;
+        e.attackAge = 0; e.attackHitMask = 0; e.vx = e.vy = 0;
+        e.attackStartX = e.x; e.attackStartY = e.y;
+        e.bossCastEnraged = e.encounterPhase == 2;
+        float warning = e.attack == EnemyAttack.BELL_LUNGE ? MourningBell.LUNGE_WINDUP : MourningBell.TOLL_WINDUP;
+        e.windup = warning; e.releaseAge = 1; beginCastPresentation(e, warning);
+        if (e.attack == EnemyAttack.BELL_LUNGE) {
+            e.attackCooldown = 3.4f; e.attackRadius = e.radius;
+            float distance = Math.min(MourningBell.LUNGE_RANGE, Math.max(180, length(target.x - e.x, target.y - e.y) + 70));
+            e.attackTargetX = clamp(e.x + e.castFacingX * distance, -HALF_WIDTH + e.radius, HALF_WIDTH - e.radius);
+            e.attackTargetY = clamp(e.y + e.castFacingY * distance, -HALF_HEIGHT + e.radius, HALF_HEIGHT - e.radius);
+        } else {
+            e.attackCooldown = e.bossCastEnraged ? 4.8f : 4f;
+            e.attackTargetX = e.x; e.attackTargetY = e.y; e.attackRadius = MourningBell.TOLL_RADIUS;
+        }
+    }
+
+    private void updateBellAttack(Enemy e) {
+        float previousAge = e.attackAge;
+        e.attackAge += STEP; e.vx = e.vy = 0;
+        float duration;
+        if (e.attack == EnemyAttack.BELL_LUNGE) {
+            duration = MourningBell.LUNGE_DURATION;
+            e.windup = remainingWindup(MourningBell.LUNGE_WINDUP, e.attackAge);
+            float progress = clamp((e.attackAge - MourningBell.LUNGE_WINDUP) / MourningBell.LUNGE_SECONDS, 0, 1);
+            float previousProgress = clamp((previousAge - MourningBell.LUNGE_WINDUP) / MourningBell.LUNGE_SECONDS, 0, 1);
+            if (progress > previousProgress) {
+                if (previousProgress == 0) { bellLunges++; e.releaseAge = 0; }
+                float oldX = e.x, oldY = e.y;
+                e.x = e.attackStartX + (e.attackTargetX - e.attackStartX) * progress;
+                e.y = e.attackStartY + (e.attackTargetY - e.attackStartY) * progress;
+                e.vx = (e.x - oldX) / STEP; e.vy = (e.y - oldY) / STEP;
+                for (Player p : players) {
+                    int bit = 1 << p.slot;
+                    if ((e.attackHitMask & bit) != 0 || !p.active || !p.alive
+                        || segmentDistanceSquared(oldX, oldY, e.x, e.y, p.x, p.y) > square(e.radius + PLAYER_RADIUS)) continue;
+                    // Crossing during Dodge consumes the strike; recovery never reapplies contact damage.
+                    e.attackHitMask |= bit;
+                    hurt(p, MourningBell.LUNGE_DAMAGE, e, e.castFacingX, e.castFacingY);
+                    if (!e.active) break;
+                }
+            }
+        } else {
+            duration = e.bossCastEnraged ? MourningBell.DOUBLE_TOLL_DURATION : MourningBell.TOLL_DURATION;
+            if (e.bossCastEnraged && previousAge + .000001f < MourningBell.SECOND_TOLL_WARNING_START
+                && e.attackAge + .000001f >= MourningBell.SECOND_TOLL_WARNING_START)
+                beginCastPresentation(e, MourningBell.SECOND_TOLL_RELEASE - MourningBell.SECOND_TOLL_WARNING_START);
+            e.windup = MourningBell.tollWarning(e, 0) ? remainingWindup(MourningBell.TOLL_WINDUP, e.attackAge)
+                : MourningBell.tollWarning(e, 1) ? remainingWindup(MourningBell.SECOND_TOLL_RELEASE, e.attackAge) : 0;
+            for (int beat = 0, count = e.bossCastEnraged ? 2 : 1; beat < count; beat++) {
+                float release = MourningBell.tollRelease(beat);
+                if (previousAge + .000001f < release && e.attackAge + .000001f >= release) {
+                    bellTolls++; e.releaseAge = 0;
+                }
+                if (e.attackAge + .000001f < release || previousAge >= release + MourningBell.TOLL_WAVE_SECONDS) continue;
+                float inner = MourningBell.radiusAt(previousAge, beat) - MourningBell.TOLL_HALF_WIDTH - PLAYER_RADIUS;
+                float outer = MourningBell.radiusAt(e.attackAge, beat) + MourningBell.TOLL_HALF_WIDTH + PLAYER_RADIUS;
+                for (Player p : players) {
+                    int bit = 1 << (p.slot + beat * 2);
+                    float distance = distanceSquared(p.x, p.y, e.attackStartX, e.attackStartY);
+                    if ((e.attackHitMask & bit) != 0 || !p.active || !p.alive
+                        || distance < square(Math.max(0, inner)) || distance > square(outer)) continue;
+                    e.attackHitMask |= bit;
+                    hurt(p, MourningBell.TOLL_DAMAGE, e, p.x - e.attackStartX, p.y - e.attackStartY);
+                    if (!e.active) break;
+                }
+                if (!e.active) break;
+            }
+        }
+        if (e.attackAge + .000001f >= duration) {
+            e.attack = EnemyAttack.NONE; e.attackAge = duration; e.windup = 0;
+        }
+    }
+
     private static void knockbackEnemy(Enemy e, float dx, float dy) {
+        // Its heavy committed body and warned lane stay aligned throughout the Bell action.
+        if (e.kind == EnemyKind.MOURNING_BELL && e.attack != EnemyAttack.NONE) return;
         float previousX = e.x, previousY = e.y;
         e.x = clamp(e.x + dx, -HALF_WIDTH + e.radius, HALF_WIDTH - e.radius);
         e.y = clamp(e.y + dy, -HALF_HEIGHT + e.radius, HALF_HEIGHT - e.radius);
@@ -665,6 +750,7 @@ public final class ArenaWorld {
             case CULTIST -> timeline.isFullRun() ? 60 : 48;
             case SOVEREIGN -> timeline.isFullRun() ? (e.encounterPhase == 2 ? 80 : 65) : (e.encounterPhase == 2 ? 56 : 44);
             case BOSS -> e.encounterPhase == 2 ? 56 : 44;
+            case MOURNING_BELL -> 70;
             default -> timeline.isFullRun() ? 65 : 57;
         };
         speed *= e.speedMultiplier * (1 - e.slowAmount);
@@ -849,7 +935,7 @@ public final class ArenaWorld {
         fx = effect(EffectKind.DEATH, enemy.x, enemy.y, owner, .35f);
         impact(fx, enemy, actual, critical);
         if (fx != null) fx.impactKind = kind;
-        int reward = enemy.kind == EnemyKind.BOSS ? 20 : enemy.kind == EnemyKind.SOVEREIGN ? 8 : enemy.elite ? 8 : enemy.kind == EnemyKind.BRUTE ? 3 : enemy.kind == EnemyKind.CULTIST ? 2 : 1;
+        int reward = enemy.kind == EnemyKind.BOSS ? 20 : enemy.kind == EnemyKind.SOVEREIGN ? 8 : enemy.kind == EnemyKind.MOURNING_BELL ? 12 : enemy.elite ? 8 : enemy.kind == EnemyKind.BRUTE ? 3 : enemy.kind == EnemyKind.CULTIST ? 2 : 1;
         // Snapshot party scaling at spawn; late joining cannot alter souls already on the floor.
         int rewardHundredths = reward * enemy.soulPercent + sharedXpRemainder;
         int soulReward = rewardHundredths / 100; sharedXpRemainder = rewardHundredths % 100;
@@ -861,6 +947,7 @@ public final class ArenaWorld {
         } else if (enemy.elite || kills % 7 == 0)
             drop(enemy.x + 14, enemy.y, true, enemy.elite ? 40 : 24);
         if (enemy == boss && enemy.kind == EnemyKind.BOSS) bossDefeated = true;
+        if (enemy == bell && enemy.kind == EnemyKind.MOURNING_BELL) bellDefeated = true;
         if (enemy == sovereign && enemy.kind == EnemyKind.SOVEREIGN) {
             sovereignDefeated = true; sovereignDefeatedAt = elapsed;
         }
@@ -1091,9 +1178,9 @@ public final class ArenaWorld {
             e.kind = kind; e.elite = elite;
             e.variant = variant; e.spawnId = ++enemySpawnSerial;
             e.soulPercent = timeline.isFullRun() && livingPlayerCount() > 1 ? 82 : 100;
-            float health = switch (kind) { case WRAITH -> 18; case BRUTE -> 95; case CULTIST -> 35; case BOSS -> 1100; case SOVEREIGN -> 450; default -> 32; };
+            float health = switch (kind) { case WRAITH -> 18; case BRUTE -> 95; case CULTIST -> 35; case BOSS -> 1100; case SOVEREIGN -> 450; case MOURNING_BELL -> 420; default -> 32; };
             if (isBoss(kind)) {
-                if (timeline.isFullRun()) health = kind == EnemyKind.BOSS ? 8200 : 5400;
+                if (timeline.isFullRun()) health = kind == EnemyKind.BOSS ? 8200 : kind == EnemyKind.SOVEREIGN ? 5400 : 1800;
                 health *= 1 + .6f * (activePlayerCount() - 1);
             } else if (timeline.isFullRun()) {
                 health *= timeline.healthMultiplier(elapsed) * (1 + .6f * (livingPlayerCount() - 1));
@@ -1291,6 +1378,7 @@ public final class ArenaWorld {
         if (bossSpawned || outcome != Outcome.RUNNING || activePlayerCount() == 0) return;
         elapsed = Math.max(elapsed, durationSeconds()); wave = timeline.phaseCount();
         if (!sovereignSpawned) sovereignSkipped = true; // Isolate the final fixture from unearned history.
+        if (!bellSpawned) bellSkipped = true;
         spawnFinalBoss();
     }
 
@@ -1298,6 +1386,7 @@ public final class ArenaWorld {
     public void debugStartSovereign() {
         if (sovereignSpawned || outcome != Outcome.RUNNING || activePlayerCount() == 0) return;
         elapsed = Math.max(elapsed, timeline.sovereignSeconds()); wave = timeline.phaseIndex(elapsed) + 1;
+        if (!bellSpawned) bellSkipped = true;
         sovereignSkipped = false; spawnSovereign();
     }
 
@@ -1307,6 +1396,45 @@ public final class ArenaWorld {
         for (Enemy e : enemies) if (e.active && !isBoss(e.kind) && !e.elite) {
             e.active = false; activeEnemies--; return;
         }
+    }
+
+    /** Developer fixture: inspect the early encounter without a five-minute playthrough. */
+    public void debugStartBell() {
+        if (bellSpawned || outcome != Outcome.RUNNING || activePlayerCount() == 0) return;
+        elapsed = Math.max(elapsed, timeline.bellSeconds()); wave = timeline.phaseIndex(elapsed) + 1;
+        bellSkipped = false; spawnBell();
+    }
+
+    /** Profile-only real Bell encounter, with no inherited waves or rewards. */
+    public void profileMourningBell() {
+        if (outcome != Outcome.RUNNING || choicePending() || activePlayerCount() == 0) return;
+        for (Enemy enemy : enemies) enemy.active = false;
+        for (Bolt bolt : bolts) bolt.active = false;
+        for (Shot shot : shots) shot.active = false;
+        for (Hazard hazard : hazards) hazard.active = false;
+        for (Effect effect : effects) effect.active = false;
+        for (Pickup pickup : pickups) pickup.active = false;
+        activeEnemies = 0;
+        bellSpawned = bellDefeated = false; bell = null;
+        bossSpawned = bossDefeated = sovereignSpawned = sovereignDefeated = false; boss = sovereign = null;
+        elapsed = timeline.bellSeconds(); simulationElapsed = elapsed;
+        wave = timeline.phaseIndex(elapsed) + 1; encounterPhase = wave - 1;
+        nextCheckpoint = wave; spawnCountdown = 12;
+        bellSkipped = false; sovereignSkipped = false;
+        spawnBell();
+        if (bell != null) {
+            Player anchor = livingAnchor();
+            bell.x = clamp(anchor.x + 200, -HALF_WIDTH + bell.radius, HALF_WIDTH - bell.radius);
+            bell.y = clamp(anchor.y + 90, -HALF_HEIGHT + bell.radius, HALF_HEIGHT - bell.radius);
+            bell.attackCooldown = .8f; bell.spawnAge = 1;
+        }
+    }
+
+    private void spawnBell() {
+        if (bellSpawned) return;
+        reserveBossSlot();
+        Enemy spawned = spawn(EnemyKind.MOURNING_BELL, false);
+        if (spawned != null) { bell = spawned; bellSpawned = true; }
     }
 
     private void spawnSovereign() {
@@ -1332,6 +1460,7 @@ public final class ArenaWorld {
         bossSpawned = bossDefeated = false; boss = null; bossPhase = 1;
         // This late fixture deliberately omits historical encounters, including the Sovereign.
         sovereignSpawned = sovereignDefeated = false; sovereign = null; sovereignSkipped = true;
+        bellSpawned = bellDefeated = false; bell = null; bellSkipped = true;
         for (Enemy enemy : enemies) enemy.active = false;
         for (Shot shot : shots) shot.active = false;
         for (Bolt bolt : bolts) bolt.active = false;

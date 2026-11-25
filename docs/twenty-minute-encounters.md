@@ -1,13 +1,13 @@
 # Twenty-minute encounter targets
 
-The normal run uses `ArenaTimeline.TWENTY_MINUTES`. Hollow Sovereign spawns as a mini boss at 12:00 elapsed combat time; waves and the clock continue. At 20:00 the Grave King arrives, even if the mini survives. Victory requires killing the Grave King. Pauses, phone choices and disconnects retain the existing simulation freeze. `SHORT` remains the explicit three-minute development fixture, with the mini at 1:48; it is not a player-facing mode. See [two-boss behavior and art](boss-encounters.md).
+The normal run uses `ArenaTimeline.TWENTY_MINUTES`. Mourning Bell arrives at 5:00 and Hollow Sovereign at 12:00 elapsed combat time; waves and the clock continue. At 20:00 the Grave King arrives, even if either mini survives. Victory requires killing the Grave King. Pauses, phone choices and disconnects retain the existing simulation freeze. `SHORT` remains the explicit three-minute development fixture, with Bell at 0:45 and Sovereign at 1:48; it is not a player-facing mode. See [boss behavior and art](boss-encounters.md).
 
 | Active time | Phase / composition | Checkpoint |
 | --- | --- | --- |
 | 0:00–1:30 | The Crypt Stirs: ghoul swarm | — |
 | 1:30–3:00 | Restless Hunt: wraiths and ghouls | — |
 | 3:00–5:00 | The Iron March: brute, ghoul, wraith | Brute elite |
-| 5:00–7:00 | Choir of Ash: cultist formation | — |
+| 5:00–7:00 | Choir of Ash: cultist formation | Mourning Bell at 5:00 |
 | 7:00–9:00 | Broken Ranks: brute/cultist siege | Cultist elite |
 | 9:00–11:00 | Wraith Procession: mobile hunters | — |
 | 11:00–13:00 | Sovereign's Guard: mixed siege | Brute elite at 11:00; Sovereign mini boss at 12:00 |

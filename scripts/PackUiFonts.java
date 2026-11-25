@@ -7,7 +7,9 @@ import java.util.Map;
 
 /** Offline, lossless relocation of glyph rectangles and their original two-pixel surroundings. */
 public final class PackUiFonts {
-    private static final int WIDTH = 1024, HEIGHT = 768, GUTTER = 2;
+    // Original packed glyphs and their gutters end at row 563. Retain a small
+    // transparent guard while reclaiming the unused bottom for gameplay art.
+    private static final int WIDTH = 1024, HEIGHT = 576, GUTTER = 2;
 
     /** Owns only the packed page; the caller retains ownership of the original atlas. */
     public static final class Result implements AutoCloseable {
@@ -75,7 +77,7 @@ public final class PackUiFonts {
                     copy.drawPixmap(original, 0, 0, block.sourceX, block.sourceY, block.width, block.height);
                     var rectangle = packer.pack("glyph-" + i, copy);
                     if (packer.getPages().size != 1)
-                        throw new IllegalStateException("Glyphs exceeded the single 1024x768 font page");
+                        throw new IllegalStateException("Glyphs exceeded the single 1024x576 font page");
                     block.x = (int) rectangle.getX(); block.y = (int) rectangle.getY();
                     if (rectangle.getX() != block.x || rectangle.getY() != block.y
                         || rectangle.getWidth() != block.width || rectangle.getHeight() != block.height)
