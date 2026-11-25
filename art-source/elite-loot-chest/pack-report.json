@@ -1,0 +1,62 @@
+{
+  "source": "generated-master.png",
+  "sourceSha256": "29dcd58c019b94036c494d53da237d063619e3a04815b38fc609510c4943be86",
+  "alphaCropThreshold": 32,
+  "sourceCrop": [
+    114,
+    167,
+    1196,
+    1056
+  ],
+  "page": "gameplay-grave-king.png",
+  "pageIndex": 3,
+  "pageSize": [
+    512,
+    256
+  ],
+  "frame": 232,
+  "rect": [
+    464,
+    4,
+    46,
+    38
+  ],
+  "pivot": [
+    23.0,
+    30.5
+  ],
+  "worldHeight": 44,
+  "gutter": 2,
+  "edgeExtrusion": 1,
+  "reservedRect": [
+    462,
+    2,
+    512,
+    44
+  ],
+  "existingPageFramesChecked": 8,
+  "supplementalPageFilesChecked": {
+    "enemy-attacks.json": [
+      "gameplay-actors-main.png",
+      "gameplay-actors-common.png"
+    ],
+    "magic-projectiles.json": [
+      "gameplay-environment.png"
+    ],
+    "painted-borders.json": [
+      "gameplay-actors-main.png",
+      "gameplay-actors-common.png",
+      "gameplay-environment.png"
+    ],
+    "engraved-floor.json": [
+      "gameplay-actors-main.png",
+      "gameplay-actors-common.png",
+      "gameplay-environment.png",
+      "arena-border.png"
+    ]
+  },
+  "outsidePatchRgbaSha256": "b2df6f64269b77116937693ee13f29bcf7dc2e6f33b5a5f7948889439cbeafa7",
+  "outsidePatchPixels": "unchanged",
+  "addedTextureBytes": 0,
+  "retainedDecodedPixmapBytes": 0
+}
