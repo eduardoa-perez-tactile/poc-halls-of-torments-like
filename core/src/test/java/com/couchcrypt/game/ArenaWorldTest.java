@@ -22,13 +22,13 @@ class ArenaWorldTest {
         world.setInput(0, 1f, 0f, false);
         world.update(ArenaWorld.STEP);
         ArenaWorld.Player player = world.players[0];
-        assertEquals(9f, player.x, .001f);
+        assertEquals(11.25f, player.x, .001f);
         assertTrue(player.invulnerable > 0f);
         assertTrue(player.dodgeCooldown > 2f);
         player.dodgeTime = 0f;
         world.setInput(0, 1f, 0f, true);
         world.update(ArenaWorld.STEP);
-        assertEquals(12f, player.x, .001f);
+        assertEquals(14.25f, player.x, .001f);
         assertEquals(0f, player.dodgeTime);
     }
 

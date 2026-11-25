@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DodgeTrailTest {
-    @Test void snapshotsStayOnActualPathAndOutliveDodgeBrieflyWithoutChangingDistanceOrCooldown() {
+    @Test void snapshotsStayOnActualPathAndOutliveLongerDodgeWithoutChangingCooldown() {
         ArenaWorld world = solo();
         ArenaWorld.Player player = world.players[0];
         world.setInput(0, 1, 0, true);
@@ -14,7 +14,7 @@ class DodgeTrailTest {
         assertEquals(ActorAnimation.State.DODGE, first.state);
         assertEquals(ActorAnimation.Facing.NE, first.facing);
         assertEquals(player.hero.dodgeCooldown, player.dodgeCooldown, .0001f);
-        assertEquals(player.hero.moveSpeed * 3 * ArenaWorld.STEP, player.x, .0001f);
+        assertEquals(player.hero.moveSpeed * 3.75f * ArenaWorld.STEP, player.x, .0001f);
         float firstAlpha = first.alpha();
         world.update(.1f);
         assertEquals(0, first.x, "A stored ghost must not travel with its player");
@@ -26,7 +26,7 @@ class DodgeTrailTest {
         world.setInput(0, 0, 0, false);
         world.update(.1f); world.update(ArenaWorld.STEP);
         assertEquals(0, player.dodgeTime);
-        assertEquals(player.hero.moveSpeed * 3 * .22f, player.x, .001f);
+        assertEquals(player.hero.moveSpeed * 3.75f * .22f, player.x, .001f);
         assertTrue(active(player) > 0, "The last ghosts fade briefly after the dash ends");
         world.update(.1f); world.update(.1f);
         assertEquals(0, active(player));
@@ -58,6 +58,25 @@ class DodgeTrailTest {
         player.x = ArenaWorld.HALF_WIDTH - 20;
         world.setInput(0, 1, 0, true); world.update(.1f);
         assertEquals(0, active(player));
+    }
+
+    @Test void bothHeroesTravelTwentyFivePercentFartherWithTheSameEscapeWindowAndCooldown() {
+        for (ArenaWorld.Hero hero : ArenaWorld.Hero.values()) {
+            ArenaWorld world = new ArenaWorld(); world.setHero(0, hero); world.activatePlayer(0);
+            ArenaWorld.Player player = world.players[0]; player.invulnerable = 0;
+            world.setInput(0, 1, 1, true); world.update(ArenaWorld.STEP);
+            world.setInput(0, 0, 0, false);
+            assertEquals(.22f, player.invulnerable, .0001f);
+            assertEquals(hero.dodgeCooldown, player.dodgeCooldown, .0001f);
+            for (int i = 0; i < 13; i++) world.update(ArenaWorld.STEP);
+            float oldDistance = hero.moveSpeed * 3 * .22f;
+            assertEquals(oldDistance * 1.25f, Math.hypot(player.x, player.y), .001f);
+            assertEquals(player.x, player.y, .0001f, "Diagonal input must not gain extra distance");
+            assertEquals(0, player.dodgeTime);
+            world.update(ArenaWorld.STEP);
+            assertEquals(0, player.invulnerable, .0001f, "The distance increase does not extend invulnerability");
+            assertTrue(player.dodgeCooldown > 2f);
+        }
     }
 
     private static int active(ArenaWorld.Player player) {
