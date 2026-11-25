@@ -22,6 +22,18 @@
   let axisX = 0, axisY = 0, dodgeEdge = false, stickPointer = null, dodgePointer = null, stickBounds;
   const keys = new Set();
 
+  function preventGameplayGesture(event) {
+    // Cover gaps and disabled controls too. Choice cards retain native scrolling/clicks.
+    if (document.body.classList.contains('playing') && !document.body.classList.contains('has-upgrade') && event.cancelable) {
+      event.preventDefault();
+    }
+  }
+  // Safari also exposes native pinch gestures; non-passive touch handlers cover
+  // browser gestures that start outside the captured joystick/Dodge pointers.
+  ['touchstart', 'touchmove', 'gesturestart', 'gesturechange', 'contextmenu'].forEach((name) => {
+    document.addEventListener(name, preventGameplayGesture, { passive: false });
+  });
+
   function canControl() { return joined && !upgradeOffer && phase === 'session' && hostActive && alive && foreground && !document.hidden && socket?.readyState === WebSocket.OPEN; }
   function sendInput() {
     if (socket?.readyState !== WebSocket.OPEN || !joined) return;
