@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ActorPresentationStateTest {
     private static final float EPSILON = .00001f;
 
-    @Test void wardenAttackIsImmediateWhileMovingAndDodgingAndKeepsItsAimSnapshot() {
+    @Test void wardenReleasesImmediatelyWhileDodgingAndDamageWaitsForTheCommittedWave() {
         ArenaWorld world = solo(ArenaWorld.Hero.WARDEN);
         ArenaWorld.Player player = world.players[0];
         ArenaWorld.Enemy target = enemy(world, 0, ArenaWorld.EnemyKind.GHOUL, 80, 0);
@@ -16,7 +16,7 @@ class ActorPresentationStateTest {
         world.update(ArenaWorld.STEP);
 
         assertTrue(player.moving); assertTrue(player.y > 0); assertTrue(player.dodgeTime > 0);
-        assertEquals(72, target.health, EPSILON); assertEquals(1, world.swordSwings);
+        assertEquals(100, target.health, EPSILON); assertEquals(1, world.swordSwings);
         assertEquals(0, player.attackAge); assertTrue(player.attackFacingX > .9f);
         assertTrue(player.attackFacingY < 0);
         assertEquals(0, player.dodgeFacingX()); assertEquals(1, player.dodgeFacingY());
@@ -29,7 +29,10 @@ class ActorPresentationStateTest {
         assertEquals(aimX, player.attackFacingX); assertEquals(aimY, player.attackFacingY);
         assertEquals(-1, player.facingX, EPSILON);
         assertEquals(0, player.dodgeFacingX()); assertEquals(1, player.dodgeFacingY());
-        assertEquals(72, target.health, EPSILON); assertEquals(1, world.swordSwings);
+        assertEquals(100, target.health, EPSILON); assertEquals(1, world.swordSwings);
+        for (int i = 0; i < 15 && world.swordHits == 0; i++) world.update(ArenaWorld.STEP);
+        assertEquals(72, target.health, EPSILON); assertEquals(1, world.swordHits);
+        assertEquals(aimX, player.attackFacingX); assertEquals(aimY, player.attackFacingY);
     }
 
     @Test void noTargetDoesNotStartAnAttackAndRangerShotHasNoPresentationDelay() {

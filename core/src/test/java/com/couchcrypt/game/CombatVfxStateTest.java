@@ -8,8 +8,11 @@ class CombatVfxStateTest {
         ArenaWorld world = solo();
         ArenaWorld.Enemy target = enemy(world, 80, 100);
         world.update(ArenaWorld.STEP);
-        assertEquals(72, target.health, .0001f);
+        assertEquals(100, target.health, .0001f);
         assertEquals(.7f, world.players[0].attackCooldown, .0001f);
+        assertEquals(0, world.swordHits);
+        awaitHits(world, 1);
+        assertEquals(72, target.health, .0001f);
         assertEquals(1, world.swordHits);
         ArenaWorld.Effect hit = hit(world);
         assertEquals(ArenaWorld.ImpactKind.SWORD, hit.impactKind);
@@ -20,6 +23,8 @@ class CombatVfxStateTest {
         ArenaWorld full = solo(); target = enemy(full, 80, 100);
         for (ArenaWorld.Effect fx : full.effects) { fx.active = true; fx.kind = ArenaWorld.EffectKind.AURA; fx.ttl = 10; }
         full.update(ArenaWorld.STEP);
+        assertEquals(100, target.health, .0001f);
+        awaitHits(full, 1);
         assertEquals(72, target.health, .0001f);
         assertEquals(1, full.swordHits); assertEquals(ArenaWorld.MAX_EFFECTS, full.effects.length);
     }
@@ -38,33 +43,35 @@ class CombatVfxStateTest {
         target.x = reach - 1f;
         world.update(ArenaWorld.STEP);
         assertEquals(1, world.swordSwings);
-        assertEquals(reach, slash(world).radius, .0001f);
+        assertEquals(reach, wave(world).reach, .0001f);
         player.hero = ArenaWorld.Hero.RANGER;
         assertEquals(800f, world.primaryAttackRange(player), "Sword reach gear and ranks do not exaggerate Ranger targeting range");
     }
 
-    @Test void longerSlashKeepsItsCommittedOriginAndAimWithoutSlowingHasteAttacksOrStackingTrails() {
+    @Test void outwardWaveKeepsItsCommittedOriginAndAimWhileHasteCanOverlapItsFade() {
         ArenaWorld world = solo();
         ArenaWorld.Player player = world.players[0]; player.attackRateMultiplier = 3f;
         ArenaWorld.Enemy target = enemy(world, 80, 10000);
         world.update(ArenaWorld.STEP);
-        ArenaWorld.Effect first = slash(world);
-        assertTrue(first.maxTtl >= .35f && first.maxTtl <= .4f, "The visible sweep needs enough reading time");
+        MeleeWave first = wave(world);
+        assertTrue(MeleeWave.TOTAL_SECONDS >= .35f && MeleeWave.TOTAL_SECONDS <= .4f, "The visible sweep needs enough reading time");
         assertEquals(.7f / 3f, player.attackCooldown, .0001f);
-        assertEquals(9972f, target.health, .0001f);
+        assertEquals(10000f, target.health, .0001f);
         float angle = first.angle, x = first.x, y = first.y;
         world.setInput(0, 0, 1, false);
         world.update(.1f); world.update(.1f);
         assertTrue(first.active, "The trail remains visible beyond its former 0.18-second lifetime");
         assertEquals(angle, first.angle); assertEquals(x, first.x); assertEquals(y, first.y);
         assertTrue(player.y > 0); assertEquals(1, world.swordSwings);
+        assertEquals(9972f, target.health, .0001f);
         world.update(.05f);
         assertEquals(2, world.swordSwings, "A longer cosmetic sweep must not postpone the next haste attack");
-        assertEquals(9944f, target.health, .0001f);
+        assertEquals(9972f, target.health, .0001f, "The next wave must travel before dealing its own damage");
         int trails = 0;
-        for (ArenaWorld.Effect effect : world.effects)
-            if (effect.active && effect.kind == ArenaWorld.EffectKind.SLASH && effect.owner == 0) trails++;
-        assertEquals(1, trails, "A fresh committed swing replaces the older trail instead of piling up arcs");
+        for (MeleeWave wave : world.meleeWaves) if (wave.active && wave.owner == 0) trails++;
+        assertEquals(2, trails, "The older fade cannot erase the next traveling gameplay wave");
+        awaitHits(world, 2);
+        assertEquals(9944f, target.health, .0001f);
     }
 
     @Test void boltImpactKeepsItsCriticalTravelAimAndCasterIdentityAfterPoolReuse() {
@@ -137,10 +144,13 @@ class CombatVfxStateTest {
         ArenaWorld.Enemy e = world.enemies[0]; e.active = true; e.x = x; e.y = 0;
         e.health = e.maxHealth = health; e.attackCooldown = 10; world.activeEnemies = 1; return e;
     }
-    private static ArenaWorld.Effect slash(ArenaWorld world) {
-        for (ArenaWorld.Effect effect : world.effects)
-            if (effect.active && effect.kind == ArenaWorld.EffectKind.SLASH) return effect;
-        throw new AssertionError("No committed slash");
+    private static MeleeWave wave(ArenaWorld world) {
+        for (MeleeWave wave : world.meleeWaves) if (wave.active) return wave;
+        throw new AssertionError("No committed melee wave");
+    }
+    private static void awaitHits(ArenaWorld world, int hits) {
+        for (int i = 0; i < 15 && world.swordHits < hits; i++) world.update(ArenaWorld.STEP);
+        assertEquals(hits, world.swordHits, "The expanding wave must reach its target within 240 ms");
     }
     private static ArenaWorld.Effect hit(ArenaWorld world) {
         for (ArenaWorld.Effect effect : world.effects) if (effect.active && effect.kind == ArenaWorld.EffectKind.HIT && !effect.heroHit) return effect;

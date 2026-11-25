@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class SpriteEffectArtTest {
     @Test void completeBankFitsCombinedBudgetAndKeepsFilteredFramesIsolated() throws Exception {
         SpriteEffectArt.Metadata metadata = metadata();
-        assertEquals(72, metadata.frames.length);
+        assertEquals(65, metadata.frames.length);
         assertEquals(SpriteEffectArt.Type.values().length, metadata.clips.length);
         // The resident application, including its live QR, was measured before this bank.
         assertTrue(32_467_788L + metadata.textureBytes <= 32L * 1_048_576,
@@ -54,8 +54,8 @@ class SpriteEffectArtTest {
         for (SpriteEffectArt.Clip clip : metadata.clips) {
             assertEquals(clip.frames[0], clip.sample(-1));
             assertEquals(clip.frames[0], clip.sample(Float.NaN));
-            assertEquals(clip.frames[7], clip.sample(1));
-            assertEquals(clip.frames[7], clip.sample(10));
+            assertEquals(clip.frames[clip.frames.length - 1], clip.sample(1));
+            assertEquals(clip.frames[clip.frames.length - 1], clip.sample(10));
             for (int i = 0; i < clip.frames.length - 1; i++) {
                 float boundary = clip.ends[i] / clip.duration;
                 assertEquals(clip.frames[i], clip.sample(boundary - .0001f));
@@ -97,6 +97,34 @@ class SpriteEffectArtTest {
                 assertEquals(radius, Math.sqrt(rotatedX * rotatedX + 4f * rotatedY * rotatedY), .03,
                     "Turning a slash must rotate on the 2:1 ground plane rather than tilt its ellipse");
             }
+        }
+    }
+
+    @Test void approvedWavePaintFitsTheActualConeAndItsBrightRimTracksTheRadius() throws Exception {
+        SpriteEffectArt.Metadata metadata = metadata();
+        SpriteEffectArt.Clip clip = metadata.clips[SpriteEffectArt.Type.SWORD_SWEEP.ordinal()];
+        assertEquals(1, clip.frames.length, "Continuous expansion reuses one stable painted master");
+        SpriteEffectArt.Frame frame = metadata.frames[clip.frames[0]];
+        BufferedImage page = ImageIO.read(art("sprite-effects.png").toFile());
+        for (int ray = -4; ray <= 4; ray++) {
+            double angle = -Math.PI / 4 + Math.toRadians(ray * 11.25);
+            int brightest = -1;
+            double rim = 0;
+            for (int y = 0; y < frame.height; y++) for (int x = 0; x < frame.width; x++) {
+                int pixel = page.getRGB(frame.x + x, frame.y + y);
+                if ((pixel >>> 24) < 180) continue;
+                double dx = frame.left + x + .5 - frame.pivotX;
+                double dy = 2 * (frame.pivotY - frame.top - y - .5);
+                double heading = Math.atan2(dy, dx);
+                assertTrue(Math.cos(heading + Math.PI / 4) > Math.cos(Math.toRadians(57)),
+                    "Opaque wave paint must remain inside the existing 110-degree cone");
+                if (Math.cos(heading - angle) < Math.cos(Math.toRadians(2))) continue;
+                int white = Math.min((pixel >> 16) & 255, Math.min((pixel >> 8) & 255, pixel & 255));
+                if (white > brightest) { brightest = white; rim = Math.hypot(dx, dy); }
+            }
+            assertTrue(brightest > 100, "Each ray must contain paint, including its dimmer tapered tips");
+            assertEquals(clip.groundRadius, rim, 4,
+                "The bright sprite rim must follow the same radius as damage, after 2:1 projection");
         }
     }
 

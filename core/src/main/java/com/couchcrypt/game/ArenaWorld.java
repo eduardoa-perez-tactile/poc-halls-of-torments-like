@@ -9,8 +9,8 @@ public final class ArenaWorld {
     public static final float CHEST_PICKUP_RADIUS = 40f, CHEST_LANDING_SECONDS = .35f;
     public static final int MAX_SHOTS = 96, MAX_HAZARDS = 12, MAX_EFFECTS = 96;
     public static final float STEP = 1f / 60f;
-    /** Cosmetic sweep lifetime only; damage and attack cadence still commit immediately. */
-    public static final float WARDEN_SLASH_SECONDS = .38f;
+    /** Shared wave lifetime retained under the old name for profile-fixture compatibility. */
+    public static final float WARDEN_SLASH_SECONDS = MeleeWave.TOTAL_SECONDS;
     private static final float DODGE_DURATION = .22f, DODGE_SPEED_MULTIPLIER = 4.25f, PLAYER_RADIUS = 20f;
     public enum Outcome { RUNNING, VICTORY, DEFEAT }
     public enum Hero {
@@ -71,6 +71,8 @@ public final class ArenaWorld {
     public final Shot[] shots = new Shot[MAX_SHOTS];
     public final Hazard[] hazards = new Hazard[MAX_HAZARDS];
     public final Effect[] effects = new Effect[MAX_EFFECTS];
+    /** Gameplay waves never compete with optional contact/death cosmetics for storage. */
+    public final MeleeWave[] meleeWaves = new MeleeWave[players.length * MeleeWave.PER_PLAYER];
     final DamageNumbers damageNumbers = new DamageNumbers();
     public final PartyProgression progression;
     public final RunEquipment equipment;
@@ -104,6 +106,7 @@ public final class ArenaWorld {
         for (int i = 0; i < shots.length; i++) shots[i] = new Shot();
         for (int i = 0; i < hazards.length; i++) hazards[i] = new Hazard();
         for (int i = 0; i < effects.length; i++) effects[i] = new Effect();
+        for (int i = 0; i < meleeWaves.length; i++) meleeWaves[i] = new MeleeWave();
         progression = new PartyProgression(this);
         equipment = new RunEquipment(this);
         skills = new SkillExpansion(this);
@@ -144,6 +147,7 @@ public final class ArenaWorld {
         for (Shot s : shots) s.active = false;
         for (Hazard h : hazards) h.active = false;
         for (Effect e : effects) e.active = false;
+        for (MeleeWave melee : meleeWaves) melee.active = false;
     }
 
     private void resetBuild(Player p) {
@@ -184,6 +188,7 @@ public final class ArenaWorld {
     public void deactivatePlayer(int slot) {
         Player p = player(slot); p.active = p.alive = false; resetBuild(p);
         skills.removePlayer(slot);
+        for (MeleeWave melee : meleeWaves) if (melee.owner == slot) melee.active = false;
         p.kills = p.revives = 0; p.damageDealt = p.damageTaken = 0;
         p.healingFromDrops = p.healingFromRegeneration = p.healingFromSustain = 0;
         resetPresentation(p);
@@ -303,7 +308,7 @@ public final class ArenaWorld {
         if (timeline.isFullRun()) healthDrops.update(pickups, STEP, livingPlayerCount());
         for (Player p : players) updatePlayer(p);
         skills.update();
-        updateEnemies(); updateBolts(); updateShots(); updateHazards(); updatePickups(); updateRevival();
+        updateEnemies(); updateMeleeWaves(); updateBolts(); updateShots(); updateHazards(); updatePickups(); updateRevival();
         updateChests();
         progression.update(STEP); equipment.update(STEP);
         boolean living = false; for (Player p : players) living |= p.active && p.alive;
@@ -383,31 +388,26 @@ public final class ArenaWorld {
         Enemy target = nearest(p.x, p.y, reach, 0);
         if (target == null) return;
         float dx = target.x - p.x, dy = target.y - p.y, length = length(dx, dy);
+        if (dx * dx + dy * dy < .0001f) {
+            // An overlapping target has no aim vector; retain the player's last real facing.
+            dx = p.facingX; dy = p.facingY;
+            if (dx * dx + dy * dy < .0001f) { dx = 0; dy = -1; }
+            length = length(dx, dy);
+        }
         p.facingX = dx / length; p.facingY = dy / length;
         if (p.hero == Hero.WARDEN) {
+            MeleeWave melee = freeMeleeWave(p.slot);
+            if (melee == null) return; // Impossible for legal haste caps; retain the attack for the next free tick.
             beginAttackPresentation(p);
-            float halfArcCos = .5735764f; // cos(55 degrees)
-            // A haste build replaces its older cosmetic trail instead of stacking overlapping sweeps.
-            for (Effect previous : effects)
-                if (previous.active && previous.kind == EffectKind.SLASH && previous.owner == p.slot) previous.active = false;
-            Effect fx = effect(EffectKind.SLASH, p.x, p.y, p.slot, WARDEN_SLASH_SECONDS);
-            if (fx != null) { fx.angle = (float) Math.atan2(dy, dx); fx.radius = reach; fx.sweep = 1.9198622f; }
+            melee.active = true; melee.owner = p.slot; melee.age = 0;
+            melee.x = p.x; melee.y = p.y; melee.dirX = p.facingX; melee.dirY = p.facingY;
+            melee.angle = (float) Math.atan2(dy, dx); melee.reach = reach;
+            melee.damage = p.hero.baseDamage * equipment.damageMultiplier(p);
+            melee.critChance = equipment.critChance(p); melee.critMultiplier = equipment.critDamage(p);
+            melee.frostAmount = p.frostLevel > 0 ? SkillExpansion.frostAmount(p.frostLevel) : 0;
+            melee.frostDuration = p.frostLevel > 0 ? SkillExpansion.frostDuration(p.frostLevel) * SkillExpansion.duration(p) : 0;
+            java.util.Arrays.fill(melee.hitGenerations, -1);
             swordSwings++;
-            for (Enemy e : enemies) {
-                if (!e.active) continue;
-                float ex = e.x - p.x, ey = e.y - p.y, distance = length(ex, ey);
-                if (distance > reach + e.radius || (ex * p.facingX + ey * p.facingY) / distance < halfArcCos) continue;
-                boolean critical = rollCritical(p);
-                skills.frost(p, e);
-                hit(e, p.hero.baseDamage * equipment.damageMultiplier(p) * criticalMultiplier(p, critical),
-                    p.slot, true, critical, ImpactKind.SWORD, ex, ey);
-                swordHits++;
-                if (e.active) {
-                    e.stunTime = Math.max(e.stunTime, isBoss(e.kind) ? .02f : .16f);
-                    float knockback = isBoss(e.kind) ? 3 : e.kind == EnemyKind.BRUTE ? 12 : 25;
-                    knockbackEnemy(e, ex / distance * knockback, ey / distance * knockback);
-                }
-            }
             skills.swordFollowup(p, reach);
             p.attackCooldown = p.hero.attackInterval / equipment.attackRate(p);
         } else {
@@ -429,6 +429,50 @@ public final class ArenaWorld {
                 b.ricochetsRemaining = p.ricochetLevel; b.shatter = p.shatterBolt; arrowsFired++;
             }
             p.attackCooldown = p.hero.attackInterval / equipment.attackRate(p);
+        }
+    }
+
+    private MeleeWave freeMeleeWave(int owner) {
+        int first = owner * MeleeWave.PER_PLAYER;
+        for (int i = first; i < first + MeleeWave.PER_PLAYER; i++)
+            if (!meleeWaves[i].active) return meleeWaves[i];
+        return null;
+    }
+
+    /** Test the crossed radial band, rather than repeatedly damaging the already swept interior. */
+    private void updateMeleeWaves() {
+        for (MeleeWave melee : meleeWaves) {
+            if (!melee.active) continue;
+            Player owner = players[melee.owner];
+            if (!owner.active || !owner.alive) { melee.active = false; continue; }
+            float previousAge = melee.age;
+            melee.age += STEP;
+            if (previousAge < MeleeWave.EXPAND_SECONDS) {
+                float previousRadius = MeleeWave.radiusAtAge(previousAge, melee.reach);
+                float radius = melee.radius();
+                for (int i = 0; i < enemies.length; i++) {
+                    Enemy enemy = enemies[i];
+                    if (!enemy.active || melee.hitGenerations[i] == enemy.spawnId) continue;
+                    float dx = enemy.x - melee.x, dy = enemy.y - melee.y, distance = length(dx, dy);
+                    if (dx * dx + dy * dy < .0001f) {
+                        dx = melee.dirX * .01f; dy = melee.dirY * .01f;
+                    }
+                    if (distance > radius + enemy.radius || distance + enemy.radius < previousRadius
+                        || (dx * melee.dirX + dy * melee.dirY) / distance < MeleeWave.HALF_ARC_COS) continue;
+                    melee.hitGenerations[i] = enemy.spawnId;
+                    boolean critical = random() < melee.critChance;
+                    if (melee.frostAmount > 0) skills.slow(enemy, melee.frostAmount, melee.frostDuration);
+                    hit(enemy, melee.damage * (critical ? melee.critMultiplier : 1), melee.owner,
+                        true, critical, ImpactKind.SWORD, dx, dy);
+                    swordHits++;
+                    if (enemy.active) {
+                        enemy.stunTime = Math.max(enemy.stunTime, isBoss(enemy.kind) ? .02f : .16f);
+                        float knockback = isBoss(enemy.kind) ? 3 : enemy.kind == EnemyKind.BRUTE ? 12 : 25;
+                        knockbackEnemy(enemy, dx / distance * knockback, dy / distance * knockback);
+                    }
+                }
+            }
+            if (melee.age >= MeleeWave.TOTAL_SECONDS) melee.active = false;
         }
     }
 
@@ -1210,6 +1254,7 @@ public final class ArenaWorld {
         for (Shot shot : shots) shot.active = false;
         for (Hazard hazard : hazards) hazard.active = false;
         for (Effect effect : effects) effect.active = false;
+        for (MeleeWave melee : meleeWaves) melee.active = false;
         for (Pickup pickup : pickups) pickup.active = false;
         activeEnemies = 0; spawnCountdown = 12f;
         for (Player player : players) if (player.active) {
@@ -1413,6 +1458,7 @@ public final class ArenaWorld {
         for (Shot shot : shots) shot.active = false;
         for (Hazard hazard : hazards) hazard.active = false;
         for (Effect effect : effects) effect.active = false;
+        for (MeleeWave melee : meleeWaves) melee.active = false;
         for (Pickup pickup : pickups) pickup.active = false;
         activeEnemies = 0;
         bellSpawned = bellDefeated = false; bell = null;
@@ -1467,6 +1513,7 @@ public final class ArenaWorld {
         for (Hazard hazard : hazards) hazard.active = false;
         for (Pickup pickup : pickups) pickup.active = false;
         for (Effect effect : effects) effect.active = false;
+        for (MeleeWave melee : meleeWaves) melee.active = false;
         activeEnemies = 0;
         ArenaTimeline.Phase phase = timeline.phase(encounterPhase);
         spawn(phase.eliteKind() == null ? EnemyKind.BRUTE : phase.eliteKind(), true);

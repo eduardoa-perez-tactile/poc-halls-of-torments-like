@@ -167,7 +167,8 @@ class MourningBellEncounterTest {
     @Test void deathAwardsSoulsWithoutEquipmentOrVictoryAndResetClearsAllState() {
         ArenaWorld world = isolated(); ArenaWorld.Enemy bell = world.bell;
         int rewards = world.equipment.rewardsEarned(); bell.x = 80; bell.y = 0; bell.health = 1;
-        world.players[0].attackCooldown = 0; tick(world);
+        world.players[0].attackCooldown = 0;
+        for (int step = 0; step < 15 && bell.active; step++) tick(world);
         assertTrue(world.bellDefeated); assertFalse(bell.active); assertNull(world.activeBoss());
         assertEquals(ArenaWorld.Outcome.RUNNING, world.outcome);
         assertEquals(rewards, world.equipment.rewardsEarned());
