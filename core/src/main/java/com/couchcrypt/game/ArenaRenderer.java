@@ -126,11 +126,13 @@ public final class ArenaRenderer implements Disposable {
         int active = (world.players[0].active ? 1 : 0) + (world.players[1].active ? 1 : 0);
         boolean split = active == 2;
         drawCalls = 0;
+        playerFootRing.drawCalls = 0;
         int floorDraws = 0, worldDraws = 0, visibleSprites = 0;
         if (metrics != null) ((ProfileBatch) batch).textureSelections = 0;
         Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST);
         for (int slot = 0; slot < 2; slot++) {
             if (!world.players[slot].active) continue;
+            int ringDrawsBefore = playerFootRing.drawCalls;
             int paneX = split && slot == 1 ? width / 2 : 0;
             int paneWidth = split ? (slot == 0 ? width / 2 : width - width / 2) : width;
             Gdx.gl.glViewport(paneX, 0, paneWidth, height);
@@ -148,7 +150,7 @@ public final class ArenaRenderer implements Disposable {
             batch.begin();
             art.engravedFloor.draw(batch, medallion);
             drawChestLights(world, camera);
-            skillArt.ground(batch, world);
+            skillArt.ground(batch, world, camera);
             drawMeleeWaves(world, camera);
             // All floor effects precede the complete depth-sorted actor pass. Their painted
             // foreground rims must never be laid over a closer enemy or the player's body.
@@ -174,14 +176,15 @@ public final class ArenaRenderer implements Disposable {
             drawBolts(world, camera);
             drawShots(world, camera);
             drawEffects(world, camera);
-            skillArt.followups(batch, world);
+            skillArt.followups(batch, world, camera);
             drawDamageNumbers(world, camera);
             drawEnemyRanks(world);
             batch.end();
-            drawCalls += batch.renderCalls;
+            int ringDraws = playerFootRing.drawCalls - ringDrawsBefore;
+            drawCalls += batch.renderCalls + ringDraws;
             if (metrics != null) {
                 metrics.endStage(FrameMetrics.WORLD_DRAW);
-                worldDraws += batch.renderCalls;
+                worldDraws += batch.renderCalls + ringDraws;
             }
         }
         Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
@@ -1214,5 +1217,5 @@ public final class ArenaRenderer implements Disposable {
     }
     private static float screenX(float x, float y) { return (x - y) * ISO_X; }
     private static float screenY(float x, float y) { return (x + y) * ISO_Y; }
-    @Override public void dispose() { floorCache.dispose(); batch.dispose(); paletteShader.dispose(); iris.dispose(); }
+    @Override public void dispose() { floorCache.dispose(); batch.dispose(); paletteShader.dispose(); iris.dispose(); playerFootRing.dispose(); }
 }

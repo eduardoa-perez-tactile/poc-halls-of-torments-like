@@ -5,10 +5,15 @@ import android.os.Build;
 import android.view.WindowManager;
 import com.badlogic.gdx.backends.android.AndroidApplication;
 import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration;
+import com.badlogic.gdx.backends.android.AndroidAudio;
+import android.content.Context;
 import com.couchcrypt.CryptLobby;
 import com.couchcrypt.GameConfig;
 
 public final class AndroidLauncher extends AndroidApplication {
+    @Override public AndroidAudio createAudio(Context context, AndroidApplicationConfiguration config) {
+        return new WorkerOwnedAndroidAudio(context, config);
+    }
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);

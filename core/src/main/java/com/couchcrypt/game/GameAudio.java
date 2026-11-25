@@ -9,9 +9,8 @@ import static com.couchcrypt.game.SoundCue.*;
 public final class GameAudio implements Disposable {
     private static final SoundCue[] CUES = SoundCue.values();
     private static final int MAX_VOICES = 6, MAX_STARTS_PER_UPDATE = 4;
-    private final Sound[] sounds = new Sound[CUES.length];
+    private final VoiceMixer mixer;
     private final float[] gates = new float[CUES.length];
-    private final long[] voiceIds = new long[MAX_VOICES];
     private final int[] voiceSounds = new int[MAX_VOICES], voicePriorities = new int[MAX_VOICES];
     private final float[] voiceRemaining = new float[MAX_VOICES], voiceVolumes = new float[MAX_VOICES];
     private final boolean[] activePlayers = new boolean[2], alivePlayers = new boolean[2];
@@ -24,18 +23,20 @@ public final class GameAudio implements Disposable {
     private ArenaWorld.Outcome outcome;
 
     public GameAudio() {
-        for (int i = 0; i < sounds.length; i++) {
-            var file = Gdx.files.internal(CUES[i].path);
-            if (!file.exists()) continue;
-            try { sounds[i] = Gdx.audio.newSound(file); }
-            catch (RuntimeException failure) { Gdx.app.error("Audio", "Cue unavailable: " + CUES[i].path, failure); }
+        if (Gdx.audio instanceof AudioWorkerLifecycle) mixer = new AsyncVoiceMixer(MAX_VOICES);
+        else {
+            // Desktop OpenAL owns its stream updates on the render thread.
+            var loader = AsyncVoiceMixer.productionLoader();
+            Sound[] loaded = new Sound[CUES.length];
+            for (int i = 0; i < loaded.length; i++) loaded[i] = loader.load(i);
+            mixer = new VoiceMixer.Direct(loaded, MAX_VOICES);
         }
     }
 
     /** Package-scoped injection keeps event routing verifiable without a device audio backend. */
     GameAudio(Sound[] loaded, boolean soundEnabled) {
-        if (loaded.length != sounds.length) throw new IllegalArgumentException("Expected every cue slot");
-        System.arraycopy(loaded, 0, sounds, 0, loaded.length);
+        if (loaded.length != CUES.length) throw new IllegalArgumentException("Expected every cue slot");
+        mixer = new VoiceMixer.Direct(loaded, MAX_VOICES);
         volume = soundEnabled ? 1f : 0f;
     }
 
@@ -45,7 +46,7 @@ public final class GameAudio implements Disposable {
         volume = next;
         if (volume == 0) { stop(); return; }
         for (int i = 0; i < MAX_VOICES; i++) if (voiceRemaining[i] > 0)
-            sounds[voiceSounds[i]].setVolume(voiceIds[i], voiceVolumes[i] * volume);
+            mixer.volume(i, voiceVolumes[i] * volume);
     }
 
     public void setSuspended(boolean value) {
@@ -68,7 +69,7 @@ public final class GameAudio implements Disposable {
             if (voiceRemaining[i] <= 0) continue;
             voiceRemaining[i] -= dt;
             if (voiceRemaining[i] <= 0) {
-                sounds[voiceSounds[i]].stop(voiceIds[i]);
+                mixer.stop(i);
                 voiceRemaining[i] = 0;
             }
         }
@@ -139,7 +140,7 @@ public final class GameAudio implements Disposable {
     /** Presentation events use the same bounded mixer as combat. Missing optional files are silent. */
     public void play(SoundCue effect) {
         int cue = effect.ordinal(), priority = effect.priority;
-        if (suspended || volume <= 0 || sounds[cue] == null || gates[cue] > 0 || starts >= MAX_STARTS_PER_UPDATE) return;
+        if (suspended || volume <= 0 || !mixer.available(cue) || gates[cue] > 0 || starts >= MAX_STARTS_PER_UPDATE) return;
         int slot = -1;
         for (int i = 0; i < MAX_VOICES; i++) if (voiceRemaining[i] <= 0) { slot = i; break; }
         if (slot < 0) {
@@ -150,18 +151,19 @@ public final class GameAudio implements Disposable {
                     || (voicePriorities[i] == voicePriorities[slot] && voiceRemaining[i] < voiceRemaining[slot])) slot = i;
             }
             if (slot < 0) return;
-            sounds[voiceSounds[slot]].stop(voiceIds[slot]);
+            mixer.stop(slot);
             voiceRemaining[slot] = 0;
         }
         // Cosmetic variation never consumes the simulation's random stream. Ceremonies stay in tune.
         float pitch = priority >= 5 || isUi(effect) ? 1f : .96f + variation * .01f;
         variation = (variation + 5) % 9;
-        long id = sounds[cue].play(effect.volume * volume, pitch, 0f);
+        float lifetime = effect.seconds / pitch + .03f;
+        boolean accepted = mixer.start(slot, cue, effect.volume * volume, pitch, lifetime);
         gates[cue] = effect.gate;
-        if (id < 0) return;
-        voiceIds[slot] = id; voiceSounds[slot] = cue; voicePriorities[slot] = priority;
+        if (!accepted) return;
+        voiceSounds[slot] = cue; voicePriorities[slot] = priority;
         voiceVolumes[slot] = effect.volume;
-        voiceRemaining[slot] = effect.seconds / pitch + .03f;
+        voiceRemaining[slot] = lifetime;
         starts++;
     }
 
@@ -172,14 +174,14 @@ public final class GameAudio implements Disposable {
     /** Pausing combat leaves the remote action's short feedback audible. */
     public void stopCombat() {
         for (int i = 0; i < MAX_VOICES; i++) if (voiceRemaining[i] > 0 && !isUi(CUES[voiceSounds[i]])) {
-            sounds[voiceSounds[i]].stop(voiceIds[i]);
+            mixer.stop(i);
             voiceRemaining[i] = 0;
         }
     }
 
     public void stop() {
-        for (Sound sound : sounds) if (sound != null) sound.stop();
+        mixer.stopAll();
         for (int i = 0; i < MAX_VOICES; i++) voiceRemaining[i] = 0;
     }
-    @Override public void dispose() { stop(); for (Sound sound : sounds) if (sound != null) sound.dispose(); }
+    @Override public void dispose() { stop(); mixer.dispose(); }
 }

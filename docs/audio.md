@@ -4,6 +4,14 @@ The TV now ships a complete score and sampled effect bank. `GameAudio` owns shor
 effects; `SceneMusic` owns one streamed track at a time. Phones remain silent.
 No combat rules, timings or network messages depend on playback.
 
+Android native loading, playback, volume, stop and disposal now run on two bounded
+audio owners: six latest-state effect slots and one latest-state music request.
+The render/lifecycle thread only publishes state. Replaced/expired requests do
+not accumulate or replay after pause, and backend shutdown waits for ownership
+release off-thread. Desktop retains its original OpenAL thread model. See the
+[submission and stability results](performance-submission.md) for the native
+ownership fix, resource bounds and ten-minute headless stress evidence.
+
 ## Included score
 
 | Runtime path under `assets/` | Scene | Source composition / author |

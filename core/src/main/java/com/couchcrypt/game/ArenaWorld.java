@@ -38,12 +38,21 @@ public final class ArenaWorld {
     public static final class Diagnostics {
         /** Active, not-yet-hit bolt/enemy pairs submitted to the geometric collision test. */
         public long boltCollisionCandidates;
+        /** Active, not-yet-hit melee/enemy pairs submitted to the crossed-rim/cone test. */
+        public long meleeCollisionCandidates;
+        /** Orbiter, field, glaive and delayed-strike damage tests; excludes targeting and placement. */
+        public long expansionCollisionCandidates;
         public long enemySpawnMisses, boltAcquireMisses, shotAcquireMisses, hazardAcquireMisses, effectAcquireMisses;
+        public long meleeAcquireMisses;
+        /** Due relic placements blocked by a full pool or failed bounded safe-position searches. */
+        public long relicPoolBlockedTicks, relicPlacementMisses;
         /** Rewards merged into existing pickups because every pickup slot was occupied. */
         public long pickupMerges;
 
         private void reset() {
             boltCollisionCandidates = enemySpawnMisses = boltAcquireMisses = shotAcquireMisses = 0;
+            meleeCollisionCandidates = expansionCollisionCandidates = meleeAcquireMisses = 0;
+            relicPoolBlockedTicks = relicPlacementMisses = 0;
             hazardAcquireMisses = effectAcquireMisses = pickupMerges = 0;
         }
     }
@@ -436,6 +445,7 @@ public final class ArenaWorld {
         int first = owner * MeleeWave.PER_PLAYER;
         for (int i = first; i < first + MeleeWave.PER_PLAYER; i++)
             if (!meleeWaves[i].active) return meleeWaves[i];
+        if (diagnostics != null) diagnostics.meleeAcquireMisses++;
         return null;
     }
 
@@ -453,6 +463,7 @@ public final class ArenaWorld {
                 for (int i = 0; i < enemies.length; i++) {
                     Enemy enemy = enemies[i];
                     if (!enemy.active || melee.hitGenerations[i] == enemy.spawnId) continue;
+                    if (diagnostics != null) diagnostics.meleeCollisionCandidates++;
                     float dx = enemy.x - melee.x, dy = enemy.y - melee.y, distance = length(dx, dy);
                     if (dx * dx + dy * dy < .0001f) {
                         dx = melee.dirX * .01f; dy = melee.dirY * .01f;

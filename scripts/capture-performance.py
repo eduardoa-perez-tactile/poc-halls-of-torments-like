@@ -34,7 +34,7 @@ def websocket_frame(payload, opcode=1):
 
 class Phone:
     """Heartbeat by default; optional deterministic session input, never choices."""
-    def __init__(self, port, room, moving_input=False, player_offset=0):
+    def __init__(self, port, room, moving_input=False, player_offset=0, token=None):
         self.connection = socket.create_connection(('127.0.0.1', port), timeout=3)
         self.stopping = threading.Event()
         self.error = None
@@ -42,6 +42,9 @@ class Phone:
         self.moving_input = moving_input
         self.player_offset = player_offset
         self.joined = self.controllable = False
+        self.token = token
+        self.player = None
+        self.latest_status = None
         self.sequence = 0
         self.received = bytearray()
         self.fragment = bytearray()
@@ -49,7 +52,8 @@ class Phone:
         self.input_messages = self.active_input_messages = self.dodge_edges = 0
         try:
             key = base64.b64encode(os.urandom(16)).decode()
-            request = (f'GET /socket?room={room} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n'
+            query = f'room={room}' + (f'&token={token}' if token is not None else '')
+            request = (f'GET /socket?{query} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n'
                        f'Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: {key}\r\n'
                        'Sec-WebSocket-Version: 13\r\n\r\n')
             self.connection.sendall(request.encode())
@@ -115,9 +119,12 @@ class Phone:
             self.fragment.clear()
             if message.get('type') == 'joined':
                 self.joined = True
+                self.token = message.get('token')
+                self.player = message.get('player')
             elif message.get('type') in ('error', 'removed'):
                 raise RuntimeError('Synthetic controller rejected: ' + str(message.get('reason', 'removed')))
             elif message.get('type') == 'status':
+                self.latest_status = message
                 self.controllable = message.get('phase') == 'session' and message.get('hostActive') is True and message.get('alive') is not False
 
     def input(self, elapsed, neutral=False):
@@ -197,7 +204,7 @@ def parser_for_capture():
     parser.add_argument('--host', required=True, type=phone_reachable_host,
                         help='Existing relay LAN IPv4 used by the TV QR (persisted by Android)')
     parser.add_argument('--forward-port', type=int, required=True, help='Existing ADB localhost forward to TV8787')
-    parser.add_argument('--fixture', choices=['lobby', 'boss-solo', 'boss-coop', 'late-coop', 'items-coop', 'art-solo', 'art-coop', 'results'], default='boss-coop')
+    parser.add_argument('--fixture', choices=['lobby', 'boss-solo', 'boss-coop', 'late-coop', 'items-coop', 'art-solo', 'art-coop', 'expansion-coop', 'results'], default='boss-coop')
     parser.add_argument('--seconds', type=int, default=20, choices=range(5, 31), metavar='5..30')
     parser.add_argument('--lifecycle', action='store_true', help='Add one brief results/lobby/background-resume observation')
     parser.add_argument('--switch-smoke', action='store_true', help='Results only: send rapid F7/F8/Back after measurement')
@@ -458,6 +465,9 @@ def main():
                 key(142)  # F12: equipped late encounter, real builds and temporary invulnerability.
                 wait(.2)
                 key(136)  # F6: add the real final boss and existing telegraphs.
+            elif args.fixture == 'expansion-coop':
+                key(11)  # NUM_4: complete skill composition, fixed durable targets and both relics.
+                metadata['fixture_note'] = 'Dedicated expansion fixture; not simultaneous maximum-pool saturation.'
             else:
                 key(137 if args.fixture == 'results' else 141 if args.fixture == 'late-coop' else 142 if args.fixture == 'items-coop' else 136)
                 # F7 sample victory / F11 late encounter / F12 equipped late encounter / F6 boss fixture.

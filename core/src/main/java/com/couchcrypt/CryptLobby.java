@@ -32,6 +32,7 @@ import com.couchcrypt.game.HudArt;
 import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.GameAudio;
 import com.couchcrypt.game.AudioSettings;
+import com.couchcrypt.game.AudioWorkerLifecycle;
 import com.couchcrypt.game.SceneMusic;
 import com.couchcrypt.game.SoundCue;
 import com.couchcrypt.game.ArenaRenderer;
@@ -1334,15 +1335,24 @@ public final class CryptLobby extends ApplicationAdapter {
                 if (config.profile()) {
                     Gdx.app.log("LobbyPerf", stats);
                     var counters = world.diagnostics();
+                    AudioWorkerLifecycle audioWorkers = Gdx.audio instanceof AudioWorkerLifecycle owner ? owner : null;
                     int healingOnFloor = 0, healingValue = 0;
                     for (var pickup : world.pickups) if (pickup.active && pickup.healing) {
                         healingOnFloor++; healingValue += pickup.value;
                     }
                     Gdx.app.log("ProfileWorld", "phase=" + profileMode() + " runSeed=" + world.runSeed
-                        + " elapsed=" + world.elapsed + " candidates=" + counters.boltCollisionCandidates
+                        + " elapsed=" + world.elapsed + " boltCollisionCandidates=" + counters.boltCollisionCandidates
+                        + " meleeCollisionCandidates=" + counters.meleeCollisionCandidates
+                        + " expansionCollisionCandidates=" + counters.expansionCollisionCandidates
                         + " enemyMisses=" + counters.enemySpawnMisses + " boltMisses=" + counters.boltAcquireMisses
                         + " shotMisses=" + counters.shotAcquireMisses + " hazardMisses=" + counters.hazardAcquireMisses
-                        + " effectMisses=" + counters.effectAcquireMisses + " pickupMerges=" + counters.pickupMerges
+                        + " effectMisses=" + counters.effectAcquireMisses + " meleeMisses=" + counters.meleeAcquireMisses
+                        + " fieldMisses=" + world.skills.fieldAcquireMisses + " delayedMisses=" + world.skills.delayedAcquireMisses
+                        + " relicPoolBlockedTicks=" + counters.relicPoolBlockedTicks
+                        + " relicPlacementMisses=" + counters.relicPlacementMisses
+                        + " audioWorkers=" + (audioWorkers == null ? 0 : audioWorkers.diagnosticWorkers())
+                        + " audioMusicHandles=" + (audioWorkers == null ? 0 : audioWorkers.diagnosticMusicHandles())
+                        + " pickupMerges=" + counters.pickupMerges
                         + " partyLevel=" + world.progression.level + " partyXp=" + world.progression.totalXp
                         + " kills=" + world.kills + " activeEnemies=" + world.activeEnemies
                         + " healingOnFloor=" + healingOnFloor + " healingFloorValue=" + healingValue
@@ -1379,14 +1389,7 @@ public final class CryptLobby extends ApplicationAdapter {
         if (frameMetrics != null) {
             frameMetrics.endStage(FrameMetrics.UI);
             frameMetrics.addSimulationSteps(simulationSteps, rawDelta);
-            int enemies = 0, bolts = 0, pickups = 0, shots = 0, hazards = 0, effects = 0;
-            for (var value : world.enemies) if (value.active) enemies++;
-            for (var value : world.bolts) if (value.active) bolts++;
-            for (var value : world.pickups) if (value.active) pickups++;
-            for (var value : world.shots) if (value.active) shots++;
-            for (var value : world.hazards) if (value.active) hazards++;
-            for (var value : world.effects) if (value.active) effects++;
-            frameMetrics.recordPoolCounts(enemies, bolts, pickups, shots, hazards, effects);
+            frameMetrics.recordPoolCounts(world);
             frameMetrics.endFrame(profileMode(), residentArtBytes(), residentPixmapBytes(),
                 Gdx.app.getJavaHeap(), (screen == Screen.SESSION ? arena.drawCalls : 0) + ((SpriteBatch) stage.getBatch()).renderCalls);
         }
