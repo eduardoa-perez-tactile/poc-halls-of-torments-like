@@ -1,0 +1,152 @@
+{
+  "ne": {
+    "pivot": [
+      94.25,
+      80.75
+    ],
+    "translationNewVsGuideSourcePixels": [
+      -1.7272727272727266,
+      -3.1363636363636367
+    ],
+    "method": "opaque128 outergroundarm contours constrained to authored2:1 slopes; mixed corners use vertical outerfold for horizontalshift",
+    "evidence": {
+      "slopes": [
+        -0.5,
+        0.5
+      ],
+      "oldInterceptAndRms": [
+        [
+          138.50757575757575,
+          0.24988518943137336,
+          33
+        ],
+        [
+          40.28030303030303,
+          0.3880681356019908,
+          33
+        ]
+      ],
+      "newInterceptAndRms": [
+        [
+          134.50757575757575,
+          0.24988518943137336,
+          33
+        ],
+        [
+          38.00757575757576,
+          0.24988518943137336,
+          33
+        ]
+      ]
+    }
+  },
+  "nw": {
+    "pivot": [
+      97.0,
+      82.75
+    ],
+    "translationNewVsGuideSourcePixels": [
+      1.0,
+      -1.1666666666666643
+    ],
+    "method": "opaque128 outergroundarm contours constrained to authored2:1 slopes; mixed corners use vertical outerfold for horizontalshift",
+    "evidence": {
+      "slope": 0.5,
+      "oldFoldMedianMinMax": [
+        90.5,
+        90.5,
+        90.5
+      ],
+      "newFoldMedianMinMax": [
+        91.5,
+        91.5,
+        91.5
+      ],
+      "oldInterceptAndRms": [
+        40.28030303030303,
+        0.3880681356019908,
+        33
+      ],
+      "newInterceptAndRms": [
+        38.61363636363637,
+        0.3319530651546461,
+        33
+      ]
+    }
+  },
+  "se": {
+    "pivot": [
+      97.0,
+      83.25
+    ],
+    "translationNewVsGuideSourcePixels": [
+      1.0,
+      -0.7424242424242493
+    ],
+    "method": "opaque128 outergroundarm contours constrained to authored2:1 slopes; mixed corners use vertical outerfold for horizontalshift",
+    "evidence": {
+      "slope": -0.5,
+      "oldFoldMedianMinMax": [
+        101.5,
+        101.5,
+        101.5
+      ],
+      "newFoldMedianMinMax": [
+        102.5,
+        102.5,
+        102.5
+      ],
+      "oldInterceptAndRms": [
+        138.49242424242425,
+        0.24988518943137336,
+        33
+      ],
+      "newInterceptAndRms": [
+        138.25,
+        0.3481553119113957,
+        33
+      ]
+    }
+  },
+  "sw": {
+    "pivot": [
+      95.5,
+      82.0
+    ],
+    "translationNewVsGuideSourcePixels": [
+      -0.5454545454545467,
+      -1.9393939393939448
+    ],
+    "method": "opaque128 outergroundarm contours constrained to authored2:1 slopes; mixed corners use vertical outerfold for horizontalshift",
+    "evidence": {
+      "slopes": [
+        0.5,
+        -0.5
+      ],
+      "oldInterceptAndRms": [
+        [
+          40.553030303030305,
+          0.29998469504883835,
+          33
+        ],
+        [
+          138.2348484848485,
+          0.35855028988482524,
+          33
+        ]
+      ],
+      "newInterceptAndRms": [
+        [
+          38.88636363636363,
+          0.5938156952201644,
+          33
+        ],
+        [
+          136.02272727272728,
+          0.27773186030035396,
+          33
+        ]
+      ]
+    }
+  }
+}

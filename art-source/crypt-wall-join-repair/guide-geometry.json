@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "purpose": "native original-wall-only imagegen edit targets; no production source changes",
+  "pixelSize": [
+    256,
+    192
+  ],
+  "cameraViewportLogical": [
+    400,
+    300
+  ],
+  "logicalUnitsPerGuidePixel": 1.5625,
+  "groundRootPixelTopLeft": [
+    128,
+    112
+  ],
+  "cameraRiseAboveGroundRootLogical": 25,
+  "armLengthWorld": 180,
+  "clipping": "one vertical screen-plane per arm at authored world-axis cut; original vertex UV interpolation",
+  "alpha": "straight RGBA; source-over alpha compositing into transparent RGBA8888 FBO, followed by unpremultiplication of framebuffer RGB",
+  "omitted": [
+    "floor",
+    "props",
+    "actors",
+    "old corner backing",
+    "HUD",
+    "iris"
+  ],
+  "recommendedBakedPixelSize": [
+    192,
+    144
+  ],
+  "recommendedBakedPivotTopLeft": [
+    96,
+    84
+  ],
+  "recommendedBakedLogicalUnitsPerPixel": 2.0833333333333335,
+  "corners": {
+    "north-east": {
+      "file": "north-east.png",
+      "cornerWorld": [
+        1212,
+        912
+      ],
+      "groundRootPixelTopLeft": [
+        128,
+        112
+      ],
+      "groundRootScreenLogical": [
+        212.132034,
+        750.9474003600001
+      ],
+      "cameraCenterScreenLogical": [
+        212.132034,
+        775.9474003600001
+      ],
+      "armCutWorld": {
+        "x": 1032,
+        "y": 732
+      },
+      "paintSourceEnds": {
+        "x": "right",
+        "y": "left"
+      },
+      "alphaBounds": [
+        47,
+        47,
+        209,
+        165
+      ]
+    },
+    "north-west": {
+      "file": "north-west.png",
+      "cornerWorld": [
+        -1212,
+        912
+      ],
+      "groundRootPixelTopLeft": [
+        128,
+        112
+      ],
+      "groundRootScreenLogical": [
+        -1501.8948007200001,
+        -106.066017
+      ],
+      "cameraCenterScreenLogical": [
+        -1501.8948007200001,
+        -81.066017
+      ],
+      "armCutWorld": {
+        "x": -1032,
+        "y": 732
+      },
+      "paintSourceEnds": {
+        "x": "left",
+        "y": "left"
+      },
+      "alphaBounds": [
+        118,
+        3,
+        209,
+        163
+      ]
+    },
+    "south-east": {
+      "file": "south-east.png",
+      "cornerWorld": [
+        1212,
+        -912
+      ],
+      "groundRootPixelTopLeft": [
+        128,
+        112
+      ],
+      "groundRootScreenLogical": [
+        1501.8948007200001,
+        106.066017
+      ],
+      "cameraCenterScreenLogical": [
+        1501.8948007200001,
+        131.066017
+      ],
+      "armCutWorld": {
+        "x": 1032,
+        "y": -732
+      },
+      "paintSourceEnds": {
+        "x": "right",
+        "y": "right"
+      },
+      "alphaBounds": [
+        47,
+        11,
+        138,
+        165
+      ]
+    },
+    "south-west": {
+      "file": "south-west.png",
+      "cornerWorld": [
+        -1212,
+        -912
+      ],
+      "groundRootPixelTopLeft": [
+        128,
+        112
+      ],
+      "groundRootScreenLogical": [
+        -212.132034,
+        -750.9474003600001
+      ],
+      "cameraCenterScreenLogical": [
+        -212.132034,
+        -725.9474003600001
+      ],
+      "armCutWorld": {
+        "x": -1032,
+        "y": -732
+      },
+      "paintSourceEnds": {
+        "x": "left",
+        "y": "right"
+      },
+      "alphaBounds": [
+        47,
+        3,
+        209,
+        118
+      ]
+    }
+  }
+}

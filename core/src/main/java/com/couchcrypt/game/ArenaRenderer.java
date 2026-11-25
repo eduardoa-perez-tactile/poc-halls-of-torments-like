@@ -33,7 +33,7 @@ public final class ArenaRenderer implements Disposable {
     private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
     private static final float[] SOVEREIGN_ORIGIN = {37, 78, -12, 67, 18, 90, -35, 82};
     private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PAINTED_BORDER = 3, DODGE_GHOST = 4, CHEST = 5,
-        SENTINEL_BLADE = 6, RETURNING_GLAIVE = 7, WORLD_RELIC = 8;
+        SENTINEL_BLADE = 6, RETURNING_GLAIVE = 7, WORLD_RELIC = 8, PAINTED_CORNER = 9;
     private final GameArt art;
     private final GameHud gameHud;
     private final EnemyRankMarkers rankMarkers;
@@ -57,12 +57,14 @@ public final class ArenaRenderer implements Disposable {
     private final boolean[] cameraReady = new boolean[2];
     private final ArenaLayout layout;
     private final PaintedBorderArt.Scene paintedBorders;
+    private final GateWallOpening gateOpening;
+    private final PaintedCornerArt.Scene paintedCorners;
     private final GameplayAtlas.Region[] propArt;
     private final GameplayAtlas.Region chestArt;
     private final float chestScale;
     private final float[] environmentVertices = new float[20];
     private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + 2 * DodgeTrail.CAPACITY
-        + ArenaLayout.MAX_PLACEMENTS + PaintedBorderArt.MAX_SCENERY + ArenaWorld.MAX_CHESTS
+        + ArenaLayout.MAX_PLACEMENTS + PaintedBorderArt.MAX_SCENERY + PaintedCornerArt.MAX_SCENERY + ArenaWorld.MAX_CHESTS
         + SkillExpansion.MAX_ORBITERS + SkillExpansion.MAX_GLAIVES + SkillExpansion.MAX_RELICS];
     private final int[] types = new int[depths.length], indices = new int[depths.length], layers = new int[depths.length];
     private int sortCount;
@@ -103,6 +105,8 @@ public final class ArenaRenderer implements Disposable {
         layout = ArenaLayout.load(art.metadata);
         ambience = new ArenaAmbience(floorLayout, layout);
         paintedBorders = art.paintedBorders.place(layout, art.metadata);
+        gateOpening = new GateWallOpening(paintedBorders, layout, art.metadata);
+        paintedCorners = art.paintedCorners.place(layout, paintedBorders);
         propArt = new GameplayAtlas.Region[layout.placements.length];
         for (int i = 0; i < propArt.length; i++)
             propArt[i] = art.environment(layout.placements[i].region);
@@ -370,8 +374,16 @@ public final class ArenaRenderer implements Disposable {
                 add(PROP, i, placement.x, placement.y);
         }
         for (int i = 0; i < paintedBorders.quads.length; i++) if (paintedBorders.visible(camera, i)) {
+            float[] cut = paintedCorners.wallVertices[i];
+            if (cut != null && cut.length == 0) continue;
             PaintedBorderArt.Quad q = paintedBorders.quads[i];
             add(PAINTED_BORDER, i, q.worldX, q.worldY);
+            depths[sortCount - 1] = q.sortDepth;
+            layers[sortCount - 1] = q.renderLayer;
+        }
+        for (int i = 0; i < paintedCorners.quads.length; i++) if (paintedCorners.visible(camera, i)) {
+            PaintedCornerArt.Quad q = paintedCorners.quads[i];
+            add(PAINTED_CORNER, i, q.worldX, q.worldY);
             depths[sortCount - 1] = q.sortDepth;
             layers[sortCount - 1] = q.renderLayer;
         }
@@ -438,7 +450,7 @@ public final class ArenaRenderer implements Disposable {
         batch.setColor(1f, 1f, 1f, .62f);
         for (int i = 0; i < sortCount; i++) {
             int index = indices[i]; float x, y, width;
-            if (types[i] == PAINTED_BORDER || types[i] == DODGE_GHOST
+            if (types[i] == PAINTED_BORDER || types[i] == PAINTED_CORNER || types[i] == DODGE_GHOST
                 || types[i] == SENTINEL_BLADE || types[i] == RETURNING_GLAIVE || types[i] == WORLD_RELIC) continue;
             if (types[i] == PLAYER) {
                 ArenaWorld.Player player = world.players[index];
@@ -868,7 +880,13 @@ public final class ArenaRenderer implements Disposable {
             int index = indices[i];
             if (types[i] == PAINTED_BORDER) {
                 batch.setColor(Color.WHITE);
-                paintedBorders.draw(batch, index);
+                float[] cut = paintedCorners.wallVertices[index];
+                if (cut == null) cut = gateOpening.vertices[index];
+                if (cut == null) paintedBorders.draw(batch, index);
+                else if (cut.length > 0) paintedBorders.draw(batch, index, cut);
+            } else if (types[i] == PAINTED_CORNER) {
+                batch.setColor(Color.WHITE);
+                paintedCorners.draw(batch, index);
             } else if (types[i] == PROP) {
                 drawEnvironment(world, camera, viewer, index);
             } else if (types[i] == CHEST) {
