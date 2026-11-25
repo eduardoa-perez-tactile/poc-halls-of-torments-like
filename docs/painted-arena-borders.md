@@ -1,5 +1,68 @@
 # Continuous painted arena borders
 
+## Painted gate/corner repair — 25 November 2026
+
+The user found that the gate still looked freestanding and the four wall turns
+still looked assembled from separate endcaps. A further geometry-only fit was
+rejected. The user approved the subsequent painted join proposal in
+[`art-source/crypt-wall-join-repair/approved-proposal.png`](../art-source/crypt-wall-join-repair/approved-proposal.png).
+That approval supersedes the corner-backing treatment described in the older
+records below; the long wall paintings and the rest of the level stay unchanged.
+
+The gate is now seated at (0,912), on the north wall centre line, instead of
+(0,870) in front of the wall. Its existing 250×50 footprint overlaps the 36-unit
+wall by seven units on each face. `GateWallOpening` caches a narrow wall cut
+inside the opaque door/jamb artwork. Resident alpha checks cover the complete
+cut through the wall's thickness and height, and confirm that it cannot expose
+transparent gaps. Gate scale, painted pixels and corrected ground projection
+are preserved. The gate remains render-only; arena movement bounds are unchanged.
+
+Four original directional join paintings wrap the broad masonry courses around
+the turns without separate posts, lips or doubled cap faces. The native wall-only
+guides keep the existing arms and camera projection. Whole-canvas normalization
+produces 192×144 sources at 2.083333 logical units per pixel; measured ground
+contours determine each pivot. The built-in ImageGen prompts, source guides,
+approved proposal, raw masters and normalization/calibration records are preserved
+in the [source package](../art-source/crypt-wall-join-repair/README.md).
+
+`PaintedCornerArt` reuses spare space in the four already resident gameplay pages,
+including the managed Grave King page. Its 88 storage pieces preserve neighbouring
+source pixels and sampling gutters. No page, texture dimensions, GPU texture
+bytes or retained Pixmaps are added. The archive-only baker verifies that every
+old frame rectangle, gutter and nonzero RGBA pixel remains identical and that
+the saved pieces reconstruct each new painting exactly.
+
+All endpoint cuts, source UVs and join meshes are cached once. Old backing pieces
+are hidden and the old endcaps are trimmed only beneath the new painted wraps,
+with an opaque handoff overlap. Mixed front/back corners are split into cached
+rear and foreground meshes so their rear wall arm stays behind the complete
+actor pass. Joins are grouped by resident page within each drawing layer. There
+is no per-frame geometry allocation, source resampling, texture upload, scenery
+collision, gameplay rebalance or change to the approved floor.
+
+### Repair verification and handoff
+
+Twenty focused JDK 21 checks passed across the original painted borders, the
+new corner meshes, gate opening, environment projection and arena layout.
+Desktop compilation and Android debug assembly passed. The new tests check
+source-area conservation across mixed front/back splits, original affine UVs,
+layer order, bounded caches, page grouping, gate opacity coverage and separation
+between doorway and endpoint cuts. The baker independently verifies original
+protected atlas pixels and gutters.
+
+Fresh native 1920×1080 views cover the seated gate, all four corners with a nearby
+hero, and the entire updated arena. The user accepted these runtime views
+("way much better"). Original long-wall paintings remain, so their short material
+handoffs to the new wraps can still be visible at close zoom. Evidence is ignored
+under `.run/wall-gate-final/`; rejected geometry-only studies are not implemented.
+A 120-frame static renderer sample measured CPU submission p50/p95/p99/max
+0.202/0.410/1.629/2.396 ms. This excludes simulation, audio and GPU completion and
+does not prove physical-TV 60 FPS or full-run balance. No survival playthrough was
+run. Temporary native processes and harness files were removed; the user's
+emulator, LAN relay and ADB forwards were preserved by this repair task.
+
+## Historical 24 November correction
+
 The 24 November formal-layout correction removes the legacy tile-foundation skirt,
 so these paintings now form the only visible perimeter. Whole-painting scale fits
 the actual adjoining outer-face span; it no longer adds an extra wall thickness

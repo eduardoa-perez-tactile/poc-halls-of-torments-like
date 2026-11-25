@@ -15,6 +15,7 @@ public final class GameArt implements Disposable {
     public final EnemyAttackArt enemyAttacks;
     public final MagicProjectileArt projectiles;
     public final PaintedBorderArt paintedBorders;
+    public final PaintedCornerArt paintedCorners;
     public final EngravedFloorArt engravedFloor;
     public final TextureRegion shadow, glow, pixel, soul;
     public final long textureBytes;
@@ -45,6 +46,7 @@ public final class GameArt implements Disposable {
             enemyAttacks = new EnemyAttackArt(pages);
             projectiles = new MagicProjectileArt(pages[2]);
             paintedBorders = new PaintedBorderArt(pages, metadata);
+            paintedCorners = new PaintedCornerArt(new JsonReader().parse(Gdx.files.internal("art/painted-corners.json")), metadata, pages);
             // Ground metadata keeps its original three gameplay pages + foundation page.
             // Supplemental actor pages do not change those stable storage indices.
             Texture[] groundPages = java.util.Arrays.copyOf(pages, 4);

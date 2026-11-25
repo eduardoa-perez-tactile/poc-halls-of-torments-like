@@ -234,7 +234,9 @@ class PaintedBorderArtTest {
         float left = rootX + frame.left * gate.scale;
         float right = rootX + (frame.left + frame.width) * gate.scale;
         float attachedWallY = Float.NaN;
-        for (var run : layout.wallRuns) if (run.alongX() && run.y() > gate.y) attachedWallY = run.y();
+        for (var run : layout.wallRuns) if (run.alongX()
+            && (!Float.isFinite(attachedWallY) || Math.abs(run.y() - gate.y) < Math.abs(attachedWallY - gate.y)))
+            attachedWallY = run.y();
         assertTrue(Float.isFinite(attachedWallY));
 
         int leftColumns = 0, rightColumns = 0, backColumns = 0, frontColumns = 0;

@@ -12,7 +12,8 @@ import java.util.ArrayList;
 /** Whole painted wall runs, split only for storage in already resident atlas pages. */
 public final class PaintedBorderArt {
     public static final int MAX_PIECES = 256, MAX_SCENERY = 512;
-    public static final int CORNER_LAYER = 0, BACK_WALL_LAYER = 1, INTERIOR_LAYER = 2, FRONT_WALL_LAYER = 3;
+    public static final int CORNER_LAYER = 0, BACK_WALL_LAYER = 1, BACK_JOIN_LAYER = 2,
+        INTERIOR_LAYER = 3, FRONT_WALL_LAYER = 4, FRONT_JOIN_LAYER = 5;
     private static final float ISO_X = .70710678f, ISO_Y = .35355339f;
     public final Painting x, y, corner;
     private final Texture[] textures;
@@ -152,8 +153,10 @@ public final class PaintedBorderArt {
             }
         }
         public void draw(SpriteBatch batch, int index) {
-            Quad q = quads[index];
-            batch.draw(textures[q.piece.page], q.vertices, 0, q.vertices.length);
+            draw(batch, index, quads[index].vertices);
+        }
+        public void draw(SpriteBatch batch, int index, float[] cachedVertices) {
+            batch.draw(textures[quads[index].piece.page], cachedVertices, 0, cachedVertices.length);
         }
         public boolean visible(OrthographicCamera camera, int index) {
             Quad q = quads[index];

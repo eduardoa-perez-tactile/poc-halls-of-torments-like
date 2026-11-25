@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "tool": "built-in image_gen",
+  "corners": {
+    "ne": {
+      "file": "north-east.png",
+      "sourceSize": [
+        192,
+        144
+      ],
+      "pivot": [
+        94.25,
+        80.75
+      ],
+      "worldScale": 2.0833333333333335,
+      "armLengthWorld": 180
+    },
+    "nw": {
+      "file": "north-west.png",
+      "sourceSize": [
+        192,
+        144
+      ],
+      "pivot": [
+        97.0,
+        82.75
+      ],
+      "worldScale": 2.0833333333333335,
+      "armLengthWorld": 180
+    },
+    "se": {
+      "file": "south-east.png",
+      "sourceSize": [
+        192,
+        144
+      ],
+      "pivot": [
+        97.0,
+        83.25
+      ],
+      "worldScale": 2.0833333333333335,
+      "armLengthWorld": 180
+    },
+    "sw": {
+      "file": "south-west.png",
+      "sourceSize": [
+        192,
+        144
+      ],
+      "pivot": [
+        95.5,
+        82.0
+      ],
+      "worldScale": 2.0833333333333335,
+      "armLengthWorld": 180
+    }
+  },
+  "provenanceFiles": [
+    "approved-proposal.png",
+    "proposal-prompt.txt",
+    "asset-prompts.json",
+    "guide-geometry.json",
+    "normalization.json",
+    "masters/north-east.png",
+    "masters/north-west.png",
+    "masters/south-east.png",
+    "masters/south-west.png"
+  ]
+}
