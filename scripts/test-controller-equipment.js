@@ -10,6 +10,7 @@ class Element {
   constructor() {
     this.hidden = false; this.disabled = false; this.textContent = ''; this.dataset = {};
     this.listeners = new Map(); this.children = new Map(); this.attributes = new Map();
+    this.capturedPointers = new Set();
     const classes = new Set();
     this.classList = {
       add: (...names) => names.forEach((name) => classes.add(name)),
@@ -29,8 +30,10 @@ class Element {
     return this.children.get(selector);
   }
   setAttribute(name, value) { this.attributes.set(name, value); }
-  setPointerCapture() {}
-  hasPointerCapture() { return false; }
+  getBoundingClientRect() { return { left: 0, top: 0, width: 200, height: 200 }; }
+  setPointerCapture(id) { this.capturedPointers.add(id); }
+  hasPointerCapture(id) { return this.capturedPointers.has(id); }
+  releasePointerCapture(id) { this.capturedPointers.delete(id); }
   click() { this.listeners.get('click')?.({}); }
 }
 
@@ -40,9 +43,11 @@ async function main() {
     if (!elements.has(id)) elements.set(id, new Element());
     return elements.get(id);
   };
+  const documentEvents = new Map();
   const document = {
     getElementById: get, querySelector: get, body: new Element(), documentElement: new Element(),
-    hidden: false, visibilityState: 'visible', addEventListener() {}
+    hidden: false, visibilityState: 'visible',
+    addEventListener(name, handler, options) { documentEvents.set(name, { handler, options }); }
   };
   let now = 1000;
   const sockets = [];
@@ -82,6 +87,16 @@ async function main() {
   });
   const choices = get('upgrade-choices');
   const first = get('upgrade-option-0');
+  const browserGestures = ['touchstart', 'touchmove', 'gesturestart', 'gesturechange', 'contextmenu'];
+  function gesture(name, target = document.body, cancelable = true) {
+    const listener = documentEvents.get(name);
+    assert.ok(listener, `${name} has a document-wide gesture guard`);
+    assert.equal(listener.options.passive, false, `${name} can cancel browser defaults`);
+    const event = { target, cancelable, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+    listener.handler(event);
+    return event.defaultPrevented;
+  }
+  browserGestures.forEach((name) => assert.equal(gesture(name), false, `Lobby retains normal ${name} behavior`));
   const starterBuild = { skillsGranted: 19, equipmentGranted: 8 };
   status({ equipment: null, starterBuild });
   assert.equal(get('game-controls').hidden, false, 'New late join immediately shows the controller');
@@ -89,6 +104,41 @@ async function main() {
   assert.equal(get('.touch-controls').inert, false);
   assert.equal(get('dodge').disabled, false);
   assert.equal(get('starter-build').hidden, false, 'A short confirmation needs no interaction');
+  browserGestures.forEach((name) => {
+    assert.equal(gesture(name), true, `Gameplay blank space suppresses ${name}`);
+    assert.equal(gesture(name, get('dodge'), false), false, `Noncancelable ${name} is left alone`);
+  });
+  status({ equipment: null, dodgeCooldown: 1 });
+  assert.equal(get('dodge').disabled, true);
+  browserGestures.forEach((name) => assert.equal(gesture(name, get('dodge')), true,
+    `Cooldown does not restore browser ${name} gestures over Dodge`));
+  status({ equipment: null });
+  const joystick = get('joystick'), dodge = get('dodge');
+  const pointer = (element, type, pointerId, clientX = 100, clientY = 100) =>
+    element.listeners.get(type)({ pointerId, clientX, clientY, preventDefault() {} });
+  pointer(joystick, 'pointerdown', 1, 150);
+  assert.ok(socket.sent.at(-1).x > 0, 'The first thumb starts movement');
+  assert.equal(joystick.hasPointerCapture(1), true);
+  pointer(dodge, 'pointerdown', 2);
+  assert.equal(socket.sent.at(-1).dodge, true, 'A second thumb can Dodge during movement');
+  assert.ok(socket.sent.at(-1).x > 0, 'Dodge preserves held movement');
+  pointer(joystick, 'pointermove', 1, 1000);
+  [...intervals.values()].filter((timer) => timer.delay === 1000 / 30).forEach((timer) => timer.handler());
+  assert.equal(socket.sent.at(-1).x, 1, 'Captured movement remains normalized outside the joystick');
+  pointer(joystick, 'pointerup', 1);
+  assert.equal(socket.sent.at(-1).x, 0);
+  assert.equal(dodge.classList.contains('pressed'), true, 'Lifting movement does not release the other thumb');
+  pointer(joystick, 'pointerdown', 3, 0);
+  assert.equal(socket.sent.at(-1).x, -1, 'Movement can restart while Dodge remains held');
+  assert.equal(socket.sent.at(-1).dodge, false, 'Restarting movement does not retrigger held Dodge');
+  pointer(joystick, 'pointercancel', 99);
+  assert.equal(joystick.classList.contains('engaged'), true, 'Another pointer cannot cancel movement');
+  pointer(joystick, 'pointercancel', 3);
+  assert.equal(socket.sent.at(-1).x, 0, 'A canceled movement pointer sends neutral input');
+  assert.equal(joystick.classList.contains('engaged'), false);
+  pointer(dodge, 'pointercancel', 2);
+  assert.equal(dodge.classList.contains('pressed'), false, 'A canceled Dodge clears its held appearance');
+  assert.equal(socket.sent.at(-1).dodge, false);
   const keyboard = (key) => windowEvents.get('keydown')({ key, target: {}, preventDefault() {} });
   keyboard('d');
   assert.equal(socket.sent.at(-1).x, 1, 'A defaulted late join can move immediately');
@@ -96,12 +146,14 @@ async function main() {
   assert.equal(socket.sent.at(-1).dodge, true, 'A defaulted late join can Dodge immediately');
   get('dodge').listeners.get('pointerup')({ pointerId: 7 });
   status({ equipment: null, starterBuild, phase: 'paused' });
+  browserGestures.forEach((name) => assert.equal(gesture(name), false, `Pause restores normal ${name} behavior`));
   assert.equal(get('starter-build').hidden, true);
   assert.equal(socket.sent.at(-1).x, 0, 'Pause still neutralizes movement');
   status({ equipment: null, starterBuild });
   assert.equal(choices.hidden, true);
   assert.equal(get('dodge').disabled, false);
   status({ progression: { upgrade }, starterBuild });
+  browserGestures.forEach((name) => assert.equal(gesture(name, first), false, `Skill cards retain ${name} behavior`));
   assert.equal(get('starter-build').hidden, true, 'Normal future choices retain the full card space');
   assert.equal(get('upgrade-level').textContent, 'LEVEL 2', 'Skill choices take priority over equipment');
   assert.equal(get('equipment-keep').hidden, true);
@@ -112,6 +164,7 @@ async function main() {
   status({ equipment: { ...equipment, options: [...equipment.options, option('Removed Third')] } });
   assert.equal(choices.hidden, true, 'A legacy three-item gear payload is rejected');
   status();
+  browserGestures.forEach((name) => assert.equal(gesture(name, first), false, `Equipment cards retain ${name} behavior`));
   assert.equal(get('upgrade-level').textContent, 'EQUIPMENT', 'Equal numeric IDs from different choice types do not reuse a skill card');
   assert.equal(get('upgrade-option-2').hidden, true, 'Equipment has exactly two visible cards');
   assert.equal(get('upgrade-option-2').disabled, true);
@@ -280,7 +333,7 @@ async function main() {
   status({ equipment: null, phase: 'lobby' });
   assert.equal(get('title').textContent, 'You have a place');
   assert.equal(get('party').textContent, 'Ready for a solo descent');
-  console.log('Controller skill/loot pause, party waiting, defaults, acknowledgment and reconnect checks passed.');
+  console.log('Controller two-thumb/gesture guards, skill/loot pause, party waiting, defaults, acknowledgment and reconnect checks passed.');
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });
