@@ -21,14 +21,14 @@ class GateWallOpeningTest {
         assertNotNull(attached);
         assertEquals(attached.y(), gate.y, .001f, "Gate must straddle the north wall, not stand in front of its inner face");
         assertTrue(attached.y() > 0);
-        var region = fixture.atlas.regions.get(gate.region);
-        var frame = fixture.atlas.frames[region.frame()];
-        float excessDepth = (region.footprintWorldY() - attached.thickness()) * .5f;
-        assertTrue(excessDepth >= 0 && excessDepth <= 8f, "Only the painted plinth's small proud edge should extend past the wall");
-        BufferedImage page = page(fixture.atlas, frame.page);
+        PaintedGateArt art = new PaintedGateArt(json("assets/art/painted-gate.json"), fixture.atlas, null);
+        var rendered = art.place(fixture.layout);
+        assertTrue(rendered.quads.length > 0 && rendered.quads.length <= PaintedGateArt.MAX_SCENERY);
+        BufferedImage[] pages = new BufferedImage[fixture.atlas.pages.length];
+        for (int i = 0; i < pages.length; i++) pages[i] = page(fixture.atlas, i);
         float rootX = (gate.x - gate.y) * ISO_X;
-        int samples = 0, minimumAlpha = 255;
-        // Exercise the cut edges and interior through the full wall thickness and above its tallest ordinary top.
+        int samples = 0, minimumInteriorAlpha = 255, minimumGroundEdgeAlpha = 255;
+        // Sample the actual newly packed gate through the complete opening and wall thickness.
         for (int column = 0; column <= 60; column++) {
             float dx = fixture.opening.left + (fixture.opening.right - fixture.opening.left) * column / 60f - rootX;
             for (int depthStep = 0; depthStep <= 12; depthStep++) {
@@ -36,18 +36,28 @@ class GateWallOpeningTest {
                 float along = dx / ISO_X + depth;
                 for (int height = 0; height <= 110; height += 2) {
                     float dy = (along + depth) * ISO_Y + height;
-                    float sourceYup = (dy - dx * region.renderShearY()) / (gate.scale * region.renderScaleY());
-                    int x = frame.x + Math.round(dx / gate.scale - frame.left);
-                    int y = frame.y + Math.round(frame.height + frame.bottom - sourceYup);
-                    assertTrue(x >= frame.x && x < frame.x + frame.width && y >= frame.y && y < frame.y + frame.height,
-                        "The proposed hole must remain inside the packed gate artwork");
-                    minimumAlpha = Math.min(minimumAlpha, page.getRGB(x, y) >>> 24);
+                    float sx = art.pivotX + dx / art.worldScale;
+                    float sy = art.pivotY - (dy - dx * art.renderShearY) / art.worldScale;
+                    assertTrue(sx >= 0 && sx < art.sourceWidth && sy >= 0 && sy < art.sourceHeight);
+                    int alpha = packedAlpha(art, pages, sx, sy);
+                    if (height == 0) minimumGroundEdgeAlpha = Math.min(minimumGroundEdgeAlpha, alpha);
+                    else minimumInteriorAlpha = Math.min(minimumInteriorAlpha, alpha);
                     samples++;
                 }
             }
         }
         assertTrue(samples > 40_000);
-        assertTrue(minimumAlpha >= 240, "The wall cut may never expose transparent gaps around the gate's jambs or threshold");
+        assertTrue(minimumInteriorAlpha >= 240, "Every sampled door/jamb pixel above the ground edge must be opaque");
+        assertTrue(minimumGroundEdgeAlpha >= 64,
+            "The flush ground edge may antialias into the floor, but may never contain a transparent hole");
+    }
+
+    private static int packedAlpha(PaintedGateArt art, BufferedImage[] pages, float x, float y) {
+        int sx = (int) Math.floor(x), sy = (int) Math.floor(y);
+        for (var piece : art.pieces) if (sx >= piece.coreX && sx < piece.coreX + piece.coreWidth
+            && sy >= piece.coreY && sy < piece.coreY + piece.coreHeight)
+            return pages[piece.page].getRGB(piece.atlasX + sx - piece.sourceX, piece.atlasY + sy - piece.sourceY) >>> 24;
+        return 0;
     }
 
     @Test void cutRetainsOriginalAffinePaintAndNeverChangesAnyOtherWallOrBacking() throws Exception {

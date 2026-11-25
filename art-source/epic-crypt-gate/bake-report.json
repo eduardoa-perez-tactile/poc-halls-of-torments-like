@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "sourceArchiveSha256": "36aaa2417769cb12be9145d1e8feda46198cf26fd00ba0f313329abcd4135c39",
+  "addedTextureBytes": 0,
+  "pieceCount": 49,
+  "maxPieces": 128,
+  "coreGrid": {
+    "body": [
+      72,
+      55,
+      122,
+      128
+    ],
+    "initialWings": [
+      14,
+      32
+    ],
+    "adaptiveStorageCuts": true
+  },
+  "packing": "area/short-side",
+  "context": 1,
+  "padding": 2,
+  "edgeExtrusion": 2,
+  "pageCapacityBeforeAppend": [
+    {
+      "size": [
+        1024,
+        1024
+      ],
+      "legacyRectangles": 425,
+      "protectedPixels": 1017274,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 31302
+    },
+    {
+      "size": [
+        512,
+        512
+      ],
+      "legacyRectangles": 101,
+      "protectedPixels": 254074,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 8070
+    },
+    {
+      "size": [
+        512,
+        512
+      ],
+      "legacyRectangles": 124,
+      "protectedPixels": 236622,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 25522
+    },
+    {
+      "size": [
+        512,
+        256
+      ],
+      "legacyRectangles": 60,
+      "protectedPixels": 117088,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 13984
+    }
+  ],
+  "baselineProtectedPixelSha256": [
+    "0620852ff63b905067af847dc6bec2bdbd00dccc22c163f0cc16d1809248e444",
+    "d8443a5fa1820386fdcdf08066231f89d99f419e7ce1a9c257baf28b169a4027",
+    "0301095cc65572c64b6246c5f582f856434398cc497fdfc1f7f75161c0b07a43",
+    "96e8828d26b4364a21b88aa750b2b9aa8abf0a8c49c04dd0737c488ca6efa4d4"
+  ],
+  "baselineMetadataSha256": {
+    "gameplay.json": "3643acff6dcbcf2bc4efb1d00e21210190158dd679166b66153b7c221269bc65",
+    "enemy-attacks.json": "bc07ad52deb8daf4443f03a0a4867e981ef32ac34d4a9bd01aae4878e7ab2cef",
+    "magic-projectiles.json": "99b5dc983af5bbcccd35ac4db532f127ee27bbab5a6c10beea925736b30cfbb1",
+    "painted-borders.json": "6c12fb5579baa6c569a24a0b7df7da18a10bc98d71410e2b8dfde8934c5bf4fb",
+    "engraved-floor.json": "f05dac8082c88a8e873a2f805fac1d3655b5701afb374b5a25e7ef26691149d1",
+    "arena-border.json": "1cd7c8c61d5a6d457e22800094c5c862e42e08abc4a24cfea7fedf2a0ab4a5c6",
+    "painted-corners.json": "4681fa85670563a75d9cadb0f5926b7265d9ef3657e4252469359116a2221c71"
+  },
+  "sourceRgbaSha256": "0033a3dec5cf782b86955e34f0fb94d2ea6654e9d284912285042f323ae89590",
+  "sourceRgbaPreserved": true,
+  "protectedPixelsAndGuttersPreserved": true,
+  "reclaimedLegacyGate": {
+    "explicitOptIn": "--reclaim-legacy-gate",
+    "frame": 219,
+    "page": 2,
+    "rect": [
+      2,
+      2,
+      124,
+      130
+    ],
+    "guardedRect": [
+      0,
+      0,
+      128,
+      134
+    ],
+    "reason": "Original sealed-gate renderer replaced by the approved separate painted gate",
+    "originalPixelsAndMetadataRetainedInArchive": true
+  },
+  "onlyAuthorizedLegacyGateMayDiffer": true,
+  "outputs": {
+    "gameplay-actors-main.png": "898bdb7ae0899a3894cd2991bc8f434edd852f1b933c8b4a2dbea6f5aa515eb9",
+    "gameplay-actors-common.png": "c523ebb5d91a8b2d1ee5e4aa62b8bd9cab42b5597da42148c4090c83c99b710f",
+    "gameplay-environment.png": "076c516cbf2c13ceb183b10f754ba647b1a01aad4a1ded29d41347558697c060",
+    "gameplay-grave-king.png": "40c449a022f2cdf299acca9cb80f8495c4124b70b357012c2914f58ff96eb958",
+    "painted-gate.json": "934cd336f35da17ff6bf391b64a4491341204a763da154b1e6eb9926cf877f19"
+  }
+}

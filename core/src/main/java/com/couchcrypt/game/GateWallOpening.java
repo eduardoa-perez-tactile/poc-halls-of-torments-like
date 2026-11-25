@@ -1,9 +1,9 @@
 package com.couchcrypt.game;
 
-/** Startup-only wall cut seated safely inside the existing painted gate's opaque jambs. */
+/** Startup-only wall cut concealed by the separate painted gate's opaque doors and jambs. */
 final class GateWallOpening {
     private static final float ISO_X = .70710678f;
-    // Measured against the resident gate at its original 250x50 footprint; not a collision opening.
+    // Preserve the original narrow opening; resident painted-gate alpha checks cover both wall faces.
     private static final float HALF_WIDTH = 90f;
     final float[][] vertices;
     final float left, right;

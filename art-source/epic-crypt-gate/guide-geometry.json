@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "pixelSize": [
+    256,
+    256
+  ],
+  "cameraViewportLogical": [
+    533.333333333,
+    533.333333333
+  ],
+  "groundRootPixelTopLeft": [
+    128,
+    176
+  ],
+  "worldScale": 2.0833333333333335,
+  "worldPosition": [
+    0,
+    912
+  ],
+  "rootScreenLogical": [
+    -644.8813833600001,
+    322.44069168000004
+  ],
+  "cameraRiseLogical": 100,
+  "orientation": "north-wall-x",
+  "oldGateFootprintWorld": [
+    250,
+    50
+  ],
+  "doorWallOpeningHalfWidthWorld": 90,
+  "wallContextHalfLengthWorld": 275,
+  "proposedWallWingsBeyondOldDoorHalfWidthWorld": 150,
+  "proposedArchHeightLogical": [
+    230,
+    260
+  ],
+  "alpha": "native RGBA8888 FBO alpha-composited; RGB unpremultiplied to straight PNG",
+  "omitted": [
+    "floor",
+    "props except current seated gate",
+    "old gate shadow",
+    "actors",
+    "HUD",
+    "iris"
+  ],
+  "alphaBounds": [
+    35,
+    81,
+    221,
+    232
+  ]
+}

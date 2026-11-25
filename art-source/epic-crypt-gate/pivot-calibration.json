@@ -1,0 +1,25 @@
+{
+  "method": "Fit the lower opaque edge of both outer wall wings at alpha 128 using source columns 40\u201365 and 190\u2013214. Apply one global affine ground correction; vertical uprights remain vertical.",
+  "sourceCoordinates": "Source X points right and Y points down. Samples use pixel centres at X + 0.5 and the lower opaque edge at Y + 0.5.",
+  "originalGuideFit": {
+    "slopeDown": -0.5017264828493614,
+    "interceptDown": 246.50724338806492,
+    "rmsPixels": 0.3303073853194732
+  },
+  "newSourceFit": {
+    "slopeDown": -0.4620437602898719,
+    "interceptDown": 233.35868310092,
+    "rmsPixels": 0.4568543760362465,
+    "yAtPivotX128": 174.21708178381638
+  },
+  "targetSlopeDown": -0.5,
+  "renderShearY": 0.03795624,
+  "worldScale": 2.0833333333333335,
+  "wallThicknessWorld": 36,
+  "frontPlaneBaselineDownFromRootSourcePixels": 6.1094025792,
+  "pivot": [
+    128,
+    168.1
+  ],
+  "rationale": "Fit the actual north wall front plane rather than the taller arch silhouette. One bounded affine transform aligns both wings and preserves all source pixels."
+}
