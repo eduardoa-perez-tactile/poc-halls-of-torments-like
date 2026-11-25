@@ -32,7 +32,7 @@ class RunEquipmentTest {
         gear.rewardElite(); // This entitlement waits behind a skill round.
         assertFalse(gear.offers[0].pending);
         assertTrue(world.progression.choose(0, world.progression.offers[0].id, 0));
-        world.elapsed = 90; gear.update(.01f); // The timed reliquary queues behind that elite.
+        world.elapsed = 90; gear.rewardArenaChest(90); // A collected arena chest queues behind that elite.
         assertEquals(2, gear.rewardsEarned());
         var elite = gear.choiceOrigin();
         assertEquals("elite", elite.source()); assertEquals("ELITE DEFEATED", elite.label());
@@ -45,18 +45,18 @@ class RunEquipmentTest {
         assertTrue(world.progression.choose(0, world.progression.offers[0].id, 0));
         assertTrue(gear.choose(0, gear.offers[0].id, -1));
         assertEquals(30, gear.choiceSecondsLeft(), "Each queued entitlement starts a fresh shared window");
-        var reliquary = gear.choiceOrigin();
-        assertEquals("reliquary", reliquary.source()); assertEquals(90, reliquary.scheduledSeconds());
-        assertEquals("TIMED RELIQUARY 1:30", reliquary.label()); assertEquals(2, reliquary.number());
+        var discovery = gear.choiceOrigin();
+        assertEquals("arena-chest", discovery.source()); assertEquals(90, discovery.scheduledSeconds());
+        assertEquals("CHEST DISCOVERED", discovery.label()); assertEquals(2, discovery.number());
         world.elapsed = 500; // Cause belongs to the earned entitlement, not its eventual presentation time.
         var offer = gear.offers[0]; int old = offer.id;
         offer.options[0] = ItemCatalog.byId("fletchers_hood"); // Ranger-only gear invalidates a Warden offer.
         assertFalse(gear.choose(0, old, 0));
-        assertNotEquals(old, offer.id); assertSame(reliquary, offer.origin); assertEquals(30, offer.secondsLeft);
+        assertNotEquals(old, offer.id); assertSame(discovery, offer.origin); assertEquals(30, offer.secondsLeft);
         gear.updateChoices(4);
         world.activatePlayer(1); // Fresh participant receives the earlier two rewards without offers.
         assertEquals(2, gear.foundationCount(1)); assertFalse(gear.offers[1].pending);
-        assertSame(reliquary, gear.offers[0].origin);
+        assertSame(discovery, gear.offers[0].origin);
         gear.rewardElite();
         assertTrue(gear.choose(0, offer.id, -1));
         assertEquals(30, gear.choiceSecondsLeft());
@@ -123,7 +123,7 @@ class RunEquipmentTest {
         gear.updateChoices(5);
         gear.drain(world.players[0], 100);
         assertEquals(52, world.players[0].health, .0001f);
-        assertEquals(1, gear.rewardsEarned(), "Reliquary scheduling belongs to combat updates");
+        assertEquals(1, gear.rewardsEarned(), "Choice updates never schedule or collect arena chests");
         assertEquals(25, gear.choiceSecondsLeft());
     }
 
@@ -279,13 +279,14 @@ class RunEquipmentTest {
         assertTrue(found);
     }
 
-    @Test void directCacheBoundariesAndEliteRewardsCannotExceedEight() {
+    @Test void equipmentClockCannotGrantFreeGearAndCollectedChestRewardsCannotExceedEight() {
         ArenaWorld world = solo(); RunEquipment gear = world.equipment;
-        world.elapsed = 89.99f; gear.update(.01f); assertEquals(0, gear.rewardsEarned());
-        world.elapsed = 90; gear.update(.01f); assertEquals(1, gear.rewardsEarned());
-        gear.update(.01f); assertEquals(1, gear.rewardsEarned());
-        world.elapsed = 600; gear.update(.01f); assertEquals(2, gear.rewardsEarned());
-        world.elapsed = 1140; gear.update(.01f); assertEquals(3, gear.rewardsEarned());
+        for (float seconds : new float[]{90, 600, 1140}) {
+            world.elapsed = seconds; gear.update(.01f);
+            assertEquals(0, gear.rewardsEarned(), "Combat time alone cannot award equipment");
+        }
+        for (int i = 0; i < 10; i++) gear.rewardArenaChest(90);
+        assertEquals(3, gear.rewardsEarned());
         for (int i = 0; i < 10; i++) gear.rewardElite();
         assertEquals(8, gear.rewardsEarned());
         assertTrue(world.elapsed < world.durationSeconds());

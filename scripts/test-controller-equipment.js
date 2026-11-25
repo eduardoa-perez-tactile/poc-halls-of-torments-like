@@ -79,7 +79,7 @@ async function main() {
     slot: 'RING', icon: 0, rank: 0, category: 'OFFENSE',
     headline: 'RING I: REPLACES Ashen Loop', before: '+10% DMG -5% SPD', after: '+12% DMG +5% CRIT'
   });
-  const equipment = { id: 1, secondsLeft: 27, source: 'reliquary', sourceLabel: 'TIMED RELIQUARY 1:30', sourceSeconds: 90, rewardNumber: 1, options: ['Iron Loop', 'Swift Loop'].map(option) };
+  const equipment = { id: 1, secondsLeft: 27, source: 'arena-chest', sourceLabel: 'CHEST DISCOVERED', sourceSeconds: 90, rewardNumber: 1, options: ['Iron Loop', 'Swift Loop'].map(option) };
   const upgrade = { id: 1, level: 2, secondsLeft: 28, options: ['Soulfire', 'Quickening', 'Vitality'].map(option) };
   const status = (changes = {}) => socket.receive({
     type: 'status', connected: 1, hostActive: true, phase: 'session', alive: true, dodgeCooldown: 0,
@@ -168,7 +168,7 @@ async function main() {
   assert.equal(get('upgrade-level').textContent, 'EQUIPMENT', 'Equal numeric IDs from different choice types do not reuse a skill card');
   assert.equal(get('upgrade-option-2').hidden, true, 'Equipment has exactly two visible cards');
   assert.equal(get('upgrade-option-2').disabled, true);
-  assert.equal(get('equipment-source').textContent, 'TIMED RELIQUARY 1:30');
+  assert.equal(get('equipment-source').textContent, 'CHEST DISCOVERED');
   assert.equal(get('equipment-explanation').hidden, false);
   const beforeForgedThird = socket.sent.length; get('upgrade-option-2').click();
   assert.equal(socket.sent.length, beforeForgedThird, 'A hidden third equipment option cannot send a choice');
@@ -209,7 +209,7 @@ async function main() {
   status();
   assert.equal(choices.hidden, false); assert.equal(first.disabled, false);
   assert.equal(get('upgrade-level').textContent, 'EQUIPMENT');
-  assert.equal(get('equipment-source').textContent, 'TIMED RELIQUARY 1:30', 'Reconnect restores the earned cause');
+  assert.equal(get('equipment-source').textContent, 'CHEST DISCOVERED', 'Reconnect restores the earned cause');
   status({ progression: { upgrade } });
   assert.equal(get('upgrade-option-2').hidden, false, 'Switching back to skills restores all three cards');
   assert.equal(get('equipment-source').hidden, true);

@@ -15,8 +15,11 @@ Summons, elemental status conversions, gold economies, potion inventories, perma
 ## Earning and choosing gear
 
 Equipment is separate from XP levels. The party earns one personal choice for each
-of up to five collected elite chests, plus automatic timed reliquaries at 1:30,
-10:00 and 19:00 of the normal twenty-minute combat timeline. Defeating an elite
+of up to five collected elite chests and three discovered arena chests. At 1:30,
+10:00 and 19:00 of the normal twenty-minute combat timeline, a chest appears at
+a random interior location away from living players. Its appearance does not
+announce loot, open cards, pause combat or grant equipment; players must find
+and collect it first. Defeating an elite
 leaves a stationary chest at its death position; either living player can walk
 over it to unlock that reward for the whole party. Chests have a brief landing
 delay, do not expire or attract toward players, and do not use the soul/healing
@@ -52,3 +55,16 @@ The original chest uses spare space in the resident Grave King page. All earlier
 atlas metadata and pixels outside the new sprite/gutter patch were compared
 against Git; page sizes and GPU texture use are unchanged. The APK contains the
 updated atlas. Art provenance is in `art-source/elite-loot-chest/README.md`.
+
+
+## Discoverable chest verification (2026-11-25)
+
+101 focused Java checks passed across discovery placement/collection, equipment,
+choice pauses, late joining, combat/timeline boundaries and lobby protocol. The
+phone controller check passed with the CHEST DISCOVERED source restored across
+acknowledgment and reconnect. JDK 21 built desktop classes and the Android APK.
+A brief hidden desktop render verified solo/co-op chest presentation, no reward
+on appearance, and Player 2 walking into the chest to open both personal offers
+with its original source. The placement RNG did not change the next authored
+combat pack when candidate rejection differed. These were short fixtures, not
+a full survival run or physical-TV performance test. No textures were added.

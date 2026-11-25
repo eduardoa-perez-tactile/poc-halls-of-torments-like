@@ -188,7 +188,7 @@ class JoinServerTest {
             var cards = new PartyProgression.CardPreview[2];
             for (int i = 0; i < 2; i++) cards[i] = new PartyProgression.CardPreview(options[i].icon(), 0,
                 "DEFENSE", "HELMET: REPLACES Old Guard", "+10 HP", options[i].description());
-            var origin = new RunEquipment.RewardOrigin("reliquary", "TIMED RELIQUARY 1:30", 90, 1);
+            var origin = new RunEquipment.RewardOrigin("arena-chest", "CHEST DISCOVERED", 90, 1);
             state.publishEquipment(0, 10, 26.5f, options, cards, false, 30, origin);
             state.publishEquipment(1, 20, 30, options, cards);
             state.setPhase(LobbyState.Phase.SESSION);
@@ -197,8 +197,8 @@ class JoinServerTest {
             var offer = status.get("equipment");
             assertEquals(10, offer.getInt("id")); assertEquals(26.5f, offer.getFloat("secondsLeft"));
             assertEquals(2, offer.get("options").size);
-            assertEquals("reliquary", offer.getString("source"));
-            assertEquals("TIMED RELIQUARY 1:30", offer.getString("sourceLabel"));
+            assertEquals("arena-chest", offer.getString("source"));
+            assertEquals("CHEST DISCOVERED", offer.getString("sourceLabel"));
             assertEquals(90, offer.getInt("sourceSeconds")); assertEquals(1, offer.getInt("rewardNumber"));
             assertTrue(status.get("progression").get("upgrade").isNull());
             for (int i = 0; i < 2; i++) {

@@ -203,7 +203,7 @@ class LobbyStateTest {
         var state = new LobbyState(); var joined = state.join(null, "a", 1);
         state.setPhase(LobbyState.Phase.SESSION);
         var options = equipmentOptions(); var cards = equipmentCards(options);
-        var origin = new RunEquipment.RewardOrigin("reliquary", "TIMED RELIQUARY 1:30", 90, 2);
+        var origin = new RunEquipment.RewardOrigin("arena-chest", "CHEST DISCOVERED", 90, 2);
         state.publishEquipment(0, 7, 24, options, cards, false, 30, origin);
         var request = new LobbyState.EquipmentRequest();
         state.chooseEquipment("a", 7, 0); state.setPhase(LobbyState.Phase.PAUSED);
