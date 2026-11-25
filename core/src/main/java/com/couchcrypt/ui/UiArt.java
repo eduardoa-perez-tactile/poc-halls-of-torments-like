@@ -35,6 +35,7 @@ public final class UiArt implements Disposable {
     public final Drawable pixel;
     public final Drawable panel, focusPanel, disabledPanel, scrim, goldLine;
     public final Button.ButtonStyle normal, focused, cardNormal, cardFocused, homeNormal, homeFocused, exitNormal, exitFocused;
+    public final Button.ButtonStyle summaryNormal, summaryFocused;
     private final Texture panelTexture, buttonTexture, focusedButtonTexture;
     private final Array<Texture> generated = new Array<>();
     private final Array<Pixmap> generatedPixmaps = new Array<>();
@@ -65,6 +66,17 @@ public final class UiArt implements Disposable {
         normal.disabled = disabledPanel;
         focused = new Button.ButtonStyle(selectedPlate, selectedPlate, selectedPlate);
         focused.disabled = disabledPanel;
+        // Results have fixed, proportional destinations: preserve the entire painted slab
+        // instead of squeezing its middle between independently scaled nine-patch ends.
+        TextureRegionDrawable summaryPlate = new TextureRegionDrawable(buttonTexture);
+        TextureRegionDrawable summaryFocus = new TextureRegionDrawable(focusedButtonTexture);
+        summaryPlate.setMinWidth(0); summaryPlate.setMinHeight(0);
+        summaryFocus.setMinWidth(0); summaryFocus.setMinHeight(0);
+        Drawable summaryDisabled = summaryPlate.tint(new Color(.82f, .82f, .82f, .8f));
+        summaryNormal = new Button.ButtonStyle(summaryPlate, summaryFocus, summaryPlate);
+        summaryNormal.disabled = summaryDisabled;
+        summaryFocused = new Button.ButtonStyle(summaryFocus, summaryFocus, summaryFocus);
+        summaryFocused.disabled = summaryDisabled;
         cardNormal = new Button.ButtonStyle(panel, focusPanel, panel);
         cardFocused = new Button.ButtonStyle(focusPanel, focusPanel, focusPanel);
         menuScene = new MenuSceneArt();
