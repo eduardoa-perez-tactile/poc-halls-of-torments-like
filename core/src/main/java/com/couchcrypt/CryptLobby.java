@@ -48,6 +48,7 @@ import com.couchcrypt.ui.BuildIcons;
 import com.couchcrypt.ui.ItemArt;
 import com.couchcrypt.ui.RunDetailsView;
 import com.couchcrypt.ui.ResultsSummaryView;
+import com.couchcrypt.ui.PauseMenuView;
 import com.couchcrypt.ui.CharacterInfoView;
 import com.couchcrypt.ui.HeroSelectionView;
 import com.couchcrypt.ui.HeroPortraitDrawable;
@@ -574,9 +575,16 @@ public final class CryptLobby extends ApplicationAdapter {
         labels.add("AUDIO"); actions.add(() -> audioSettings(true));
         labels.add("RESTART RUN"); actions.add(this::confirmRestart);
         labels.add("RETURN TO LOBBY"); actions.add(this::confirmReturnToLobby);
-        modal("Paused", pauseDescription(snapshot), labels.toArray(String[]::new), actions.toArray(Runnable[]::new));
+        if (overlay != null) closeModal();
+        savedButtons = new ArrayList<>(buttons); savedFocus = focus; buttons.clear();
+        overlay = new Table(); overlay.setFillParent(true); overlay.setBackground(art.scrim);
+        overlay.setTouchable(Touchable.enabled);
+        PauseMenuView view = new PauseMenuView(art, pauseDescription(snapshot),
+            labels.toArray(String[]::new), actions.toArray(Runnable[]::new), this::registerButton);
+        overlay.add(view.root).minHeight(740);
+        stage.addActor(overlay); overlay.validate(); setFocus(0);
         modalKind = Modal.PAUSE;
-        pauseMessage = modalMessage;
+        pauseMessage = modalMessage = view.message;
         pauseResume = buttons.get(0);
         setTextButtonDisabled(pauseResume, !canResume(snapshot));
         if (pauseResume.isDisabled()) setFocus(1);
@@ -592,19 +600,17 @@ public final class CryptLobby extends ApplicationAdapter {
         for (int slot = 0; slot < 2; slot++) {
             if (!world.players[slot].active) continue;
             var player = slot == 0 ? snapshot.first() : snapshot.second();
+            if (message.length() > 0) message.append("\n\n");
             message.append(slot == 0 ? "PLAYER I" : "PLAYER II");
-            if (player.connected()) message.append(" CONNECTED");
+            if (player.connected()) message.append("\nPhone connected");
             else if (player.reserved()) {
-                message.append(" DISCONNECTED - ");
-                if (player.secondsLeft() > 0) message.append("reconnect within ").append(player.secondsLeft()).append('s');
-                else message.append("reconnect or remove player");
+                message.append("\nPhone disconnected");
+                if (player.secondsLeft() > 0) message.append("\nReconnect within ").append(player.secondsLeft()).append('s');
             }
-            else message.append(" PLACE RELEASED");
-            message.append('\n');
+            else message.append("\nPlace released");
         }
-        if (snapshot.connected() == 0) message.append("Reconnect a phone to resume. Keep its controller page open.");
-        else if (!canResume(snapshot)) message.append("Waiting for the missing phone. Reconnect it or remove its place below.");
-        else message.append("Ready to resume. The run and upgrade timers stay frozen until you continue.");
+        if (snapshot.connected() == 0) message.append("\n\nReconnect a phone to continue.");
+        else if (!canResume(snapshot)) message.append("\n\nReconnect the missing phone or remove its place.");
         return message.toString();
     }
 
