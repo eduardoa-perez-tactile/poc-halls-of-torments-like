@@ -26,14 +26,12 @@ public final class ArenaRenderer implements Disposable {
     private static final float ENVIRONMENT_BASE_HEIGHT = 24f;
     private static final float LEVEL_FX_SCALE = 1.6f, RECOIL_MARGIN = 30f;
     private static final float SOUL_PULSE_RADIUS = 60f;
-    // Keep the painted cutting trail near the weapon's scale, independent of reach upgrades.
-    private static final float WARDEN_SLASH_RADIUS = 48f;
     // Fixed SE/SW/NE/NW release landmarks, in untrimmed source pixels relative to the ground root.
     // Only the rendered origin moves; the simulation keeps its original projectile coordinates and trajectory.
     private static final float[] BOLT_ORIGIN = {23, 51, -29, 55, 27, 65, -25, 65};
     private static final float[] SOVEREIGN_ORIGIN = {37, 78, -12, 67, 18, 90, -35, 82};
     private static final int PLAYER = 0, ENEMY = 1, PROP = 2, PAINTED_BORDER = 3, DODGE_GHOST = 4, CHEST = 5,
-        SENTINEL_BLADE = 6, RETURNING_GLAIVE = 7, WORLD_RELIC = 8;
+        SENTINEL_BLADE = 6, RETURNING_GLAIVE = 7, WORLD_RELIC = 8, PAINTED_CORNER = 9, PAINTED_GATE = 10;
     private final GameArt art;
     private final GameHud gameHud;
     private final EnemyRankMarkers rankMarkers;
@@ -57,12 +55,16 @@ public final class ArenaRenderer implements Disposable {
     private final boolean[] cameraReady = new boolean[2];
     private final ArenaLayout layout;
     private final PaintedBorderArt.Scene paintedBorders;
+    private final GateWallOpening gateOpening;
+    private final PaintedCornerArt.Scene paintedCorners;
+    private final PaintedGateArt.Scene paintedGate;
     private final GameplayAtlas.Region[] propArt;
     private final GameplayAtlas.Region chestArt;
     private final float chestScale;
     private final float[] environmentVertices = new float[20];
     private final float[] depths = new float[ArenaWorld.MAX_ENEMIES + 2 + 2 * DodgeTrail.CAPACITY
-        + ArenaLayout.MAX_PLACEMENTS + PaintedBorderArt.MAX_SCENERY + ArenaWorld.MAX_CHESTS
+        + ArenaLayout.MAX_PLACEMENTS + PaintedBorderArt.MAX_SCENERY + PaintedCornerArt.MAX_SCENERY
+        + PaintedGateArt.MAX_SCENERY + ArenaWorld.MAX_CHESTS
         + SkillExpansion.MAX_ORBITERS + SkillExpansion.MAX_GLAIVES + SkillExpansion.MAX_RELICS];
     private final int[] types = new int[depths.length], indices = new int[depths.length], layers = new int[depths.length];
     private int sortCount;
@@ -103,6 +105,9 @@ public final class ArenaRenderer implements Disposable {
         layout = ArenaLayout.load(art.metadata);
         ambience = new ArenaAmbience(floorLayout, layout);
         paintedBorders = art.paintedBorders.place(layout, art.metadata);
+        gateOpening = new GateWallOpening(paintedBorders, layout, art.metadata);
+        paintedCorners = art.paintedCorners.place(layout, paintedBorders);
+        paintedGate = art.paintedGate.place(layout);
         propArt = new GameplayAtlas.Region[layout.placements.length];
         for (int i = 0; i < propArt.length; i++)
             propArt[i] = art.environment(layout.placements[i].region);
@@ -144,6 +149,7 @@ public final class ArenaRenderer implements Disposable {
             art.engravedFloor.draw(batch, medallion);
             drawChestLights(world, camera);
             skillArt.ground(batch, world);
+            drawMeleeWaves(world, camera);
             // All floor effects precede the complete depth-sorted actor pass. Their painted
             // foreground rims must never be laid over a closer enemy or the player's body.
             drawHazards(world, camera, SpriteEffectArt.Layer.ALL);
@@ -355,7 +361,7 @@ public final class ArenaRenderer implements Disposable {
         }
         for (int i = 0; i < layout.placements.length; i++) {
             ArenaLayout.Placement placement = layout.placements[i];
-            if (placement.wall) continue;
+            if (placement.wall || placement.region.equals("sealed-gate")) continue;
             GameplayAtlas.Frame frame = art.metadata.frames[propArt[i].frame()];
             float scale = placement.scale;
             GameplayAtlas.Region source = propArt[i];
@@ -370,8 +376,22 @@ public final class ArenaRenderer implements Disposable {
                 add(PROP, i, placement.x, placement.y);
         }
         for (int i = 0; i < paintedBorders.quads.length; i++) if (paintedBorders.visible(camera, i)) {
+            float[] cut = paintedCorners.wallVertices[i];
+            if (cut != null && cut.length == 0) continue;
             PaintedBorderArt.Quad q = paintedBorders.quads[i];
             add(PAINTED_BORDER, i, q.worldX, q.worldY);
+            depths[sortCount - 1] = q.sortDepth;
+            layers[sortCount - 1] = q.renderLayer;
+        }
+        for (int i = 0; i < paintedCorners.quads.length; i++) if (paintedCorners.visible(camera, i)) {
+            PaintedCornerArt.Quad q = paintedCorners.quads[i];
+            add(PAINTED_CORNER, i, q.worldX, q.worldY);
+            depths[sortCount - 1] = q.sortDepth;
+            layers[sortCount - 1] = q.renderLayer;
+        }
+        for (int i = 0; i < paintedGate.quads.length; i++) if (paintedGate.visible(camera, i)) {
+            PaintedGateArt.Quad q = paintedGate.quads[i];
+            add(PAINTED_GATE, i, q.worldX, q.worldY);
             depths[sortCount - 1] = q.sortDepth;
             layers[sortCount - 1] = q.renderLayer;
         }
@@ -397,7 +417,7 @@ public final class ArenaRenderer implements Disposable {
                 art.actor(ActorAnimation.actor(enemy.kind)), enemyScale(enemy));
             boolean arrival = enemy.spawnAge < art.vfx.duration(VfxArt.Animation.SPAWN)
                 && visible(camera, enemy.x, enemy.y, art.vfx.maxRadius(VfxArt.Animation.SPAWN) * spawnScale(enemy));
-            boolean attack = enemy.attack != ArenaWorld.EnemyAttack.NONE
+            boolean attack = enemy.attack != ArenaWorld.EnemyAttack.NONE && art.enemyAttacks.hasActor(enemy.kind)
                 && visible(camera, enemy.x, enemy.y, art.enemyAttacks.actorRadius(enemy.kind)
                     * art.actor(ActorAnimation.actor(enemy.kind)).pixelScale * enemyScale(enemy) + 20f);
             if (body || arrival || attack) add(ENEMY, i, enemy.x, enemy.y);
@@ -438,7 +458,7 @@ public final class ArenaRenderer implements Disposable {
         batch.setColor(1f, 1f, 1f, .62f);
         for (int i = 0; i < sortCount; i++) {
             int index = indices[i]; float x, y, width;
-            if (types[i] == PAINTED_BORDER || types[i] == DODGE_GHOST
+            if (types[i] == PAINTED_BORDER || types[i] == PAINTED_CORNER || types[i] == PAINTED_GATE || types[i] == DODGE_GHOST
                 || types[i] == SENTINEL_BLADE || types[i] == RETURNING_GLAIVE || types[i] == WORLD_RELIC) continue;
             if (types[i] == PLAYER) {
                 ArenaWorld.Player player = world.players[index];
@@ -580,7 +600,9 @@ public final class ArenaRenderer implements Disposable {
         for (ArenaWorld.Enemy enemy : world.enemies) {
             if (!enemy.active || enemy.attack == ArenaWorld.EnemyAttack.NONE) continue;
             float age = enemy.attackAge;
-            if (enemy.attack == ArenaWorld.EnemyAttack.BRUTE_SLAM) {
+            if (enemy.kind == ArenaWorld.EnemyKind.MOURNING_BELL) {
+                drawBellGroundCues(enemy, camera);
+            } else if (enemy.attack == ArenaWorld.EnemyAttack.BRUTE_SLAM) {
                 if (!visible(camera, enemy.attackTargetX, enemy.attackTargetY, enemy.attackRadius + 80f)) continue;
                 if (age < ArenaWorld.BRUTE_WINDUP) {
                     drawWarningRune(.94f, enemy.attackTargetX, enemy.attackTargetY, enemy.attackRadius);
@@ -619,6 +641,35 @@ public final class ArenaRenderer implements Disposable {
         batch.setColor(Color.WHITE);
     }
 
+    private void drawBellGroundCues(ArenaWorld.Enemy enemy, OrthographicCamera camera) {
+        if (enemy.attack == ArenaWorld.EnemyAttack.BELL_LUNGE) {
+            float age = enemy.attackAge;
+            if (age >= MourningBell.LUNGE_WINDUP + MourningBell.LUNGE_SECONDS) return;
+            boolean released = age >= MourningBell.LUNGE_WINDUP;
+            float alpha = released ? .7f * (1f - (age - MourningBell.LUNGE_WINDUP) / MourningBell.LUNGE_SECONDS) : .96f;
+            for (int arrow = 1; arrow <= 3; arrow++) {
+                float along = arrow * .25f;
+                float x = MathUtils.lerp(enemy.attackStartX, enemy.attackTargetX, along);
+                float y = MathUtils.lerp(enemy.attackStartY, enemy.attackTargetY, along);
+                if (visible(camera, x, y, 45f))
+                    enemyGroundVfx.arrow(batch, x, y, enemy.castFacingX, enemy.castFacingY, alpha, released);
+            }
+        } else if (enemy.attack == ArenaWorld.EnemyAttack.BELL_TOLL
+            && visible(camera, enemy.attackStartX, enemy.attackStartY, MourningBell.TOLL_RADIUS + 30f)) {
+            for (int beat = 0; beat < 2; beat++) {
+                if (MourningBell.tollWarning(enemy, beat))
+                    drawWarningRune(.86f, enemy.attackStartX, enemy.attackStartY, MourningBell.TOLL_RADIUS);
+                if (MourningBell.tollActive(enemy, beat)) {
+                    float progress = MathUtils.clamp((enemy.attackAge - MourningBell.tollRelease(beat))
+                        / MourningBell.TOLL_WAVE_SECONDS, 0f, 1f);
+                    playerFootRing.draw(batch, screenX(enemy.attackStartX, enemy.attackStartY),
+                        screenY(enemy.attackStartX, enemy.attackStartY), MourningBell.tollRadius(enemy, beat),
+                        1f, .75f, .43f, .96f * (1f - .5f * progress));
+                }
+            }
+        }
+    }
+
     private void drawWarningRune(float alpha, float x, float y, float radius) {
         playerFootRing.draw(batch, screenX(x, y), screenY(x, y), radius,
             1f, .93f, .77f, alpha);
@@ -644,6 +695,19 @@ public final class ArenaRenderer implements Disposable {
     private void participantTint(int owner, float alpha) {
         if (owner == 0) batch.setColor(1f, 1f, 1f, alpha);
         else batch.setColor(.55f, .95f, .95f, alpha);
+    }
+
+    private void drawMeleeWaves(ArenaWorld world, OrthographicCamera camera) {
+        for (MeleeWave wave : world.meleeWaves) {
+            if (!wave.active || !visible(camera, wave.x, wave.y, wave.reach + 24f)) continue;
+            batch.setColor(1f, 1f, 1f, MeleeWave.fadeAlpha(wave.age));
+            // The approved master points SE (-45 degrees before Y compression).
+            // World facing adds 45 degrees; subtracting the source adds another 45.
+            art.spriteEffects.drawGround(batch, SpriteEffectArt.Type.SWORD_SWEEP, 0,
+                screenX(wave.x, wave.y), screenY(wave.x, wave.y), wave.radius(),
+                wave.angle + MathUtils.PI * .5f, SpriteEffectArt.Layer.ALL);
+        }
+        batch.setColor(Color.WHITE);
     }
 
     private void drawFootEffects(ArenaWorld world, OrthographicCamera camera) {
@@ -692,7 +756,7 @@ public final class ArenaRenderer implements Disposable {
     private void drawEnemyRanks(ArenaWorld world) {
         for (int i = 0; i < sortCount; i++) if (types[i] == ENEMY) {
             ArenaWorld.Enemy enemy = world.enemies[indices[i]];
-            if (enemy.kind == ArenaWorld.EnemyKind.BOSS || enemy.kind == ArenaWorld.EnemyKind.SOVEREIGN
+            if (ArenaWorld.isBoss(enemy.kind)
                 || !enemy.elite && enemy.variant.healthMultiplier <= 1f) continue;
             GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(enemy.kind));
             float scale = enemyScale(enemy), top = screenY(enemy.x, enemy.y) + actor.maxAbove * scale;
@@ -714,6 +778,7 @@ public final class ArenaRenderer implements Disposable {
             float x = screenX(entry.x, entry.y) + entry.offsetX;
             float y = screenY(entry.x, entry.y) + actor.maxAbove * entry.renderScale + entry.liftPadding + entry.rise();
             if (entry.enemyKind == ArenaWorld.EnemyKind.BOSS) y += graveKingHover(world.elapsed);
+            else if (entry.enemyKind == ArenaWorld.EnemyKind.MOURNING_BELL) y += MourningBellPresentation.hover(world.elapsed);
             if (visibleProjected(camera, x, y, 48f)) damageNumberArt.draw(batch, entry, x, y);
         }
         batch.setColor(Color.WHITE);
@@ -726,12 +791,7 @@ public final class ArenaRenderer implements Disposable {
             float life = Math.max(0f, Math.min(1f, effect.ttl / Math.max(.001f, effect.maxTtl)));
             float x = screenX(effect.x, effect.y), y = screenY(effect.x, effect.y);
             switch (effect.kind) {
-                case SLASH -> {
-                    batch.setColor(Color.WHITE);
-                    // The painted crescent faces screen-down at angle zero. Rotate before projection.
-                    art.spriteEffects.drawGround(batch, SpriteEffectArt.Type.SWORD_SWEEP, effectProgress(effect),
-                        x, y + 45f, WARDEN_SLASH_RADIUS, effect.angle + MathUtils.PI * .75f, SpriteEffectArt.Layer.ALL);
-                }
+                case SLASH -> { /* Legacy fixture kind; primary attacks use combat-owned meleeWaves. */ }
                 case HIT -> {
                     float lift = impactLift(effect);
                     float impactX = x, impactY = y + lift;
@@ -868,7 +928,16 @@ public final class ArenaRenderer implements Disposable {
             int index = indices[i];
             if (types[i] == PAINTED_BORDER) {
                 batch.setColor(Color.WHITE);
-                paintedBorders.draw(batch, index);
+                float[] cut = paintedCorners.wallVertices[index];
+                if (cut == null) cut = gateOpening.vertices[index];
+                if (cut == null) paintedBorders.draw(batch, index);
+                else if (cut.length > 0) paintedBorders.draw(batch, index, cut);
+            } else if (types[i] == PAINTED_CORNER) {
+                batch.setColor(Color.WHITE);
+                paintedCorners.draw(batch, index);
+            } else if (types[i] == PAINTED_GATE) {
+                batch.setColor(Color.WHITE);
+                paintedGate.draw(batch, index);
             } else if (types[i] == PROP) {
                 drawEnvironment(world, camera, viewer, index);
             } else if (types[i] == CHEST) {
@@ -902,10 +971,15 @@ public final class ArenaRenderer implements Disposable {
                 GameplayAtlas.Actor actor = art.actor(ActorAnimation.actor(enemy.kind));
                 ActorAnimation.State state = ActorAnimation.state(enemy);
                 float recoil = MathUtils.sin(MathUtils.clamp(enemy.hitFlash / .12f, 0f, 1f) * MathUtils.PI)
-                    * (enemy.kind == ArenaWorld.EnemyKind.BOSS || enemy.kind == ArenaWorld.EnemyKind.SOVEREIGN ? 1.5f
+                    * (ArenaWorld.isBoss(enemy.kind) ? 1.5f
                         : enemy.kind == ArenaWorld.EnemyKind.BRUTE ? 4f : 8f);
                 // This short reaction moves only the paint. Ground root, shadow, sort and collision stay fixed.
-                if (enemy.attack != ArenaWorld.EnemyAttack.NONE) {
+                if (enemy.kind == ArenaWorld.EnemyKind.MOURNING_BELL) {
+                    int frame = actor.clip(state, ActorAnimation.facing(enemy, state)).frame(ActorAnimation.phase(enemy, state));
+                    drawBellFrame(frame, enemy, actor.pixelScale * scale, world.elapsed,
+                        screenX(enemy.hitDirectionX, enemy.hitDirectionY) * recoil,
+                        screenY(enemy.hitDirectionX, enemy.hitDirectionY) * recoil);
+                } else if (enemy.attack != ArenaWorld.EnemyAttack.NONE) {
                     ActorAnimation.Facing facing = ActorAnimation.facing(enemy, state);
                     float sx = screenX(enemy.x, enemy.y), sy = screenY(enemy.x, enemy.y);
                     if (enemy.attack == ArenaWorld.EnemyAttack.WRAITH_DASH
@@ -1083,6 +1157,15 @@ public final class ArenaRenderer implements Disposable {
             screenY(x, y) + frame.bottom * scale + offsetY, frame.width * scale, frame.height * scale);
     }
 
+    private void drawBellFrame(int index, ArenaWorld.Enemy enemy, float scale, float combatTime, float recoilX, float recoilY) {
+        GameplayAtlas.Frame frame = art.metadata.frames[index];
+        float x = screenX(enemy.x, enemy.y) + recoilX;
+        float y = screenY(enemy.x, enemy.y) + MourningBellPresentation.hover(combatTime) + recoilY;
+        batch.draw(art.frame(index), x + frame.left * scale, y + frame.bottom * scale,
+            -frame.left * scale, -frame.bottom * scale, frame.width * scale, frame.height * scale,
+            1f, 1f, MourningBellPresentation.tilt(enemy));
+    }
+
     private void drawMuzzle(ArenaWorld.Player player) {
         if (player.hero != ArenaWorld.Hero.RANGER || player.attackAge >= .1f) return;
         int origin = ActorAnimation.facing(player.attackFacingX, player.attackFacingY, ActorAnimation.Facing.SE).ordinal() * 2;
@@ -1105,11 +1188,13 @@ public final class ArenaRenderer implements Disposable {
     private static boolean visibleActor(OrthographicCamera camera, float x, float y,
                                         GameplayAtlas.Actor actor, float scale) {
         // Include a small shadow/elite-bar margin around the precomputed complete action envelope.
-        float above = actor.maxAbove * scale + (actor.id == ActorAnimation.Actor.GRAVE_KING ? 34f : 12f);
+        float motionMargin = RECOIL_MARGIN + (actor.id == ActorAnimation.Actor.MOURNING_BELL ? 48f : 0f);
+        float above = actor.maxAbove * scale
+            + (actor.id == ActorAnimation.Actor.GRAVE_KING || actor.id == ActorAnimation.Actor.MOURNING_BELL ? 40f : 12f);
         if (actor.id == ActorAnimation.Actor.WARDEN || actor.id == ActorAnimation.Actor.RANGER)
             above = Math.max(above, REVIVE_BAR_Y + REVIVE_BAR_HEIGHT);
-        return visible(camera, x, y, Math.max(40f, actor.maxLeft * scale) + RECOIL_MARGIN,
-            Math.max(40f, actor.maxRight * scale) + RECOIL_MARGIN, above + RECOIL_MARGIN,
+        return visible(camera, x, y, Math.max(40f, actor.maxLeft * scale) + motionMargin,
+            Math.max(40f, actor.maxRight * scale) + motionMargin, above + RECOIL_MARGIN,
             Math.max(12f, actor.maxBelow * scale) + RECOIL_MARGIN);
     }
 

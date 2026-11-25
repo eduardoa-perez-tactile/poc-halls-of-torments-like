@@ -16,7 +16,7 @@ class EnvironmentProjectionTest {
         Path root = root();
         GameplayAtlas atlas = load();
         JsonValue sources = new JsonReader().parse(Files.readString(root.resolve("art-source/crypt-environment-v2/environment.json")));
-        for (String name : new String[]{"altar", "sealed-gate"}) {
+        for (String name : new String[]{"altar"}) {
             var region = atlas.regions.get(name);
             var frame = atlas.frames[region.frame()];
             BufferedImage page = ImageIO.read(root.resolve("assets/art/" + atlas.pages[frame.page].file()).toFile());

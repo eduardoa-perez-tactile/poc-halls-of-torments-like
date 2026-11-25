@@ -140,8 +140,11 @@ class EliteChestPickupTest {
         ArenaWorld.Enemy elite = world.enemies[0];
         elite.active = elite.elite = true; elite.x = x; elite.y = 0;
         elite.health = elite.maxHealth = 1; elite.kind = ArenaWorld.EnemyKind.BRUTE;
+        elite.spawnId++; elite.speedMultiplier = 0; elite.stunTime = 0;
+        elite.attack = ArenaWorld.EnemyAttack.NONE; elite.windup = 0; elite.attackCooldown = 10;
         world.activeEnemies = 1; world.players[0].attackCooldown = 0;
-        world.update(ArenaWorld.STEP);
+        // Each manually reused slot is a fresh elite; wait for an actual wave contact.
+        for (int tick = 0; tick < 30 && elite.active; tick++) world.update(ArenaWorld.STEP);
         assertFalse(elite.active);
     }
 

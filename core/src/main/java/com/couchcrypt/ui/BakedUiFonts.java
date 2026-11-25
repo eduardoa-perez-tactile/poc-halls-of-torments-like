@@ -27,7 +27,7 @@ public final class BakedUiFonts implements Disposable {
             JsonValue root = new JsonReader().parse(Gdx.files.internal(DIRECTORY + "fonts.json"));
             int pageWidth = root.getInt("pageWidth", 1024);
             int pageHeight = root.getInt("pageHeight", 1024);
-            if (pageWidth != 1024 || (pageHeight != 768 && pageHeight != 1024))
+            if (pageWidth != 1024 || (pageHeight != 576 && pageHeight != 768 && pageHeight != 1024))
                 throw new IllegalArgumentException("Unexpected bounded font atlas dimensions");
             JsonValue pageFiles = root.require("pages");
             if (!pageFiles.isArray() || pageFiles.size != 1)

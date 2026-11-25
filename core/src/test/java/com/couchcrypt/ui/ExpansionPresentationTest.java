@@ -79,7 +79,7 @@ class ExpansionPresentationTest {
             BufferedImage image = ImageIO.read(art(file).toFile());
             total += (long) image.getWidth() * image.getHeight() * 4;
         }
-        assertEquals(33_483_596L, total);
+        assertEquals(32_959_308L, total); // Bell page plus lossless font-page headroom.
         assertTrue(total <= 32L * 1_048_576, "All shared art and a live QR must fit 32 MiB together");
     }
 

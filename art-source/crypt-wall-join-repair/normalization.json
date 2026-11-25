@@ -1,0 +1,102 @@
+{
+  "north-east": {
+    "masterSize": [
+      1448,
+      1086
+    ],
+    "normalizedSize": [
+      192,
+      144
+    ],
+    "method": "one whole-canvas proportional Lanczos resize, no mirror/repaint/geometry warp; alpha>=32 bounds plus2pixelAA margin trims distant noise only",
+    "significantBounds": [
+      35,
+      35,
+      157,
+      117
+    ],
+    "retainedRect": [
+      33,
+      33,
+      159,
+      119
+    ],
+    "masterSha256": "581cde746d7f89b78b55cb3908d08e83b9e8c96a9d3d8478aad7b6d8fc1a5589",
+    "normalizedSha256": "f47ba202a00a62a3f301eb23cb89869fe7bcaa1db7e7f7e2401ac3ee0be6e922"
+  },
+  "north-west": {
+    "masterSize": [
+      1448,
+      1086
+    ],
+    "normalizedSize": [
+      192,
+      144
+    ],
+    "method": "one whole-canvas proportional Lanczos resize, no mirror/repaint/geometry warp; alpha>=32 bounds plus2pixelAA margin trims distant noise only",
+    "significantBounds": [
+      90,
+      4,
+      163,
+      121
+    ],
+    "retainedRect": [
+      88,
+      2,
+      165,
+      123
+    ],
+    "masterSha256": "718da3ad43e7d2174d9b2441b770d18406d05288a2ef101e297520a9552ed345",
+    "normalizedSha256": "a293d06aeeb298e97f43fbab70365bef7882d5cbd690bcc0d0de49ae3ad0ecc3"
+  },
+  "south-east": {
+    "masterSize": [
+      1448,
+      1086
+    ],
+    "normalizedSize": [
+      192,
+      144
+    ],
+    "method": "one whole-canvas proportional Lanczos resize, no mirror/repaint/geometry warp; alpha>=32 bounds plus2pixelAA margin trims distant noise only",
+    "significantBounds": [
+      34,
+      9,
+      104,
+      121
+    ],
+    "retainedRect": [
+      32,
+      7,
+      106,
+      123
+    ],
+    "masterSha256": "1c05c0c13a498e8eabd35c51b6ff9ac49edd3bdd3ff506c6307e5b1ae6e951ad",
+    "normalizedSha256": "f7be1fddf87a917af70a8375bb12d2c529df53ae7b52ad76340d76dcc1c1311a"
+  },
+  "south-west": {
+    "masterSize": [
+      1448,
+      1086
+    ],
+    "normalizedSize": [
+      192,
+      144
+    ],
+    "method": "one whole-canvas proportional Lanczos resize, no mirror/repaint/geometry warp; alpha>=32 bounds plus2pixelAA margin trims distant noise only",
+    "significantBounds": [
+      35,
+      4,
+      158,
+      86
+    ],
+    "retainedRect": [
+      33,
+      2,
+      160,
+      88
+    ],
+    "masterSha256": "f01594a0fe2453f5394b0336f02d2dfebd413b1d91d24fb6f62d33f7e15d08ae",
+    "normalizedSha256": "a9006d20d8aff2e797daf5cb2fb8fc7f59858820beb2d190934c22741e911478"
+  }
+}

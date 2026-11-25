@@ -8,13 +8,20 @@ then requested implementation with corrected gate/altar projection and all four
 corners checked again. This replaces the four landmark clusters and radial paths
 described in the historical integration below.
 
-The fixed 2400×1800 court has one north-wall sealed entrance at (0,870), a
+The fixed 2400×1800 court has one north-wall sealed entrance at (0,912), a
 240-unit-wide processional aisle through the original 600-unit engraved seal,
 and one altar at (0,-660) with guardians at (±250,-670). Two three-tomb rows at
 X=±800, Y=-430/0/430 sit on 320-unit-wide paving bands. Four broken columns at
 (±1020,±610) and two adjoining rubble groups complete the room. All sixteen
 interior props are resident artwork. The centre and broad circulation lanes stay
 open; no new collisions, movement limits, enemies or gameplay rules are added.
+
+The 25 November wall-join correction seats the gate on the wall centre line;
+its previous (0,870) position left the portal standing in front of the wall.
+The existing 50-unit gate depth now overlaps the 36-unit wall by seven units
+on each face. A cached opening beneath the opaque door/jamb artwork removes
+the uninterrupted masonry behind it. Gate scale, corrected projection and all
+source pixels remain unchanged; this adds no passage or collision behavior.
 
 The old foundation tile skirt and its exterior walkway are no longer submitted.
 The continuous painted walls are the sole perimeter. Whole-wall scale reaches

@@ -11,7 +11,7 @@ class CompleteArenaCombatTest {
         ArenaWorld.Enemy behind = enemy(world, 2, -80, 0, 100);
         // Make front uniquely nearest so aim is deterministic.
         behind.x = -120;
-        world.update(ArenaWorld.STEP);
+        for (int i = 0; i < 10; i++) world.update(ArenaWorld.STEP);
         assertEquals(72, front.health, .001f);
         assertEquals(72, beside.health, .001f);
         assertEquals(100, behind.health, .001f);
@@ -91,14 +91,14 @@ class CompleteArenaCombatTest {
         world.players[0].attackCooldown = 0; world.boss.health = 1;
         world.boss.x = 80; world.boss.y = 0;
         for (ArenaWorld.Enemy e : world.enemies) if (e != world.boss) e.active = false;
-        world.update(ArenaWorld.STEP);
+        for (int i = 0; i < 10 && world.outcome == ArenaWorld.Outcome.RUNNING; i++) world.update(ArenaWorld.STEP);
         assertTrue(world.bossDefeated); assertEquals(ArenaWorld.Outcome.VICTORY, world.outcome);
     }
 
     @Test void elitesRewardSharedXpAndResetKeepsPoolsButChangesSeed() {
         ArenaWorld world = solo(ArenaWorld.Hero.WARDEN);
         ArenaWorld.Enemy elite = enemy(world, 0, 30, 0, 1); elite.elite = true;
-        world.update(ArenaWorld.STEP);
+        for (int i = 0; i < 4; i++) world.update(ArenaWorld.STEP);
         assertEquals(1, world.elitesKilled); assertEquals(8, world.souls); assertEquals(8, world.progression.totalXp);
         int seed = world.runSeed; ArenaWorld.Shot shot = world.shots[0];
         world.reset(); assertSame(shot, world.shots[0]); assertNotEquals(seed, world.runSeed);
@@ -118,6 +118,7 @@ class CompleteArenaCombatTest {
     private static ArenaWorld.Enemy enemy(ArenaWorld world, int index, float x, float y, float health) {
         ArenaWorld.Enemy e = world.enemies[index];
         e.active = true; e.x = x; e.y = y; e.health = e.maxHealth = health; e.attackCooldown = 10;
+        e.speedMultiplier = 0;
         world.activeEnemies++; return e;
     }
 }

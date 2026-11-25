@@ -1,5 +1,27 @@
 # Texture headroom — 24 November 2026
 
+## 25 November: Mourning Bell headroom
+
+The current font upload is **1024×576 RGBA (2.25 MiB)**. This removes only
+transparent rows below all original glyph blocks and their two-pixel gutters;
+the maximum glyph bottom is row 561. An independent comparison confirms all
+font records/coordinates and the retained top RGBA bytes are unchanged, and the
+discarded bottom has no nonzero alpha. The original offline baker still verifies
+all 405 glyph blocks, 410 records and 40 real layout examples.
+
+This recovers 786,432 GPU bytes. The Mourning Bell's managed 256×256 page adds
+262,144 bytes, leaving the combined bank **524,288 bytes smaller** than before
+the encounter. Current combined maximum, including the unchanged 360×360 QR:
+**32,959,308 bytes / 31.4324 MiB**, leaving 595,124 bytes under 32 MiB. Runtime
+file-backed font and gameplay uploads retain no decoded Pixmaps. The font
+loader also accepts the historical 768/1024-height schemas.
+
+The pinned twelve-icon UI exporter now fixes its temporary legacy icon array at
+twelve before appending the current expansion, so rebaking fonts remains
+reproducible after the skill enum grew. No original icon pixels change.
+
+The historical measurements below describe the preceding allocation.
+
 The shared font atlas now occupies one 1024×768 RGBA texture instead of
 1024×1024. This recovers exactly **1 MiB** without resizing or repainting any
 glyph. Other artwork, text metrics, filters, font-page count and gameplay stay

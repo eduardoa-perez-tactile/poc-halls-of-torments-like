@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "sourceArchiveSha256": "c997c0a8cc64019fef2b9ad6263c512759f677c189010c426c1da9b44e78864a",
+  "addedTextureBytes": 0,
+  "pieceCount": 88,
+  "maxPieces": 128,
+  "coreGrid": [
+    16,
+    32
+  ],
+  "packing": "area/area",
+  "context": 1,
+  "padding": 2,
+  "edgeExtrusion": 2,
+  "pageCapacityBeforeAppend": [
+    {
+      "size": [
+        1024,
+        1024
+      ],
+      "legacyRectangles": 398,
+      "protectedPixels": 1004257,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 44319
+    },
+    {
+      "size": [
+        512,
+        512
+      ],
+      "legacyRectangles": 98,
+      "protectedPixels": 252828,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 9316
+    },
+    {
+      "size": [
+        512,
+        512
+      ],
+      "legacyRectangles": 118,
+      "protectedPixels": 250054,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 12090
+    },
+    {
+      "size": [
+        512,
+        256
+      ],
+      "legacyRectangles": 9,
+      "protectedPixels": 81334,
+      "unknownNonzeroPixelsProtected": 0,
+      "availablePixels": 49738
+    }
+  ],
+  "baselineProtectedPixelSha256": [
+    "d140dbf28a7bfc0faf27ce8313ad60a21490a30c178273df0f719246907a8793",
+    "b5833c43f013368109e19a1eb65c05499c077e325fa1032b7b682fbcf3f2ce1f",
+    "617f1f113dc60ba031802ded974081cdbcbcc5a0de76579f10b72c331f0d43aa",
+    "e727c905fcfe4760f62b494250decdcba4a40b1d3596370d8f07dc79c1970a9a"
+  ],
+  "baselineMetadataSha256": {
+    "gameplay.json": "3643acff6dcbcf2bc4efb1d00e21210190158dd679166b66153b7c221269bc65",
+    "enemy-attacks.json": "bc07ad52deb8daf4443f03a0a4867e981ef32ac34d4a9bd01aae4878e7ab2cef",
+    "magic-projectiles.json": "99b5dc983af5bbcccd35ac4db532f127ee27bbab5a6c10beea925736b30cfbb1",
+    "painted-borders.json": "6c12fb5579baa6c569a24a0b7df7da18a10bc98d71410e2b8dfde8934c5bf4fb",
+    "engraved-floor.json": "f05dac8082c88a8e873a2f805fac1d3655b5701afb374b5a25e7ef26691149d1",
+    "arena-border.json": "1cd7c8c61d5a6d457e22800094c5c862e42e08abc4a24cfea7fedf2a0ab4a5c6"
+  },
+  "sourceRgbaPreserved": true,
+  "existingPixelsAndGuttersPreserved": true,
+  "sourceRgbaSha256": {
+    "ne": "44fd599b4ecafd9636061a1d4f9e0f8f65070da84a55dce2c480b0a8aa152449",
+    "nw": "e1bd8fcfa0dc9b49166778748071cb46eb587884c4f98f5cb0632618450cfa23",
+    "se": "76ae1d08d85b2819ce8c897d1b7ea537eb7fc8e0213e187202dc5a770d045dd0",
+    "sw": "51f3f2048a9eaca5c4cd07e9930f9ce29aad5b109bb4f29a4645853713d3125a"
+  },
+  "outputs": {
+    "gameplay-actors-main.png": "4453a36d91a002c3f88f9c0ff6d9c48061cb70b025c9a580ca95e63a33a0b777",
+    "gameplay-actors-common.png": "74876a1b07ee9df6abf85da37c16c952efddd8ff8c884beb1bb67818374a4dac",
+    "gameplay-environment.png": "2a27a7734aa087047bda12a29fe1c92edf4580b4d84185161c7592cdc5dec8fe",
+    "gameplay-grave-king.png": "ec0e3659b5a6e48742f88bc51cba970a596ec7a1f8c5f8c71b73cbbe81e76f94",
+    "painted-corners.json": "4681fa85670563a75d9cadb0f5926b7265d9ef3657e4252469359116a2221c71"
+  }
+}

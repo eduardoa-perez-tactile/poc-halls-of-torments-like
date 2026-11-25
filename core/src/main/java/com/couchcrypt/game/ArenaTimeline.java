@@ -81,6 +81,8 @@ public final class ArenaTimeline {
     public float durationSeconds() { return duration; }
     /** Twelve minutes in production, proportionally shortened only in development fixtures. */
     public float sovereignSeconds() { return duration * .6f; }
+    /** Five active minutes in production, forty-five seconds in the short development fixture. */
+    public float bellSeconds() { return duration * .25f; }
 
     public int phaseIndex(float elapsed) {
         float end = 0;

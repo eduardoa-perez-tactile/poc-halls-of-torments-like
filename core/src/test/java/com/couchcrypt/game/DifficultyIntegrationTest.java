@@ -20,13 +20,7 @@ class DifficultyIntegrationTest {
         for (boolean late : new boolean[]{false, true}) {
             ArenaWorld world = quiet(late ? 181 : 20);
             int count = late ? 20 : 14;
-            for (int i = 0; i < count; i++) {
-                var enemy = world.enemies[0];
-                enemy.active = true; enemy.kind = ArenaWorld.EnemyKind.GHOUL;
-                enemy.elite = false; enemy.health = 1; enemy.x = 30; enemy.y = 0;
-                world.activeEnemies = 1; world.players[0].attackCooldown = 0;
-                world.update(ArenaWorld.STEP); finishChoices(world);
-            }
+            for (int i = 0; i < count; i++) killOne(world);
             assertEquals(count, world.kills);
             assertEquals(1, world.healthDrops.generated);
             for (var pickup : world.pickups) if (pickup.active && pickup.healing) {
@@ -97,13 +91,19 @@ class DifficultyIntegrationTest {
         world.players[0].attackCooldown = 1000; world.players[0].invulnerable = 1000;
         world.elapsed = elapsed; world.update(ArenaWorld.STEP); finishChoices(world);
         world.debugSceneryView(0, 0);
+        world.players[0].invulnerable = 1000; // Scenery inspection clears it; reward fixtures must stay at full health.
         return world;
     }
     private static void killOne(ArenaWorld world) {
         var enemy = world.enemies[0]; enemy.active = true; enemy.health = 1;
         enemy.kind = ArenaWorld.EnemyKind.GHOUL; enemy.elite = false;
+        enemy.spawnId++; enemy.speedMultiplier = 0; enemy.stunTime = 0;
         enemy.x = 30; enemy.y = 0; world.activeEnemies = 1;
-        world.players[0].attackCooldown = 0; world.update(ArenaWorld.STEP); finishChoices(world);
+        world.players[0].attackCooldown = 0;
+        for (int tick = 0; tick < 30 && enemy.active; tick++) {
+            world.update(ArenaWorld.STEP); finishChoices(world);
+        }
+        assertFalse(enemy.active, "The controlled kill must wait for a real melee-wave contact");
     }
     private static int xpOnFloor(ArenaWorld world) {
         int xp = 0; for (var pickup : world.pickups) if (pickup.active && !pickup.healing) xp += pickup.value; return xp;

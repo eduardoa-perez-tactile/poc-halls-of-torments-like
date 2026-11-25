@@ -18,16 +18,34 @@ class GameAudioTest {
     @Test void eachBossGetsOneArrivalCueEvenWhenSovereignSurvivesIntoFinale() {
         Mixer mixer = new Mixer(); ArenaWorld world = new ArenaWorld();
         try (Fixture f = new Fixture(mixer, world, true)) {
-            world.sovereignSpawned = true;
+            world.bellSpawned = true;
             f.audio.update(world, .016f);
             f.audio.update(world, .25f);
             assertEquals(List.of("boss"), mixer.played);
-            world.bossSpawned = true;
+            world.sovereignSpawned = true;
             f.audio.update(world, .016f);
             f.audio.update(world, .25f);
             assertEquals(List.of("boss", "boss"), mixer.played);
+            world.bossSpawned = true;
+            f.audio.update(world, .016f);
+            f.audio.update(world, .25f);
+            assertEquals(List.of("boss", "boss", "boss"), mixer.played);
             f.audio.reset(world); f.audio.update(world, .016f);
-            assertEquals(2, mixer.played.size(), "Restoring a live encounter must not replay arrival cues");
+            assertEquals(3, mixer.played.size(), "Restoring a live encounter must not replay arrival cues");
+        }
+    }
+
+    @Test void eachBellBeatHasItsOwnTollAndResetConsumesOldAttackCounters() {
+        Mixer mixer = new Mixer(); ArenaWorld world = new ArenaWorld();
+        try (Fixture f = new Fixture(mixer, world, true)) {
+            world.bellTolls++; f.audio.update(world, .016f);
+            f.audio.update(world, .25f);
+            world.bellTolls++; f.audio.update(world, .016f);
+            assertEquals(List.of("bell-toll", "bell-toll"), mixer.played);
+            world.bellLunges++; f.audio.update(world, .016f);
+            assertEquals("wraith-dash", mixer.played.getLast());
+            f.audio.reset(world); f.audio.update(world, .25f);
+            assertEquals(3, mixer.played.size());
         }
     }
 

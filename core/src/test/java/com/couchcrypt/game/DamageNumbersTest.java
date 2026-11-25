@@ -29,7 +29,7 @@ class DamageNumbersTest {
 
     @Test void choiceFreezeRetainsLabelsUntilCombatResumesAndResetClearsThem() {
         ArenaWorld world = solo(); enemy(world, 80, 1000);
-        world.update(ArenaWorld.STEP);
+        advanceToSwordHit(world);
         DamageNumbers.Entry label = first(world);
         assertEquals(28, value(label)); assertFalse(label.critical);
         world.players[0].attackCooldown = 10;
@@ -51,7 +51,7 @@ class DamageNumbersTest {
         for (ArenaWorld.Effect effect : world.effects) {
             effect.active = true; effect.kind = ArenaWorld.EffectKind.AURA; effect.ttl = 10;
         }
-        world.update(ArenaWorld.STEP);
+        advanceToSwordHit(world);
         assertEquals(972, enemy.health); assertEquals(28, world.players[0].damageDealt);
         assertEquals(1, world.swordHits); assertEquals(DamageNumbers.CAPACITY, active(world));
         DamageNumbers.Entry newest = world.damageNumbers.entries[0];
@@ -72,6 +72,11 @@ class DamageNumbersTest {
         int count = 0;
         for (DamageNumbers.Entry entry : world.damageNumbers.entries) if (entry.ttl > 0) count++;
         return count;
+    }
+
+    private static void advanceToSwordHit(ArenaWorld world) {
+        for (int i = 0; i < 15 && world.swordHits == 0; i++) world.update(ArenaWorld.STEP);
+        assertEquals(1, world.swordHits);
     }
 
     private static int value(DamageNumbers.Entry entry) {

@@ -29,7 +29,8 @@ public enum SoundCue {
     UI_BACK("ui-back", .22f, .25f, 3, .07f),
     LOOT("loot", 1.05f, .42f, 5, 0),
     PLAYER_DOWN("player-down", .85f, .42f, 4, .15f),
-    REVIVE("revive", 1.05f, .42f, 4, .15f);
+    REVIVE("revive", 1.05f, .42f, 4, .15f),
+    BELL_TOLL("bell-toll", .85f, .42f, 4, .15f);
 
     public final String path;
     public final float seconds, volume, gate;

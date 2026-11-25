@@ -123,6 +123,10 @@ public final class ResultsSummaryView {
             int remaining = remainingHealthPercent(world.sovereign);
             return "REACHED THE SOVEREIGN  /  " + remaining + "% HEALTH REMAINING";
         }
+        if (world.bellSpawned && world.bell != null && world.bell.maxHealth > 0) {
+            if (world.bellDefeated) return "THE MOURNING BELL FELL  /  THE SOVEREIGN AWAITS";
+            return "REACHED THE MOURNING BELL  /  " + remainingHealthPercent(world.bell) + "% HEALTH REMAINING";
+        }
         return "THE CRYPT CLAIMS ANOTHER SOUL";
     }
 

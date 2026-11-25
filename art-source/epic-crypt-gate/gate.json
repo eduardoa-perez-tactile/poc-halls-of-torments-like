@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "tool": "built-in image_gen",
+  "gate": {
+    "file": "gate.png",
+    "sourceSize": [
+      256,
+      256
+    ],
+    "pivot": [
+      128,
+      168.1
+    ],
+    "worldScale": 2.0833333333333335,
+    "renderShearY": 0.03795624,
+    "worldPosition": [
+      0,
+      912
+    ],
+    "orientation": "north-wall-x",
+    "armLengthWorld": 150,
+    "totalWallContextHalfLengthWorld": 275
+  },
+  "provenanceFiles": [
+    "epic-design-proposal.png",
+    "proposal-prompt.txt",
+    "asset-prompt.txt",
+    "gate-master.png",
+    "native-wall-guide.png",
+    "guide-geometry.json",
+    "pivot-calibration.json"
+  ]
+}

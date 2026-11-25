@@ -194,4 +194,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.package_review:
         package_review(args.package_review, args.source)
-    print(json.dumps(bake(args.source, args.output), indent=2))
+    # The approved 25 November melee wave supersedes the canonical sword strip.
+    # Keep bake() available to reconstruct the untouched base bank, then overlay
+    # the current production replacement for both public export entry points.
+    from BakeMeleeWave import export
+    print(json.dumps(export(args.output, args.source), indent=2))

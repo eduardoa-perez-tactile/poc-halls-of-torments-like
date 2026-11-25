@@ -39,6 +39,14 @@ def main():
         for name in NAMES:
             path = package / (name + '.java')
             path.write_bytes(subprocess.check_output(['git', 'show', f'{revision}:core/src/main/java/com/couchcrypt/ui/{name}.java'], cwd=ROOT))
+            if name == 'BuildIcons':
+                # This pinned baker exports the original twelve cells. The
+                # current enum also has expansion skills, appended below.
+                source = path.read_text()
+                declaration = 'new TextureRegion[PartyProgression.Upgrade.values().length]'
+                if source.count(declaration) != 1:
+                    raise RuntimeError('Pinned twelve-icon source declaration changed')
+                path.write_text(source.replace(declaration, 'new TextureRegion[12]'))
             sources.append(str(path))
         classes = work / 'classes'
         classes.mkdir()

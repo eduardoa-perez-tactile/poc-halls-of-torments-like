@@ -10,6 +10,7 @@ public final class EnemySizing {
 
     /** Multiplier of the actor's existing pixel scale, not an absolute pixels-to-world scale. */
     public static float renderScale(ArenaWorld.EnemyKind kind, EnemyVariant variant, boolean elite) {
+        if (kind == ArenaWorld.EnemyKind.MOURNING_BELL) return 1.7f;
         if (ArenaWorld.isBoss(kind)) return 2.2f;
         float normal = switch (kind) {
             case GHOUL -> HERO_REFERENCE_HEIGHT * .89f / (48f * SOURCE_PIXEL_SCALE);
