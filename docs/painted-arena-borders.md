@@ -1,5 +1,56 @@
 # Continuous painted arena borders
 
+## Separate epic gate — 25 November 2026
+
+The later gate feedback supersedes preservation of the old gate artwork below.
+The main entrance is now its own original transparent painting: a tall pointed
+stone arch, carved crest, closed iron-bound wooden doors and stepped masonry
+shoulders. Its fixed north-wall position allows both wings to be painted for the
+actual adjoining wall plane. The continuous perimeter and approved corner wraps
+remain intact; the gate is still render-only at `(0,912)`.
+
+The production asset uses a single whole-canvas 256×256 normalization. Measured
+bottom contours calibrate its ground pivot and a slight vertical shear; uprights
+stay vertical and no source pieces are individually warped or resampled.
+`PaintedGateArt` caches all storage-cut vertices, bounds and UVs once, borrows
+resident textures and draws after the rear wall but before complete actors.
+The old gate prop and its separate shadow are no longer submitted. The narrow
+wall opening stays beneath opaque gate paint.
+The wing handoffs stop inside their painted flat endcaps and use a short cached
+opacity blend over the unchanged wall; the arch and doors stay fully opaque.
+
+The offline baker reuses the retired gate frame 219's exclusive guarded slot
+plus spare pixels. Its old pixels and metadata remain in the exact baseline
+archive. Every other sprite, gutter, floor/border painting and approved corner
+is protected. The new gate adds zero GPU texture bytes and retains no decoded
+gameplay Pixmaps. Exact prompts, original master, native guide, calibration,
+rebuild inputs and preservation proof are in the
+[gate source package](../art-source/epic-crypt-gate/README.md).
+
+### Epic gate verification
+
+The full source is stored in 49 collared pieces; cached handoff meshes add only
+bounded CPU geometry. The archive-only rebuild reproduced all four PNG pages
+and gate metadata byte for byte. Every existing corner piece plus its two-pixel
+gutter was independently compared with the pre-gate baseline and stayed identical.
+All other protected active atlas pixels and gutters also passed their hash checks.
+
+Twenty-four focused JDK 21 tests passed across the new gate, wall opening,
+environment projection, original borders, corners and arena layout. Checks cover
+resident source reconstruction, wing ground alignment, vertical uprights, opaque
+doorway coverage, source/UV preservation across handoff splits, continuous vertex
+opacity, rear-layer ordering and bounded metadata. Desktop compilation and Android
+debug assembly passed. No full survival playthrough was run.
+
+Native 1920×1080 screenshots under `.run/epic-gate-final/` show the actual updated
+gate close-up, normal gameplay camera/HUD and full arena. A final 90-frame static
+sample measured CPU submission p50/p95/max of 0.440/0.534/3.184 ms, excluding
+simulation, audio and GPU completion; this does not prove physical-TV 60 FPS.
+Gameplay art remains 8,978,432 texture bytes with zero retained gameplay Pixmaps,
+and the combined texture inventory is unchanged. The emulator and its phone relay
+were not restarted or reconfigured; the saved LAN join host and endpoint remain
+available for the user's playtest.
+
 ## Painted gate/corner repair — 25 November 2026
 
 The user found that the gate still looked freestanding and the four wall turns
