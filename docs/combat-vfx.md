@@ -1,5 +1,9 @@
 # Sprite combat feedback
 
+Current permanent player outlines and Dodge presentation are defined by the
+25 November range-and-afterimage update below; earlier aura approvals are retained
+as implementation history.
+
 The 23 November 2026 pass integrates the approved enemy-arrival and level-up sprite direction, corrects the gold ring's flat perspective and replaces the rejected small impact glint with separate, larger sword and bolt bursts. Weapon contact now combines a brief directional sprite with painted recoil, stronger attack trails and distinct sound cues. Existing damage, attack cadence, movement, Dodge distance/invulnerability and enemy collision positions are preserved.
 
 ## Art and resources
@@ -114,3 +118,67 @@ LAN relay/QR configuration and existing forwards were left alone. Verification
 used a separate desktop GL process, which was closed afterward. The Android APK
 is available for playtesting; its updated rendering was not launched on that busy
 emulator. Native captures/logs are ignored under `.run/glowing-auras/`.
+
+## Live attack range and mild Dodge ghosts (2026-11-25)
+
+The user's new feedback supersedes the fixed cosmetic/glowing foot auras. Each
+living player now has one plain gold/teal outline at `primaryAttackRange`, the same
+radius used to acquire targets. Warden starts at 160 world units and changes
+immediately with reach ranks and equipment; Ranger stays at 800. Ranger's outline
+can extend beyond the close camera and is never clamped to a cosmetic radius.
+The outline describes acquisition distance to enemy centres; Warden still swings
+its existing directional cone and its compact sword paint remains unchanged.
+
+`PlayerFootRing` projects the circle into the true 2:1 ground plane. Its 192 cached
+segments have a constant 1.2-logical-unit core and 0.7-unit antialiasing fringes,
+without double rings, ticks, glow, pulse or fill. Cached unit directions/normals
+allow immediate scaling without frame-loop trigonometry or allocations. The
+576 quads reuse the resident white texel, with 49,184 bytes of instance float-array
+payload (reduced from 102,528). The entire outline stays beneath all actors.
+
+Dodge replaces the closely attached copies/body glow with at most four stored
+past poses per player, captured every 50 ms while actually moving. Each preserves
+its real position, hero, animation state/facing/phase and fades from 24% opacity
+over 180 ms. The subtle warm/teal tint uses existing actor frames, depth-sorted
+at each snapshot's own ground root, without an extra shadow. Both cameras read
+the same combat-owned history; choices, manual pause, disconnect, background and
+the frozen Defeat arena cannot age it. Fresh participation/reset/removal clears
+the history, while existing-participant reconnect preserves it. Blocked movement
+does not accumulate stationary ghosts. Dodge ground artwork remains unchanged.
+
+No textures, retained Pixmaps, gameplay balance changes or dependencies are added.
+Targeting/damage, sword cadence, Dodge distance/cooldown/invulnerability, equipment
+sustain and the existing artwork are preserved.
+
+## Projectile release scale (2026-11-25)
+
+Ranger, Cultist and both bosses' moving missiles emerge at 20% visual size and
+smoothly reach their existing size over the first 100 ms of combat-owned age.
+Scaling stays anchored to the existing painted head pivot and muzzle offset.
+Delayed trail copies use their own sample ages and are omitted before birth,
+so a full-size tail cannot appear behind a newly fired small projectile. Ranger's
+brief weapon flash/glow uses the same emergence curve. All four authored facings,
+critical projectile sizes, trajectories, speed, collision, damage, lifetime and
+pause behavior remain unchanged. The effect reuses existing frames and adds no
+textures, retained Pixmaps or frame-loop objects.
+
+## Range/Dodge/release verification
+
+JDK 21 desktop compilation, Android debug assembly and 43 focused checks passed,
+covering live reach acquisition, Dodge distance/cooldown/history/expiry, choice
+freeze/reset/reconnect, actual projectile firing/travel/collision sizes, pool-age
+reset, actor presentation and projectile atlas metadata. No survival playthrough
+was run.
+
+Isolated 1920×1080 native desktop OpenGL captures show Warden range changing from
+160 to 256, Ranger's exact 800-unit boundary, co-op outlines and fading Dodge
+history. A 180-frame static crowded co-op renderer sample after warmup measured
+CPU submission p50/p95/p99/max 0.439/0.592/0.657/0.665 ms with 165 draws. This
+excludes simulation, audio and GPU completion and does not prove sustained
+physical-TV 60 FPS. The current run's texture accounting excludes QR, while these
+changes add zero texture bytes and retain no gameplay Pixmaps.
+
+The existing TV emulator was running another game, so its activity, saved LAN
+join override (192.168.14.248:8787), relay and ADB forwards were preserved. The
+temporary desktop render process was closed. Captures/logs are ignored under
+`.run/range-dodge-preview/`; the Android APK is ready for user playtesting.

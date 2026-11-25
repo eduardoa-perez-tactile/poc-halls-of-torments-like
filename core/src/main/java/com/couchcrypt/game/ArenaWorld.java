@@ -170,6 +170,7 @@ public final class ArenaWorld {
     private static void resetPresentation(Player p) {
         p.moving = false; p.walkTime = p.hurtTime = 0; p.attackAge = 1;
         p.attackFacingX = p.facingX; p.attackFacingY = p.facingY;
+        p.dodgeTrail.clear();
     }
 
     private static void resetPresentation(Enemy e) {
@@ -292,6 +293,7 @@ public final class ArenaWorld {
     }
 
     private void updatePlayer(Player p) {
+        p.dodgeTrail.update(STEP);
         p.dodgeCooldown = Math.max(0, p.dodgeCooldown - STEP);
         p.invulnerable = Math.max(0, p.invulnerable - STEP);
         p.attackCooldown = Math.max(0, p.attackCooldown - STEP);
@@ -302,7 +304,7 @@ public final class ArenaWorld {
             p.hurtTime = Math.max(0, p.hurtTime - STEP);
         }
         boolean dodge = pendingDodge[p.slot]; pendingDodge[p.slot] = false;
-        if (!p.active || !p.alive) return;
+        if (!p.active || !p.alive) { p.dodgeTrail.clear(); return; }
         boolean choosing = equipment.choosing(p.slot);
         float x = choosing ? 0 : inputX[p.slot], y = choosing ? 0 : inputY[p.slot], magnitude = x * x + y * y;
         if (choosing) dodge = false;
@@ -323,8 +325,13 @@ public final class ArenaWorld {
         float speed = p.hero.moveSpeed * equipment.moveMultiplier(p);
         float previousX = p.x, previousY = p.y;
         if (p.dodgeTime > 0) {
-            float duration = Math.min(STEP, p.dodgeTime); p.x += p.dodgeX * speed * 3 * duration;
-            p.y += p.dodgeY * speed * 3 * duration; p.dodgeTime = Math.max(0, p.dodgeTime - STEP); p.walkTime += STEP * 2;
+            float duration = Math.min(STEP, p.dodgeTime);
+            float nextX = clamp(p.x + p.dodgeX * speed * 3 * duration, -HALF_WIDTH + 20, HALF_WIDTH - 20);
+            float nextY = clamp(p.y + p.dodgeY * speed * 3 * duration, -HALF_HEIGHT + 20, HALF_HEIGHT - 20);
+            // Retain real past positions/poses rather than copies attached to the current body.
+            if (nextX != p.x || nextY != p.y) p.dodgeTrail.capture(p);
+            p.x = nextX; p.y = nextY;
+            p.dodgeTime = Math.max(0, p.dodgeTime - STEP); p.walkTime += STEP * 2;
         } else {
             p.x += x * speed * STEP; p.y += y * speed * STEP; if (magnitude > .0025f) p.walkTime += STEP;
         }
@@ -335,7 +342,7 @@ public final class ArenaWorld {
         if (p.stormLevel > 0 && p.stormCooldown <= 0) storm(p);
     }
 
-    /** Primary targeting envelope. The compact painted foot aura is cosmetic. Target centers must enter this range. */
+    /** Primary targeting envelope, also used by the live ground outline. Target centers must enter this range. */
     public float primaryAttackRange(Player player) {
         return player.hero.attackRange * (player.hero == Hero.WARDEN ? equipment.reachMultiplier(player) : 1f);
     }
@@ -1227,6 +1234,7 @@ public final class ArenaWorld {
         public float cleaveMultiplier = 1, critChance, pickupMultiplier = 1, auraCooldown, stormCooldown, damageDealt, damageTaken;
         public float healingFromDrops, healingFromRegeneration, healingFromSustain;
         private float dodgeX, dodgeY;
+        final DodgeTrail dodgeTrail = new DodgeTrail();
         float dodgeFacingX() { return dodgeX; }
         float dodgeFacingY() { return dodgeY; }
         private Player(int slot) { this.slot = slot; hero = slot == 0 ? Hero.WARDEN : Hero.RANGER; }
