@@ -138,7 +138,7 @@ class ActorPresentationStateTest {
         enemy(world, 1, ArenaWorld.EnemyKind.GHOUL, 500, 100);
         ArenaWorld.Enemy cultist = enemy(world, 2, ArenaWorld.EnemyKind.CULTIST, 600, 0);
         cultist.attackCooldown = 0;
-        ArenaWorld.Enemy boss = enemy(world, 3, ArenaWorld.EnemyKind.BOSS, 800, 100);
+        ArenaWorld.Enemy boss = enemy(world, 3, ArenaWorld.EnemyKind.SOVEREIGN, 800, 100);
         boss.attackCooldown = 0;
         shotAtPlayer(world); world.setInput(0, 0, 1, false); world.update(ArenaWorld.STEP);
         assertEquals(0, player.attackAge); assertTrue(player.hurtTime > 0);
@@ -191,12 +191,15 @@ class ActorPresentationStateTest {
         ArenaWorld.Enemy previous = enemy(world, 0, ArenaWorld.EnemyKind.CULTIST, 400, 0);
         previous.attackCooldown = 0; world.update(ArenaWorld.STEP);
         assertEquals(.7f, previous.castDuration); assertEquals(0, previous.castAge);
-        previous.windup = ArenaWorld.STEP; world.update(ArenaWorld.STEP);
+        for (int tick = 0; tick < 44 && previous.windup > 0; tick++) world.update(ArenaWorld.STEP);
         assertEquals(0, previous.releaseAge, "The pooled slot has exercised a real release event");
         previous.active = false; world.activeEnemies = 0;
         world.debugStartBoss();
         assertSame(previous, world.boss); assertEquals(ArenaWorld.EnemyKind.BOSS, previous.kind);
         assertFalse(previous.moving); assertEquals(0, previous.moveTime);
+        assertEquals(ArenaWorld.EnemyAttack.NONE, previous.attack);
+        assertEquals(0, previous.attackTargetX); assertEquals(0, previous.attackTargetY);
+        assertEquals(0, previous.attackHitMask); assertEquals(0, previous.windup);
         assertEquals(1, previous.castAge); assertEquals(0, previous.castDuration);
         assertEquals(1, previous.releaseAge);
         assertEquals(1, previous.facingX * previous.facingX + previous.facingY * previous.facingY, EPSILON);
@@ -205,7 +208,7 @@ class ActorPresentationStateTest {
         assertEquals(1, previous.releaseAge);
     }
 
-    @Test void cultistCastTracksItsExistingDelayedReleaseAndBossBoltsStillStartImmediately() {
+    @Test void cultistCastLocksItsDelayedReleaseAndSovereignBoltsStillStartImmediately() {
         ArenaWorld world = solo(ArenaWorld.Hero.WARDEN); world.players[0].attackCooldown = 10;
         ArenaWorld.Enemy cultist = enemy(world, 0, ArenaWorld.EnemyKind.CULTIST, 350, 0);
         cultist.attackCooldown = 0; world.update(ArenaWorld.STEP);
@@ -216,15 +219,16 @@ class ActorPresentationStateTest {
         for (int tick = 0; tick < 44 && cultist.windup > 0; tick++) world.update(ArenaWorld.STEP);
         assertEquals(0, cultist.windup); assertEquals(1, activeShots(world));
         assertEquals(0, cultist.releaseAge, "Release artwork starts in the projectile's actual creation tick");
-        assertTrue(cultist.castFacingX < 0); assertTrue(cultist.castFacingY > 0,
-            "Release still aims at the live target, not its position at cast start");
+        assertTrue(cultist.castFacingX < 0); assertEquals(0, cultist.castFacingY,
+            "The revised cast commits to the target position at windup start");
+        assertEquals(0, world.shots[0].vy, EPSILON);
 
         ArenaWorld bossWorld = solo(ArenaWorld.Hero.WARDEN); bossWorld.players[0].attackCooldown = 10;
-        bossWorld.debugStartBoss(); bossWorld.boss.attackCooldown = 0;
+        bossWorld.debugStartSovereign(); bossWorld.sovereign.attackCooldown = 0;
         bossWorld.update(ArenaWorld.STEP);
-        assertEquals(0, bossWorld.boss.castAge); assertEquals(1, bossWorld.boss.castDuration);
-        assertEquals(0, bossWorld.boss.releaseAge);
-        assertTrue(bossWorld.boss.windup > 0); assertEquals(5, activeShots(bossWorld));
+        assertEquals(0, bossWorld.sovereign.castAge); assertEquals(1, bossWorld.sovereign.castDuration);
+        assertEquals(0, bossWorld.sovereign.releaseAge);
+        assertTrue(bossWorld.sovereign.windup > 0); assertEquals(5, activeShots(bossWorld));
         assertTrue(bossWorld.hazards[0].active); assertTrue(bossWorld.hazards[0].warning > .9f);
         assertEquals(100, bossWorld.players[0].health);
     }
@@ -243,7 +247,7 @@ class ActorPresentationStateTest {
         assertEquals(cultist.castFacingX, aimX); assertEquals(cultist.castFacingY, aimY);
 
         cultist.active = false; world.activeEnemies--;
-        ArenaWorld.Enemy boss = enemy(world, 0, ArenaWorld.EnemyKind.BOSS, 350, 200);
+        ArenaWorld.Enemy boss = enemy(world, 0, ArenaWorld.EnemyKind.SOVEREIGN, 350, 200);
         boss.elite = false; boss.attackCooldown = 10;
         world.update(ArenaWorld.STEP);
         assertEquals(ArenaWorld.EnemyKind.CULTIST, shot.casterKind,
@@ -252,7 +256,7 @@ class ActorPresentationStateTest {
         assertEquals(aimX, shot.launchFacingX); assertEquals(aimY, shot.launchFacingY);
 
         shot.active = false; boss.attackCooldown = 0; world.update(ArenaWorld.STEP);
-        assertTrue(shot.active); assertEquals(ArenaWorld.EnemyKind.BOSS, shot.casterKind);
+        assertTrue(shot.active); assertEquals(ArenaWorld.EnemyKind.SOVEREIGN, shot.casterKind);
         assertFalse(shot.casterElite); assertEquals(15, shot.damage);
         assertEquals(boss.castFacingX, shot.launchFacingX); assertEquals(boss.castFacingY, shot.launchFacingY);
         assertNotEquals(aimY, shot.launchFacingY);
@@ -267,6 +271,8 @@ class ActorPresentationStateTest {
     private static ArenaWorld.Enemy enemy(ArenaWorld world, int index, ArenaWorld.EnemyKind kind, float x, float y) {
         ArenaWorld.Enemy enemy = world.enemies[index];
         enemy.active = true; enemy.kind = kind; enemy.x = x; enemy.y = y;
+        // This helper represents a fresh spawn when reusing an array slot.
+        enemy.attack = ArenaWorld.EnemyAttack.NONE; enemy.attackAge = 2; enemy.windup = 0;
         enemy.health = enemy.maxHealth = 100; enemy.attackCooldown = 10;
         world.activeEnemies++; return enemy;
     }

@@ -2,7 +2,7 @@
 
 `gameplay-canonical.zip` preserves the exact selected canonical PNGs, actor/environment manifests, original creative prompts, normalization/selection records and source hashes for the current seven-actor crypt kit. Artwork came from built-in ImageGen; installed Pillow performs deterministic exports and atlas packing. No image API, installation or dependency download is needed for a rebuild.
 
-The archive is **1,945,905 bytes**, with **427 entries**. `CANONICAL-SOURCES.json` indexes the other 426 entries by SHA-256 and byte count and records the four expected runtime output hashes. Historical review statuses are preserved; final inclusion is established by the complete strict pack. Raw generated posters and review media remain local in `.run/art-exploration/` and are excluded from this compact archive.
+This base archive is **1,945,905 bytes**, with **427 entries**. `CANONICAL-SOURCES.json` indexes the other 426 entries by SHA-256 and byte count and records the four expected runtime output hashes. Historical review statuses are preserved; final inclusion is established by the complete strict pack. Raw generated posters and review media remain local in `.run/art-exploration/` and are excluded from this compact archive.
 
 ## Rebuild
 
@@ -13,10 +13,15 @@ python3 -m zipfile -e art-source/gameplay-canonical.zip .run/art-exploration
 python3 scripts/BakeGameplayAtlas.py
 ```
 
-The strict baker writes `.run/art-exploration/weekend/packed/`, leaving `assets/art/` unchanged. It requires all seven actors and nineteen regions, preserves canonical pixels/timing/roots, and validates the fixed 6 MiB page layout, saved RGBA reconstruction, nonoverlap and gutters. Confirm exact agreement with the shipped output:
+The strict base baker writes `.run/art-exploration/weekend/packed/`, leaving `assets/art/` unchanged. It requires all seven actors and nineteen regions, preserves canonical pixels/timing/roots, and validates the fixed 6 MiB layout, saved RGBA reconstruction, nonoverlap and gutters. The later attack/projectile passes fill spare pixels in these pages. Run both stages before comparing with the current shipped output:
 
 ```sh
-for file in gameplay-actors-main.png gameplay-actors-common.png gameplay-environment.png gameplay.json; do
+python3 scripts/BakeEnemyAttackArt.py --base-art .run/art-exploration/weekend/packed --output .run/art-exploration/weekend/packed
+python3 scripts/BakeMagicProjectiles.py --output .run/art-exploration/weekend/packed
+python3 scripts/BakeCryptEnvironment.py --output .run/art-exploration/weekend/packed
+python3 scripts/BakePaintedArenaBorders.py --output .run/art-exploration/weekend/packed
+python3 scripts/BakeEngravedFloor.py --output .run/art-exploration/weekend/packed
+for file in gameplay-actors-main.png gameplay-actors-common.png gameplay-environment.png gameplay.json enemy-attacks.json magic-projectiles.json painted-borders.json; do
   cmp ".run/art-exploration/weekend/packed/$file" "assets/art/$file" || exit 1
 done
 ```
@@ -26,3 +31,99 @@ Independent QA already verified all indexed source hashes/byte counts, confined 
 `scripts/ArchiveGameplaySources.py` recreates the compact archive from a complete strict local pack plus provenance and refuses incomplete input. It is an archival step for changed approved sources, not part of a normal rebuild.
 
 `legacy-gameplay/` retains the four superseded original `game-*.png` masters outside runtime assets. Their exact initial prompts remain in [the historical art record](../docs/gameplay-art.md). See [current integration and verification](../docs/gameplay-art-integration.md) for resource accounting and known limits.
+## Combat VFX sources
+
+`combat-vfx-canonical.zip` contains the four original sprite sheets, exact generation prompts/provenance, source hashes and baked projection/timing parameters. Run `python3 scripts/BakeCombatVfx.py --output /path/to/rebuilt-art` with installed Pillow to reproduce `combat-vfx.png` and `combat-vfx.json`. No extraction, generation service or dependency download is required. See [combat-feedback details](../docs/combat-vfx.md) for resource bounds, behavior and measured limits.
+
+## Integrated border tile sources
+
+[`border-tiles-v1/`](border-tiles-v1/README.md) contains nine integrated floor/border tiles,
+their original painted master and prompt, matching full/half-size atlases, and a
+reproducible export/packing/QA workflow. Review maps are assembled from those PNGs,
+not the generated concept painting. The source bank stays outside runtime assets;
+only the bounded half-size atlas is exported into the game. See the
+[integration record](../docs/border-tiles-integration.md) for unchanged playable
+bounds, resource accounting and in-game verification.
+
+## Enemy attacks and magic missiles
+
+`enemy-attacks-canonical.zip` retains the approved southwest attacks, three additional authored facings per enemy, the neutral aura loop, exact built-in ImageGen prompts/provenance and normalized fixed-root frames. `magic-projectiles-canonical.zip` retains three original eight-frame magical missile sheets, their prompts/provenance, head pivots and untouched base environment page. The ordered supplemental stages above reproduce all three current gameplay PNGs and both supplemental manifests while preserving every original frame and sampling gutter. They allocate no additional runtime textures. See [attack art](../docs/enemy-attack-art.md), [magic projectiles](../docs/magic-projectiles.md) and [runtime integration](../docs/enemy-attacks.md).
+
+
+## Open crypt environment replacement (2026-11-23)
+
+[`crypt-environment-v2/`](crypt-environment-v2/README.md) retains the selected original
+painted low ruined walls and coherent isometric landmarks, their exact ImageGen prompts,
+measured ground-footprint metadata and a compact canonical baker-input archive.
+This final environment stage retires the unused legacy floor/wall/prop runtime
+regions; the old masters remain in the base canonical archive above. The newer
+floor/border page remains separate and unchanged.
+
+```sh
+python3 scripts/BakeCryptEnvironment.py --output assets/art
+```
+
+This environment stage follows the base/attack/missile stages; the continuous painted-border stage below now runs last. It reads only its tracked
+`canonical-inputs.zip`, rewrites only the existing 512×512 environment page and
+its gameplay/missile metadata, and preserves the actor pages, actor indices 0–207,
+all 24 missile sprite pixels/timing/pivots and four utility sprites. Metadata
+rectangles move through complete deterministic repacking with gutters and saved
+RGBA reconstruction checks. No `.run` cache or image service is needed for a
+rebuild. The verification record in that folder preserves output/actor hashes and
+the archive-only deterministic rebuild result.
+
+
+## Approved continuous painted borders (2026-11-23)
+
+[painted-arena-borders/](painted-arena-borders/README.md) holds the original full-side
+wall paintings, low corner, exact ImageGen prompts, geometry references and fits.
+The source paintings are not repeated within a side. The baker's standalone
+`bake-inputs.zip` also preserves the exact earlier gameplay pages and metadata.
+
+```sh
+python3 scripts/BakePaintedArenaBorders.py --output assets/art --source-output art-source/painted-arena-borders
+```
+
+Run this stage before the engraved-floor stage. It adds original neighbouring-pixel slices into empty space
+in the existing three gameplay pages and writes `painted-borders.json`. Every
+previous sprite/gutter is preserved; existing gameplay, enemy-attack and missile
+metadata are unchanged. One global 85% Lanczos normalization of the two full wall
+paintings precedes slicing; the corner retains its selected resolution. Full
+masters and earlier normalized sources remain intact. The explicit `--source-output`
+writes the derived proof paintings beside those sources. Without it, proof PNGs
+are written under `<output>/painted-border-sources`, keeping temporary rebuilds
+from modifying tracked sources. Archive-only reconstruction matched every output.
+See [runtime checks and limits](../docs/painted-arena-borders.md).
+
+
+## Engraved crypt floor (2026-11-23)
+
+[engraved-crypt-floor/](engraved-crypt-floor/README.md) preserves the approved
+concept, three original ImageGen masters, exact prompts and source provenance.
+This historical floor archive can still be rebuilt byte-for-byte:
+
+```sh
+python3 scripts/BakeEngravedFloor.py --archive art-source/engraved-crypt-floor/bake-inputs.zip --output .run/legacy-floor-rebuild
+```
+
+Its archive contains the untouched pre-floor baseline. Whole normalized floor
+materials are split only for storage in guarded spare areas of the four existing
+gameplay/foundation pages; it adds no textures and preserves prior sprite pixels
+and gutters. See [runtime integration](../docs/engraved-crypt-floor.md).
+
+
+## Clear paving and separate path borders (2026-11-23)
+
+[crypt-floor-clarity/](crypt-floor-clarity/README.md) is the current selected floor
+source. It preserves clearer original field/path paintings, a transparent border
+stone, exact ImageGen prompts, baseline archive and independent rebuild proof.
+The final stage still runs after the painted wall baker:
+
+```sh
+python3 scripts/BakeEngravedFloor.py --output assets/art --source-output art-source/crypt-floor-clarity
+```
+
+It preserves the medallion, earlier sprite pixels/gutters and five metadata files.
+The same four existing pages hold 317 source pieces; no texture is added. Runtime
+uses separately placed border blocks with real grout gaps. The old floor archive
+remains supported for historical exports; it is not the current runtime selection.

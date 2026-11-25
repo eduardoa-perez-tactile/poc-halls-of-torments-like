@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "status": "standalone-art-review-not-runtime-integrated",
+  "tileWidth": 240,
+  "tileHeight": 120,
+  "canvasWidth": 304,
+  "canvasHeight": 168,
+  "anchor": [
+    152,
+    2
+  ],
+  "logicalWorldCell": 120,
+  "projection": "2:1; x=(i-j)*tileWidth/2; y=(i+j)*tileHeight/2",
+  "source": {
+    "file": "painted-master.png",
+    "sha256": "e356485e160e27a164c3d0d4930fd776aafc7fc0fe4f1b0d3c353e02c0cf7309",
+    "measuredCopingCorners": {
+      "far": [
+        886,
+        23
+      ],
+      "left": [
+        120,
+        418
+      ],
+      "near": [
+        886,
+        813
+      ],
+      "right": [
+        1654,
+        418
+      ]
+    },
+    "normalization": "shared affine camera, periodic texture collars, floor illumination normalization; no separate wall composition"
+  },
+  "tiles": [
+    {
+      "id": "corner-n",
+      "file": "tiles/corner-n.png",
+      "mask": 3,
+      "sourceCell": [
+        0,
+        0
+      ],
+      "sha256": "4484f83875902d16a53f3e2acd601745bf152234af2e7c96cfd9adb50128ca84"
+    },
+    {
+      "id": "edge-ne",
+      "file": "tiles/edge-ne.png",
+      "mask": 2,
+      "sourceCell": [
+        1,
+        0
+      ],
+      "sha256": "f2fdda0754cacc648624d8e61ae5d14603c71e20fbe9fa6228970694cb82b6ca"
+    },
+    {
+      "id": "corner-e",
+      "file": "tiles/corner-e.png",
+      "mask": 6,
+      "sourceCell": [
+        2,
+        0
+      ],
+      "sha256": "bb08e0f97f98f371230caaafe337f1d99e6da49020ed85a140bce916ba4fffbf"
+    },
+    {
+      "id": "edge-nw",
+      "file": "tiles/edge-nw.png",
+      "mask": 1,
+      "sourceCell": [
+        0,
+        1
+      ],
+      "sha256": "1d1b6331c97d3ba1011f35b4bc6a3442c9f9ca9ac2c877f8273fb6e9bfc824d3"
+    },
+    {
+      "id": "interior",
+      "file": "tiles/interior.png",
+      "mask": 0,
+      "sourceCell": [
+        1,
+        1
+      ],
+      "sha256": "075105b781efd9ca270be41923c9bb8b686e22f4046c160ad25d26ac7710f645"
+    },
+    {
+      "id": "edge-se",
+      "file": "tiles/edge-se.png",
+      "mask": 4,
+      "sourceCell": [
+        2,
+        1
+      ],
+      "sha256": "38afd2541f06d02bbbb9294e5e2d9cc2c74e432ea087a6a5d5d8947e9413b69e"
+    },
+    {
+      "id": "corner-w",
+      "file": "tiles/corner-w.png",
+      "mask": 9,
+      "sourceCell": [
+        0,
+        2
+      ],
+      "sha256": "6b04c9bfe12b8e2c1650540208996bc6be0bc6c5f3b69ea37dedbeb65045463b"
+    },
+    {
+      "id": "edge-sw",
+      "file": "tiles/edge-sw.png",
+      "mask": 8,
+      "sourceCell": [
+        1,
+        2
+      ],
+      "sha256": "7d4e449a61f14b0b463c7bf9262085a7603e08c3a00b9d5753bd6c3c4dfa275a"
+    },
+    {
+      "id": "corner-s",
+      "file": "tiles/corner-s.png",
+      "mask": 12,
+      "sourceCell": [
+        2,
+        2
+      ],
+      "sha256": "46ff0400428c4fda495d0865aca287737fc3b370edd51e4dd70c70ff0ab674c5"
+    }
+  ]
+}

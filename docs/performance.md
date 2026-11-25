@@ -185,3 +185,245 @@ Fifty-five focused metadata, presentation, combat, pause and late-join tests pas
 The pre-existing emulator/relay session ended once during the checks; no app fatal exception was recorded before that interruption. A cold boot of the already-installed image and restored relay recovered the environment. The remaining checks and final sample completed without a recorded fatal exception. No tools, SDKs or dependencies were installed or downloaded.
 
 Raw evidence stays ignored under `.run/performance-art-coop.*` and `.run/art-exploration/weekend/tv-verification/`; source archive reconstruction and viewer checks are under the adjacent QA folders. The tested rendering APK SHA-256 is `24a89f003b49286aa005f8e66567beb1cb166b87cbcd627d28b6882507be5611`.
+## 23 November — sprite VFX integration
+
+The later [combat-feedback pass](combat-vfx.md) adds one managed 512×288 RGBA VFX page (0.5625 MiB), retaining zero decoded Pixmaps for that page. Actual accounted textures including QR reached **32,893,772 bytes / 31.3699455 MiB**, below 32 MiB. A seven-second 301-frame co-op boss fixture reported interval p95/p99/max **19.84/21.28/26.80 ms**, CPU submission **10.83/15.45/21.54 ms**, 148 intervals above 16.7 ms and none above 33.4 ms; the reported frame used 64 draws. A separate short fixture-construction window included a **52.71 ms** interval and 170 draws while the equipped late encounter and simultaneous arrivals were prepared. Physical-TV 60 FPS remains unproven; this is not a full survival or balance test. Earlier measurements below are historical evidence for their original builds.
+
+
+## Cleaner combat HUD (2026-11-23)
+
+The approved revision uses smooth 176-pixel health orbs, no numeric health/duplicate rails,
+80-pixel skill emblems, a bottom shared XP lane and a new illustrated Dodge boot.
+A soft critical-health halo and the Dodge source occupy existing unused/obsolete cells
+in the same managed 512×256 HUD atlas: no additional GPU texture bytes or retained
+Pixmap. The halo varies only opacity; its 1.6-second clock uses the HUD delta and
+therefore freezes with manual pause. No frame-loop image processing or layout creation
+was introduced. Fonts and emblems remain shared.
+
+JDK 21 desktop classes and Android debug assembly passed. Focused HUD model/state tests
+cover actual ranks/overflow, shared-round completion, automatic late-join foundations
+and notices. Three stale model fixtures were corrected for the existing party-round
+and automatic catch-up behavior; gameplay/progression code was not changed.
+A brief Television_1080p / Android 13 ARM64 emulator check captured solo without the
+boss lane, populated co-op with critical P1 health/boss preview, a second pulse phase,
+manual pause, downed-ally guidance and revival progress. Ignored local screenshots are
+`.run/cleaner-hud-*.png`; the log is `.run/cleaner-hud-render.log`.
+
+The startup-adjacent co-op window contained 275 frames: interval p95/p99/max
+28.24/60.90/114.38 ms and CPU submission p95/p99/max 9.75/50.10/57.40 ms. The next
+183-frame partial window had interval p95/p99/max 18.76/19.58/19.83 ms and CPU
+2.74/6.81/8.84 ms. Accounted textures were 33,319,756 bytes (31.78 MiB), below
+32 MiB, and retained Pixmaps 20,245,324 bytes. These short startup/rendering checks
+include capture overhead; they do not prove physical-TV 60 FPS, sustained combat
+performance, or long-run memory behavior. The strict frame target remains unverified.
+Temporary controllers/logging were stopped and the game returned to Home. The existing
+emulator, relay and ADB forward remain running for user handoff; no physical device
+was touched.
+
+
+## Smaller painted boss header and combat feedback (2026-11-23)
+
+The approved painted death-mask/frame is a separate alpha sprite with a separate
+crimson fill. The live boss-health fraction crops the fill behind the reservoir;
+the name uses existing cached font glyphs. The 960×180 destination contains about
+814×165 visible artwork pixels, reduced from the approved full-size concept.
+Survival shows only the timer; boss combat shows the name/health header. Persistent
+Slain/Souls counters, BOSS/phase text and routine top banners no longer render.
+Dodge is anchored beside each orb, independent of acquired-skill count. The living
+hero colour marker is removed; actual revival progress remains. Projectile hits
+use short direction-free circular accents with the existing glow/pixel textures
+and pooled effect lifetime, with no frame-loop allocations or changes to projectile rules.
+
+The shared file-backed managed HUD page grows from 512×256 to 512×352 RGBA,
+adding 196,608 GPU bytes and no retained Pixmap. Existing named HUD regions retain
+their pixels and coordinates. Total accounted textures with QR are now
+33,516,364 bytes (31.9637 MiB), leaving 38,068 bytes below 32 MiB. Retained Pixmaps
+remain 20,245,324 bytes. The startup budget guard includes the fixed 360×360 QR.
+The boss master/concept are source files only; runtime loads the small shared atlas.
+Future art additions must respect this narrow remaining budget or repack residency.
+
+JDK 21 desktop classes and Android debug assembly passed, along with 19 focused
+HUD/model/state and actor-presentation checks (including projectile presentation
+snapshots and choice freezes). Brief Android 13 ARM64 Television_1080p observations
+covered Ranger solo with zero acquired skills, a four-second projectile-contact
+recording, populated solo/co-op boss previews, downed feedback and manual pause.
+The initial atlas inspection caught fill-filter bleed into a neighboring Dodge
+cell; a guarded fill region fixed it. The final APK was rebuilt and a final co-op
+capture confirmed that guarded atlas. Local evidence is ignored under
+`.run/epic-hud-*.png`, `.run/projectile-impacts.mp4` and `.run/epic-hud-render.log`.
+
+One startup-adjacent solo window contained 288 frames: interval p95/p99/max
+20.65/49.20/50.01 ms, CPU submission p95/p99/max 6.36/33.29/49.02 ms.
+The populated co-op window contained 290 frames: interval p95/p99/max
+20.08/44.69/73.94 ms, CPU 9.30/24.25/39.19 ms. A following 175-frame partial window
+including capture/transitions reached 130.94 ms interval and 130.28 ms CPU.
+These brief emulator samples include startup/capture work and do not isolate GPU
+time, establish sustained 60 FPS, or replace physical-TV gameplay/performance
+checks. The strict frame target is not proven. Native screenrecord is silent.
+Temporary controllers/logging were stopped and the app returned to Home. The
+existing emulator, relay and ADB forward remain available; no physical device
+was touched.
+
+
+## Attack reach and readable Warden sweep (2026-11-23)
+
+A thin projected gold/teal ground ring reads the same primary-targeting helper used
+by combat: Warden skill/gear reach is included, Ranger's 800-unit range is unchanged.
+Ranger's boundary can lie partly outside the close camera. Two thin 64-segment passes
+provide understated contrast on the pale floor, before actors/pickups are drawn.
+The cosmetic Warden slash lasts 0.38 seconds with a readable sweep/fade; repeated
+haste attacks replace their owner's previous trail rather than stacking trails.
+Damage/cooldown timing and committed aim/origin remain unchanged. No textures,
+Pixmaps or frame-loop objects were added.
+
+All 18 focused combat-VFX/actor-presentation checks passed, including live reach
+and high-haste snapshot/cadence coverage, with JDK 21 desktop classes/Android debug
+assembly. A brief Television_1080p Android 13 ARM64 check captured a five-second
+Warden close encounter and a manual-pause view; native screenshots/recording are
+ignored under `.run/attack-range-*.png` and `.run/range-and-warden-slash.mp4`.
+The 283-frame window reported interval p95/p99/max 19.83/77.48/101.45 ms and CPU
+submission 8.73/29.77/58.55 ms, with 144 intervals above 16.7 ms and four above 33.4 ms.
+Accounted textures remain 33,516,364 bytes (31.9637 MiB); retained Pixmaps remain
+20,245,324 bytes. Capture/startup work is included, and sustained physical-TV 60 FPS
+is not established. Synthetic controllers/logging were stopped and the existing
+emulator/relay returned to Home. No physical device was touched.
+
+That illustration was the initial proposal. The subsequent open-landmark implementation and character-height ruined-wall revision are recorded in docs/arena-redesign-proposal.md; the concept itself is not a gameplay or performance verification.
+
+
+## Two equipment choices and reward explanations (2026-11-23)
+
+Equipment offers now carry exactly two illustrated choices and immutable reward
+provenance. Skills retain three. TV and phone name the elite defeat or original
+timed reliquary, and explain equip/replace, run-only gear and Keep Current Gear.
+Sixty-three focused layout/art/equipment/lobby/socket checks and twelve directly
+affected late-join/item-combat checks passed with JDK 21; the controller protocol
+script also passed. Desktop classes and Android debug assembly succeeded.
+
+A real headless browser connected through the emulator's controller server was
+checked at 390×844 portrait and 844×390 landscape. The native late-encounter fixture
+queued separate 1:30 and 10:00 reliquaries; both source labels appeared in order,
+with exactly two visible gear cards. Declining both restored the controller;
+a following real skill offer restored three cards. A clipped landscape comparison
+was corrected by placing equipment art beside its copy, then this affected flow
+was rechecked. Native TV source/explanation text was also captured. This fixture
+does not establish what triggered rewards in an unrecorded user playtest.
+
+Temporary browser/controllers/logging were stopped and the emulator returned to
+Home. Native captures and logs are ignored under `.run/`; a phone page opened
+before this update needs a reload to receive the changed controller JavaScript.
+
+
+## Open landmarks and low ruined borders (2026-11-23)
+
+The authored open arena has 59 placements: 36 wide wall sections, four corner
+supports and 19 props across four landmark groups. Broken masonry replaces the
+rejected tall clean wall treatment. Wall stone bodies are approximately 70–85
+render units with broken tops, against roughly 104-unit visible heroes; diagonal
+half-spans add to their bounding-box peaks. Corner peaks are about 106 units.
+Small measured source projection errors are calibrated using the same four sprite
+vertices, with fitted ground pivots. A fixed 20-float staging array is reused;
+there are no additional textures, GPU buffers or frame-loop object allocations.
+
+The source kit includes original built-in ImageGen masters/exact prompt chains,
+fit samples, metadata and independently rebuildable canonical inputs. An
+archive-only bake reproduced all three runtime files byte for byte. Actor pages
+and frame prefix 0–207, all 24 missile RGBA frames/timing/pivots and utilities are
+preserved. Runtime residency including QR remains **33,516,364 bytes (31.9637 MiB)**;
+retained Pixmaps remain **20,245,324 bytes**. Gameplay retains no decoded Pixmaps.
+
+Across targeted runs, 76 focused tests passed for layout, projection/occlusion,
+art contracts, equipment, protocol/lobby, item combat and late joining. Final
+JDK 21 desktop classes and Android debug assembly passed. The controller script
+and actual portrait/landscape phone checks are recorded above. Native solo views
+covered landmarks and near/far corners; independent co-op cameras were checked
+at the near border. The first capture exposed overly broad fading of low walls.
+The final overlap check uses the local diagonal wall height at the actor and
+requires upper-body obstruction; low masonry remains continuous when the head
+and upper body are clear. Only the affected views were rechecked. The profile-only
+camera fixture clears combat pools and gives separated split views, with no
+blinking inspection shield; normal movement/combat is unchanged.
+
+The final brief co-op window contained 295 frames: interval p95/p99/max
+**20.06/33.33/97.02 ms**, CPU submission **6.13/14.11/18.63 ms**, 138 intervals above
+16.7 ms and two above 33.4 ms, with 12 draw calls. Startup/capture work is included;
+the preceding lobby transition had much larger startup hitches. This establishes
+rendering/joins and bounded residency, not sustained physical-TV 60 FPS, gameplay
+balance or arena fun. The 16.7 ms displayed-frame requirement remains unproven.
+
+Native captures/logs are ignored under `.run/ruined-arena-*`; the final split view
+is `ruined-arena-coop-near-corner.png`. Temporary controllers, browser profiles,
+logging and inspection scripts were removed/stopped; the existing emulator is at
+Home and the existing relay/ADB forward remain available. No physical phone/TV
+was targeted. Floor artwork remains unchanged pending the user's follow-up
+conversation about the concept's engraved circle, paths and tile variation.
+
+## Continuous painted borders (2026-11-23)
+
+The approved full-side paintings reuse the three existing gameplay pages with no
+GPU growth: 33,516,364 accounted texture bytes including QR, below 32 MiB. There
+are 99 stored pieces and 206 cached quads, with 16,480 vertex bytes; no frame-loop
+allocations or uploads were added. Old sprite pixels/gutters and metadata remain
+unchanged. Twenty-two focused checks, desktop classes and Android debug assembly
+passed. Native API-33 ARM64 checks covered all four corners and separated co-op
+cameras. A final 301-frame co-op window reported interval p95/p99/max
+20.91/21.85/22.57 ms, CPU submission 4.42/4.77/4.99 ms, 36 draws, 142 intervals
+above 16.7 ms and none above 33.4 ms. This exceeds the strict interval target and
+does not establish physical-TV 60 FPS, long-run balance or stability. See
+[implementation, source proof and limits](painted-arena-borders.md).
+
+
+## Engraved floor (2026-11-23)
+
+The approved floor reuses four existing managed texture pages. Accounted texture
+residency remains 33,516,364 bytes includingQR; no decoded floor Pixmap is retained.
+The startup-only cache uses 5,666 quads (453,280 vertex +67,992 index bytes), within
+8,000 quad allocated capacity (640,000 vertex +96,000 index bytes). The 292 cached
+medallion quads have 23,360 vertex bytes and draw through the existing SpriteBatch.
+Twenty-two focused floor/UV/layout/wall/foundation checks, desktop classes and
+Android debug assembly passed. Native centre/landmark/co-op captures verify
+rendering, not sustained 60 FPS. A final 275-frame co-op window reported interval
+p 95/p 99/max 27.96/42.31/46.78 ms and render-callback wall time 19.89/39.60/42.98 ms;
+7 intervals exceeded 33.4 ms. These observation windows includeADB/navigation and
+screenshot work. Earlier checks also contained much larger callback spikes;
+the cause is not established. Raw evidence was passed to the coordinated
+performance-baseline chat for controlled investigation. Physical-TV performance
+and full-run balance remain unverified. See [floor integration](engraved-crypt-floor.md).
+
+
+## Clear stone floor (2026-11-23)
+
+The later [clarity pass](engraved-crypt-floor.md) replaces blurry field/path paint
+and adds separate flat border stones with real grout gaps. It uses 317 source
+pieces and 4,564 cached ground quads (365,120 vertex + 54,768 index used bytes),
+versus 364 pieces and 5,666 quads previously. Cache capacity remains 8,000; the
+medallion remains 292 cached quads. Texture/Pixmap accounting is unchanged.
+Twenty-five focused checks and desktop/Android builds passed. Brief native
+centre/landmark/co-op checks show the new stones and borders; a 298-frame co-op
+observation had interval p95/p99/max 21.81/23.81/56.85 ms, callback wall time
+7.04/8.60/41.60 ms and 39 draws (16 floor across both cameras). This is not a
+controlled before/after performance comparison or proof of physical-TV 60 FPS.
+The coordinated [baseline report](performance-baseline.md) measures the earlier
+cc8ab2a floor; preserve that version distinction for future comparisons.
+
+
+## Startup and retained pixels (2026-11-24)
+
+The exact-output UI bake removes 18.8125 MiB of retained decoded pixels: total
+including QR falls from 20,245,324 to 518,988 bytes. Accounted GPU textures remain
+33,516,364 bytes. A three-restart comparison using the same emulator per-app ART
+compilation setting observed create-callback medians 953.20 → 857.99 ms; other
+startup samples varied with the environment. This does not establish a physical-TV
+speedup or sustained frame-rate improvement. Original pixels, font metrics and
+gameplay are preserved; the larger debug APK is an explicit storage tradeoff.
+See [implementation, reproduction, checks and limits](startup-art-memory.md).
+
+## Shared font texture headroom (2026-11-24)
+
+Lossless font-block repacking reduces the single shared atlas from 1024×1024 to
+1024×768. Combined texture accounting including QR falls by exactly 1 MiB to
+32,467,788 bytes (30.9637 MiB), leaving 1,086,644 bytes (1.0363 MiB) under the
+32 MiB ceiling. Retained decoded Pixmaps remain 518,988 bytes. Glyph pixels,
+gutters, metrics and layout are preserved; the native fractional-scale fixture
+has 25 pixels differing by at most one RGB level, while six Home text/button
+crops are pixel-identical. See [proof, checks and limits](texture-headroom.md).

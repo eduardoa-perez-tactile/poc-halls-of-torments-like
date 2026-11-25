@@ -6,10 +6,9 @@ import java.util.Locale;
 
 /** Validated offline atlas metadata. It neither loads GL textures nor fits artwork. */
 public final class GameplayAtlas {
-    public static final long MAX_TEXTURE_BYTES = 6L * 1_048_576;
-    public static final String[] REQUIRED_REGIONS = {"floor-intact", "floor-chipped", "floor-fractured",
-        "wall-ne", "wall-nw", "corner", "arch", "pillar", "sarcophagus", "rubble", "urn", "relic",
-        "obelisk", "shrine", "orb", "shadow", "glow", "soul", "white"};
+    public static final long MAX_TEXTURE_BYTES = 6L * 1_048_576 + 512L * 256 * 4;
+    public static final String[] REQUIRED_REGIONS = {"wall-x", "wall-x-broken", "wall-y", "wall-y-broken", "buttress", "sarcophagus-x", "sarcophagus-y",
+        "altar", "guardian", "broken-column", "rubble", "sealed-gate", "shadow", "glow", "soul", "white"};
 
     public record Page(String file, int width, int height) {}
 
@@ -112,7 +111,8 @@ public final class GameplayAtlas {
             if (id == ActorAnimation.Actor.WARDEN || id == ActorAnimation.Actor.RANGER) {
                 require(ActorAnimation.State.ATTACK); require(ActorAnimation.State.DODGE);
                 require(ActorAnimation.State.HIT); require(ActorAnimation.State.DOWNED);
-            } else if (id == ActorAnimation.Actor.CULTIST || id == ActorAnimation.Actor.SOVEREIGN) {
+            } else if (id == ActorAnimation.Actor.CULTIST || id == ActorAnimation.Actor.SOVEREIGN
+                || id == ActorAnimation.Actor.GRAVE_KING) {
                 require(ActorAnimation.State.ATTACK); require(ActorAnimation.State.WINDUP);
             }
             maxLeft = left; maxRight = right; maxAbove = above; maxBelow = below;
@@ -131,7 +131,9 @@ public final class GameplayAtlas {
         }
     }
 
-    public record Region(int frame, float worldHeight) {}
+    /** Footprint width is measured in source pixels; world extents are authored ground-plane units. */
+    public record Region(int frame, float worldHeight, float footprintWidth,
+                         float footprintWorldX, float footprintWorldY, float renderShearY, float renderScaleY) {}
 
     public final Page[] pages;
     public final Frame[] frames;
@@ -143,7 +145,7 @@ public final class GameplayAtlas {
         if (root.getInt("version") != 1) throw invalid("Unsupported atlas version");
         if (root.getBoolean("preview", false)) throw invalid("An incomplete preview atlas cannot be loaded by the game");
         JsonValue pageList = root.require("pages");
-        if (!pageList.isArray() || pageList.size < 1 || pageList.size > 3) throw invalid("Invalid page count");
+        if (!pageList.isArray() || pageList.size < 1 || pageList.size > 4) throw invalid("Invalid page count");
         pages = new Page[pageList.size]; long bytes = 0;
         for (int i = 0; i < pages.length; i++) {
             JsonValue page = pageList.get(i); String file = page.getString("file");
@@ -152,14 +154,14 @@ public final class GameplayAtlas {
                 || size[0] > 1024 || size[1] > 1024) throw invalid("Invalid atlas page");
             pages[i] = new Page(file, size[0], size[1]); bytes += (long) size[0] * size[1] * 4;
         }
-        if (bytes > MAX_TEXTURE_BYTES) throw invalid("Gameplay atlas exceeds its 6 MiB envelope");
+        if (bytes > MAX_TEXTURE_BYTES) throw invalid("Gameplay atlas exceeds its 6.5 MiB envelope");
         textureBytes = bytes;
         JsonValue frameList = root.require("frames");
         if (!frameList.isArray() || frameList.size < 1 || frameList.size > 512) throw invalid("Invalid frame count");
         frames = new Frame[frameList.size];
         for (int i = 0; i < frames.length; i++) frames[i] = new Frame(frameList.get(i), pages);
         JsonValue actorList = root.require("actors");
-        if (!actorList.isArray() || actorList.size != actors.length) throw invalid("Seven real actor banks are required");
+        if (!actorList.isArray() || actorList.size != actors.length) throw invalid("A complete actor bank is required");
         for (JsonValue entry = actorList.child; entry != null; entry = entry.next) {
             Actor actor = new Actor(entry, frames);
             if (actors[actor.id.ordinal()] != null) throw invalid("Duplicate actor bank");
@@ -170,7 +172,22 @@ public final class GameplayAtlas {
             int frame = entry.getInt("frame"); float height = entry.getFloat("worldHeight");
             if (frame < 0 || frame >= frames.length || !Float.isFinite(height) || height <= 0)
                 throw invalid("Invalid environment region");
-            if (regions.put(entry.name, new Region(frame, height)) != null) throw invalid("Duplicate environment region");
+            float footprintWidth = entry.getFloat("footprintWidth", frames[frame].sourceWidth);
+            float footprintWorldX = entry.getFloat("footprintWorldX", height);
+            float footprintWorldY = entry.getFloat("footprintWorldY", height);
+            float renderShearY = entry.getFloat("renderShearY", 0f);
+            float renderScaleY = entry.getFloat("renderScaleY", 1f);
+            boolean calibratedProp = entry.name.equals("altar") || entry.name.equals("sealed-gate");
+            if (!Float.isFinite(footprintWidth) || footprintWidth <= 0 || footprintWidth > frames[frame].sourceWidth
+                || !Float.isFinite(footprintWorldX) || footprintWorldX <= 0 || footprintWorldX > 2400
+                || !Float.isFinite(footprintWorldY) || footprintWorldY <= 0 || footprintWorldY > 2400
+                || !Float.isFinite(renderShearY) || Math.abs(renderShearY) > .1f
+                || !Float.isFinite(renderScaleY) || renderScaleY < .85f || renderScaleY > 1.2f
+                || renderShearY != 0 && !entry.name.startsWith("wall-") && !calibratedProp
+                || renderScaleY != 1f && !calibratedProp)
+                throw invalid("Invalid environment footprint");
+            if (regions.put(entry.name, new Region(frame, height, footprintWidth, footprintWorldX, footprintWorldY, renderShearY, renderScaleY)) != null)
+                throw invalid("Duplicate environment region");
         }
         for (String name : REQUIRED_REGIONS) if (!regions.containsKey(name)) throw invalid("Missing region " + name);
     }

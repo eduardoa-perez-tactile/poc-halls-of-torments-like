@@ -13,6 +13,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Scaling;
 import com.couchcrypt.game.ArenaWorld;
+import com.couchcrypt.game.RunEquipment;
 
 /** One shared choice clock in an art-led ceremony over the frozen arena. */
 public final class LevelUpView extends Table {
@@ -23,6 +24,7 @@ public final class LevelUpView extends Table {
     private final Radiance radiance;
     private int previousLevel = -1, previousSeconds = -1;
     private int previousMode = -1;
+    private RunEquipment.RewardOrigin previousOrigin;
 
     public LevelUpView(UiArt art) {
         setFillParent(true);
@@ -72,13 +74,17 @@ public final class LevelUpView extends Table {
     /** Unchanged frames allocate no strings and do not invalidate layout. */
     public void update(ArenaWorld world) {
         boolean loot = !world.levelUpPending() && world.lootPending();
+        // A brief sprite burst remains readable before the existing crest ceremony settles in.
+        // The phone offers and authoritative choice clock start immediately.
+        setColor(1, 1, 1, loot ? 1 : MathUtils.clamp((world.levelUpFxAge - .15f) / .3f, 0, 1));
         int mode = loot ? 1 : 0;
-        if (previousMode != mode || previousLevel != world.progression.level) {
-            previousMode = mode;
+        RunEquipment.RewardOrigin origin = loot ? world.equipment.choiceOrigin() : null;
+        if (previousMode != mode || previousLevel != world.progression.level || previousOrigin != origin) {
+            previousMode = mode; previousOrigin = origin;
             previousLevel = world.progression.level;
             title.setText(loot ? "LOOT FOUND" : "LEVEL UP");
-            level.setText(loot ? "EQUIPMENT REWARD" : "PARTY LEVEL " + previousLevel);
-            instruction.setText(loot ? "Choose equipment or keep your current gear. Combat is paused."
+            level.setText(loot ? origin.label() : "PARTY LEVEL " + previousLevel);
+            instruction.setText(loot ? "Pick 1 of 2 items for this run, or keep current gear. Items equip or replace their slot."
                 : "Choose your next power. Combat is paused.");
         }
         int seconds = Math.max(0, Math.min(30, (int) Math.ceil(loot

@@ -7,7 +7,7 @@ import static com.couchcrypt.game.ItemCatalog.Stat.*;
 
 /** Bounded run-only equipment. Skill stats remain untouched; combat reads effective values here. */
 public final class RunEquipment {
-    public static final int SLOT_COUNT = 7, MAX_REWARDS = 8;
+    public static final int SLOT_COUNT = 7, MAX_REWARDS = 8, CHOICE_COUNT = 2;
     public static final float CHOICE_SECONDS = 30f;
     private static final ItemCatalog.Stat[] STATS = ItemCatalog.Stat.values();
     private static final String[] SLOT_NAMES = {"HELMET", "AMULET", "RING I", "RING II", "CHEST", "BOOTS", "GLOVES"};
@@ -15,13 +15,17 @@ public final class RunEquipment {
         "emberheart_pendant", "rustbound_signet", "cryptguard_plate", "quickpulse_loop", "marching_spurs"};
     /** Snapshot of automatic equipment, using the item illustration atlas rather than effect icons. */
     public record FoundationItem(String id, String title, int icon, String slot) {}
+    /** Immutable entitlement provenance: never recomputed from the clock when a queued offer opens. */
+    public record RewardOrigin(String source, String label, int scheduledSeconds, int number) {}
+    public static final RewardOrigin UNKNOWN_ORIGIN = new RewardOrigin("reward", "GEAR REWARD", 0, 0);
     public static final class Offer {
         public boolean pending, catchUp;
         public int id;
+        public RewardOrigin origin = UNKNOWN_ORIGIN;
         public float secondsLeft, durationSeconds;
-        public final ItemCatalog.Item[] options = new ItemCatalog.Item[3];
-        public final PartyProgression.CardPreview[] cards = new PartyProgression.CardPreview[3];
-        private final int[] targets = new int[3];
+        public final ItemCatalog.Item[] options = new ItemCatalog.Item[CHOICE_COUNT];
+        public final PartyProgression.CardPreview[] cards = new PartyProgression.CardPreview[CHOICE_COUNT];
+        private final int[] targets = new int[CHOICE_COUNT];
     }
     private final ArenaWorld world;
     private final ItemCatalog.Item[][] worn = {new ItemCatalog.Item[SLOT_COUNT], new ItemCatalog.Item[SLOT_COUNT]};
@@ -32,6 +36,7 @@ public final class RunEquipment {
     private final List<List<FoundationItem>> foundationItems = Arrays.asList(List.of(), List.of());
     private final boolean[] participants = new boolean[2], moving = new boolean[2];
     private final float[] sustain = new float[2], xpRemainder = new float[2];
+    private final RewardOrigin[] origins = new RewardOrigin[MAX_REWARDS];
     private int earned, nextId, cacheIndex, eliteRewards;
     private float choiceSecondsLeft;
     private boolean resolvingTimeout;
@@ -40,6 +45,7 @@ public final class RunEquipment {
     public RunEquipment(ArenaWorld world) { this.world = world; }
     public void reset() {
         earned = cacheIndex = eliteRewards = 0;
+        Arrays.fill(origins, null);
         choiceSecondsLeft = 0; resolvingTimeout = false;
         for (int slot = 0; slot < 2; slot++) clearPlayer(slot);
     }
@@ -49,7 +55,7 @@ public final class RunEquipment {
         foundationItems.set(slot, List.of());
         sustain[slot] = 2f; xpRemainder[slot] = 0;
         Arrays.fill(worn[slot], null); Arrays.fill(totals[slot], 0);
-        Offer offer = offers[slot]; offer.pending = offer.catchUp = false; offer.id = 0;
+        Offer offer = offers[slot]; offer.pending = offer.catchUp = false; offer.id = 0; offer.origin = UNKNOWN_ORIGIN;
         offer.secondsLeft = offer.durationSeconds = 0;
         Arrays.fill(offer.options, null); Arrays.fill(offer.cards, null);
     }
@@ -93,17 +99,28 @@ public final class RunEquipment {
     public static String slotName(int position) { return SLOT_NAMES[position]; }
 
     /** Authoritative party entitlement, shared once and retained for later joining. */
-    public void grantReward() {
+    public void grantReward() { grantReward("reward", "GEAR REWARD", 0); }
+    private void grantReward(String source, String label, int scheduledSeconds) {
         if (earned >= MAX_REWARDS) return;
+        origins[earned] = new RewardOrigin(source, label, scheduledSeconds, earned + 1);
         earned++;
         startNextRound();
     }
-    public void rewardElite() { if (eliteRewards < 5) { eliteRewards++; grantReward(); } }
+    public void rewardElite() {
+        if (eliteRewards < 5) { eliteRewards++; grantReward("elite", "ELITE DEFEATED", 0); }
+    }
+    public RewardOrigin choiceOrigin() {
+        for (Offer offer : offers) if (offer.pending) return offer.origin;
+        return UNKNOWN_ORIGIN;
+    }
     public void update(float delta) {
         if (!Float.isFinite(delta) || delta <= 0 || world.levelUpPending()) return;
         float duration = world.durationSeconds();
         while (cacheIndex < 3 && world.elapsed >= duration * (cacheIndex == 0 ? .075f : cacheIndex == 1 ? .5f : .95f)) {
-            cacheIndex++; grantReward();
+            int seconds = Math.round(duration * (cacheIndex == 0 ? .075f : cacheIndex == 1 ? .5f : .95f));
+            cacheIndex++;
+            String time = seconds / 60 + ":" + (seconds % 60 < 10 ? "0" : "") + seconds % 60;
+            grantReward("reliquary", "TIMED RELIQUARY " + time, seconds);
         }
         for (int slot = 0; slot < 2; slot++)
             sustain[slot] = Math.min(2f, sustain[slot] + delta * 2f);
@@ -137,7 +154,7 @@ public final class RunEquipment {
     public boolean choose(int slot, int id, int option) {
         if (!valid(slot) || !participants[slot] || !world.players[slot].active || world.levelUpPending()) return false;
         Offer offer = offers[slot];
-        if (!offer.pending || offer.id != id || option < -1 || option >= 3) return false;
+        if (!offer.pending || offer.id != id || option < -1 || option >= CHOICE_COUNT) return false;
         if (option >= 0 && refreshOffer(slot)) return false;
         if (option >= 0) equip(slot, offer.targets[option], offer.options[option]);
         applied[slot]++; offer.pending = false; offer.secondsLeft = 0;
@@ -172,8 +189,8 @@ public final class RunEquipment {
         int first = Math.floorMod(seed ^ seed >>> 16, ItemCatalog.ALL.size());
         int count = 0;
         // Empty slots lead the default; later replacements still vary by replay seed.
-        for (int pass = 0; pass < 2 && count < 3; pass++) {
-            for (int i = 0; i < ItemCatalog.ALL.size() && count < 3; i++) {
+        for (int pass = 0; pass < 2 && count < CHOICE_COUNT; pass++) {
+            for (int i = 0; i < ItemCatalog.ALL.size() && count < CHOICE_COUNT; i++) {
                 ItemCatalog.Item item = ItemCatalog.ALL.get((first + i) % ItemCatalog.ALL.size());
                 if (!eligible(slot, item)) continue;
                 int target = target(slot, item.slot());
@@ -189,9 +206,10 @@ public final class RunEquipment {
                 count++;
             }
         }
-        if (count < 3) return;
+        if (count < CHOICE_COUNT) return;
         if (++nextId <= 0) nextId = 1;
         offer.id = nextId; offer.pending = true; offer.catchUp = false;
+        offer.origin = origins[applied[slot]];
         offer.secondsLeft = offer.durationSeconds = CHOICE_SECONDS;
         previewSkillCount[slot] = world.progression.appliedUpgradeCount(slot);
     }
@@ -261,7 +279,7 @@ public final class RunEquipment {
             if (!absolute) result.append('%');
             result.append(' ').append(switch (stat) {
                 case DAMAGE -> "DMG"; case ATTACK_SPEED -> "ATK SPD"; case MOVE_SPEED -> "MOVE"; case MAX_HEALTH -> "HP";
-                case DODGE_COOLDOWN -> "DODGE RED"; case REACH -> "REACH"; case PROJECTILES -> "ARROWS"; case PIERCE -> "PIERCE";
+                case DODGE_COOLDOWN -> "DODGE RED"; case REACH -> "REACH"; case PROJECTILES -> "BOLTS"; case PIERCE -> "PIERCE";
                 case AURA_DAMAGE -> "CIRCLE"; case STORM_DAMAGE -> "STORM"; case PICKUP_RANGE -> "PICKUP"; case CRIT_CHANCE -> "CRIT";
                 case CRIT_DAMAGE -> "CRIT DMG"; case DAMAGE_REDUCTION -> "DMG RED"; case REGENERATION -> "HP/s";
                 case LIFE_STEAL -> "LIFE STEAL"; case THORNS -> "THORNS"; case XP_GAIN -> "XP"; case KILL_HEAL -> "HP/KILL";

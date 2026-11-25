@@ -1,0 +1,332 @@
+{
+  "independent": {
+    "status": "passed-structural-and-pixel-checks",
+    "independent": true,
+    "renderSource": "Exported tile PNGs only, never painted master",
+    "tiles": [
+      {
+        "id": "corner-n",
+        "size": [
+          304,
+          168
+        ],
+        "alphaBounds": [
+          31,
+          2,
+          273,
+          122
+        ],
+        "sha256Matches": true,
+        "binaryAlpha": true,
+        "canvasHasTransparentMargin": true
+      },
+      {
+        "id": "edge-ne",
+        "size": [
+          304,
+          168
+        ],
+        "alphaBounds": [
+          33,
+          1,
+          275,
+          122
+        ],
+        "sha256Matches": true,
+        "binaryAlpha": true,
+        "canvasHasTransparentMargin": true
+      },
+      {
+        "id": "corner-e",
+        "size": [
+          304,
+          168
+        ],
+        "alphaBounds": [
+          33,
+          1,
+          272,
+          135
+        ],
+        "sha256Matches": true,
+        "binaryAlpha": true,
+        "canvasHasTransparentMargin": true
+      },
+      {
+        "id": "edge-nw",
+        "size": [
+          304,
+          168
+        ],
+        "alphaBounds": [
+          31,
+          1,
+          271,
+          122
+        ],
+        "sha256Matches": true,
+        "binaryAlpha": true,
+        "canvasHasTransparentMargin": true
+      },
+      {
+        "id": "interior",
+        "size": [
+          304,
+          168
+        ],
+        "alphaBounds": [
+          33,
+          2,
+          271,
+          122
+        ],
+        "sha256Matches": true,
+        "binaryAlpha": true,
+        "canvasHasTransparentMargin": true
+      },
+      {
+        "id": "edge-se",
+        "size": [
+          304,
+          168
+        ],
+        "alphaBounds": [
+          33,
+          2,
+          297,
+          135
+        ],
+        "sha256Matches": true,
+        "binaryAlpha": true,
+        "canvasHasTransparentMargin": true
+      },
+      {
+        "id": "corner-w",
+        "size": [
+          304,
+          168
+        ],
+        "alphaBounds": [
+          32,
+          1,
+          271,
+          135
+        ],
+        "sha256Matches": true,
+        "binaryAlpha": true,
+        "canvasHasTransparentMargin": true
+      },
+      {
+        "id": "edge-sw",
+        "size": [
+          304,
+          168
+        ],
+        "alphaBounds": [
+          6,
+          2,
+          271,
+          135
+        ],
+        "sha256Matches": true,
+        "binaryAlpha": true,
+        "canvasHasTransparentMargin": true
+      },
+      {
+        "id": "corner-s",
+        "size": [
+          304,
+          168
+        ],
+        "alphaBounds": [
+          7,
+          2,
+          298,
+          147
+        ],
+        "sha256Matches": true,
+        "binaryAlpha": true,
+        "canvasHasTransparentMargin": true
+      }
+    ],
+    "atlases": [
+      {
+        "file": "border-tiles-atlas.png",
+        "size": [
+          1024,
+          512
+        ],
+        "rgbaGpuBytes": 2097152,
+        "exactTileReconstruction": true,
+        "paddedRectanglesNonoverlapping": true,
+        "onePixelExtrusionMatches": true,
+        "secondGutterTransparent": true
+      },
+      {
+        "file": "border-tiles-half-atlas.png",
+        "size": [
+          512,
+          256
+        ],
+        "rgbaGpuBytes": 524288,
+        "exactTileReconstruction": true,
+        "paddedRectanglesNonoverlapping": true,
+        "onePixelExtrusionMatches": true,
+        "secondGutterTransparent": true
+      }
+    ],
+    "maps": [
+      {
+        "file": "assembled-3x3.png",
+        "size": [
+          880,
+          504
+        ],
+        "cells": 9,
+        "exactPngOnlyReassembly": true,
+        "positionsAndMasksCorrect": true,
+        "nonopaqueInteriorPixels": 0,
+        "transparentInteriorPixels": 0,
+        "footprintInsetWorldCells": 0.04
+      },
+      {
+        "file": "assembled-8x6.png",
+        "size": [
+          1840,
+          984
+        ],
+        "cells": 48,
+        "exactPngOnlyReassembly": true,
+        "positionsAndMasksCorrect": true,
+        "nonopaqueInteriorPixels": 0,
+        "transparentInteriorPixels": 0,
+        "footprintInsetWorldCells": 0.04,
+        "floorSeamTexture": {
+          "samples": 1200,
+          "meanRgbAbsoluteDifference": 6.0333,
+          "p95RgbAbsoluteDifference": 14.6667,
+          "maximumRgbAbsoluteDifference": 32.6667
+        },
+        "floorControlTexture": {
+          "samples": 1200,
+          "meanRgbAbsoluteDifference": 5.2603,
+          "p95RgbAbsoluteDifference": 14.3333,
+          "maximumRgbAbsoluteDifference": 15.6667
+        },
+        "textureMetricMeaning": "Descriptive two-pixel RGB differences; grout, wear and color variation are not transparency gaps. No universal aesthetic pass threshold."
+      },
+      {
+        "file": "assembled-20x15.png",
+        "size": [
+          4360,
+          2244
+        ],
+        "cells": 300,
+        "exactPngOnlyReassembly": true,
+        "positionsAndMasksCorrect": true,
+        "nonopaqueInteriorPixels": 0,
+        "transparentInteriorPixels": 0,
+        "footprintInsetWorldCells": 0.04,
+        "floorSeamTexture": {
+          "samples": 16320,
+          "meanRgbAbsoluteDifference": 6.0353,
+          "p95RgbAbsoluteDifference": 14.6667,
+          "maximumRgbAbsoluteDifference": 32.6667
+        },
+        "floorControlTexture": {
+          "samples": 16320,
+          "meanRgbAbsoluteDifference": 5.0805,
+          "p95RgbAbsoluteDifference": 13.3333,
+          "maximumRgbAbsoluteDifference": 15.6667
+        },
+        "textureMetricMeaning": "Descriptive two-pixel RGB differences; grout, wear and color variation are not transparency gaps. No universal aesthetic pass threshold."
+      }
+    ],
+    "smallAndThinFixtures": [
+      {
+        "file": "independent-2x2",
+        "size": [
+          832,
+          456
+        ],
+        "cells": 4,
+        "exactPngOnlyReassembly": true,
+        "positionsAndMasksCorrect": true,
+        "nonopaqueInteriorPixels": 0,
+        "transparentInteriorPixels": 0,
+        "footprintInsetWorldCells": 0.04
+      },
+      {
+        "file": "independent-2x15",
+        "size": [
+          2392,
+          1236
+        ],
+        "cells": 30,
+        "exactPngOnlyReassembly": true,
+        "positionsAndMasksCorrect": true,
+        "nonopaqueInteriorPixels": 0,
+        "transparentInteriorPixels": 0,
+        "footprintInsetWorldCells": 0.04
+      },
+      {
+        "file": "independent-20x2",
+        "size": [
+          2992,
+          1536
+        ],
+        "cells": 40,
+        "exactPngOnlyReassembly": true,
+        "positionsAndMasksCorrect": true,
+        "nonopaqueInteriorPixels": 0,
+        "transparentInteriorPixels": 0,
+        "footprintInsetWorldCells": 0.04
+      }
+    ],
+    "halfScaleMap": {
+      "file": "assembled-20x15-half.png",
+      "size": [
+        2228,
+        1170
+      ],
+      "cells": 300,
+      "exactPngOnlyReassembly": true,
+      "positionsAndMasksCorrect": true,
+      "nonopaqueInteriorPixels": 0,
+      "transparentInteriorPixels": 0,
+      "footprintInsetWorldCells": 0.04,
+      "floorSeamTexture": {
+        "samples": 16320,
+        "meanRgbAbsoluteDifference": 6.5152,
+        "p95RgbAbsoluteDifference": 16.0,
+        "maximumRgbAbsoluteDifference": 23.0
+      },
+      "floorControlTexture": {
+        "samples": 16320,
+        "meanRgbAbsoluteDifference": 4.7571,
+        "p95RgbAbsoluteDifference": 12.0,
+        "maximumRgbAbsoluteDifference": 15.6667
+      },
+      "textureMetricMeaning": "Descriptive two-pixel RGB differences; grout, wear and color variation are not transparency gaps. No universal aesthetic pass threshold."
+    },
+    "halfTileFilesMatchSavedAtlas": true,
+    "runtimeChangesAgainstDevelop": [],
+    "visualReview": {
+      "reviewed": [
+        "assembled-8x6.jpg",
+        "assembled-20x15.jpg",
+        "join-rear-straight.jpg",
+        "join-far-corner.jpg",
+        "join-near-corner.jpg"
+      ],
+      "finding": "Continuous wall silhouette, coping and footing; no open corner gaps or doubled pillars seen. Repeated floor texture is still discernible.",
+      "limits": "Art-only PNG checks do not verify runtime layer sorting, collision alignment, filtering/zoom on GPU, TV readability or performance."
+    }
+  },
+  "isolatedSourceRebuild": {
+    "rebuiltFiles": 10,
+    "byteIdentical": true,
+    "sourceSha256": "e356485e160e27a164c3d0d4930fd776aafc7fc0fe4f1b0d3c353e02c0cf7309"
+  },
+  "runtimeIntegrated": false
+}

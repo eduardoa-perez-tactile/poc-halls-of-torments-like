@@ -1,0 +1,71 @@
+{
+  "file": "corner.png",
+  "sourceSize": [
+    54,
+    91
+  ],
+  "pivot": [
+    27.0,
+    76.5
+  ],
+  "alphaBounds": [
+    2,
+    2,
+    52,
+    89
+  ],
+  "footprintWorld": [
+    50,
+    50
+  ],
+  "footprintWorldX": 50,
+  "footprintWorldY": 50,
+  "worldHeightTarget": 90,
+  "projectedFootprintWidth": 50,
+  "scale": 1.4142135623730951,
+  "renderShearY": 0,
+  "groundFit": {
+    "method": "corner near diamond vertex at lower alpha bound; footprint centre lies projectedFootprintWidth/4 above it",
+    "nearVertex": [
+      27.0,
+      89
+    ],
+    "cornerGroundCentreOffset": 12.5,
+    "nominalDiagonalSlopesDown": [
+      -0.5,
+      0.5
+    ]
+  },
+  "bodyHeightMeasurement": {
+    "approximateVerticalStoneBodyWorld": 87.6812408671319,
+    "peakAboveGroundCentreWorld": 105.3589103967956
+  },
+  "normalization": {
+    "crop": [
+      144,
+      157,
+      861,
+      1408
+    ],
+    "contentSize": [
+      50,
+      87
+    ],
+    "offset": [
+      2,
+      2
+    ],
+    "resample": "proportional Lanczos, no alpha mask/repaint/warp/rotation/mirror"
+  },
+  "generation": {
+    "tool": "built-in image_gen",
+    "promptChain": [
+      "corner-prompt.txt",
+      "corner-correction-prompt.txt"
+    ],
+    "selectedMaster": "corner-source.png",
+    "originalGeneratedOutput": "/Users/eduardoleale/.codex/generated_images/01a2081c-e0b7-7163-80da-7c209811d13c/exec-c5c7a0bb-da4f-49c4-8206-e99599ab4ae6.png",
+    "masterSha256": "1b3c2dd313c81a0a9c5f036341f98bac52bf7d8be85b5d18d2fcdc3fa6cb84c3",
+    "normalizedSha256": "8da5b275af633ec78ea08736971caf4ba726e93f4bfb45e046a3e0fa4dfb3c7d"
+  }
+}

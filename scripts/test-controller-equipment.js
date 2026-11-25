@@ -74,7 +74,7 @@ async function main() {
     slot: 'RING', icon: 0, rank: 0, category: 'OFFENSE',
     headline: 'RING I: REPLACES Ashen Loop', before: '+10% DMG -5% SPD', after: '+12% DMG +5% CRIT'
   });
-  const equipment = { id: 1, secondsLeft: 27, options: ['Iron Loop', 'Swift Loop', 'Guard Loop'].map(option) };
+  const equipment = { id: 1, secondsLeft: 27, source: 'reliquary', sourceLabel: 'TIMED RELIQUARY 1:30', sourceSeconds: 90, rewardNumber: 1, options: ['Iron Loop', 'Swift Loop'].map(option) };
   const upgrade = { id: 1, level: 2, secondsLeft: 28, options: ['Soulfire', 'Quickening', 'Vitality'].map(option) };
   const status = (changes = {}) => socket.receive({
     type: 'status', connected: 1, hostActive: true, phase: 'session', alive: true, dodgeCooldown: 0,
@@ -109,8 +109,16 @@ async function main() {
   assert.equal(socket.sent.at(-1).type, 'upgrade');
   assert.equal(choices.hidden, false, 'A submitted choice remains visible until the host clears it');
 
+  status({ equipment: { ...equipment, options: [...equipment.options, option('Removed Third')] } });
+  assert.equal(choices.hidden, true, 'A legacy three-item gear payload is rejected');
   status();
   assert.equal(get('upgrade-level').textContent, 'EQUIPMENT', 'Equal numeric IDs from different choice types do not reuse a skill card');
+  assert.equal(get('upgrade-option-2').hidden, true, 'Equipment has exactly two visible cards');
+  assert.equal(get('upgrade-option-2').disabled, true);
+  assert.equal(get('equipment-source').textContent, 'TIMED RELIQUARY 1:30');
+  assert.equal(get('equipment-explanation').hidden, false);
+  const beforeForgedThird = socket.sent.length; get('upgrade-option-2').click();
+  assert.equal(socket.sent.length, beforeForgedThird, 'A hidden third equipment option cannot send a choice');
   assert.equal(first.querySelector('.skill-title').textContent, 'Iron Loop');
   assert.equal(first.querySelector('.skill-rank').textContent, 'RING');
   assert.equal(first.querySelector('.skill-before').textContent, equipment.options[0].before);
@@ -148,7 +156,11 @@ async function main() {
   status();
   assert.equal(choices.hidden, false); assert.equal(first.disabled, false);
   assert.equal(get('upgrade-level').textContent, 'EQUIPMENT');
+  assert.equal(get('equipment-source').textContent, 'TIMED RELIQUARY 1:30', 'Reconnect restores the earned cause');
   status({ progression: { upgrade } });
+  assert.equal(get('upgrade-option-2').hidden, false, 'Switching back to skills restores all three cards');
+  assert.equal(get('equipment-source').hidden, true);
+  assert.equal(get('equipment-explanation').hidden, true);
   assert.equal(first.querySelector('.skill-illustration').style.backgroundImage, '', 'Skill cards restore the existing skill atlas after gear');
   assert.equal(first.querySelector('.skill-illustration').style.backgroundSize, '');
   const futureSkill = { ...upgrade, id: 9, level: 12, durationSeconds: 30, secondsLeft: 17.25 };
@@ -254,6 +266,20 @@ async function main() {
   assert.equal(get('starter-build').hidden, false, 'A gear-only default build is acknowledged');
   status({ equipment: null, starterBuild, phase: 'lobby' });
   assert.equal(get('game-controls').hidden, true); assert.equal(get('starter-build').hidden, true);
+  status({ equipment: null, phase: 'results', outcome: 'victory', connected: 2 });
+  assert.equal(get('title').textContent, 'Victory');
+  assert.equal(get('party').textContent, 'Both controllers connected');
+  assert.match(get('message').textContent, /run summary/);
+  assert.equal(get('game-controls').hidden, true); assert.equal(get('dodge').disabled, true);
+  status({ equipment: null, phase: 'results', outcome: 'defeat' });
+  assert.equal(get('title').textContent, 'Defeat');
+  assert.equal(get('party').textContent, 'Your controller is connected');
+  assert.match(get('message').textContent, /remote/);
+  status({ equipment: null, phase: 'results' });
+  assert.equal(get('title').textContent, 'Round complete', 'Missing outcome remains compatible with an older host');
+  status({ equipment: null, phase: 'lobby' });
+  assert.equal(get('title').textContent, 'You have a place');
+  assert.equal(get('party').textContent, 'Ready for a solo descent');
   console.log('Controller skill/loot pause, party waiting, defaults, acknowledgment and reconnect checks passed.');
 }
 

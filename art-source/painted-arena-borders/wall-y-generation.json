@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "id": "wall-y",
+  "tool": "built-in image_gen",
+  "transparentBackground": true,
+  "generatedPath": "/Users/eduardoleale/.codex/generated_images/01a2082a-0e5b-7020-9bf5-f231a1a7a272/exec-8b1bd5dd-2ace-437f-ab0b-75101beba6c6.png",
+  "sourcePath": "wall-y-source.png",
+  "normalizedPath": "wall-y.png",
+  "rawSourceSize": [
+    1774,
+    887
+  ],
+  "sourceSize": [
+    758,
+    380
+  ],
+  "alphaBoundsThreshold": 32,
+  "alphaBounds": [
+    13,
+    11,
+    1761,
+    883
+  ],
+  "normalization": {
+    "crop": [
+      13,
+      11,
+      1761,
+      883
+    ],
+    "contentSize": [
+      754,
+      376
+    ],
+    "offset": [
+      2,
+      2
+    ],
+    "scale": 0.43135011441647597,
+    "process": "alpha-bounds crop and proportional Lanczos resize/centering only; no warp, repaint, recolour or alpha masking"
+  },
+  "groundFit": {
+    "sampleFraction": [
+      0.2,
+      0.8
+    ],
+    "sampleCount": 1049,
+    "first": [
+      363,
+      302
+    ],
+    "last": [
+      1411,
+      753
+    ],
+    "rawIntercept": 147.7609811598104,
+    "rawSlopeDown": 0.4302446532138934,
+    "rmsError": 1.237683260882137,
+    "normalizedIntercept": 62.261343274552274,
+    "normalizedSlopeDown": 0.4301001910256911,
+    "normalizedYAtPivotX": 225.26931567328919,
+    "normalizedFirst": [
+      153,
+      127
+    ],
+    "normalizedLast": [
+      605,
+      322
+    ],
+    "normalizedSampleCount": 453,
+    "normalizedRmsError": 0.5959308773568325
+  },
+  "pivot": [
+    379.0,
+    217.87715881054407
+  ],
+  "projectedFootprintWidth": 754,
+  "footprintWorldX": 36,
+  "footprintWorldY": 1800,
+  "worldScale": 1.7218143902632643,
+  "renderShearY": -0.06989980897430892,
+  "bodyHeightMeasurement": {
+    "axis": "above ground centre, excluding near half-thickness",
+    "medianWorld": 85.65810118922535,
+    "minWorld": 75.04965442100591,
+    "maxWorld": 98.28082444658835,
+    "measurementSource": "normalized PNG alpha>=32 contour, central20\u201380%"
+  },
+  "alphaRange": [
+    0,
+    255
+  ],
+  "sha256": "74d1cfc9a8bb067c916cdd645e01ae08593fbbc33be4a6aa42c96f6d3231b70e",
+  "provenance": "Original full-wall painting generated once with exact prompt in wall-y-prompt.txt; approved native camera proposal used as material reference and wall-y-geometry as composition reference."
+}

@@ -1,0 +1,104 @@
+{
+  "date": "2026-11-23",
+  "tool": "built-in image_gen",
+  "approvedStyleReference": {
+    "path": "art-source/arena-border-repair-proposal/native-camera-proposal.png",
+    "sha256": "5a82b9bc78c2e6e504cdc023600af45c427d5b178d97760fa64457e12daf046d"
+  },
+  "productionMethod": "One full original continuous painting per complete arena side; source strips are atlas packing only, never repeated",
+  "artOperations": "Exact original masters copied; alpha-bounds crop and proportional Lanczos downsample/transparent margins only. No mask/repaint/recolour/mirror/warp.",
+  "paintings": {
+    "x": {
+      "master": "wall-x-source.png",
+      "masterSha256": "2ec314c7346f79ae2903f857387ac68b51b2d6cc5080cd42c1c77a9a76af5040",
+      "normalized": "wall-x.png",
+      "normalizedSha256": "a2c3ede5973b3f3c359bf13732e411e2768ebdaea96d0bddbbcea8bc2cd5d4ee",
+      "geometryReference": "wall-x-geometry.png",
+      "geometryReferenceSha256": "ced4fe482074a1cd4648d70fbc5408f064a7bdf4e2a35795fde1fba9ab7f6a9e",
+      "promptChain": [
+        "wall-x-prompt.txt"
+      ],
+      "originalGeneratedOutput": "/Users/eduardoleale/.codex/generated_images/01a2081c-e0b7-7163-80da-7c209811d13c/exec-585b6f9e-7964-4c0b-88bf-d814a9f6c658.png",
+      "globalCalibrationOnly": true,
+      "normalization": {
+        "crop": [
+          19,
+          51,
+          1613,
+          936
+        ],
+        "offset": [
+          2,
+          2
+        ],
+        "contentSize": [
+          1000,
+          555
+        ],
+        "resample": "proportional Lanczos, no alpha mask/repaint/warp/rotation/mirror"
+      }
+    },
+    "y": {
+      "master": "wall-y-source.png",
+      "masterSha256": "55d6a9c13e70ddbddbe455e1545169a1c1a9429f26a5a112d5b45ea551904526",
+      "normalized": "wall-y.png",
+      "normalizedSha256": "74d1cfc9a8bb067c916cdd645e01ae08593fbbc33be4a6aa42c96f6d3231b70e",
+      "geometryReference": "wall-y-geometry.png",
+      "geometryReferenceSha256": "304fb0ed06b7fcca76c48e3279e03f0076b702d383bef086621b6ee5970aadca",
+      "promptChain": [
+        "wall-y-prompt.txt"
+      ],
+      "originalGeneratedOutput": "/Users/eduardoleale/.codex/generated_images/01a2082a-0e5b-7020-9bf5-f231a1a7a272/exec-8b1bd5dd-2ace-437f-ab0b-75101beba6c6.png",
+      "globalCalibrationOnly": true,
+      "normalization": {
+        "crop": [
+          13,
+          11,
+          1761,
+          883
+        ],
+        "contentSize": [
+          754,
+          376
+        ],
+        "offset": [
+          2,
+          2
+        ],
+        "scale": 0.43135011441647597,
+        "process": "alpha-bounds crop and proportional Lanczos resize/centering only; no warp, repaint, recolour or alpha masking"
+      }
+    },
+    "corner": {
+      "master": "corner-source.png",
+      "masterSha256": "1b3c2dd313c81a0a9c5f036341f98bac52bf7d8be85b5d18d2fcdc3fa6cb84c3",
+      "normalized": "corner.png",
+      "normalizedSha256": "8da5b275af633ec78ea08736971caf4ba726e93f4bfb45e046a3e0fa4dfb3c7d",
+      "geometryReference": "corner-geometry.png",
+      "geometryReferenceSha256": "b452c1d20f79a23bce99ecb319965c348c8d884e878a4979a9daf63738fef69a",
+      "promptChain": [
+        "corner-prompt.txt",
+        "corner-correction-prompt.txt"
+      ],
+      "originalGeneratedOutput": "/Users/eduardoleale/.codex/generated_images/01a2081c-e0b7-7163-80da-7c209811d13c/exec-c5c7a0bb-da4f-49c4-8206-e99599ab4ae6.png",
+      "globalCalibrationOnly": true,
+      "normalization": {
+        "crop": [
+          144,
+          157,
+          861,
+          1408
+        ],
+        "contentSize": [
+          50,
+          87
+        ],
+        "offset": [
+          2,
+          2
+        ],
+        "resample": "proportional Lanczos, no alpha mask/repaint/warp/rotation/mirror"
+      }
+    }
+  }
+}

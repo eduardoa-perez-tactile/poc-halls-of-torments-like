@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "created": "2026-11-23",
+  "approval": "User approved the floor proposal and explicitly requested runtime implementation on 2026-11-23.",
+  "reference": {
+    "file": "approved-proposal.png",
+    "role": "approved generated concept, not native verification",
+    "sha256": "4f66bcd4c1869f443c01d5a3bc5615c498e1adfd78a3ca6a9830bd39408cd568",
+    "originalToolOutputPath": "/Users/eduardoleale/.codex/generated_images/01a207d7-f0cb-7130-82c2-8d08d2d54f83/exec-15411438-cf79-455a-8523-657d45bfa5fd.png",
+    "promptFile": "approved-proposal-prompt.txt",
+    "promptSha256": "5714de1edbc187a0b3784ff1afc1ce7e5f0e7b79629e01805d586eee74c87b88"
+  },
+  "generatedAssets": {
+    "medallion": {
+      "tool": "built-in image_gen.imagegen",
+      "masterFile": "medallion-master.png",
+      "masterSize": [
+        1254,
+        1254
+      ],
+      "masterSha256": "e7b9ac7dd76506d3a2513bb4b9f68a13cb91d6dff4b09bf83ff540cc74062074",
+      "promptFile": "medallion-prompt.txt",
+      "promptSha256": "6602383cb244c07f78ec76106511e114aca2c5529bd1d291332e381f74aebc11",
+      "toolOutputPath": "/Users/eduardoleale/.codex/generated_images/01a208ff-823a-71f1-8b84-51764c98aaa9/exec-53458fb4-467c-46c5-877b-db7c1ccac6cc.png"
+    },
+    "field": {
+      "tool": "built-in image_gen.imagegen",
+      "masterFile": "field-master.png",
+      "masterSize": [
+        1254,
+        1254
+      ],
+      "masterSha256": "227e3e346135d2d9203996efc2047cd5bde5db15ebdccc8f6fd774644a275226",
+      "promptFile": "field-prompt.txt",
+      "promptSha256": "b5da36352daece59db0418e061df07c7f1717023273bd8cfcb1ac0948163c345",
+      "toolOutputPath": "/Users/eduardoleale/.codex/generated_images/01a208ff-823a-71f1-8b84-51764c98aaa9/exec-ff1affb0-c9c0-4205-a35b-a3bf0b134e2e.png"
+    },
+    "path": {
+      "tool": "built-in image_gen.imagegen",
+      "masterFile": "path-master.png",
+      "masterSize": [
+        1254,
+        1254
+      ],
+      "masterSha256": "31624ae1cf977f5e02e2e7afd82e55d532c4ba79649443c21e4a2b7562cf20cd",
+      "promptFile": "path-prompt.txt",
+      "promptSha256": "e7a4bbc07f235501156643754fa523e6e4f730fe5633e2ea0ce0f6e57b207801",
+      "toolOutputPath": "/Users/eduardoleale/.codex/generated_images/01a208ff-823a-71f1-8b84-51764c98aaa9/exec-47552501-b522-4956-93a1-0d8def431aec.png",
+      "sourceRevision": 2
+    }
+  },
+  "normalization": {
+    "medallion": "One proportional whole-master Lanczos normalization to256x256, then transparent1pxcontext on allfour sides. No geometry painting, mirroring, masking or content replacement.",
+    "field": "One whole-master Lanczos normalization to96x96. Generatedpainting alone supplies allstonepixels. Periodic boundary collars crossfade originalcentralmaterial through14%wrapdistance with smoothstep weights. A1pxwrapped original-neighbour collar forms98x98source.",
+    "path": "One whole-master Lanczos normalization to64x64. Only Y repeat collars sample originalcentre through14%smoothstep weights; X retains authorededging and clamps sourcecontext. Onecontextpixelonallsides forms66x66source."
+  },
+  "packing": {
+    "baker": "scripts/BakeEngravedFloor.py",
+    "after": "scripts/BakePaintedArenaBorders.py",
+    "baselineArchive": "bake-inputs.zip",
+    "pages": 4,
+    "addedGpuBytes": 0,
+    "oldProtectedPadding": 2,
+    "newSourceNeighbourContext": 1,
+    "newPieceOuterPadding": 0,
+    "notes": "Context includes actualoriginalwhole-sourcepixels outsidecoreUVs; extraatlasextrusion isunnecessary. Existingactor,attack,projectile,paintedwall,foundation metadata,pixelsandgutters arepreserved."
+  },
+  "supersededAssets": {
+    "path-v1": {
+      "tool": "built-in image_gen.imagegen",
+      "masterFile": "path-master-v1.png",
+      "masterSize": [
+        1254,
+        1254
+      ],
+      "masterSha256": "5f517fd8aa200ac2234a1bc793ef2964470515218d108304ce2a50967b26636c",
+      "promptFile": "path-prompt-v1.txt",
+      "promptSha256": "891cc93ee81498bd8e899c8e52787cf6b0333c009e2caf55b31af5e41f616777",
+      "toolOutputPath": "/Users/eduardoleale/.codex/generated_images/01a208ff-823a-71f1-8b84-51764c98aaa9/exec-d59612b2-b6b4-48c5-a2c6-8c87d8a2a729.png",
+      "reason": "Native review found paths read as flat bands without dressed paver edging."
+    }
+  }
+}

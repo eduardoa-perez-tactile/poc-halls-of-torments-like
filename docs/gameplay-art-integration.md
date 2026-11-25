@@ -1,5 +1,52 @@
 # Gameplay art integration
 
+The current [enemy variants](enemy-variants.md) add gameplay stat roles,
+material-selective Frost/Dusk recolouring and brighter ground attack warnings.
+They supersede the initial whole-body Frost/Dusk tints described below.
+
+The initial 24 November enemy-colour pass keeps each regular enemy's original paint and
+adds two cosmetic appearances: Moss/Frost for Ghoul and Brute, Ember/Dusk for
+Wraith and Cultist. These eight extra appearances use `EnemyVariant` RGB
+multipliers in the existing sprite batch, including authored attacks and Wraith
+dash ghosts. The boss retains its original palette; elite cues, damage flashes,
+telegraphs, projectiles and combat rules retain their existing behaviour. Each
+successful spawn assigns a stable palette from a separate cosmetic hash, without
+consuming combat randomness or tying colours to reusable enemy-pool slots. Reset
+clears palettes. This pass adds no textures, decoded Pixmaps, shaders or draw calls.
+The follow-up contrast revision strengthens Frost to cyan/teal and Dusk to deep
+blue after the first grey/purple versions proved too close to the originals.
+Desktop sprite comparisons and JDK 21 desktop/Android builds verified that
+palette-only revision; the emulator measurements below belong to the first pass.
+JDK 21 desktop compilation, Android debug assembly and 20 focused existing
+animation/attack/feedback tests passed. A five-second co-op art fixture confirmed
+mixed palettes in both cameras and unchanged accounted texture use of 32,467,788
+bytes (30.96 MiB, including QR). Its 300 measured frame intervals had p95/p99/max
+18.13/19.23/20.83 ms; 131 exceeded 16.7 ms. This is a brief emulator rendering
+check, not evidence of sustained physical-TV performance. Local review media and
+logs are under ignored `.run/enemy-variants*`.
+
+The latest [engraved floor pass](engraved-crypt-floor.md) appends original paving,
+path and medallion materials into guarded spare areas of four existing pages,
+without texture growth. Run its baker after the painted border stage. Earlier
+whole-page hashes predate this additive floor bake.
+
+The latest [continuous painted border pass](painted-arena-borders.md) supersedes
+the repeated wall fragments. It appends original whole-side paintings into blank
+areas of all three existing gameplay pages, preserving earlier sprite pixels,
+gutters and metadata with no texture growth. Its source/rebuild contract is
+current; historical whole-page hashes predate this additive bake.
+
+The 23 November [open crypt pass](arena-redesign-proposal.md) replaces the legacy
+environment regions with measured isometric landmarks and character-height ruined
+walls in the same 512×512 page. It preserves the actor frames and projectile art.
+Its source/rebuild contract supersedes the historical environment counts below.
+
+The [enemy-attack and magic-crossbow pass](enemy-attacks.md) adds authored four-facing Wraith/Brute/Cultist attacks, reusable aura sprites and three animated magic missile types in spare atlas space. It adds no GPU texture memory. The [border pass](border-tiles-integration.md) brings the combined accounted total including QR to 31.8699455 MiB.
+
+The [integrated border pass](border-tiles-integration.md) replaces the old floor/wall arrangement with the approved merged tiles, preserves the playable arena and adds a bounded 0.5 MiB managed page. Its native join checks and current texture totals supersede the historical floor/resource notes below.
+
+The later [sprite combat-feedback pass](combat-vfx.md) adds a bounded 0.5625 MiB VFX page, stronger weapon contacts and choice-round celebrations. Its measured combined texture total is 31.3699455 MiB; the original actor/environment bank below remains unchanged at 6 MiB.
+
 The 13 November 2026 art milestone replaces the temporary arena kit with the selected original crypt environment and seven actors. Four separately authored diagonal facings preserve asymmetric equipment. Warden uses the corrected northeast walk and northwest sword strike; Ranger retains the compact crossbow without introducing a reload delay. Existing combat cadence, damage, collision, controls and playable bounds remain unchanged.
 
 ## Shipped kit and resources

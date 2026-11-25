@@ -1,0 +1,246 @@
+{
+  "version": 1,
+  "coordinateSystem": "sourceXright/sourceYdown; pivot at ground footprint centre; runtimeYup",
+  "artMethod": "one original complete painting per full arena side; source slices are packing only, never repeated",
+  "paintings": {
+    "x": {
+      "file": "wall-x.png",
+      "sourceSize": [
+        1004,
+        559
+      ],
+      "pivot": [
+        502.0,
+        305.509549
+      ],
+      "alphaBounds": [
+        2,
+        2,
+        1002,
+        557
+      ],
+      "footprintWorld": [
+        2400,
+        36
+      ],
+      "worldLength": 2400,
+      "worldThickness": 36,
+      "worldHeightTarget": 90,
+      "projectedFootprintWidth": 1000,
+      "scale": 1.7225121189704298,
+      "renderShearY": -0.00383221,
+      "groundFit": {
+        "method": "alpha>=32 lower contour central20%-80% source bounds least-squares; one global fit",
+        "rawFitSlopeDown": -0.5040201535074339,
+        "rawFitInterceptDown": 958.0378494112538,
+        "firstContourPoint": [
+          338,
+          787
+        ],
+        "lastContourPoint": [
+          1293,
+          306
+        ],
+        "sampleCount": 956,
+        "normalizedSlopeDown": -0.5038322137891768,
+        "normalizedInterceptDown": 565.8224823987761,
+        "frontBaseYAtPivot": 312.8987110766093,
+        "frontGroundOffsetSource": 7.389162561576356,
+        "targetSlopeDown": -0.5
+      },
+      "normalization": {
+        "crop": [
+          19,
+          51,
+          1613,
+          936
+        ],
+        "offset": [
+          2,
+          2
+        ],
+        "contentSize": [
+          1000,
+          555
+        ],
+        "resample": "proportional Lanczos, no alpha mask/repaint/warp/rotation/mirror"
+      },
+      "generation": {
+        "tool": "built-in image_gen",
+        "prompt": "wall-x-prompt.txt",
+        "selectedMaster": "wall-x-source.png",
+        "originalGeneratedOutput": "/Users/eduardoleale/.codex/generated_images/01a2081c-e0b7-7163-80da-7c209811d13c/exec-585b6f9e-7964-4c0b-88bf-d814a9f6c658.png",
+        "masterSha256": "2ec314c7346f79ae2903f857387ac68b51b2d6cc5080cd42c1c77a9a76af5040",
+        "normalizedSha256": "a2c3ede5973b3f3c359bf13732e411e2768ebdaea96d0bddbbcea8bc2cd5d4ee"
+      },
+      "bodyHeightMeasurement": {
+        "method": "top contour to fitted front baseline, subtract projected full36-unit thickness; central20%-80%",
+        "medianWorld": 83.58105661726938,
+        "minWorld": 68.53043945497151,
+        "maxWorld": 96.75350044090041
+      }
+    },
+    "y": {
+      "file": "wall-y.png",
+      "sourceSize": [
+        758,
+        380
+      ],
+      "pivot": [
+        379.0,
+        217.87715881054407
+      ],
+      "alphaBounds": [
+        2,
+        2,
+        756,
+        378
+      ],
+      "footprintWorld": [
+        36,
+        1800
+      ],
+      "worldLength": 1800,
+      "worldThickness": 36,
+      "worldHeightTarget": 90,
+      "projectedFootprintWidth": 754,
+      "scale": 1.7218143902632643,
+      "renderShearY": -0.06989980897430892,
+      "groundFit": {
+        "sampleFraction": [
+          0.2,
+          0.8
+        ],
+        "sampleCount": 1049,
+        "first": [
+          363,
+          302
+        ],
+        "last": [
+          1411,
+          753
+        ],
+        "rawIntercept": 147.7609811598104,
+        "rawSlopeDown": 0.4302446532138934,
+        "rmsError": 1.237683260882137,
+        "normalizedIntercept": 62.261343274552274,
+        "normalizedSlopeDown": 0.4301001910256911,
+        "normalizedYAtPivotX": 225.26931567328919,
+        "normalizedFirst": [
+          153,
+          127
+        ],
+        "normalizedLast": [
+          605,
+          322
+        ],
+        "normalizedSampleCount": 453,
+        "normalizedRmsError": 0.5959308773568325
+      },
+      "normalization": {
+        "crop": [
+          13,
+          11,
+          1761,
+          883
+        ],
+        "contentSize": [
+          754,
+          376
+        ],
+        "offset": [
+          2,
+          2
+        ],
+        "scale": 0.43135011441647597,
+        "process": "alpha-bounds crop and proportional Lanczos resize/centering only; no warp, repaint, recolour or alpha masking"
+      },
+      "bodyHeightMeasurement": {
+        "axis": "above ground centre, excluding near half-thickness",
+        "medianWorld": 85.65810118922535,
+        "minWorld": 75.04965442100591,
+        "maxWorld": 98.28082444658835,
+        "measurementSource": "normalized PNG alpha>=32 contour, central20\u201380%"
+      },
+      "generation": {
+        "tool": "built-in image_gen",
+        "prompt": "wall-y-prompt.txt",
+        "selectedMaster": "wall-y-source.png",
+        "originalGeneratedOutput": "/Users/eduardoleale/.codex/generated_images/01a2082a-0e5b-7020-9bf5-f231a1a7a272/exec-8b1bd5dd-2ace-437f-ab0b-75101beba6c6.png",
+        "masterSha256": "55d6a9c13e70ddbddbe455e1545169a1c1a9429f26a5a112d5b45ea551904526",
+        "normalizedSha256": "74d1cfc9a8bb067c916cdd645e01ae08593fbbc33be4a6aa42c96f6d3231b70e"
+      }
+    },
+    "corner": {
+      "file": "corner.png",
+      "sourceSize": [
+        54,
+        91
+      ],
+      "pivot": [
+        27.0,
+        76.5
+      ],
+      "alphaBounds": [
+        2,
+        2,
+        52,
+        89
+      ],
+      "footprintWorld": [
+        50,
+        50
+      ],
+      "footprintWorldX": 50,
+      "footprintWorldY": 50,
+      "worldHeightTarget": 90,
+      "projectedFootprintWidth": 50,
+      "scale": 1.4142135623730951,
+      "renderShearY": 0,
+      "groundFit": {
+        "method": "corner near diamond vertex at lower alpha bound; footprint centre lies projectedFootprintWidth/4 above it",
+        "nearVertex": [
+          27.0,
+          89
+        ],
+        "cornerGroundCentreOffset": 12.5,
+        "nominalDiagonalSlopesDown": [
+          -0.5,
+          0.5
+        ]
+      },
+      "bodyHeightMeasurement": {
+        "approximateVerticalStoneBodyWorld": 87.6812408671319,
+        "peakAboveGroundCentreWorld": 105.3589103967956
+      },
+      "normalization": {
+        "crop": [
+          144,
+          157,
+          861,
+          1408
+        ],
+        "contentSize": [
+          50,
+          87
+        ],
+        "offset": [
+          2,
+          2
+        ],
+        "resample": "proportional Lanczos, no alpha mask/repaint/warp/rotation/mirror"
+      },
+      "generation": {
+        "tool": "built-in image_gen",
+        "promptChain": [
+          "corner-prompt.txt",
+          "corner-correction-prompt.txt"
+        ],
+        "selectedMaster": "corner-source.png",
+        "originalGeneratedOutput": "/Users/eduardoleale/.codex/generated_images/01a2081c-e0b7-7163-80da-7c209811d13c/exec-c5c7a0bb-da4f-49c4-8206-e99599ab4ae6.png",
+        "masterSha256": "1b3c2dd313c81a0a9c5f036341f98bac52bf7d8be85b5d18d2fcdc3fa6cb84c3",
+        "normalizedSha256": "8da5b275af633ec78ea08736971caf4ba726e93f4bfb45e046a3e0fa4dfb3c7d"
+      }
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "archive": "bake-inputs.zip",
+  "sha256": "6f2d5c1d29c81e394fa6a6c29fc6957b4bbf0ca7e853f76790ee9291db5c92cf",
+  "entries": {
+    "baseline/arena-border.json": {
+      "bytes": 2737,
+      "sha256": "1cd7c8c61d5a6d457e22800094c5c862e42e08abc4a24cfea7fedf2a0ab4a5c6"
+    },
+    "baseline/arena-border.png": {
+      "bytes": 79549,
+      "sha256": "610cfa74f66f50839953f2a6624df15dbe5f124830fe36d34fdf083598a4b6ab"
+    },
+    "baseline/enemy-attacks.json": {
+      "bytes": 29647,
+      "sha256": "bc07ad52deb8daf4443f03a0a4867e981ef32ac34d4a9bd01aae4878e7ab2cef"
+    },
+    "baseline/gameplay-actors-common.png": {
+      "bytes": 370125,
+      "sha256": "77cdc72fbd771d7417b8b9063d672e9ac1f6aa87a53dda56bda5d543c8aca863"
+    },
+    "baseline/gameplay-actors-main.png": {
+      "bytes": 1522727,
+      "sha256": "9dc497005bad4a0d7c54fe9b9ca474e471d011dff46d02413e4f5bf33f4e1328"
+    },
+    "baseline/gameplay-environment.png": {
+      "bytes": 355424,
+      "sha256": "463be8b9a1d87d7e00d76439590025c216928b60db7283e4d8b1b255d4ba4079"
+    },
+    "baseline/gameplay.json": {
+      "bytes": 83231,
+      "sha256": "c455c0aff9492a21e0226b64a1ee0f3561b1deca0d88201193af02bee1134d9a"
+    },
+    "baseline/magic-projectiles.json": {
+      "bytes": 6709,
+      "sha256": "99b5dc983af5bbcccd35ac4db532f127ee27bbab5a6c10beea925736b30cfbb1"
+    },
+    "baseline/painted-borders.json": {
+      "bytes": 44209,
+      "sha256": "6c12fb5579baa6c569a24a0b7df7da18a10bc98d71410e2b8dfde8934c5bf4fb"
+    },
+    "source/field-master.png": {
+      "bytes": 2236473,
+      "sha256": "227e3e346135d2d9203996efc2047cd5bde5db15ebdccc8f6fd774644a275226"
+    },
+    "source/medallion-master.png": {
+      "bytes": 2549498,
+      "sha256": "e7b9ac7dd76506d3a2513bb4b9f68a13cb91d6dff4b09bf83ff540cc74062074"
+    },
+    "source/path-master.png": {
+      "bytes": 2178432,
+      "sha256": "31624ae1cf977f5e02e2e7afd82e55d532c4ba79649443c21e4a2b7562cf20cd"
+    }
+  },
+  "supersedesArchiveSha256": "deee4a74ed5275ca1305282ce46fbb3138909638feedeebfe164d5fae965b562",
+  "revision": "Selected path source revised after native review; all baseline pages/metadata and other masters unchanged."
+}

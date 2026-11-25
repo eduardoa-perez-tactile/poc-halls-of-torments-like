@@ -1,0 +1,46 @@
+{
+  "archive": "bake-inputs.zip",
+  "sha256": "5e145ed0da4983fd4cae447a02f48801991c071af005558bfffb26ec27d8e1ff",
+  "entries": {
+    "baseline/enemy-attacks.json": {
+      "bytes": 29647,
+      "sha256": "bc07ad52deb8daf4443f03a0a4867e981ef32ac34d4a9bd01aae4878e7ab2cef"
+    },
+    "baseline/gameplay-actors-common.png": {
+      "bytes": 369745,
+      "sha256": "0531b71609797fd4ba20feed95e91a6231159b3e85ccfc944504e7da712b6e39"
+    },
+    "baseline/gameplay-actors-main.png": {
+      "bytes": 1318126,
+      "sha256": "03fe9d2a3e13181bd72f941f9f4b140057f59b477af77c6854caf9d7b47e9fe0"
+    },
+    "baseline/gameplay-environment.png": {
+      "bytes": 307582,
+      "sha256": "106f821fa40ed1e47e60175e49fdba5aca76de841770096b742d127eda7cef4e"
+    },
+    "baseline/gameplay.json": {
+      "bytes": 83231,
+      "sha256": "c455c0aff9492a21e0226b64a1ee0f3561b1deca0d88201193af02bee1134d9a"
+    },
+    "baseline/magic-projectiles.json": {
+      "bytes": 6709,
+      "sha256": "99b5dc983af5bbcccd35ac4db532f127ee27bbab5a6c10beea925736b30cfbb1"
+    },
+    "source/corner.png": {
+      "bytes": 10759,
+      "sha256": "8da5b275af633ec78ea08736971caf4ba726e93f4bfb45e046a3e0fa4dfb3c7d"
+    },
+    "source/paintings.json": {
+      "bytes": 6885,
+      "sha256": "612ca32062028efdcb6fa7c0fe5a556eed1e4ef5c7124d44ea58993ef341fe7d"
+    },
+    "source/wall-x.png": {
+      "bytes": 182624,
+      "sha256": "a2c3ede5973b3f3c359bf13732e411e2768ebdaea96d0bddbbcea8bc2cd5d4ee"
+    },
+    "source/wall-y.png": {
+      "bytes": 127145,
+      "sha256": "74d1cfc9a8bb067c916cdd645e01ae08593fbbc33be4a6aa42c96f6d3231b70e"
+    }
+  }
+}

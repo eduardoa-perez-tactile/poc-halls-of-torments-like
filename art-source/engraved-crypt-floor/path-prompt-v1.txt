@@ -1,0 +1,6 @@
+Use case: stylized-concept
+Asset type: original seamless tileable square top-down dressed-stone path material
+Reference image: supplied screenshot is ONLY material/painting style inspiration. Match the wider, slightly lighter paved paths.
+Primary request: a square seamless repeating medieval dressed limestone paving material, directly top-down orthographic with NO perspective. Fill every pixel with opaque paving. Larger broad rectangular dressed stone slabs in subtly staggered horizontal courses, about 3 slabs across and 4 courses high. Calm matte cool grey, about 8% lighter than the screenshot's surrounding small field paving, narrow shallow worn seams, softly chipped corners, restrained mottling, occasional tiny fine cracks. This should look like the paving inside a broad inset stone processional path, entirely flush with the adjacent floor. No raised border or curb.
+Lighting/style: same painterly dark-fantasy game stone as reference, diffuse neutral lighting, no dramatic shadows, no gradients/vignette. Precisely tileable left/right/top/bottom so continuous courses align.
+Constraints: a full opaque square of only paving material, NO surrounding field texture, NO outline or frame, NO ring, NO medallion, NO emblem, NO text, no gold, no glow, no characters, no HUD, no objects, no perspective. Original production texture.

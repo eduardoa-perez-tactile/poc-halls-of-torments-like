@@ -1,0 +1,2467 @@
+{
+  "version": 1,
+  "addedTextureBytes": 0,
+  "pages": [
+    {
+      "file": "gameplay-actors-main.png",
+      "size": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "file": "gameplay-actors-common.png",
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "file": "gameplay-environment.png",
+      "size": [
+        512,
+        512
+      ]
+    }
+  ],
+  "context": 1,
+  "padding": 2,
+  "edgeExtrusion": 1,
+  "sourceArchiveSha256": "5e145ed0da4983fd4cae447a02f48801991c071af005558bfffb26ec27d8e1ff",
+  "trimAlphaThreshold": 32,
+  "paintings": {
+    "x": {
+      "file": "wall-x-runtime.png",
+      "sourceSize": [
+        853,
+        475
+      ],
+      "pivot": [
+        426.5,
+        259.6020980507282
+      ],
+      "alphaBounds": [
+        0,
+        0,
+        853,
+        475
+      ],
+      "footprintWorld": [
+        2400,
+        36
+      ],
+      "worldLength": 2400,
+      "worldThickness": 36,
+      "worldHeightTarget": 90,
+      "projectedFootprintWidth": 849.601593625498,
+      "scale": 2.027435131824515,
+      "renderShearY": -0.003909348162034476,
+      "groundFit": {
+        "method": "alpha>=32 lower contour central20%-80% source bounds least-squares; one global fit",
+        "rawFitSlopeDown": -0.5040201535074339,
+        "rawFitInterceptDown": 958.0378494112538,
+        "firstContourPoint": [
+          338,
+          787
+        ],
+        "lastContourPoint": [
+          1293,
+          306
+        ],
+        "sampleCount": 956,
+        "normalizedSlopeDown": -0.5039093481620345,
+        "normalizedInterceptDown": 480.79727931917466,
+        "frontBaseYAtPivot": 265.87994232806693,
+        "frontGroundOffsetSource": 6.277844277338718,
+        "targetSlopeDown": -0.5,
+        "normalizedYAtPivotX": 265.87994232806693,
+        "normalizedIntercept": 480.79727931917466
+      },
+      "normalization": {
+        "crop": [
+          19,
+          51,
+          1613,
+          936
+        ],
+        "offset": [
+          2,
+          2
+        ],
+        "contentSize": [
+          1000,
+          555
+        ],
+        "resample": "proportional Lanczos, no alpha mask/repaint/warp/rotation/mirror"
+      },
+      "generation": {
+        "tool": "built-in image_gen",
+        "prompt": "wall-x-prompt.txt",
+        "selectedMaster": "wall-x-source.png",
+        "originalGeneratedOutput": "/Users/eduardoleale/.codex/generated_images/01a2081c-e0b7-7163-80da-7c209811d13c/exec-585b6f9e-7964-4c0b-88bf-d814a9f6c658.png",
+        "masterSha256": "2ec314c7346f79ae2903f857387ac68b51b2d6cc5080cd42c1c77a9a76af5040",
+        "normalizedSha256": "a2c3ede5973b3f3c359bf13732e411e2768ebdaea96d0bddbbcea8bc2cd5d4ee"
+      },
+      "bodyHeightMeasurement": {
+        "method": "top contour to fitted front baseline, subtract projected full36-unit thickness; central20%-80%",
+        "medianWorld": 83.58105661726938,
+        "minWorld": 68.53043945497151,
+        "maxWorld": 96.75350044090041
+      },
+      "originalSource": {
+        "file": "wall-x.png",
+        "sourceSize": [
+          1004,
+          559
+        ],
+        "sha256": "a2c3ede5973b3f3c359bf13732e411e2768ebdaea96d0bddbbcea8bc2cd5d4ee"
+      },
+      "bakeNormalization": {
+        "requestedScale": 0.85,
+        "sx": 0.849601593625498,
+        "sy": 0.8497316636851521,
+        "resample": "one proportional whole-painting Lanczos before slicing",
+        "sha256": "9bd088b7c541216da6d7c650cd44b4820ceef56b5055c6bd9b6d3b0f84ae208f",
+        "originalSourceSize": [
+          1004,
+          559
+        ],
+        "originalNormalization": {
+          "crop": [
+            19,
+            51,
+            1613,
+            936
+          ],
+          "offset": [
+            2,
+            2
+          ],
+          "contentSize": [
+            1000,
+            555
+          ],
+          "resample": "proportional Lanczos, no alpha mask/repaint/warp/rotation/mirror"
+        }
+      },
+      "pieces": [
+        {
+          "page": 0,
+          "rect": [
+            963,
+            694,
+            33,
+            50
+          ],
+          "sourceRect": [
+            0,
+            409,
+            33,
+            50
+          ],
+          "coreRect": [
+            0,
+            410,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            211,
+            944,
+            33,
+            18
+          ],
+          "sourceRect": [
+            0,
+            457,
+            33,
+            18
+          ],
+          "coreRect": [
+            0,
+            458,
+            32,
+            17
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            720,
+            963,
+            34,
+            50
+          ],
+          "sourceRect": [
+            31,
+            390,
+            34,
+            50
+          ],
+          "coreRect": [
+            32,
+            391,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            258,
+            471,
+            34,
+            30
+          ],
+          "sourceRect": [
+            31,
+            438,
+            34,
+            30
+          ],
+          "coreRect": [
+            32,
+            439,
+            32,
+            28
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            756,
+            902,
+            34,
+            50
+          ],
+          "sourceRect": [
+            63,
+            377,
+            34,
+            50
+          ],
+          "coreRect": [
+            64,
+            378,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            957,
+            801,
+            34,
+            26
+          ],
+          "sourceRect": [
+            63,
+            425,
+            34,
+            26
+          ],
+          "coreRect": [
+            64,
+            426,
+            32,
+            24
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            144,
+            450,
+            34,
+            50
+          ],
+          "sourceRect": [
+            95,
+            362,
+            34,
+            50
+          ],
+          "coreRect": [
+            96,
+            363,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            983,
+            891,
+            34,
+            25
+          ],
+          "sourceRect": [
+            95,
+            410,
+            34,
+            25
+          ],
+          "coreRect": [
+            96,
+            411,
+            32,
+            23
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            182,
+            450,
+            34,
+            50
+          ],
+          "sourceRect": [
+            127,
+            345,
+            34,
+            50
+          ],
+          "coreRect": [
+            128,
+            346,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            957,
+            831,
+            34,
+            26
+          ],
+          "sourceRect": [
+            127,
+            393,
+            34,
+            26
+          ],
+          "coreRect": [
+            128,
+            394,
+            32,
+            24
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            220,
+            450,
+            34,
+            50
+          ],
+          "sourceRect": [
+            159,
+            329,
+            34,
+            50
+          ],
+          "coreRect": [
+            160,
+            330,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            946,
+            861,
+            34,
+            26
+          ],
+          "sourceRect": [
+            159,
+            377,
+            34,
+            26
+          ],
+          "coreRect": [
+            160,
+            378,
+            32,
+            24
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            758,
+            956,
+            34,
+            50
+          ],
+          "sourceRect": [
+            191,
+            312,
+            34,
+            50
+          ],
+          "coreRect": [
+            192,
+            313,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            140,
+            855,
+            34,
+            27
+          ],
+          "sourceRect": [
+            191,
+            360,
+            34,
+            27
+          ],
+          "coreRect": [
+            192,
+            361,
+            32,
+            25
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            794,
+            902,
+            34,
+            50
+          ],
+          "sourceRect": [
+            223,
+            300,
+            34,
+            50
+          ],
+          "coreRect": [
+            224,
+            301,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            910,
+            950,
+            34,
+            23
+          ],
+          "sourceRect": [
+            223,
+            348,
+            34,
+            23
+          ],
+          "coreRect": [
+            224,
+            349,
+            32,
+            21
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            805,
+            843,
+            34,
+            50
+          ],
+          "sourceRect": [
+            255,
+            280,
+            34,
+            50
+          ],
+          "coreRect": [
+            256,
+            281,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            2,
+            994,
+            34,
+            27
+          ],
+          "sourceRect": [
+            255,
+            328,
+            34,
+            27
+          ],
+          "coreRect": [
+            256,
+            329,
+            32,
+            25
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            796,
+            956,
+            34,
+            50
+          ],
+          "sourceRect": [
+            287,
+            263,
+            34,
+            50
+          ],
+          "coreRect": [
+            288,
+            264,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            101,
+            418,
+            34,
+            28
+          ],
+          "sourceRect": [
+            287,
+            311,
+            34,
+            28
+          ],
+          "coreRect": [
+            288,
+            312,
+            32,
+            26
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            832,
+            897,
+            34,
+            50
+          ],
+          "sourceRect": [
+            319,
+            246,
+            34,
+            50
+          ],
+          "coreRect": [
+            320,
+            247,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            130,
+            993,
+            34,
+            29
+          ],
+          "sourceRect": [
+            319,
+            294,
+            34,
+            29
+          ],
+          "coreRect": [
+            320,
+            295,
+            32,
+            27
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            834,
+            951,
+            34,
+            50
+          ],
+          "sourceRect": [
+            351,
+            239,
+            34,
+            50
+          ],
+          "coreRect": [
+            352,
+            240,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            421,
+            378,
+            34,
+            20
+          ],
+          "sourceRect": [
+            351,
+            287,
+            34,
+            20
+          ],
+          "coreRect": [
+            352,
+            288,
+            32,
+            18
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            809,
+            723,
+            34,
+            50
+          ],
+          "sourceRect": [
+            383,
+            217,
+            34,
+            50
+          ],
+          "coreRect": [
+            384,
+            218,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            983,
+            920,
+            34,
+            25
+          ],
+          "sourceRect": [
+            383,
+            265,
+            34,
+            25
+          ],
+          "coreRect": [
+            384,
+            266,
+            32,
+            23
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            812,
+            777,
+            34,
+            50
+          ],
+          "sourceRect": [
+            415,
+            199,
+            34,
+            50
+          ],
+          "coreRect": [
+            416,
+            200,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            40,
+            994,
+            34,
+            27
+          ],
+          "sourceRect": [
+            415,
+            247,
+            34,
+            27
+          ],
+          "coreRect": [
+            416,
+            248,
+            32,
+            25
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            843,
+            831,
+            34,
+            50
+          ],
+          "sourceRect": [
+            447,
+            178,
+            34,
+            50
+          ],
+          "coreRect": [
+            448,
+            179,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            800,
+            238,
+            34,
+            32
+          ],
+          "sourceRect": [
+            447,
+            226,
+            34,
+            32
+          ],
+          "coreRect": [
+            448,
+            227,
+            32,
+            30
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            870,
+            885,
+            34,
+            50
+          ],
+          "sourceRect": [
+            479,
+            169,
+            34,
+            50
+          ],
+          "coreRect": [
+            480,
+            170,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            945,
+            921,
+            34,
+            25
+          ],
+          "sourceRect": [
+            479,
+            217,
+            34,
+            25
+          ],
+          "coreRect": [
+            480,
+            218,
+            32,
+            23
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            872,
+            939,
+            34,
+            50
+          ],
+          "sourceRect": [
+            511,
+            149,
+            34,
+            50
+          ],
+          "coreRect": [
+            512,
+            150,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            168,
+            993,
+            34,
+            29
+          ],
+          "sourceRect": [
+            511,
+            197,
+            34,
+            29
+          ],
+          "coreRect": [
+            512,
+            198,
+            32,
+            27
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            258,
+            417,
+            34,
+            50
+          ],
+          "sourceRect": [
+            543,
+            132,
+            34,
+            50
+          ],
+          "coreRect": [
+            544,
+            133,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            296,
+            471,
+            34,
+            30
+          ],
+          "sourceRect": [
+            543,
+            180,
+            34,
+            30
+          ],
+          "coreRect": [
+            544,
+            181,
+            32,
+            28
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            296,
+            417,
+            34,
+            50
+          ],
+          "sourceRect": [
+            575,
+            123,
+            34,
+            50
+          ],
+          "coreRect": [
+            576,
+            124,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            948,
+            978,
+            34,
+            23
+          ],
+          "sourceRect": [
+            575,
+            171,
+            34,
+            23
+          ],
+          "coreRect": [
+            576,
+            172,
+            32,
+            21
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            943,
+            370,
+            34,
+            50
+          ],
+          "sourceRect": [
+            607,
+            96,
+            34,
+            50
+          ],
+          "coreRect": [
+            608,
+            97,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            307,
+            379,
+            34,
+            34
+          ],
+          "sourceRect": [
+            607,
+            144,
+            34,
+            34
+          ],
+          "coreRect": [
+            608,
+            145,
+            32,
+            32
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            981,
+            370,
+            34,
+            50
+          ],
+          "sourceRect": [
+            639,
+            82,
+            34,
+            50
+          ],
+          "coreRect": [
+            640,
+            83,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 1,
+          "rect": [
+            2,
+            479,
+            34,
+            31
+          ],
+          "sourceRect": [
+            639,
+            130,
+            34,
+            31
+          ],
+          "coreRect": [
+            640,
+            131,
+            32,
+            29
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            830,
+            621,
+            34,
+            50
+          ],
+          "sourceRect": [
+            671,
+            72,
+            34,
+            50
+          ],
+          "coreRect": [
+            672,
+            73,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            983,
+            949,
+            34,
+            25
+          ],
+          "sourceRect": [
+            671,
+            120,
+            34,
+            25
+          ],
+          "coreRect": [
+            672,
+            121,
+            32,
+            23
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            847,
+            675,
+            34,
+            50
+          ],
+          "sourceRect": [
+            703,
+            55,
+            34,
+            50
+          ],
+          "coreRect": [
+            704,
+            56,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            984,
+            861,
+            34,
+            26
+          ],
+          "sourceRect": [
+            703,
+            103,
+            34,
+            26
+          ],
+          "coreRect": [
+            704,
+            104,
+            32,
+            24
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            850,
+            729,
+            34,
+            50
+          ],
+          "sourceRect": [
+            735,
+            34,
+            34,
+            50
+          ],
+          "coreRect": [
+            736,
+            35,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 1,
+          "rect": [
+            40,
+            479,
+            34,
+            31
+          ],
+          "sourceRect": [
+            735,
+            82,
+            34,
+            31
+          ],
+          "coreRect": [
+            736,
+            83,
+            32,
+            29
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            881,
+            783,
+            34,
+            50
+          ],
+          "sourceRect": [
+            767,
+            20,
+            34,
+            50
+          ],
+          "coreRect": [
+            768,
+            21,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            872,
+            993,
+            34,
+            29
+          ],
+          "sourceRect": [
+            767,
+            68,
+            34,
+            29
+          ],
+          "coreRect": [
+            768,
+            69,
+            32,
+            27
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            908,
+            837,
+            34,
+            50
+          ],
+          "sourceRect": [
+            799,
+            2,
+            34,
+            50
+          ],
+          "coreRect": [
+            800,
+            3,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            919,
+            802,
+            34,
+            31
+          ],
+          "sourceRect": [
+            799,
+            50,
+            34,
+            31
+          ],
+          "coreRect": [
+            800,
+            51,
+            32,
+            29
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            488,
+            271,
+            22,
+            49
+          ],
+          "sourceRect": [
+            831,
+            0,
+            22,
+            49
+          ],
+          "coreRect": [
+            832,
+            0,
+            20,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            915,
+            326,
+            22,
+            18
+          ],
+          "sourceRect": [
+            831,
+            47,
+            22,
+            18
+          ],
+          "coreRect": [
+            832,
+            48,
+            20,
+            16
+          ]
+        }
+      ],
+      "trim": {
+        "excludedLowAlphaPixels": 286,
+        "maximumExcludedAlpha": 9,
+        "drawnBounds": [
+          0,
+          0,
+          852,
+          475
+        ]
+      }
+    },
+    "y": {
+      "file": "wall-y-runtime.png",
+      "sourceSize": [
+        644,
+        323
+      ],
+      "pivot": [
+        322.0,
+        185.19851065525162
+      ],
+      "alphaBounds": [
+        0,
+        0,
+        644,
+        323
+      ],
+      "footprintWorld": [
+        36,
+        1800
+      ],
+      "worldLength": 1800,
+      "worldThickness": 36,
+      "worldHeightTarget": 90,
+      "projectedFootprintWidth": 640.6015831134564,
+      "scale": 2.0266076208378174,
+      "renderShearY": -0.06969945174246467,
+      "groundFit": {
+        "sampleFraction": [
+          0.2,
+          0.8
+        ],
+        "sampleCount": 1049,
+        "first": [
+          363,
+          302
+        ],
+        "last": [
+          1411,
+          753
+        ],
+        "rawIntercept": 147.7609811598104,
+        "rawSlopeDown": 0.4302446532138934,
+        "rmsError": 1.237683260882137,
+        "normalizedIntercept": 52.92214178336943,
+        "normalizedSlopeDown": 0.43030054825753533,
+        "normalizedYAtPivotX": 191.4789183222958,
+        "normalizedFirst": [
+          153,
+          127
+        ],
+        "normalizedLast": [
+          605,
+          322
+        ],
+        "normalizedSampleCount": 453,
+        "normalizedRmsError": 0.5959308773568325,
+        "frontBaseYAtPivot": 191.4789183222958,
+        "normalizedInterceptDown": 52.92214178336943,
+        "targetSlopeDown": 0.5,
+        "frontGroundOffsetSource": 6.280407667044184
+      },
+      "normalization": {
+        "crop": [
+          13,
+          11,
+          1761,
+          883
+        ],
+        "contentSize": [
+          754,
+          376
+        ],
+        "offset": [
+          2,
+          2
+        ],
+        "scale": 0.43135011441647597,
+        "process": "alpha-bounds crop and proportional Lanczos resize/centering only; no warp, repaint, recolour or alpha masking"
+      },
+      "bodyHeightMeasurement": {
+        "axis": "above ground centre, excluding near half-thickness",
+        "medianWorld": 85.65810118922535,
+        "minWorld": 75.04965442100591,
+        "maxWorld": 98.28082444658835,
+        "measurementSource": "normalized PNG alpha>=32 contour, central20\u201380%"
+      },
+      "generation": {
+        "tool": "built-in image_gen",
+        "prompt": "wall-y-prompt.txt",
+        "selectedMaster": "wall-y-source.png",
+        "originalGeneratedOutput": "/Users/eduardoleale/.codex/generated_images/01a2082a-0e5b-7020-9bf5-f231a1a7a272/exec-8b1bd5dd-2ace-437f-ab0b-75101beba6c6.png",
+        "masterSha256": "55d6a9c13e70ddbddbe455e1545169a1c1a9429f26a5a112d5b45ea551904526",
+        "normalizedSha256": "74d1cfc9a8bb067c916cdd645e01ae08593fbbc33be4a6aa42c96f6d3231b70e"
+      },
+      "originalSource": {
+        "file": "wall-y.png",
+        "sourceSize": [
+          758,
+          380
+        ],
+        "sha256": "74d1cfc9a8bb067c916cdd645e01ae08593fbbc33be4a6aa42c96f6d3231b70e"
+      },
+      "bakeNormalization": {
+        "requestedScale": 0.85,
+        "sx": 0.8496042216358839,
+        "sy": 0.85,
+        "resample": "one proportional whole-painting Lanczos before slicing",
+        "sha256": "23b895a2f0031e5abd3df069dd6e21b73f2557b6a7e7243a648bb46e0801ae17",
+        "originalSourceSize": [
+          758,
+          380
+        ],
+        "originalNormalization": {
+          "crop": [
+            13,
+            11,
+            1761,
+            883
+          ],
+          "contentSize": [
+            754,
+            376
+          ],
+          "offset": [
+            2,
+            2
+          ],
+          "scale": 0.43135011441647597,
+          "process": "alpha-bounds crop and proportional Lanczos resize/centering only; no warp, repaint, recolour or alpha masking"
+        }
+      },
+      "pieces": [
+        {
+          "page": 0,
+          "rect": [
+            957,
+            748,
+            33,
+            49
+          ],
+          "sourceRect": [
+            0,
+            0,
+            33,
+            49
+          ],
+          "coreRect": [
+            0,
+            0,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            459,
+            402,
+            33,
+            20
+          ],
+          "sourceRect": [
+            0,
+            47,
+            33,
+            20
+          ],
+          "coreRect": [
+            0,
+            48,
+            32,
+            18
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            946,
+            424,
+            34,
+            50
+          ],
+          "sourceRect": [
+            31,
+            7,
+            34,
+            50
+          ],
+          "coreRect": [
+            32,
+            8,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            78,
+            994,
+            34,
+            27
+          ],
+          "sourceRect": [
+            31,
+            55,
+            34,
+            27
+          ],
+          "coreRect": [
+            32,
+            56,
+            32,
+            25
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            907,
+            424,
+            34,
+            50
+          ],
+          "sourceRect": [
+            63,
+            26,
+            34,
+            50
+          ],
+          "coreRect": [
+            64,
+            27,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            478,
+            808,
+            34,
+            22
+          ],
+          "sourceRect": [
+            63,
+            74,
+            34,
+            22
+          ],
+          "coreRect": [
+            64,
+            75,
+            32,
+            20
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            984,
+            424,
+            34,
+            50
+          ],
+          "sourceRect": [
+            95,
+            39,
+            34,
+            50
+          ],
+          "coreRect": [
+            96,
+            40,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            986,
+            978,
+            34,
+            23
+          ],
+          "sourceRect": [
+            95,
+            87,
+            34,
+            23
+          ],
+          "coreRect": [
+            96,
+            88,
+            32,
+            21
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            946,
+            478,
+            34,
+            50
+          ],
+          "sourceRect": [
+            127,
+            57,
+            34,
+            50
+          ],
+          "coreRect": [
+            128,
+            58,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            154,
+            533,
+            34,
+            19
+          ],
+          "sourceRect": [
+            127,
+            105,
+            34,
+            19
+          ],
+          "coreRect": [
+            128,
+            106,
+            32,
+            17
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            984,
+            478,
+            34,
+            50
+          ],
+          "sourceRect": [
+            159,
+            66,
+            34,
+            50
+          ],
+          "coreRect": [
+            160,
+            67,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            374,
+            836,
+            34,
+            24
+          ],
+          "sourceRect": [
+            159,
+            114,
+            34,
+            24
+          ],
+          "coreRect": [
+            160,
+            115,
+            32,
+            22
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            888,
+            478,
+            34,
+            50
+          ],
+          "sourceRect": [
+            191,
+            81,
+            34,
+            50
+          ],
+          "coreRect": [
+            192,
+            82,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            334,
+            417,
+            34,
+            23
+          ],
+          "sourceRect": [
+            191,
+            129,
+            34,
+            23
+          ],
+          "coreRect": [
+            192,
+            130,
+            32,
+            21
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            859,
+            532,
+            34,
+            50
+          ],
+          "sourceRect": [
+            223,
+            103,
+            34,
+            50
+          ],
+          "coreRect": [
+            224,
+            104,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            907,
+            398,
+            32,
+            15
+          ],
+          "sourceRect": [
+            225,
+            151,
+            32,
+            15
+          ],
+          "coreRect": [
+            226,
+            152,
+            30,
+            13
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            868,
+            586,
+            34,
+            50
+          ],
+          "sourceRect": [
+            255,
+            109,
+            34,
+            50
+          ],
+          "coreRect": [
+            256,
+            110,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            345,
+            379,
+            34,
+            23
+          ],
+          "sourceRect": [
+            255,
+            157,
+            34,
+            23
+          ],
+          "coreRect": [
+            256,
+            158,
+            32,
+            21
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            897,
+            532,
+            34,
+            50
+          ],
+          "sourceRect": [
+            287,
+            123,
+            34,
+            50
+          ],
+          "coreRect": [
+            288,
+            124,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            334,
+            444,
+            34,
+            23
+          ],
+          "sourceRect": [
+            287,
+            171,
+            34,
+            23
+          ],
+          "coreRect": [
+            288,
+            172,
+            32,
+            21
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            885,
+            640,
+            34,
+            50
+          ],
+          "sourceRect": [
+            319,
+            141,
+            34,
+            50
+          ],
+          "coreRect": [
+            320,
+            142,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            372,
+            431,
+            34,
+            19
+          ],
+          "sourceRect": [
+            319,
+            189,
+            34,
+            19
+          ],
+          "coreRect": [
+            320,
+            190,
+            32,
+            17
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            906,
+            586,
+            34,
+            50
+          ],
+          "sourceRect": [
+            351,
+            152,
+            34,
+            50
+          ],
+          "coreRect": [
+            352,
+            153,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            372,
+            406,
+            34,
+            21
+          ],
+          "sourceRect": [
+            351,
+            200,
+            34,
+            21
+          ],
+          "coreRect": [
+            352,
+            201,
+            32,
+            19
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            935,
+            532,
+            34,
+            50
+          ],
+          "sourceRect": [
+            383,
+            167,
+            34,
+            50
+          ],
+          "coreRect": [
+            384,
+            168,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            459,
+            378,
+            34,
+            20
+          ],
+          "sourceRect": [
+            383,
+            215,
+            34,
+            20
+          ],
+          "coreRect": [
+            384,
+            216,
+            32,
+            18
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            973,
+            532,
+            34,
+            50
+          ],
+          "sourceRect": [
+            415,
+            179,
+            34,
+            50
+          ],
+          "coreRect": [
+            416,
+            180,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            334,
+            471,
+            34,
+            22
+          ],
+          "sourceRect": [
+            415,
+            227,
+            34,
+            22
+          ],
+          "coreRect": [
+            416,
+            228,
+            32,
+            20
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            888,
+            694,
+            34,
+            50
+          ],
+          "sourceRect": [
+            447,
+            193,
+            34,
+            50
+          ],
+          "coreRect": [
+            448,
+            194,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            383,
+            379,
+            34,
+            21
+          ],
+          "sourceRect": [
+            447,
+            241,
+            34,
+            21
+          ],
+          "coreRect": [
+            448,
+            242,
+            32,
+            19
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            923,
+            640,
+            34,
+            50
+          ],
+          "sourceRect": [
+            479,
+            211,
+            34,
+            50
+          ],
+          "coreRect": [
+            480,
+            212,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            834,
+            1005,
+            34,
+            16
+          ],
+          "sourceRect": [
+            479,
+            259,
+            34,
+            16
+          ],
+          "coreRect": [
+            480,
+            260,
+            32,
+            14
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            944,
+            586,
+            34,
+            50
+          ],
+          "sourceRect": [
+            511,
+            217,
+            34,
+            50
+          ],
+          "coreRect": [
+            512,
+            218,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            910,
+            978,
+            34,
+            24
+          ],
+          "sourceRect": [
+            511,
+            265,
+            34,
+            24
+          ],
+          "coreRect": [
+            512,
+            266,
+            32,
+            22
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            982,
+            586,
+            34,
+            50
+          ],
+          "sourceRect": [
+            543,
+            228,
+            34,
+            50
+          ],
+          "coreRect": [
+            544,
+            229,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            945,
+            891,
+            34,
+            26
+          ],
+          "sourceRect": [
+            543,
+            276,
+            34,
+            26
+          ],
+          "coreRect": [
+            544,
+            277,
+            32,
+            24
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            961,
+            640,
+            34,
+            50
+          ],
+          "sourceRect": [
+            575,
+            248,
+            34,
+            50
+          ],
+          "coreRect": [
+            576,
+            249,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            421,
+            402,
+            34,
+            20
+          ],
+          "sourceRect": [
+            575,
+            296,
+            34,
+            20
+          ],
+          "coreRect": [
+            576,
+            297,
+            32,
+            18
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            919,
+            748,
+            34,
+            50
+          ],
+          "sourceRect": [
+            607,
+            256,
+            34,
+            50
+          ],
+          "coreRect": [
+            608,
+            257,
+            32,
+            48
+          ]
+        },
+        {
+          "page": 2,
+          "rect": [
+            372,
+            454,
+            34,
+            19
+          ],
+          "sourceRect": [
+            607,
+            304,
+            34,
+            19
+          ],
+          "coreRect": [
+            608,
+            305,
+            32,
+            18
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            937,
+            116,
+            5,
+            49
+          ],
+          "sourceRect": [
+            639,
+            269,
+            5,
+            49
+          ],
+          "coreRect": [
+            640,
+            270,
+            4,
+            47
+          ]
+        }
+      ],
+      "trim": {
+        "excludedLowAlphaPixels": 92,
+        "maximumExcludedAlpha": 7,
+        "drawnBounds": [
+          0,
+          0,
+          644,
+          323
+        ]
+      }
+    },
+    "corner": {
+      "file": "corner.png",
+      "sourceSize": [
+        54,
+        91
+      ],
+      "pivot": [
+        27.0,
+        76.5
+      ],
+      "alphaBounds": [
+        2,
+        2,
+        52,
+        89
+      ],
+      "footprintWorld": [
+        50,
+        50
+      ],
+      "footprintWorldX": 50,
+      "footprintWorldY": 50,
+      "worldHeightTarget": 90,
+      "projectedFootprintWidth": 50,
+      "scale": 1.4142135623730951,
+      "renderShearY": 0,
+      "groundFit": {
+        "method": "corner near diamond vertex at lower alpha bound; footprint centre lies projectedFootprintWidth/4 above it",
+        "nearVertex": [
+          27.0,
+          89
+        ],
+        "cornerGroundCentreOffset": 12.5,
+        "nominalDiagonalSlopesDown": [
+          -0.5,
+          0.5
+        ]
+      },
+      "bodyHeightMeasurement": {
+        "approximateVerticalStoneBodyWorld": 87.6812408671319,
+        "peakAboveGroundCentreWorld": 105.3589103967956
+      },
+      "normalization": {
+        "crop": [
+          144,
+          157,
+          861,
+          1408
+        ],
+        "contentSize": [
+          50,
+          87
+        ],
+        "offset": [
+          2,
+          2
+        ],
+        "resample": "proportional Lanczos, no alpha mask/repaint/warp/rotation/mirror"
+      },
+      "generation": {
+        "tool": "built-in image_gen",
+        "promptChain": [
+          "corner-prompt.txt",
+          "corner-correction-prompt.txt"
+        ],
+        "selectedMaster": "corner-source.png",
+        "originalGeneratedOutput": "/Users/eduardoleale/.codex/generated_images/01a2081c-e0b7-7163-80da-7c209811d13c/exec-c5c7a0bb-da4f-49c4-8206-e99599ab4ae6.png",
+        "masterSha256": "1b3c2dd313c81a0a9c5f036341f98bac52bf7d8be85b5d18d2fcdc3fa6cb84c3",
+        "normalizedSha256": "8da5b275af633ec78ea08736971caf4ba726e93f4bfb45e046a3e0fa4dfb3c7d"
+      },
+      "pieces": [
+        {
+          "page": 0,
+          "rect": [
+            926,
+            694,
+            33,
+            50
+          ],
+          "sourceRect": [
+            0,
+            0,
+            33,
+            50
+          ],
+          "coreRect": [
+            1,
+            1,
+            31,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            908,
+            891,
+            33,
+            43
+          ],
+          "sourceRect": [
+            0,
+            48,
+            33,
+            43
+          ],
+          "coreRect": [
+            1,
+            49,
+            31,
+            41
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            999,
+            640,
+            23,
+            50
+          ],
+          "sourceRect": [
+            31,
+            0,
+            23,
+            50
+          ],
+          "coreRect": [
+            32,
+            1,
+            21,
+            48
+          ]
+        },
+        {
+          "page": 0,
+          "rect": [
+            208,
+            510,
+            23,
+            41
+          ],
+          "sourceRect": [
+            31,
+            48,
+            23,
+            41
+          ],
+          "coreRect": [
+            32,
+            49,
+            21,
+            39
+          ]
+        }
+      ],
+      "trim": {
+        "excludedLowAlphaPixels": 1,
+        "maximumExcludedAlpha": 1,
+        "drawnBounds": [
+          1,
+          1,
+          53,
+          90
+        ]
+      }
+    }
+  }
+}

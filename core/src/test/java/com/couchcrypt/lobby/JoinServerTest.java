@@ -4,6 +4,7 @@ import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
 import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.ItemCatalog;
+import com.couchcrypt.game.RunEquipment;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -20,6 +21,26 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JoinServerTest {
+    @Test void resultStatusReportsTheOutcomeAndClearsItOnReplay() throws Exception {
+        var state = new LobbyState(); var server = new JoinServer(0, state, Map.of()); server.open();
+        try (var http = HttpClient.newHttpClient()) {
+            var listener = new Client();
+            var socket = http.newWebSocketBuilder().buildAsync(URI.create("ws://127.0.0.1:"
+                + server.getListeningPort() + "/socket?room=" + server.room()), listener).get(3, TimeUnit.SECONDS);
+            listener.expect("joined");
+            state.publishResult(true);
+            JsonValue status;
+            do { status = listener.expect("status"); } while (!status.getString("phase").equals("results"));
+            assertEquals("victory", status.getString("outcome"));
+            state.publishResult(false);
+            do { status = listener.expect("status"); } while (!"defeat".equals(status.getString("outcome", null)));
+            state.setPhase(LobbyState.Phase.SESSION);
+            do { status = listener.expect("status"); } while (!status.getString("phase").equals("session"));
+            assertTrue(status.get("outcome").isNull());
+            socket.abort();
+        } finally { server.stop(); }
+    }
+
     @Test void lootStatusAllowsEquipmentChoiceWithoutGameplayInput() throws Exception {
         var state = new LobbyState(); var server = new JoinServer(0, state, Map.of()); server.open();
         try (var http = HttpClient.newHttpClient()) {
@@ -27,9 +48,9 @@ class JoinServerTest {
             var socket = http.newWebSocketBuilder().buildAsync(URI.create("ws://127.0.0.1:"
                 + server.getListeningPort() + "/socket?room=" + server.room()), listener).get(3, TimeUnit.SECONDS);
             listener.expect("joined");
-            var items = ItemCatalog.ALL.subList(0, 3).toArray(ItemCatalog.Item[]::new);
-            var cards = new PartyProgression.CardPreview[3];
-            for (int i = 0; i < 3; i++) cards[i] = new PartyProgression.CardPreview(items[i].icon(), 0,
+            var items = ItemCatalog.ALL.subList(0, 2).toArray(ItemCatalog.Item[]::new);
+            var cards = new PartyProgression.CardPreview[2];
+            for (int i = 0; i < 2; i++) cards[i] = new PartyProgression.CardPreview(items[i].icon(), 0,
                 "DEFENSE", "HELMET: EMPTY", "EMPTY", items[i].description());
             state.publishEquipment(0, 20, 21.5f, items, cards);
             state.setPhase(LobbyState.Phase.LOOT);
@@ -163,20 +184,24 @@ class JoinServerTest {
             var first = http.newWebSocketBuilder().buildAsync(url, one).get(3, TimeUnit.SECONDS);
             var second = http.newWebSocketBuilder().buildAsync(url, two).get(3, TimeUnit.SECONDS);
             one.expect("joined"); two.expect("joined");
-            var options = ItemCatalog.ALL.subList(0, 3).toArray(ItemCatalog.Item[]::new);
-            var cards = new PartyProgression.CardPreview[3];
-            for (int i = 0; i < 3; i++) cards[i] = new PartyProgression.CardPreview(options[i].icon(), 0,
+            var options = ItemCatalog.ALL.subList(0, 2).toArray(ItemCatalog.Item[]::new);
+            var cards = new PartyProgression.CardPreview[2];
+            for (int i = 0; i < 2; i++) cards[i] = new PartyProgression.CardPreview(options[i].icon(), 0,
                 "DEFENSE", "HELMET: REPLACES Old Guard", "+10 HP", options[i].description());
-            state.publishEquipment(0, 10, 26.5f, options, cards);
+            var origin = new RunEquipment.RewardOrigin("reliquary", "TIMED RELIQUARY 1:30", 90, 1);
+            state.publishEquipment(0, 10, 26.5f, options, cards, false, 30, origin);
             state.publishEquipment(1, 20, 30, options, cards);
             state.setPhase(LobbyState.Phase.SESSION);
             JsonValue status;
             do { status = one.expect("status"); } while (status.get("equipment").isNull());
             var offer = status.get("equipment");
             assertEquals(10, offer.getInt("id")); assertEquals(26.5f, offer.getFloat("secondsLeft"));
-            assertEquals(3, offer.get("options").size);
+            assertEquals(2, offer.get("options").size);
+            assertEquals("reliquary", offer.getString("source"));
+            assertEquals("TIMED RELIQUARY 1:30", offer.getString("sourceLabel"));
+            assertEquals(90, offer.getInt("sourceSeconds")); assertEquals(1, offer.getInt("rewardNumber"));
             assertTrue(status.get("progression").get("upgrade").isNull());
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < 2; i++) {
                 var json = offer.get("options").get(i); var item = options[i]; var card = cards[i];
                 assertEquals(item.id(), json.getString("id")); assertEquals(item.title(), json.getString("title"));
                 assertEquals(item.description(), json.getString("description")); assertEquals(item.slot().name(), json.getString("slot"));
@@ -188,6 +213,7 @@ class JoinServerTest {
             first.sendText("{\"type\":\"equipment\",\"offerId\":20,\"option\":0}", true).get(3, TimeUnit.SECONDS);
             first.sendText("{\"type\":\"equipment\",\"offerId\":10,\"option\":3}", true).get(3, TimeUnit.SECONDS);
             first.sendText("{\"type\":\"equipment\",\"player\":2,\"offerId\":10,\"option\":2}", true).get(3, TimeUnit.SECONDS);
+            first.sendText("{\"type\":\"equipment\",\"player\":2,\"offerId\":10,\"option\":1}", true).get(3, TimeUnit.SECONDS);
             var request = new LobbyState.EquipmentRequest();
             long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
             boolean found;
@@ -196,7 +222,7 @@ class JoinServerTest {
                 if (found) break;
                 java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(5));
             } while (System.nanoTime() < until);
-            assertTrue(found); assertEquals(10, request.offerId); assertEquals(2, request.option);
+            assertTrue(found); assertEquals(10, request.offerId); assertEquals(1, request.option);
             assertFalse(state.pollEquipment(1, request)); assertFalse(state.pollUpgrade(0, new LobbyState.UpgradeRequest()));
             assertEquals(10, state.equipmentFeedback(0).id(), "A click leaves the offer visible until simulation acknowledgment");
             state.publishEquipment(0, 0, 0, null, null);

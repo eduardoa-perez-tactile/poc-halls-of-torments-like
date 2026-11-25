@@ -1,0 +1,34 @@
+{
+  "frame": [
+    512,
+    96
+  ],
+  "crop": [
+    16,
+    121,
+    2168,
+    557
+  ],
+  "normalizedArt": {
+    "size": [
+      434,
+      88
+    ],
+    "offset": [
+      39,
+      4
+    ],
+    "scale": 0.2018348623853211
+  },
+  "track": {
+    "x": 101,
+    "y": 33,
+    "width": 350,
+    "height": 18
+  },
+  "title": {
+    "centerX": 276,
+    "topY": 84
+  },
+  "coordinates": "bottom-left of frame for track/title; crop/offset use image top-left"
+}

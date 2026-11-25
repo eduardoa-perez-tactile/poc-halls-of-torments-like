@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Bake the approved code-native orb HUD gradients/shapes into one bounded RGBA atlas.
 
-Source: approved .run/hud-proposal/proposal.html SVG/CSS, 2026-11-13.
+Source: original code-native HUD shapes, 2026-11-13; smooth orb rims, local
+low-health halo and original painted frames approved on 2026-11-24.
+See docs/hud-art.md and art-source/epic-combat-hud/README.md.
 Requires Pillow only for this offline asset-generation step; runtime has no dependency.
 """
 from pathlib import Path
@@ -19,10 +21,6 @@ REFLECTION = [(0, '#ffffff77'), (.17, '#ffffff00'), (.8, '#00000000'), (1, '#000
 
 def blank(size=128):
     return Image.new('RGBA', (size * SCALE, size * SCALE))
-
-
-def points(values):
-    return [(round(x * SCALE), round(y * SCALE)) for x, y in values]
 
 
 def gradient(width, height, stops, radial=None, vertical=False, horizontal=False):
@@ -96,20 +94,8 @@ def orb_rim(teal=False):
     metal = gradient(128, 128, TEAL if teal else GOLD)
     mask = circle_mask(128, 51, 5)
     rim = blank()
-    shapes = [[(13,39),(5,25),(22,28)], [(115,39),(123,25),(106,28)],
-              [(30,107),(23,119),(42,114)], [(98,107),(105,119),(86,114)]]
-    draw = ImageDraw.Draw(rim)
-    edge = ImageDraw.Draw(mask)
-    for shape in shapes:
-        draw.polygon(points(shape), fill='#242824')
-        edge.line(points(shape + [shape[0]]), fill=255, width=2*SCALE, joint='curve')
     overlay(rim, metal, mask)
     overlay(rim, metal, circle_mask(128, 44, 1.5))
-    draw = ImageDraw.Draw(rim)
-    draw.polygon(points([(64,7),(69,13),(64,20),(59,13)]), fill='#9bcbbf' if teal else '#e3c58b', outline='#29241b', width=SCALE)
-    diamond = Image.new('L', rim.size)
-    ImageDraw.Draw(diamond).polygon(points([(64,112),(69,119),(64,124),(59,119)]), fill=255)
-    overlay(rim, metal, diamond)
     shadow = blank()
     alpha = rim.getchannel('A').filter(ImageFilter.GaussianBlur(2*SCALE)).point(lambda value: round(value * .65))
     shadow.putalpha(alpha)
@@ -117,6 +103,16 @@ def orb_rim(teal=False):
     result.alpha_composite(shadow, (0, 2*SCALE))
     result.alpha_composite(rim)
     return result
+
+
+def low_health_glow():
+    """Bounded, soft ring; renderer varies only opacity, preserving the glass center."""
+    from PIL import ImageChops
+    mask = circle_mask(128, 51, 5).filter(ImageFilter.GaussianBlur(3.5*SCALE))
+    mask = ImageChops.multiply(mask, circle_mask(128, 60))
+    image = Image.new('RGBA', (128*SCALE, 128*SCALE), '#f0644d')
+    image.putalpha(mask)
+    return image.resize((64*SCALE, 64*SCALE), Image.Resampling.LANCZOS)
 
 
 def skill_rim(teal=False):
@@ -136,28 +132,39 @@ def dodge_back():
     return image
 
 
-def dodge_glyph():
-    image = blank(64)
-    ImageDraw.Draw(image).line(points([(22,40),(32,24),(40,24),(30,40)]), fill='white', width=3*SCALE, joint='curve')
-    ImageDraw.Draw(image).line(points([(27,28),(20,40)]), fill='white', width=3*SCALE)
-    return image
-
-
 def main():
-    atlas = Image.new('RGBA',(512*SCALE,256*SCALE))
+    atlas = Image.new('RGBA',(512*SCALE,352*SCALE))
+    rims = []
+    for name in ['gold', 'teal']:
+        with Image.open(ROOT/f'art-source/epic-combat-hud/orb-{name}-128.png') as source:
+            if source.size != (128, 128):
+                raise ValueError('Orb frames must use normalized 128x128 sources')
+            rims.append(source.convert('RGBA').resize((128*SCALE,128*SCALE),Image.Resampling.LANCZOS))
+    with Image.open(ROOT/'art-source/dodge-icon/dodge-128.png') as source:
+        if source.size != (128, 128):
+            raise ValueError('Dodge icon must use its normalized 128x128 source')
+        dodge_icon = source.convert('RGBA').resize((128*SCALE, 128*SCALE), Image.Resampling.LANCZOS)
     for image,x,y in [(orb_back(),0,0),(orb_blood(),128,0),(orb_reflection(),256,0),
-                      (orb_rim(),384,0),(orb_rim(True),0,128),
+                      (rims[0],384,0),(rims[1],0,128),
                       (skill_rim(),128,128),(skill_rim(True),192,128),
-                      (dodge_back(),256,128),(dodge_glyph(),320,128)]:
+                      (dodge_back(),256,128),(low_health_glow(),320,128),
+                      (dodge_icon,384,128)]:
         atlas.alpha_composite(image,(x*SCALE,y*SCALE))
     health = gradient(32,16,[(0,'#f0836b'),(.25,'#d52d30'),(.55,'#a21626'),(1,'#4a0b16')],vertical=True)
     atlas.alpha_composite(health,(256*SCALE,192*SCALE))
     for x,colors in [(288,[(0,'#886738'),(1,'#e5cf92')]),(320,[(0,'#385f5c'),(1,'#a2d3c3')])]:
         atlas.alpha_composite(gradient(32,8,colors,horizontal=True),(x*SCALE,192*SCALE))
     ImageDraw.Draw(atlas).rectangle((352*SCALE,192*SCALE,356*SCALE-1,196*SCALE-1),fill="white")
+    for name, size, target, x, y in [('epic-combat-hud/boss-frame-512x96.png', (512,96), (512,96), 0, 256),
+                                      ('boss-hud/fill-128x16.png', (128,16), (120,16), 260, 212)]:
+        with Image.open(ROOT/'art-source'/name) as source:
+            if source.size != size:
+                raise ValueError(f'Boss HUD {name} must use its normalized {size} source')
+            atlas.alpha_composite(source.convert('RGBA').resize(
+                (target[0]*SCALE,target[1]*SCALE),Image.Resampling.LANCZOS), (x*SCALE,y*SCALE))
     output=ROOT/'assets/art/hud-atlas.png'
-    atlas.resize((512,256),Image.Resampling.LANCZOS).save(output,optimize=True)
-    print(f'{output}:512x256RGBA,524288GPUbytes,staticapprovedSVG-derivedart')
+    atlas.resize((512,352),Image.Resampling.LANCZOS).save(output,optimize=True)
+    print(f'{output}:512x352RGBA,720896GPUbytes,managedoriginalHUDart')
 
 
 if __name__ == '__main__':

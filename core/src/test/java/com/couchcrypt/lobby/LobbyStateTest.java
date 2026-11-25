@@ -7,6 +7,28 @@ import com.couchcrypt.game.RunEquipment;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LobbyStateTest {
+    @Test void finishedOutcomeIsPublishedAtomicallyAndClearedBeforeTheNextRun() {
+        var state = new LobbyState(); state.join(null, "first", 1);
+        state.setPhase(LobbyState.Phase.SESSION);
+        assertTrue(state.input("first", 0, 1, 0, true, 2));
+        state.publishResult(true);
+        var victory = state.snapshot(3);
+        assertEquals(LobbyState.Phase.RESULTS, victory.phase());
+        assertEquals(LobbyState.Result.VICTORY, victory.result());
+        var controls = new LobbyState.Controls(); state.readControls(0, controls, 3);
+        assertEquals(0, controls.x); assertFalse(controls.dodge);
+        state.publishResult(true);
+        assertEquals(victory.revision(), state.snapshot(3).revision(), "Opening details does not republish unchanged results");
+        state.setPhase(LobbyState.Phase.SESSION);
+        assertNull(state.snapshot(4).result());
+        state.publishResult(false);
+        assertEquals(LobbyState.Result.DEFEAT, state.snapshot(5).result());
+        state.setPhase(LobbyState.Phase.LOBBY);
+        assertNull(state.snapshot(6).result());
+        state.setPhase(LobbyState.Phase.RESULTS);
+        assertNull(state.snapshot(7).result(), "A generic results phase cannot resurrect the last run's outcome");
+    }
+
     @Test void lootPhaseAcceptsOnlyEquipmentAndPreservesPendingChoicesAcrossRecovery() {
         var state = new LobbyState(); var joined = state.join(null, "first", 1);
         state.setPhase(LobbyState.Phase.SESSION);
@@ -41,7 +63,7 @@ class LobbyStateTest {
         assertFalse(state.chooseUpgrade("restored", 10, 0));
         assertFalse(state.chooseEquipment("restored", 22, 0), "An unacknowledged skill still has priority");
         state.publishProgression(0, 2, 0, 22, 0, 0, 0, null);
-        assertTrue(state.chooseEquipment("restored", 22, 2));
+        assertTrue(state.chooseEquipment("restored", 22, 1));
         state.setPhase(LobbyState.Phase.SESSION);
         assertTrue(state.pollEquipment(0, request), "Completion transition preserves the last gear acknowledgment");
         assertTrue(state.input("restored", 0, 1, 0, false, 5));
@@ -153,9 +175,9 @@ class LobbyStateTest {
         assertSame(expectedCard, state.equipmentFeedback(0).firstCard());
         assertFalse(state.chooseEquipment("a", 20, 0));
         assertFalse(state.chooseEquipment("intruder", 10, 0));
-        assertFalse(state.chooseEquipment("a", 10, -2)); assertFalse(state.chooseEquipment("a", 10, 3));
+        assertFalse(state.chooseEquipment("a", 10, -2)); assertFalse(state.chooseEquipment("a", 10, 2)); assertFalse(state.chooseEquipment("a", 10, 3));
         assertFalse(state.chooseUpgrade("a", 10, 0), "Gear IDs cannot select a skill offer");
-        assertTrue(state.chooseEquipment("a", 10, 2));
+        assertTrue(state.chooseEquipment("a", 10, 1));
         state.publishProgression(0, 2, 0, 22, 10, 2, 30, PartyProgression.Upgrade.values());
         var request = new LobbyState.EquipmentRequest();
         assertFalse(state.pollEquipment(0, request), "A new skill choice cancels an unconsumed hidden gear click");
@@ -181,7 +203,8 @@ class LobbyStateTest {
         var state = new LobbyState(); var joined = state.join(null, "a", 1);
         state.setPhase(LobbyState.Phase.SESSION);
         var options = equipmentOptions(); var cards = equipmentCards(options);
-        state.publishEquipment(0, 7, 24, options, cards);
+        var origin = new RunEquipment.RewardOrigin("reliquary", "TIMED RELIQUARY 1:30", 90, 2);
+        state.publishEquipment(0, 7, 24, options, cards, false, 30, origin);
         var request = new LobbyState.EquipmentRequest();
         state.chooseEquipment("a", 7, 0); state.setPhase(LobbyState.Phase.PAUSED);
         assertFalse(state.pollEquipment(0, request)); assertFalse(state.chooseEquipment("a", 7, 0));
@@ -190,10 +213,12 @@ class LobbyStateTest {
         state.setPhase(LobbyState.Phase.SESSION); assertTrue(state.chooseEquipment("a", 7, 1));
         state.setHostActive(false); assertFalse(state.pollEquipment(0, request));
         assertFalse(state.chooseEquipment("a", 7, 0));
-        state.setHostActive(true); assertTrue(state.chooseEquipment("a", 7, 2));
+        state.setHostActive(true); assertTrue(state.chooseEquipment("a", 7, 1));
         state.disconnected("a", 2); assertFalse(state.pollEquipment(0, request));
         state.join(joined.token(), "reconnected", 3);
         assertEquals(7, state.equipmentFeedback(0).id());
+        assertSame(origin, state.equipmentFeedback(0).origin());
+        assertEquals(90, state.equipmentFeedback(0).origin().scheduledSeconds());
         assertFalse(state.chooseEquipment("a", 7, 0)); assertTrue(state.chooseEquipment("reconnected", 7, 0));
         long oldGeneration = state.snapshot(3).first().generation();
         state.remove(0); state.setPhase(LobbyState.Phase.LOBBY); state.join(null, "fresh", 4);
@@ -216,18 +241,22 @@ class LobbyStateTest {
         for (float invalid : new float[]{Float.NaN, Float.POSITIVE_INFINITY, -1}) {
             state.publishEquipment(0, 2, invalid, options, cards); assertNull(state.equipmentFeedback(0));
         }
+        var three = ItemCatalog.ALL.subList(0, 3).toArray(ItemCatalog.Item[]::new);
+        var threeCards = java.util.Arrays.copyOf(cards, 3); threeCards[2] = cards[0];
+        state.publishEquipment(0, 9, 30, three, threeCards);
+        assertNull(state.equipmentFeedback(0), "Legacy three-item gear offers must not enter the two-item protocol");
         state.publishEquipment(0, 3, 30, options, null); assertNull(state.equipmentFeedback(0));
         cards[1] = null;
         state.publishEquipment(0, 4, 30, options, cards); assertNull(state.equipmentFeedback(0));
     }
 
     private static ItemCatalog.Item[] equipmentOptions() {
-        return ItemCatalog.ALL.subList(0, 3).toArray(ItemCatalog.Item[]::new);
+        return ItemCatalog.ALL.subList(0, 2).toArray(ItemCatalog.Item[]::new);
     }
 
     private static PartyProgression.CardPreview[] equipmentCards(ItemCatalog.Item[] options) {
-        var cards = new PartyProgression.CardPreview[3];
-        for (int i = 0; i < 3; i++) cards[i] = new PartyProgression.CardPreview(options[i].icon(), 0,
+        var cards = new PartyProgression.CardPreview[2];
+        for (int i = 0; i < 2; i++) cards[i] = new PartyProgression.CardPreview(options[i].icon(), 0,
             "DEFENSE", "HELMET: EMPTY", "EMPTY", options[i].description());
         return cards;
     }

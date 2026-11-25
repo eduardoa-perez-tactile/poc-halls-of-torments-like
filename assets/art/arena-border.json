@@ -1,0 +1,208 @@
+{
+  "version": 1,
+  "file": "arena-border.png",
+  "size": [
+    512,
+    256
+  ],
+  "tileWidth": 120.0,
+  "tileHeight": 60.0,
+  "anchor": [
+    76.0,
+    1.0
+  ],
+  "padding": 2,
+  "edgeExtrusion": 1,
+  "tiles": [
+    {
+      "id": "interior",
+      "rect": [
+        386,
+        73,
+        119,
+        60
+      ],
+      "sourceSize": [
+        152,
+        84
+      ],
+      "trimOffset": [
+        16,
+        1
+      ],
+      "anchor": [
+        76.0,
+        1.0
+      ]
+    },
+    {
+      "id": "edge-nw",
+      "rect": [
+        262,
+        142,
+        120,
+        60
+      ],
+      "sourceSize": [
+        152,
+        84
+      ],
+      "trimOffset": [
+        15,
+        1
+      ],
+      "anchor": [
+        76.0,
+        1.0
+      ]
+    },
+    {
+      "id": "edge-ne",
+      "rect": [
+        138,
+        142,
+        120,
+        61
+      ],
+      "sourceSize": [
+        152,
+        84
+      ],
+      "trimOffset": [
+        16,
+        0
+      ],
+      "anchor": [
+        76.0,
+        1.0
+      ]
+    },
+    {
+      "id": "edge-sw",
+      "rect": [
+        2,
+        148,
+        132,
+        66
+      ],
+      "sourceSize": [
+        152,
+        84
+      ],
+      "trimOffset": [
+        3,
+        1
+      ],
+      "anchor": [
+        76.0,
+        1.0
+      ]
+    },
+    {
+      "id": "edge-se",
+      "rect": [
+        2,
+        78,
+        132,
+        66
+      ],
+      "sourceSize": [
+        152,
+        84
+      ],
+      "trimOffset": [
+        16,
+        1
+      ],
+      "anchor": [
+        76.0,
+        1.0
+      ]
+    },
+    {
+      "id": "corner-n",
+      "rect": [
+        138,
+        78,
+        121,
+        60
+      ],
+      "sourceSize": [
+        152,
+        84
+      ],
+      "trimOffset": [
+        15,
+        1
+      ],
+      "anchor": [
+        76.0,
+        1.0
+      ]
+    },
+    {
+      "id": "corner-w",
+      "rect": [
+        386,
+        2,
+        119,
+        67
+      ],
+      "sourceSize": [
+        152,
+        84
+      ],
+      "trimOffset": [
+        16,
+        0
+      ],
+      "anchor": [
+        76.0,
+        1.0
+      ]
+    },
+    {
+      "id": "corner-e",
+      "rect": [
+        151,
+        2,
+        120,
+        67
+      ],
+      "sourceSize": [
+        152,
+        84
+      ],
+      "trimOffset": [
+        16,
+        0
+      ],
+      "anchor": [
+        76.0,
+        1.0
+      ]
+    },
+    {
+      "id": "corner-s",
+      "rect": [
+        2,
+        2,
+        145,
+        72
+      ],
+      "sourceSize": [
+        152,
+        84
+      ],
+      "trimOffset": [
+        4,
+        1
+      ],
+      "anchor": [
+        76.0,
+        1.0
+      ]
+    }
+  ],
+  "sourceAtlasSha256": "610cfa74f66f50839953f2a6624df15dbe5f124830fe36d34fdf083598a4b6ab"
+}

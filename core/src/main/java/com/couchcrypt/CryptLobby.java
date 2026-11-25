@@ -8,6 +8,7 @@ import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Actor;
@@ -17,8 +18,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
-import com.badlogic.gdx.scenes.scene2d.ui.Button;
-import com.badlogic.gdx.scenes.scene2d.utils.BaseDrawable;
 import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
@@ -33,6 +32,8 @@ import com.couchcrypt.game.HudArt;
 import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.GameAudio;
 import com.couchcrypt.game.ArenaRenderer;
+import com.couchcrypt.game.ActorAnimation;
+import com.couchcrypt.game.DefeatTransition;
 import com.couchcrypt.lobby.JoinServer;
 import com.couchcrypt.lobby.LanAddress;
 import com.couchcrypt.lobby.LobbyState;
@@ -43,7 +44,10 @@ import com.couchcrypt.ui.MenuSceneArt;
 import com.couchcrypt.ui.BuildIcons;
 import com.couchcrypt.ui.ItemArt;
 import com.couchcrypt.ui.RunDetailsView;
+import com.couchcrypt.ui.ResultsSummaryView;
 import com.couchcrypt.ui.CharacterInfoView;
+import com.couchcrypt.ui.HeroSelectionView;
+import com.couchcrypt.ui.HeroPortraitDrawable;
 import com.couchcrypt.ui.LevelUpView;
 import com.couchcrypt.game.FrameMetrics;
 import com.badlogic.gdx.graphics.glutils.PixmapTextureData;
@@ -63,9 +67,12 @@ public final class CryptLobby extends ApplicationAdapter {
     private Stage stage;
     private UiArt art;
     private Image background, shade;
+    private Image defeatCover;
+    private final DefeatTransition defeatTransition = new DefeatTransition();
     private Drawable homeBackground, partyBackground;
     private JoinServer server;
     private Table content, overlay;
+    private Table fontParityOverlay;
     private final List<RemoteButton> buttons = new ArrayList<>();
     private List<RemoteButton> savedButtons;
     private int focus, savedFocus;
@@ -87,12 +94,16 @@ public final class CryptLobby extends ApplicationAdapter {
     private ItemArt itemArt;
     private boolean resultDetails;
     private boolean equipmentDetails;
-    private RemoteButton resultDetailsLink;
+    private int resultPage;
+    private ResultsSummaryView resultSummary;
     private int characterInfoSlot, characterInfoFocus;
     private boolean characterInfoInvitation;
+    private boolean characterInfoFromChooser;
+    private ArenaWorld.Hero characterInfoPreview;
+    private HeroSelectionView heroChooser;
     private final ArenaWorld.Hero[] selectedHeroes = {ArenaWorld.Hero.WARDEN, ArenaWorld.Hero.RANGER};
     private int notifiedWave = 1, notifiedEliteKills;
-    private boolean bossAnnounced, enrageAnnounced, hudPreview;
+    private boolean bossAnnounced, sovereignAnnounced, enrageAnnounced, hudPreview;
     private final LobbyState.Controls[] controls = {new LobbyState.Controls(), new LobbyState.Controls()};
     private final long[] generations = new long[2];
     private final LobbyState.UpgradeRequest[] upgradeRequests = {new LobbyState.UpgradeRequest(), new LobbyState.UpgradeRequest()};
@@ -118,18 +129,27 @@ public final class CryptLobby extends ApplicationAdapter {
     public CryptLobby(GameConfig config) { this.config = config; }
 
     @Override public void create() {
-        if (config.profile()) frameMetrics = new FrameMetrics();
+        long startupBegin = config.profile() ? System.nanoTime() : 0;
+        if (config.profile()) {
+            frameMetrics = new FrameMetrics();
+            world.setDiagnosticsEnabled(true);
+        }
         Gdx.graphics.setForegroundFPS(60);
         Gdx.input.setCatchKey(Input.Keys.BACK, true);
         stage = new Stage(new FitViewport(1920, 1080));
+        long startupStage = config.profile() ? System.nanoTime() : 0;
         art = new UiArt();
+        startupStage = profileStartup("uiArt", startupStage);
         gameArt = new GameArt();
+        startupStage = profileStartup("gameArt", startupStage);
         outcomeTitles = new OutcomeArt.Titles();
         buildIcons = new BuildIcons();
         itemArt = new ItemArt();
         hudArt = new HudArt();
-        arena = new ArenaRenderer(gameArt, art, buildIcons, hudArt);
+        startupStage = profileStartup("sharedTitlesIconsHud", startupStage);
+        arena = new ArenaRenderer(gameArt, art, buildIcons, hudArt, frameMetrics);
         audio = new GameAudio();
+        startupStage = profileStartup("rendererAudio", startupStage);
         if (residentArtBytes() + 360L * 360 * 4 > 32L * 1_048_576)
             throw new IllegalStateException("Combined art and join QR exceed 32 MiB texture budget");
         Gdx.app.log("GameArt", "Combined resident textures: " + residentArtBytes() / 1_048_576f + " MiB");
@@ -145,13 +165,47 @@ public final class CryptLobby extends ApplicationAdapter {
         levelUpView = new LevelUpView(art); levelUpView.setVisible(false); stage.addActor(levelUpView);
         diagnostics = art.label("", art.small, UiArt.IVORY);
         diagnostics.setPosition(105, 22); diagnostics.setVisible(false); stage.addActor(diagnostics);
+        defeatCover = new Image(art.pixel);
+        defeatCover.setBounds(0, 0, 1920, 1080);
+        defeatCover.setColor(0, 0, 0, 0);
+        defeatCover.setTouchable(Touchable.enabled);
+        defeatCover.setVisible(false); stage.addActor(defeatCover);
         host = config.advertisedHost();
         if (host == null) host = LanAddress.find().stream().findFirst().orElse(null);
+        startupStage = profileStartup("initialUi", startupStage);
         openServer();
+        startupStage = profileStartup("phoneAssetsServer", startupStage);
         Gdx.input.setInputProcessor(new InputMultiplexer(new InputAdapter() {
             @Override public boolean keyDown(int key) { return key(key); }
         }, stage));
         home();
+        profileStartup("homeLayout", startupStage);
+        if (config.profile()) {
+            profileStartup("createTotal", startupBegin);
+            Gdx.app.log("ProfileMemory", "uiTextureBytes=" + art.textureBytes
+                + " uiRetainedPixmapBytes=" + art.retainedPixmapBytes
+                + " gameplayTextureBytes=" + gameArt.textureBytes
+                + " gameplayRetainedPixmapBytes=" + gameArt.retainedPixmapBytes
+                + " hudTextureBytes=" + hudArt.textureBytes
+                + " titlesTextureBytes=" + outcomeTitles.textureBytes
+                + " skillsTextureBytes=" + buildIcons.textureBytes
+                + " itemsTextureBytes=" + itemArt.textureBytes
+                + " textureLimitBytes=" + 32L * 1_048_576
+                + " floorCachedQuads=" + arena.cachedFloorQuads
+                + " floorUsedVertexBytes=" + arena.cachedFloorQuads * 80L
+                + " floorUsedIndexBytes=" + arena.cachedFloorQuads * 12L
+                + " floorCapacityVertexBytes=" + com.couchcrypt.game.EngravedFloorArt.MAX_FLOOR_QUADS * 80L
+                + " floorCapacityIndexBytes=" + com.couchcrypt.game.EngravedFloorArt.MAX_FLOOR_QUADS * 12L
+                + " medallionVertexBytes=" + arena.medallionQuads() * 80L);
+        }
+    }
+
+    /** Startup wall durations are separate from settled frame measurements. */
+    private long profileStartup(String stageName, long begin) {
+        if (!config.profile()) return 0;
+        long end = System.nanoTime();
+        Gdx.app.log("ProfileStartup", "stage=" + stageName + " wallNs=" + Math.max(0, end - begin));
+        return System.nanoTime();
     }
 
     private void openServer() {
@@ -180,7 +234,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private void reset(Screen next) {
         if (overlay != null) closeModal();
         screen = next; content.clearChildren(); content.setBackground((com.badlogic.gdx.scenes.scene2d.utils.Drawable) null); buttons.clear(); focus = 0;
-        resultDetailsLink = null;
+        resultSummary = null;
         if (next != Screen.RESULTS) {
             resultDetails = false;
             art.menuScene.setMood(MenuSceneArt.Mood.NEUTRAL);
@@ -279,13 +333,14 @@ public final class CryptLobby extends ApplicationAdapter {
         card.pad(24);
         card.add(art.label(index == 0 ? "PLAYER I" : "PLAYER II", art.section,
             index == 0 ? UiArt.GOLD : UiArt.PLAYER_TWO)).padBottom(10).row();
-        Image portrait = new Image(selectedHeroes[index] == ArenaWorld.Hero.WARDEN ? art.knight : art.ranger);
+        Image portrait = new Image(new HeroPortraitDrawable(
+            selectedHeroes[index] == ArenaWorld.Hero.WARDEN ? art.wardenFace : art.rangerFace, 1));
         portrait.setScaling(Scaling.fit);
-        card.add(portrait).size(380, 300).padBottom(10).row();
+        card.add(portrait).size(360).padBottom(10).row();
         Label status = art.label("AWAITING A SOUL", art.body, UiArt.GOLD);
         if (index == 0) firstStatus = status; else secondStatus = status;
         card.add(status).padBottom(12).row();
-        card.add(art.label(selectedHeroes[index] == ArenaWorld.Hero.WARDEN ? "WARDEN  /  SWORD SWEEP" : "RANGER  /  BOW", art.small, UiArt.MUTED));
+        card.add(art.label(selectedHeroes[index] == ArenaWorld.Hero.WARDEN ? "WARDEN  /  SWORD SWEEP" : "RANGER  /  ARCANE CROSSBOW", art.small, UiArt.MUTED));
         return card;
     }
 
@@ -351,17 +406,7 @@ public final class CryptLobby extends ApplicationAdapter {
         var player = index == 0 ? snapshot.first() : snapshot.second();
         if (screen == Screen.LOBBY || !world.players[index].active || generations[index] != player.generation()) {
             boolean invitation = screen == Screen.INVITE;
-            List<String> labels = new ArrayList<>(); List<Runnable> actions = new ArrayList<>();
-            labels.add("WARDEN  /  SWORD SWEEP"); actions.add(() -> { selectedHeroes[index] = ArenaWorld.Hero.WARDEN; showPartyScreen(invitation); });
-            labels.add("WARDEN INFO"); actions.add(() -> showCharacterInfo(index, ArenaWorld.Hero.WARDEN, invitation, 1));
-            labels.add("RANGER  /  BOW"); actions.add(() -> { selectedHeroes[index] = ArenaWorld.Hero.RANGER; showPartyScreen(invitation); });
-            labels.add("RANGER INFO"); actions.add(() -> showCharacterInfo(index, ArenaWorld.Hero.RANGER, invitation, 3));
-            if (player.reserved()) {
-                labels.add("REMOVE CONTROLLER"); actions.add(() -> { server.remove(index); showPartyScreen(invitation); });
-            }
-            labels.add("BACK"); actions.add(this::closeModal);
-            modal("Choose a hero", "Attacks are automatic. View a hero's story, base stats and available skills before choosing.",
-                labels.toArray(String[]::new), actions.toArray(Runnable[]::new));
+            showHeroChooser(index, invitation, selectedHeroes[index], selectedHeroes[index].ordinal());
             return;
         }
         if (!player.reserved()) {
@@ -374,8 +419,30 @@ public final class CryptLobby extends ApplicationAdapter {
                 () -> { server.remove(index); closeModal(); updateStatus(); }});
     }
 
+    private void showHeroChooser(int slot, boolean invitation, ArenaWorld.Hero preview, int returnFocus) {
+        if (overlay != null) closeModal();
+        modalKind = Modal.GENERAL;
+        savedButtons = new ArrayList<>(buttons); savedFocus = focus; buttons.clear();
+        overlay = new Table(); overlay.setFillParent(true); overlay.setBackground(art.scrim);
+        overlay.setTouchable(Touchable.enabled);
+        var snapshot = state.snapshot(System.currentTimeMillis());
+        boolean reserved = (slot == 0 ? snapshot.first() : snapshot.second()).reserved();
+        heroChooser = new HeroSelectionView(art, slot, preview,
+            () -> {
+                selectedHeroes[slot] = heroChooser.selectedHero();
+                showPartyScreen(invitation); setFocus(slot);
+            },
+            () -> showCharacterInfo(slot, heroChooser.selectedHero(), invitation, focus),
+            reserved ? () -> { server.remove(slot); showPartyScreen(invitation); setFocus(slot); } : null,
+            buttons::add);
+        overlay.add(heroChooser).width(1380);
+        stage.addActor(overlay); overlay.validate(); setFocus(returnFocus);
+    }
+
     private void showCharacterInfo(int slot, ArenaWorld.Hero hero, boolean invitation, int returnFocus) {
         characterInfoSlot = slot; characterInfoInvitation = invitation; characterInfoFocus = returnFocus;
+        characterInfoFromChooser = heroChooser != null;
+        characterInfoPreview = hero;
         reset(Screen.CHARACTER_INFO);
         // Leave the existing LOBBY/INVITE phase intact: viewing lore never changes joining or a paused run.
         content.setBackground(art.scrim); content.pad(0);
@@ -386,18 +453,23 @@ public final class CryptLobby extends ApplicationAdapter {
 
     private void backFromCharacterInfo() {
         showPartyScreen(characterInfoInvitation);
-        managePlayer(characterInfoSlot);
+        setFocus(characterInfoSlot);
+        if (characterInfoFromChooser)
+            showHeroChooser(characterInfoSlot, characterInfoInvitation, characterInfoPreview, characterInfoFocus);
+        else managePlayer(characterInfoSlot);
         setFocus(characterInfoFocus);
     }
 
     private void startSession() {
         if (state.snapshot(System.currentTimeMillis()).connected() < 1 || server == null || host == null) return;
+        defeatTransition.reset(); defeatCover.setVisible(false);
         world.reset(); hudState.reset(); finalWarning = false; notifiedLevel = 1; notifiedReliquaries = 0;
-        notifiedWave = 1; notifiedEliteKills = 0; bossAnnounced = enrageAnnounced = hudPreview = false;
+        notifiedWave = 1; notifiedEliteKills = 0;
+        bossAnnounced = sovereignAnnounced = enrageAnnounced = hudPreview = false;
         for (int i = 0; i < 2; i++) { previouslyAlive[i] = false; lowHealthNotified[i] = false; }
         reconcilePlayers();
         audio.reset(world);
-        hudState.notify("THE DESCENT BEGINS", "Survive the waves, then defeat the Hollow Sovereign.", ArenaHudState.Tone.INFO, 4f);
+        hudState.notify("THE DESCENT BEGINS", "Face the Sovereign at twelve minutes, then defeat the Grave King.", ArenaHudState.Tone.INFO, 4f);
         arena.resetCameras();
         showSession();
         publishProgression();
@@ -523,27 +595,46 @@ public final class CryptLobby extends ApplicationAdapter {
 
     /** Profiling-only sample data for reviewing both end screens without playing a full run. */
     private void previewResults(boolean victory) {
+        defeatTransition.reset(); defeatCover.setVisible(false);
+        if (!victory) {
+            // Keep the current arena/build for the transition fixture, without a scene jump before death.
+            if (screen != Screen.SESSION) showSession();
+            for (var player : world.players) if (player.active) { player.alive = false; player.health = 0; }
+            world.outcome = ArenaWorld.Outcome.DEFEAT;
+            beginDefeatTransition();
+            return;
+        }
+        boolean first = world.players[0].active, second = world.players[1].active;
         world.reset();
-        for (int i = 0; i < 2; i++) { world.setHero(i, selectedHeroes[i]); world.activatePlayer(i); }
-        world.progression.addXp(96);
+        for (int i = 0; i < 2; i++) if (i == 0 ? first : second) {
+            world.setHero(i, selectedHeroes[i]); world.activatePlayer(i);
+        }
+        previewHud(18);
         for (int i = 0; i < 2; i++) {
-            while (world.progression.offers[i].pending)
-                world.progression.choose(i, world.progression.offers[i].id, 1);
             var player = world.players[i];
-            player.kills = i == 0 ? 81 : 62; player.damageDealt = i == 0 ? 4820 : 3960;
-            player.damageTaken = i == 0 ? 154 : 112; player.revives = i == 0 ? 1 : 2;
+            if (!player.active) continue;
+            player.kills = i == 0 ? 1081 : 962; player.damageDealt = i == 0 ? 148820 : 123960;
+            player.damageTaken = i == 0 ? 854 : 712; player.revives = first && second ? i == 0 ? 1 : 2 : 0;
         }
         previewEquipment();
-        world.elapsed = 214; world.kills = 143; world.souls = 96;
+        world.debugStartBoss();
+        if (world.boss != null) world.boss.health = victory ? 0 : world.boss.maxHealth * .12f;
+        world.elapsed = 1234; world.kills = world.players[0].kills + world.players[1].kills;
         world.bossDefeated = victory;
         world.outcome = victory ? ArenaWorld.Outcome.VICTORY : ArenaWorld.Outcome.DEFEAT;
         showResults();
     }
 
+    private void beginDefeatTransition() {
+        world.clearInputs();
+        defeatTransition.begin();
+        defeatCover.setVisible(true); defeatCover.toFront();
+    }
+
     private void prepareResults() {
         boolean victory = world.outcome == ArenaWorld.Outcome.VICTORY;
         art.menuScene.setMood(victory ? MenuSceneArt.Mood.VICTORY : MenuSceneArt.Mood.DEFEAT);
-        state.setPhase(LobbyState.Phase.RESULTS);
+        state.publishResult(victory);
         background.setDrawable(homeBackground);
         background.setVisible(true); shade.setVisible(false);
     }
@@ -552,26 +643,11 @@ public final class CryptLobby extends ApplicationAdapter {
         reset(Screen.RESULTS); prepareResults(); resultDetails = false;
         content.pad(0);
         boolean victory = world.outcome == ArenaWorld.Outcome.VICTORY;
-        Image title = new Image(outcomeTitles.get(victory)); title.setScaling(Scaling.fit);
-        title.setTouchable(Touchable.disabled); title.setBounds(360, 790, 1200, 230); content.addActor(title);
-        Label subtitle = art.label(victory ? "THE HOLLOW SOVEREIGN HAS FALLEN" : "THE CRYPT CLAIMS ANOTHER SOUL", art.section, UiArt.IVORY);
-        subtitle.setFontScale(.88f); subtitle.setAlignment(Align.center);
-        subtitle.setBounds(240, 730, 1440, 60); content.addActor(subtitle);
-        Label summary = art.label(formatTime(world.elapsed) + "   /   LEVEL " + world.progression.level + "   /   " + world.kills + " SLAIN", art.section, UiArt.IVORY);
-        summary.setFontScale(.85f); summary.setAlignment(Align.center);
-        summary.setBounds(400, 250, 1120, 40); content.addActor(summary);
-        Table actions = new Table();
-        actions.add(resultAction(victory ? "PLAY AGAIN" : "TRY AGAIN", this::playAgain)).width(500).height(94).padRight(32);
-        actions.add(resultAction("RETURN TO LOBBY", this::showLobby)).width(500).height(94);
-        actions.setBounds(444, 126, 1032, 94); content.addActor(actions);
-        Button.ButtonStyle normal = new Button.ButtonStyle(), focused = new Button.ButtonStyle();
-        normal.up = new ResultUnderline(false); normal.down = new ResultUnderline(true);
-        focused.up = focused.down = new ResultUnderline(true);
-        resultDetailsLink = new RemoteButton(normal, focused, this::showRunDetails);
-        resultDetailsLink.pad(0); resultDetailsLink.add(art.label("RUN DETAILS", art.section, UiArt.IVORY));
-        resultDetailsLink.setBounds(800, 46, 320, 58);
-        buttons.add(resultDetailsLink); content.addActor(resultDetailsLink);
-        content.validate(); actions.validate(); setFocus(0);
+        resultSummary = ResultsSummaryView.create(art, world, outcomeTitles.get(victory),
+            this::playAgain, this::showLobby, this::showRunDetails, buttons::add);
+        content.add(resultSummary.root).grow();
+        resultSummary.updateParty(state.snapshot(System.currentTimeMillis()).connected());
+        content.validate(); setFocus(0);
     }
 
     private void playAgain() {
@@ -579,27 +655,16 @@ public final class CryptLobby extends ApplicationAdapter {
         else showLobby();
     }
 
-    private RemoteButton resultAction(String text, Runnable command) {
-        RemoteButton result = button(command);
-        result.add(art.label(text, art.section, UiArt.BUTTON_INK));
-        return result;
+    private void showRunDetails() { equipmentDetails = false; resultPage = 0; renderRunDetails(); }
+
+    private void toggleRunDetails() { equipmentDetails = !equipmentDetails; resultPage = 0; renderRunDetails(); setFocus(1); }
+
+    private void turnResultPage(int direction) {
+        resultPage = Math.max(0, Math.min(resultPage + direction, RunDetailsView.pageCount(world, equipmentDetails) - 1));
+        renderRunDetails();
+        int target = direction < 0 ? 2 : 3;
+        setFocus(buttons.get(target).isDisabled() ? (direction < 0 ? 3 : 2) : target);
     }
-
-    private final class ResultUnderline extends BaseDrawable {
-        private final boolean selected;
-        private ResultUnderline(boolean selected) { this.selected = selected; }
-        @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float x, float y, float width, float height) {
-            Color saved = batch.getColor();
-            float r = saved.r, g = saved.g, b = saved.b, a = saved.a;
-            batch.setColor(UiArt.GOLD.r, UiArt.GOLD.g, UiArt.GOLD.b, selected ? 1f : .45f);
-            art.pixel.draw(batch, x + 28, y + 2, width - 56, selected ? 4 : 1);
-            batch.setColor(r, g, b, a);
-        }
-    }
-
-    private void showRunDetails() { equipmentDetails = false; renderRunDetails(); }
-
-    private void toggleRunDetails() { equipmentDetails = !equipmentDetails; renderRunDetails(); setFocus(1); }
 
     private void renderRunDetails() {
         reset(Screen.RESULTS); prepareResults(); resultDetails = true;
@@ -608,7 +673,8 @@ public final class CryptLobby extends ApplicationAdapter {
             throw new IllegalStateException("Run details exceeds combined texture budget");
         content.setBackground(art.scrim); content.pad(0);
         content.add(RunDetailsView.create(art, world, buildIcons.regions, itemArt.regions,
-            equipmentDetails, this::toggleRunDetails, this::backToResults, buttons::add)).grow();
+            equipmentDetails, resultPage, () -> turnResultPage(-1), () -> turnResultPage(1),
+            this::toggleRunDetails, this::backToResults, buttons::add)).grow();
         content.validate(); setFocus(0);
     }
 
@@ -659,7 +725,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private boolean partyScreen() { return screen == Screen.LOBBY || screen == Screen.INVITE; }
 
     private void help() {
-        modal("Answer the call", "1. Connect one or two phones to the same Wi-Fi as the TV.\n\n2. Open the lobby and scan its QR code with your phone.\n\n3. Start solo, or connect a second phone for co-op.\n\nChoose a hero on the TV. Move with the phone joystick and tap Dodge. Attacks are automatic. Shared XP grants personal phone upgrades. Stay near a fallen ally to revive them. Survive the waves, then defeat the Sovereign.\n\nA companion can also join later: press Back to pause, then choose Invite Player 2.",
+        modal("Answer the call", "1. Connect one or two phones to the same Wi-Fi as the TV.\n\n2. Open the lobby and scan its QR code with your phone.\n\n3. Start solo, or connect a second phone for co-op.\n\nChoose a hero on the TV. Move with the phone joystick and tap Dodge. Attacks are automatic. Shared XP grants personal phone upgrades. Stay near a fallen ally to revive them. The Hollow Sovereign arrives at twelve minutes. Survive twenty minutes, then defeat the Grave King.\n\nA companion can also join later: press Back to pause, then choose Invite Player 2.",
             new String[]{"BACK"}, new Runnable[]{this::closeModal});
     }
 
@@ -712,6 +778,7 @@ public final class CryptLobby extends ApplicationAdapter {
     private void closeModal() {
         if (overlay == null) return;
         overlay.remove(); overlay = null;
+        heroChooser = null;
         pauseResume = null; pauseMessage = modalMessage = null; modalKind = Modal.GENERAL;
         buttons.clear(); buttons.addAll(savedButtons); savedButtons = null;
         setFocus(savedFocus);
@@ -734,9 +801,9 @@ public final class CryptLobby extends ApplicationAdapter {
     private void setFocus(int index) {
         if (buttons.isEmpty()) return;
         focus = Math.max(0, Math.min(index, buttons.size() - 1));
+        if (heroChooser != null) heroChooser.focusChanged(focus);
         for (int i = 0; i < buttons.size(); i++) {
             RemoteButton button = buttons.get(i); button.focused(i == focus);
-            if (button == resultDetailsLink) ((Label) button.getChildren().first()).setColor(i == focus ? UiArt.GOLD : UiArt.IVORY);
         }
     }
 
@@ -782,7 +849,80 @@ public final class CryptLobby extends ApplicationAdapter {
         }
     }
 
+    /** Profile-only camera landmarks avoid walking a survival run to inspect the new room. */
+    private int arenaPreviewIndex = -1;
+    private int enemySizePreviewFacing, enemyCastPreviewFacing;
+    private void previewArenaLandmark() {
+        arenaPreviewIndex = (arenaPreviewIndex + 1) % 8;
+        float x = switch (arenaPreviewIndex) { case 0, 1 -> 0f; case 2 -> 600f;
+            case 3 -> -1100f; case 4, 5 -> 1100f; case 6 -> -1100f; default -> 0f; };
+        float y = switch (arenaPreviewIndex) { case 0 -> 650f; case 1 -> -440f; case 2 -> 0f;
+            case 3, 5 -> -780f; case 4, 6 -> 780f; default -> 0f; };
+        world.debugSceneryView(x, y);
+        arena.resetCameras();
+    }
+
+    /** Profile-only opaque glyph fixture; does not pause or change the underlying screen. */
+    private void toggleFontParityOverlay() {
+        if (fontParityOverlay != null) {
+            fontParityOverlay.remove(); fontParityOverlay = null;
+            return;
+        }
+        Table fixture = new Table();
+        fixture.setFillParent(true);
+        fixture.setTouchable(Touchable.disabled);
+        fixture.setBackground(((TextureRegionDrawable) art.pixel).tint(Color.BLACK));
+        BitmapFont[] fonts = {art.title, art.heading, art.section, art.body, art.small};
+        Color[] colors = {UiArt.GOLD, UiArt.IVORY, UiArt.PLAYER_TWO, UiArt.MUTED, UiArt.GREEN};
+        for (int row = 0; row < fonts.length; row++) {
+            float bottom = 810 - row * 180;
+            Label normal = art.label("AV To WA 0123", fonts[row], colors[row]);
+            normal.setAlignment(Align.left);
+            normal.setBounds(100.25f, bottom + .5f, 860, 160);
+            fixture.addActor(normal);
+            Label scaled = art.label("AV To 0123\nRank 3 +20%", fonts[row], colors[(row + 1) % colors.length]);
+            scaled.setFontScale(.73f); scaled.setAlignment(Align.left);
+            scaled.setBounds(1020.5f, bottom + .25f, 800, 160);
+            fixture.addActor(scaled);
+        }
+        fontParityOverlay = fixture;
+        stage.addActor(fixture); fixture.toFront();
+    }
+
     private boolean key(int key) {
+        if (defeatTransition.active()) return true;
+        if (key == Input.Keys.END && config.profile()) {
+            toggleFontParityOverlay(); return true;
+        }
+        if (key == Input.Keys.INSERT && config.profile()) {
+            long begin = System.nanoTime();
+            art.reloadFileTextures(); buildIcons.reloadFileTexture(); outcomeTitles.reloadFileTextures();
+            Gdx.app.log("UiReload", "Managed UI file reload wallNs=" + (System.nanoTime() - begin)
+                + " gpuTextureBytes=" + residentArtBytes() + " retainedPixmapBytes=" + residentPixmapBytes());
+            return true;
+        }
+        // Profiling capture boundary only: exclude fixture/warm-up work without changing the run.
+        if (key == Input.Keys.PAGE_DOWN && frameMetrics != null) {
+            frameMetrics.reset();
+            return true;
+        }
+        if (key == Input.Keys.PAGE_UP && config.profile() && screen == Screen.SESSION
+            && overlay == null && !world.choicePending()) {
+            previewArenaLandmark(); return true;
+        }
+        if ((key == Input.Keys.NUM_1 || key == Input.Keys.MEDIA_NEXT) && config.profile() && screen == Screen.SESSION
+            && overlay == null && !world.choicePending()) {
+            world.debugEnemySizeLineup(ActorAnimation.Facing.values()[enemySizePreviewFacing++ % 4]);
+            arena.resetCameras(); return true;
+        }
+        if ((key == Input.Keys.NUM_2 || key == Input.Keys.MEDIA_PREVIOUS) && config.profile() && screen == Screen.SESSION
+            && overlay == null && !world.choicePending()) {
+            world.debugSizedCultistAttack(ActorAnimation.Facing.values()[enemyCastPreviewFacing++ % 4]);
+            arena.resetCameras(); return true;
+        }
+        if (key == Input.Keys.F1 && config.profile() && screen == Screen.SESSION && overlay == null) {
+            world.debugEnemyAttackEncounter(); return true;
+        }
         if (key == Input.Keys.F2 && config.profile() && screen == Screen.SESSION && overlay == null) {
             world.equipment.grantReward(); publishProgression(); return true;
         }
@@ -801,7 +941,11 @@ public final class CryptLobby extends ApplicationAdapter {
             return true;
         }
         if (key == Input.Keys.F10 && config.profile() && screen == Screen.SESSION && overlay == null) {
-            previewHud(12); return true;
+            // Repeat the populated HUD preview to inspect critical health without a survival run.
+            boolean critical = hudPreview && world.players[0].health > world.equipment.maxHealth(world.players[0]) * .2f;
+            previewHud(12);
+            if (critical) world.players[0].health = world.equipment.maxHealth(world.players[0]) * .15f;
+            return true;
         }
         if (key == Input.Keys.F9 && config.profile() && screen == Screen.SESSION && overlay == null
             && world.players[0].active && world.players[0].alive && world.players[1].active) {
@@ -825,8 +969,12 @@ public final class CryptLobby extends ApplicationAdapter {
             && (key == Input.Keys.F7 || key == Input.Keys.F8)) {
             previewResults(key == Input.Keys.F7); return true;
         }
-        if (key == Input.Keys.F6 && config.profile() && screen == Screen.SESSION && overlay == null) {
-            world.debugStartBoss(); syncEncounterHud(); return true;
+        if ((key == Input.Keys.F6 || key == Input.Keys.FORWARD_DEL) && config.profile() && screen == Screen.SESSION && overlay == null) {
+            // Delete also works with Android key injection without opening its letter-entry keyboard.
+            if (key == Input.Keys.FORWARD_DEL || Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT))
+                world.debugStartSovereign();
+            else world.debugStartBoss();
+            hudPreview = false; syncEncounterHud(); return true;
         }
         if (key == Input.Keys.F4 && config.profile() && screen == Screen.SESSION && !world.bossSpawned) {
             hudPreview = !hudPreview; syncEncounterHud(); return true;
@@ -851,6 +999,10 @@ public final class CryptLobby extends ApplicationAdapter {
         int dx = key == Input.Keys.LEFT ? -1 : key == Input.Keys.RIGHT ? 1 : 0;
         int dy = key == Input.Keys.UP ? 1 : key == Input.Keys.DOWN ? -1 : 0;
         if (dx == 0 && dy == 0) return false;
+        if (heroChooser != null) {
+            int target = heroChooser.navigate(key, focus);
+            if (target >= 0) { setFocus(target); return true; }
+        }
         RemoteButton current = buttons.get(focus);
         current.localToStageCoordinates(from.set(current.getWidth() / 2, current.getHeight() / 2));
         float best = Float.MAX_VALUE; int target = focus;
@@ -879,6 +1031,8 @@ public final class CryptLobby extends ApplicationAdapter {
                 setTextButtonDisabled(start, snapshot.connected() == 0 || server == null || host == null);
                 startLabel.setText(start.isDisabled() ? "CONNECT A PHONE TO START" : snapshot.connected() == 1 ? "START SOLO" : "START CO-OP");
             }
+        } else if (screen == Screen.RESULTS && resultSummary != null) {
+            resultSummary.updateParty(snapshot.connected());
         } else if (screen == Screen.SESSION && pauseResume != null) {
             if (pauseTopology != pauseTopology(snapshot)) {
                 String previousAction = ((Label) buttons.get(focus).getChildren().first()).getText().toString();
@@ -938,15 +1092,18 @@ public final class CryptLobby extends ApplicationAdapter {
             boolean itemPending = participant && !world.levelUpPending() && itemOffer.pending;
             state.publishEquipment(i, itemPending ? itemOffer.id : 0, itemPending ? itemOffer.secondsLeft : 0,
                 itemPending ? itemOffer.options : null, itemPending ? itemOffer.cards : null,
-                itemPending && itemOffer.catchUp, itemPending ? itemOffer.durationSeconds : 30f);
+                itemPending && itemOffer.catchUp, itemPending ? itemOffer.durationSeconds : 30f,
+                itemPending ? itemOffer.origin : null);
             state.publishStarterBuild(i, participant, progression.foundationCount(i), world.equipment.foundationCount(i));
         }
     }
 
     private void syncEncounterHud() {
-        if (world.bossSpawned && !world.bossDefeated && world.boss != null && world.boss.active)
-            hudState.setBoss("THE HOLLOW SOVEREIGN", world.bossPhase == 2 ? "ENRAGED" : "PHASE I", world.boss.health, world.boss.maxHealth);
-        else if (hudPreview) hudState.setBoss("THE HOLLOW SOVEREIGN", "HUD PREVIEW", 720, 1000);
+        ArenaWorld.Enemy encounter = world.activeBoss();
+        if (encounter != null)
+            hudState.setBoss(ArenaWorld.bossName(encounter), encounter.encounterPhase == 2 ? "ENRAGED" : "PHASE I",
+                encounter.health, encounter.maxHealth);
+        else if (hudPreview) hudState.setBoss("THE GRAVE KING", "HUD PREVIEW", 720, 1000);
         else hudState.clearBoss();
     }
 
@@ -965,13 +1122,17 @@ public final class CryptLobby extends ApplicationAdapter {
             notifiedEliteKills = world.elitesKilled;
             hudState.notify("ELITE SLAIN  /  CLAIM ITS SOULS", "", ArenaHudState.Tone.SUCCESS, 3f);
         }
+        if (world.sovereignSpawned && !sovereignAnnounced) {
+            sovereignAnnounced = true; hudPreview = false;
+            hudState.notify("THE HOLLOW SOVEREIGN AWAKENS", "", ArenaHudState.Tone.WARNING, 4f);
+        }
         if (world.bossSpawned && !bossAnnounced) {
             bossAnnounced = true; hudPreview = false;
-            hudState.notify("THE HOLLOW SOVEREIGN AWAKENS", "", ArenaHudState.Tone.WARNING, 4f);
+            hudState.notify("THE GRAVE KING AWAKENS", "", ArenaHudState.Tone.WARNING, 4f);
         }
         if (world.bossPhase == 2 && !enrageAnnounced) {
             enrageAnnounced = true;
-            hudState.notify("THE SOVEREIGN IS ENRAGED", "", ArenaHudState.Tone.WARNING, 3f);
+            hudState.notify("THE GRAVE KING IS ENRAGED", "", ArenaHudState.Tone.WARNING, 3f);
         }
         for (int i = 0; i < 2; i++) {
             var player = world.players[i];
@@ -992,18 +1153,21 @@ public final class CryptLobby extends ApplicationAdapter {
         }
         if (!finalWarning && !world.bossSpawned && world.timeRemaining() <= 30 && world.outcome == ArenaWorld.Outcome.RUNNING) {
             finalWarning = true;
-            hudState.notify("THE SOVEREIGN ARRIVES IN 30s", "", ArenaHudState.Tone.WARNING, 4f);
+            hudState.notify("THE GRAVE KING ARRIVES IN 30s", "", ArenaHudState.Tone.WARNING, 4f);
         }
     }
 
     @Override public void render() {
         if (frameMetrics != null) frameMetrics.beginFrame();
-        float delta = Math.min(Gdx.graphics.getDeltaTime(), 0.1f);
+        float rawDelta = Gdx.graphics.getDeltaTime();
+        float delta = Math.min(rawDelta, 0.1f);
+        int simulationSteps = 0;
+        if (frameMetrics != null) frameMetrics.beginStage(FrameMetrics.HANDOFF);
         refreshClock += delta; profileClock += delta;
         long now = System.currentTimeMillis();
         for (int i = 0; i < 2; i++) state.readControls(i, controls[i], now);
         syncChoices();
-        if (screen == Screen.SESSION && overlay == null && hostActive) {
+        if (screen == Screen.SESSION && overlay == null && hostActive && !defeatTransition.active()) {
             boolean disconnected = false;
             for (int i = 0; i < 2; i++) disconnected |= world.players[i].active && !controls[i].connected;
             if (disconnected) showPause();
@@ -1035,15 +1199,40 @@ public final class CryptLobby extends ApplicationAdapter {
                             + (itemRequest.option < 0 ? "GEAR KEPT" : "EQUIPPED"), "", ArenaHudState.Tone.SUCCESS, 2f);
                     }
                 }
+                if (frameMetrics != null) {
+                    frameMetrics.endStage(FrameMetrics.HANDOFF);
+                    frameMetrics.beginStage(FrameMetrics.SIMULATION);
+                }
                 world.update(delta);
+                simulationSteps = world.lastUpdateSteps;
+                if (frameMetrics != null) {
+                    frameMetrics.endStage(FrameMetrics.SIMULATION);
+                    frameMetrics.beginStage(FrameMetrics.AUDIO);
+                }
                 audio.update(world, delta);
+                if (frameMetrics != null) {
+                    frameMetrics.endStage(FrameMetrics.AUDIO);
+                    frameMetrics.beginStage(FrameMetrics.HANDOFF);
+                }
                 announceLevelUp();
                 hudState.update(delta);
                 updateCombatNotices();
-                if (world.outcome != ArenaWorld.Outcome.RUNNING) showResults();
+                if (world.outcome == ArenaWorld.Outcome.DEFEAT) beginDefeatTransition();
+                else if (world.outcome == ArenaWorld.Outcome.VICTORY) showResults();
+            }
+        }
+        if (defeatTransition.active()) {
+            defeatTransition.update(delta, hostActive);
+            if (defeatTransition.needsResults()) {
+                showResults();
+                defeatTransition.resultsShown();
             }
         }
         syncChoices();
+        if (frameMetrics != null) {
+            frameMetrics.endStage(FrameMetrics.HANDOFF);
+            frameMetrics.beginStage(FrameMetrics.STATUS);
+        }
         if (refreshClock >= 0.2f) {
             refreshClock = 0; updateStatus(); publishProgression();
             for (int i = 0; i < 2; i++) {
@@ -1057,23 +1246,72 @@ public final class CryptLobby extends ApplicationAdapter {
                 String stats = Gdx.graphics.getFramesPerSecond() + " FPS  /  Java " + Gdx.app.getJavaHeap() / 1_048_576
                     + " MiB  /  Art " + residentArtBytes() / 1_048_576 + " MiB  /  Draws " + (arena.drawCalls + ((SpriteBatch) stage.getBatch()).renderCalls);
                 diagnostics.setText(stats);
-                if (config.profile()) Gdx.app.log("LobbyPerf", stats);
+                if (config.profile()) {
+                    Gdx.app.log("LobbyPerf", stats);
+                    var counters = world.diagnostics();
+                    int healingOnFloor = 0, healingValue = 0;
+                    for (var pickup : world.pickups) if (pickup.active && pickup.healing) {
+                        healingOnFloor++; healingValue += pickup.value;
+                    }
+                    Gdx.app.log("ProfileWorld", "phase=" + profileMode() + " runSeed=" + world.runSeed
+                        + " elapsed=" + world.elapsed + " candidates=" + counters.boltCollisionCandidates
+                        + " enemyMisses=" + counters.enemySpawnMisses + " boltMisses=" + counters.boltAcquireMisses
+                        + " shotMisses=" + counters.shotAcquireMisses + " hazardMisses=" + counters.hazardAcquireMisses
+                        + " effectMisses=" + counters.effectAcquireMisses + " pickupMerges=" + counters.pickupMerges
+                        + " partyLevel=" + world.progression.level + " partyXp=" + world.progression.totalXp
+                        + " kills=" + world.kills + " activeEnemies=" + world.activeEnemies
+                        + " healingOnFloor=" + healingOnFloor + " healingFloorValue=" + healingValue
+                        + " healingGenerated=" + world.healthDrops.generatedValue + " healingExpired=" + world.healthDrops.expiredValue
+                        + " healingCollected=" + (world.players[0].healingFromDrops + world.players[1].healingFromDrops)
+                        + " regeneration=" + (world.players[0].healingFromRegeneration + world.players[1].healingFromRegeneration)
+                        + " gearSustain=" + (world.players[0].healingFromSustain + world.players[1].healingFromSustain)
+                        + " sovereignFightSeconds=" + (world.sovereignSpawned
+                            ? Math.max(0, (world.sovereignDefeated ? world.sovereignDefeatedAt : world.elapsed) - world.timeline.sovereignSeconds()) : 0));
+                }
             }
         }
         if (hostActive && background.isVisible()) art.menuScene.advance(delta);
+        if (frameMetrics != null) {
+            frameMetrics.endStage(FrameMetrics.STATUS);
+            frameMetrics.beginStage(FrameMetrics.ARENA);
+        }
         ScreenUtils.clear(0.025f, 0.035f, 0.04f, 1);
         if (screen == Screen.SESSION) arena.render(world, hudState,
-            overlay != null || world.choicePending() ? 0f : delta, !world.choicePending());
-        stage.getViewport().apply(); stage.act(delta); stage.draw();
-        if (frameMetrics != null) frameMetrics.endFrame(profileMode(), residentArtBytes(), residentPixmapBytes(),
-            Gdx.app.getJavaHeap(), (screen == Screen.SESSION ? arena.drawCalls : 0) + ((SpriteBatch) stage.getBatch()).renderCalls);
+            overlay != null || world.choicePending() || defeatTransition.active() ? 0f : delta,
+            defeatTransition.active() || !world.choicePending());
+        if (frameMetrics != null) {
+            frameMetrics.endStage(FrameMetrics.ARENA);
+            frameMetrics.beginStage(FrameMetrics.UI);
+        }
+        stage.getViewport().apply(); stage.act(delta);
+        if (fontParityOverlay != null) fontParityOverlay.toFront();
+        defeatCover.setVisible(defeatTransition.active());
+        if (defeatTransition.active()) {
+            defeatCover.setColor(0, 0, 0, defeatTransition.opacity());
+            defeatCover.toFront();
+        }
+        stage.draw();
+        if (frameMetrics != null) {
+            frameMetrics.endStage(FrameMetrics.UI);
+            frameMetrics.addSimulationSteps(simulationSteps, rawDelta);
+            int enemies = 0, bolts = 0, pickups = 0, shots = 0, hazards = 0, effects = 0;
+            for (var value : world.enemies) if (value.active) enemies++;
+            for (var value : world.bolts) if (value.active) bolts++;
+            for (var value : world.pickups) if (value.active) pickups++;
+            for (var value : world.shots) if (value.active) shots++;
+            for (var value : world.hazards) if (value.active) hazards++;
+            for (var value : world.effects) if (value.active) effects++;
+            frameMetrics.recordPoolCounts(enemies, bolts, pickups, shots, hazards, effects);
+            frameMetrics.endFrame(profileMode(), residentArtBytes(), residentPixmapBytes(),
+                Gdx.app.getJavaHeap(), (screen == Screen.SESSION ? arena.drawCalls : 0) + ((SpriteBatch) stage.getBatch()).renderCalls);
+        }
     }
     @Override public void resize(int width, int height) { stage.getViewport().update(width, height, true); }
     @Override public void pause() {
         if (frameMetrics != null) frameMetrics.reset();
         hostActive = false; state.setHostActive(false);
         if (audio != null) audio.stop();
-        if (screen == Screen.SESSION && overlay == null) showPause();
+        if (screen == Screen.SESSION && overlay == null && !defeatTransition.active()) showPause();
     }
     @Override public void resume() {
         if (frameMetrics != null) frameMetrics.reset();
