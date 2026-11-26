@@ -7,6 +7,24 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class FrameRequestGateTest {
+    @Test void delayedSwapKeepsAThirtyFpsCreditWhosePresentationDeadlineIsStillAhead() {
+        FrameCadence cadence = new FrameCadence();
+        FrameRequestGate gate = new FrameRequestGate();
+        long drawing = gate.beginDraw(), tick = 1_000_000_000L;
+        gate.offer(tick);
+        assertEquals(FrameRequestGate.BUSY, gate.claim(tick, cadence.maximumRequestAgeNs()));
+        assertTrue(gate.complete(drawing));
+        long completion = tick + 20_000_000L;
+        assertEquals(FrameRequestGate.CLAIMED, gate.claim(completion, cadence.maximumRequestAgeNs()));
+        long next = gate.beginDraw();
+        assertTrue(gate.presentationTimeNs(next, cadence.framePeriodNs()) > completion);
+        assertTrue(gate.complete(next));
+        assertEquals(FrameRequestGate.EMPTY, gate.claim(completion, cadence.maximumRequestAgeNs()));
+        gate.offer(tick + cadence.framePeriodNs());
+        assertEquals(FrameRequestGate.EXPIRED, gate.claim(tick + cadence.framePeriodNs()
+            + cadence.maximumRequestAgeNs() + 1, cadence.maximumRequestAgeNs()));
+        assertFalse(gate.inFlight());
+    }
     @Test void presentationTargetUsesAdmittedVsyncRatherThanDrawStartAndIsBoundToItsTicket() {
         FrameRequestGate gate = new FrameRequestGate();
         long period = 33_333_334, vsync = 1_000_000_000L;

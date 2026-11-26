@@ -29,6 +29,8 @@ public final class FrameCadence {
     public void reset() { nextFrameNs = 0; }
     public long displayPeriodNs() { return displayPeriodNs; }
     public long framePeriodNs() { return framePeriodNs; }
+    /** Leave a tenth of the period for submission; UI and post-swap admission use the same deadline. */
+    public long maximumRequestAgeNs() { return framePeriodNs * 9 / 10; }
     public int targetFps() { return targetFps; }
 
     /** Consumes this display tick even when the caller must drop its request due to backpressure. */
