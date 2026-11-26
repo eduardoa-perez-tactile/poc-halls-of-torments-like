@@ -6,11 +6,18 @@ import android.view.WindowManager;
 import com.badlogic.gdx.backends.android.AndroidApplication;
 import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration;
 import com.badlogic.gdx.backends.android.AndroidAudio;
+import com.badlogic.gdx.backends.android.AndroidGraphics;
 import android.content.Context;
 import com.couchcrypt.CryptLobby;
 import com.couchcrypt.GameConfig;
 
 public final class AndroidLauncher extends AndroidApplication {
+    private PacedAndroidGraphics pacedGraphics;
+    private boolean pacingEnabled = true, profiling;
+    @Override protected AndroidGraphics createGraphics(AndroidApplicationConfiguration config) {
+        pacedGraphics = new PacedAndroidGraphics(this, config, pacingEnabled, profiling);
+        return pacedGraphics;
+    }
     @Override public AndroidAudio createAudio(Context context, AndroidApplicationConfiguration config) {
         return new WorkerOwnedAndroidAudio(context, config);
     }
@@ -40,6 +47,21 @@ public final class AndroidLauncher extends AndroidApplication {
             }
         }
         boolean profile = getIntent().getBooleanExtra("profile", false);
+        profiling = profile;
+        pacingEnabled = !profile || getIntent().getBooleanExtra("framePacing", true);
         initialize(new CryptLobby(new GameConfig(host, port, profile)), config);
+    }
+    @Override protected void onResume() {
+        if (pacedGraphics != null) pacedGraphics.prepareResume();
+        super.onResume();
+        if (pacedGraphics != null) pacedGraphics.activate();
+    }
+    @Override protected void onPause() {
+        if (pacedGraphics != null) pacedGraphics.deactivate();
+        super.onPause();
+    }
+    @Override protected void onDestroy() {
+        if (pacedGraphics != null) pacedGraphics.closePacer();
+        super.onDestroy();
     }
 }

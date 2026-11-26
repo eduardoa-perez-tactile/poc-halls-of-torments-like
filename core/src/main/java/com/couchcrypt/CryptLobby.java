@@ -207,7 +207,8 @@ public final class CryptLobby extends ApplicationAdapter {
                 + " floorUsedIndexBytes=" + arena.cachedFloorQuads * 12L
                 + " floorCapacityVertexBytes=" + com.couchcrypt.game.EngravedFloorArt.MAX_FLOOR_QUADS * 80L
                 + " floorCapacityIndexBytes=" + com.couchcrypt.game.EngravedFloorArt.MAX_FLOOR_QUADS * 12L
-                + " medallionVertexBytes=" + arena.medallionQuads() * 80L);
+                + " medallionCachedVertexBytes=" + arena.medallionCachedVertexBytes()
+                + " medallionCachedIndexBytes=" + arena.medallionCachedIndexBytes());
         }
     }
 
@@ -956,6 +957,7 @@ public final class CryptLobby extends ApplicationAdapter {
         // Profiling capture boundary only: exclude fixture/warm-up work without changing the run.
         if (key == Input.Keys.PAGE_DOWN && frameMetrics != null) {
             frameMetrics.reset();
+            Gdx.app.log("ProfileBoundary", "resetNs=" + System.nanoTime());
             return true;
         }
         if (key == Input.Keys.PAGE_UP && config.profile() && screen == Screen.SESSION

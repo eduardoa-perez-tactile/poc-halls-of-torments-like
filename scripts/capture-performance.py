@@ -3,6 +3,7 @@
 import argparse
 import base64
 import hashlib
+import importlib.util
 import ipaddress
 import json
 import math
@@ -20,6 +21,9 @@ from datetime import datetime, timezone
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'com.couchcrypt.tv'
 COMPONENT = PACKAGE + '/com.couchcrypt.android.AndroidLauncher'
+_presentation_spec = importlib.util.spec_from_file_location('presentation_metrics', Path(__file__).with_name('presentation-metrics.py'))
+presentation_metrics = importlib.util.module_from_spec(_presentation_spec)
+_presentation_spec.loader.exec_module(presentation_metrics)
 
 
 def websocket_frame(payload, opcode=1):
@@ -209,6 +213,7 @@ def parser_for_capture():
     parser.add_argument('--lifecycle', action='store_true', help='Add one brief results/lobby/background-resume observation')
     parser.add_argument('--switch-smoke', action='store_true', help='Results only: send rapid F7/F8/Back after measurement')
     parser.add_argument('--moving-input', action='store_true', help='Send deterministic 30Hz movement and occasional Dodge; no choices')
+    parser.add_argument('--frame-pacing', choices=['on', 'off'], default='on', help='Profiling A/B override; old APKs ignore this intent extra')
     parser.add_argument('--warmup-seconds', type=int, choices=range(0, 11), default=0, metavar='0..10')
     parser.add_argument('--output-dir', type=Path, default=ROOT / '.run', help='Use a unique directory to preserve a baseline')
     parser.add_argument('--system-trace', action='store_true', help='Attempt one bounded Perfetto trace; compare with a separate untraced baseline')
@@ -340,7 +345,7 @@ def summarize_baseline(log_text, metadata):
             measured = False
             saw_end = True
             continue
-        tag = next((name for name in ('FrameMetrics', 'ProfileStartup', 'ProfileMemory', 'ProfileWorld') if name in line), None)
+        tag = next((name for name in ('FrameMetrics', 'ProfileStartup', 'ProfileMemory', 'ProfileWorld', 'ProfileBoundary', 'FramePacing') if name in line), None)
         if tag is None or '=' not in line:
             continue
         report = {'within_measurement_markers': measured, 'tag': tag, 'raw': line}
@@ -359,6 +364,7 @@ def summarize_baseline(log_text, metadata):
             'fixture': metadata['fixture'], 'measurement_complete': saw_start and saw_end,
             'trace_on': metadata.get('system_trace', {}).get('requested', False),
             'trace_captured': metadata.get('system_trace', {}).get('status') == 'captured',
+            'presentation': metadata.get('presentation_analysis', {'available': False, 'reason': 'Not collected by this capture'}),
             'reports': reports, 'diagnostics': diagnostics,
             'measured_report_count': sum(report['within_measurement_markers'] for report in reports),
             'limits': ['Report windows may straddle measurement markers; raw reports are retained.',
@@ -384,6 +390,7 @@ def main():
     logger = None
     output = None
     system_trace = None
+    presentation = None
     metadata = {'fixture': args.fixture, 'arguments': {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()},
                 'created_utc': datetime.now(timezone.utc).isoformat(), 'source': source_provenance()}
 
@@ -423,7 +430,8 @@ def main():
 
     def fresh_lobby():
         command('shell', 'am', 'force-stop', PACKAGE)
-        command('shell', 'am', 'start', '-n', COMPONENT, '--ez', 'profile', 'true', '--es', 'joinHost', args.host)
+        command('shell', 'am', 'start', '-n', COMPONENT, '--ez', 'profile', 'true',
+                '--ez', 'framePacing', 'true' if args.frame_pacing == 'on' else 'false', '--es', 'joinHost', args.host)
         wait(2)
         key(23)
         wait(.3)
@@ -433,7 +441,7 @@ def main():
         # A unique --output-dir preserves baselines; default filenames retain replacement behavior.
         output.truncate(0)
         logger = subprocess.Popen(target + ['logcat', '-v', 'threadtime', '-T', '1', 'FrameMetrics:I',
-                                            'ProfileStartup:I', 'ProfileMemory:I', 'ProfileWorld:I',
+                                            'ProfileStartup:I', 'ProfileMemory:I', 'ProfileWorld:I', 'ProfileBoundary:I', 'FramePacing:I',
                                             'LobbyPerf:I', 'OutcomeArt:I', 'AndroidRuntime:E', '*:S'],
                                   stdout=output, stderr=subprocess.STDOUT)
         fresh_lobby()
@@ -482,9 +490,14 @@ def main():
             system_trace.start()
         key(93)  # Profile-only PAGE_DOWN resets app metric windows after setup/warmup.
         metadata['metric_reset_key'] = 'PAGE_DOWN (93); requires the matching profiling APK'
+        presentation = presentation_metrics.PresentationSampler(target, metadata['surfaceflinger_start'])
+        presentation.start()
         marker('START')
         wait(args.seconds)
         marker('END')
+        presentation.stop()
+        metadata['presentation_sampling'] = presentation.metadata()
+        metadata['presentation_analysis'] = presentation.analyze(*presentation.observation_bounds())
         if system_trace is not None:
             system_trace.finish()
         metadata['pid_after_measurement'] = optional_command('shell', 'pidof', PACKAGE)
@@ -530,6 +543,10 @@ def main():
         print('Frame interval includes scheduling/presentation; CPU submission is not GPU time. Emulator results do not establish physical-TV60FPS.')
     finally:
         try:
+            if presentation is not None:
+                presentation.stop()
+                metadata['presentation_sampling'] = presentation.metadata()
+                metadata['presentation_analysis'] = presentation.analyze(*presentation.observation_bounds())
             if system_trace is not None:
                 system_trace.cleanup()
             if logger is not None:
