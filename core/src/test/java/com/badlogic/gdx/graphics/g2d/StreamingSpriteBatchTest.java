@@ -157,6 +157,7 @@ class StreamingSpriteBatchTest {
         StreamingSpriteBatch batch = new StreamingSpriteBatch(8, shader);
         int handles = driver.liveBuffers.size(), nativeAllocated = BufferUtils.getAllocatedBytesUnsafe();
         int generations = driver.bufferGenerations;
+        int startupVertexStores = driver.vertexBufferDataCalls;
         float[] inheritedVertices = batch.vertices;
         try {
             assertTrue(handles >= 4, "The pinned base mesh and streaming mesh are both tracked");
@@ -168,9 +169,13 @@ class StreamingSpriteBatchTest {
                 assertEquals(handles, driver.liveBuffers.size());
                 assertEquals(generations, driver.bufferGenerations, "Frames cannot create more VBO/IBO handles");
                 assertEquals(nativeAllocated, BufferUtils.getAllocatedBytesUnsafe(), "Native staging storage remains fixed");
+                assertEquals(startupVertexStores, driver.vertexBufferDataCalls,
+                    "GLES2 frames update the existing GPU store rather than reallocating it");
                 driver.packets.clear();
             }
             assertTrue(batch.vertexUploadCount() > 0);
+            assertEquals(batch.vertexUploadCount(), driver.vertexBufferSubDataCalls,
+                "Every normal GLES2 submission uses one bounded subdata update");
         } finally { batch.dispose(); }
         assertTrue(driver.liveBuffers.isEmpty());
         assertEquals(nativeBefore, BufferUtils.getAllocatedBytesUnsafe());
@@ -179,6 +184,51 @@ class StreamingSpriteBatchTest {
         int deletions = driver.bufferDeletions;
         batch.dispose();
         assertEquals(deletions, driver.bufferDeletions, "Disposal cannot delete native handles twice");
+    }
+
+    @Test void managedRestoreAfterAShortFrameKeepsFullGpuCapacityForTheNextLargerFrame() {
+        int size = 8, capacityBytes = size * 4 * 20;
+        float[] payload = rawSprites(size);
+        Consumer<SpriteBatch> largeFrame = batch -> {
+            batch.begin();
+            batch.draw(first, payload, 0, 3 * 20);
+            batch.draw(second, payload, 3 * 20, 3 * 20);
+            batch.draw(first, payload, 6 * 20, 2 * 20);
+            batch.end();
+        };
+        Capture expected = capture(false, size, largeFrame);
+        driver.resetObservations();
+        StreamingSpriteBatch batch = new StreamingSpriteBatch(size, shader);
+        try {
+            batch.begin(); batch.draw(first, 3f, 7f, 11f, 13f); batch.end();
+            assertEquals(1, driver.vertexBufferSubDataCalls);
+            int previousCalls = batch.totalRenderCalls;
+            long previousUploads = batch.vertexUploadCount();
+            int nativeBeforeRestore = BufferUtils.getAllocatedBytesUnsafe();
+            // A lost context destroys driver stores; managed Mesh objects and their NIO data survive.
+            driver.loseContextBuffers();
+            driver.resetObservations();
+            Mesh.invalidateAllMeshes(Gdx.app);
+            largeFrame.accept(batch);
+            Capture actual = new Capture(new ArrayList<>(driver.packets), List.of(), driver.vertexUploads,
+                batch.vertexUploadCount() - previousUploads, driver.maximumVertexBytes,
+                batch.totalRenderCalls - previousCalls, batch.maxSpritesInBatch);
+            assertSameSubmission(expected, actual);
+            assertEquals(1, actual.reportedUploads);
+            assertEquals(1, driver.vertexBufferSubDataCalls);
+            assertFalse(driver.vertexStoreSizes.isEmpty());
+            for (int allocated : driver.vertexStoreSizes)
+                assertEquals(capacityBytes, allocated,
+                    "Neither restore nor its dirty bind may shrink the GPU store to the previous short frame");
+            assertEquals(nativeBeforeRestore, BufferUtils.getAllocatedBytesUnsafe());
+            int restoredStores = driver.vertexBufferDataCalls;
+            int restoredHandles = driver.bufferGenerations;
+            driver.packets.clear();
+            largeFrame.accept(batch);
+            assertEquals(restoredStores, driver.vertexBufferDataCalls, "Restored frames reuse the same GPU allocation");
+            assertEquals(restoredHandles, driver.bufferGenerations);
+        } finally { batch.dispose(); }
+        assertTrue(driver.liveBuffers.isEmpty(), "Both replacement mesh handle pairs are disposed");
     }
 
     @Test void repeatedEmptyBarriersNeverUploadOrDraw() {
@@ -279,15 +329,22 @@ class StreamingSpriteBatchTest {
         final Map<Integer, int[]> matrices = new HashMap<>();
         final List<Packet> packets = new ArrayList<>();
         final List<Integer> markers = new ArrayList<>();
+        final List<Integer> vertexStoreSizes = new ArrayList<>();
         int nextHandle = 10, arrayBuffer, elementBuffer, texture, program;
         int bufferGenerations, bufferDeletions, maximumVertexBytes;
+        int vertexBufferDataCalls, vertexBufferSubDataCalls;
         long vertexUploads;
         boolean blending, depthWrite = true;
         int[] blend = {GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA, GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA};
 
         void resetObservations() {
             packets.clear(); markers.clear(); vertexUploads = 0; maximumVertexBytes = 0;
+            vertexBufferDataCalls = vertexBufferSubDataCalls = 0; vertexStoreSizes.clear();
             blending = false; depthWrite = true;
+        }
+
+        void loseContextBuffers() {
+            buffers.clear(); liveBuffers.clear(); arrayBuffer = elementBuffer = 0;
         }
 
         @Override public Object invoke(Object object, Method method, Object[] args) {
@@ -336,6 +393,9 @@ class StreamingSpriteBatchTest {
                     int target = (int) args[0], bytes = (int) args[1], handle = target == GL20.GL_ARRAY_BUFFER ? arrayBuffer : elementBuffer;
                     byte[] contents = bytes((Buffer) args[2], bytes);
                     buffers.put(handle, contents);
+                    if (target == GL20.GL_ARRAY_BUFFER) {
+                        vertexBufferDataCalls++; vertexStoreSizes.add(bytes);
+                    }
                     if (target == GL20.GL_ARRAY_BUFFER && args[2] != null) {
                         vertexUploads++; maximumVertexBytes = Math.max(maximumVertexBytes, bytes);
                     }
@@ -344,8 +404,13 @@ class StreamingSpriteBatchTest {
                     int target = (int) args[0], offset = (int) args[1], bytes = (int) args[2];
                     int handle = target == GL20.GL_ARRAY_BUFFER ? arrayBuffer : elementBuffer;
                     byte[] contents = buffers.get(handle);
+                    assertNotNull(contents, "glBufferSubData requires an existing GPU store");
+                    assertTrue(offset >= 0 && bytes >= 0 && (long) offset + bytes <= contents.length,
+                        "glBufferSubData must remain inside the original GPU allocation: offset=" + offset
+                            + " bytes=" + bytes + " capacity=" + contents.length);
                     System.arraycopy(bytes((Buffer) args[3], bytes), 0, contents, offset, bytes);
                     if (target == GL20.GL_ARRAY_BUFFER) {
+                        vertexBufferSubDataCalls++;
                         vertexUploads++; maximumVertexBytes = Math.max(maximumVertexBytes, offset + bytes);
                     }
                 }

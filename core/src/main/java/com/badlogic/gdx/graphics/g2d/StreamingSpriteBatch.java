@@ -17,6 +17,7 @@ import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 public class StreamingSpriteBatch extends SpriteBatch {
     private static final int MAX_RUNS = 256;
     private final Mesh streamingMesh;
+    private final boolean fixedStore;
     private final float[] stagedVertices;
     private final Texture[] textures = new Texture[MAX_RUNS];
     private final int[] offsets = new int[MAX_RUNS], counts = new int[MAX_RUNS];
@@ -29,7 +30,9 @@ public class StreamingSpriteBatch extends SpriteBatch {
         Mesh created = null;
         try {
             stagedVertices = new float[size * 20];
-            created = new Mesh(false, size * 4, size * 6,
+            fixedStore = Gdx.gl30 == null;
+            created = new Mesh(fixedStore ? Mesh.VertexDataType.VertexBufferObjectSubData : Mesh.VertexDataType.VertexBufferObjectWithVAO,
+                false, size * 4, size * 6,
                 new VertexAttribute(VertexAttributes.Usage.Position, 2, ShaderProgram.POSITION_ATTRIBUTE),
                 new VertexAttribute(VertexAttributes.Usage.ColorPacked, 4, ShaderProgram.COLOR_ATTRIBUTE),
                 new VertexAttribute(VertexAttributes.Usage.TextureCoordinates, 2, "a_texCoord0"));
@@ -76,14 +79,20 @@ public class StreamingSpriteBatch extends SpriteBatch {
         if (runCount == 0) return;
         ShaderProgram shader = getShader();
         Gdx.gl.glActiveTexture(GL20.GL_TEXTURE0);
-        streamingMesh.setVertices(stagedVertices, 0, stagedFloats);
+        if (!fixedStore) streamingMesh.setVertices(stagedVertices, 0, stagedFloats);
         if (isBlendingEnabled()) {
             Gdx.gl.glEnable(GL20.GL_BLEND);
             if (getBlendSrcFunc() != -1) Gdx.gl.glBlendFuncSeparate(getBlendSrcFunc(), getBlendDstFunc(),
                 getBlendSrcFuncAlpha(), getBlendDstFuncAlpha());
         } else Gdx.gl.glDisable(GL20.GL_BLEND);
         try {
+            if (fixedStore) {
+                // Dirty binds after context loss must restore the full GPU store, not the last short range.
+                var buffer = streamingMesh.getVerticesBuffer(false); buffer.limit(buffer.capacity());
+            }
             streamingMesh.bind(shader);
+            // Bound GLES2 SubData updates preserve that fixed allocation instead of reallocating each flush.
+            if (fixedStore) streamingMesh.setVertices(stagedVertices, 0, stagedFloats);
             vertexUploads++;
             for (int run = 0; run < runCount; run++) {
                 textures[run].bind();
@@ -107,6 +116,7 @@ public class StreamingSpriteBatch extends SpriteBatch {
     @Override public void dispose() {
         if (disposed) return;
         disposed = true;
+        // The built-in GLES2 SubData CPU buffers are GC-managed direct storage; GPU handles dispose now.
         try { streamingMesh.dispose(); }
         finally {
             for (int run = 0; run < runCount; run++) textures[run] = null;
