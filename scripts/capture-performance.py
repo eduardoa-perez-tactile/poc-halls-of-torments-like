@@ -371,7 +371,7 @@ def summarize_baseline(log_text, metadata):
             'limits': ['Report windows may straddle measurement markers; raw reports are retained.',
                        'Window percentiles cannot be combined into a run percentile.',
                        'Render callback wall time is not GPU duration or displayed-frame timing.',
-                       'Emulator evidence does not establish physical-TV 60 FPS.']}
+                       'Emulator evidence does not establish physical-TV frame pacing or thermal behavior.']}
 
 
 def main():
@@ -541,7 +541,7 @@ def main():
             memory += '\n' + label + '\n' + snapshot
         prefix.with_suffix('.memory.txt').write_text(memory)
         print(f'Captured {args.seconds}s {args.fixture}: {prefix}.log and {prefix}.memory.txt')
-        print('Frame interval includes scheduling/presentation; CPU submission is not GPU time. Emulator results do not establish physical-TV60FPS.')
+        print('Frame interval includes scheduling/presentation; CPU submission is not GPU time. Emulator results do not establish physical-TV frame pacing.')
     finally:
         try:
             if presentation is not None:

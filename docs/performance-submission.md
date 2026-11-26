@@ -1,5 +1,8 @@
 # Android submission and stability work — 25 November 2026
 
+The later [30 FPS frame-pacing report](frame-pacing.md) supersedes this build's
+rendering target and presentation results. The audio changes below remain active.
+
 This change removes blocking Android audio work from rendering, reuses large
 range-outline geometry and culls offscreen expansion effects. Asset pixels,
 targeting, damage, movement, difficulty, encounter timing and choice rules are
