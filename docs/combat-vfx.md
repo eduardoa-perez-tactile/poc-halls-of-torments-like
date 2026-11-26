@@ -55,6 +55,13 @@ are closed, and the installed game is left at Home for the user's playtest.
 Brief rendering checks do not establish sustained physical-TV frame pacing or
 thermals; no full survival playthrough was performed.
 
+The subsequently requested [crowded co-op before/after comparison](effects-performance-comparison.md)
+measured sixteen twenty-second windows in ABBA order. It found no sustained
+30 FPS regression, modest additional rendering work and a 0.707 MiB higher
+same-phase median process PSS without a sustained latest-only growth pattern.
+Both builds retained rare presentation gaps; see the report for raw-interval
+statistics, memory details and emulator limits.
+
 ## Isometric skill readability (2026-11-26)
 
 The user approved `art-source/isometric-skill-readability/approved-proposal.png`,
