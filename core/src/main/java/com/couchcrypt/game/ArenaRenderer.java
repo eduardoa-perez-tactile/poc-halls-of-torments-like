@@ -92,7 +92,7 @@ public final class ArenaRenderer implements Disposable {
         playerFootRing = new PlayerFootRing(art.pixel);
         enemyGroundVfx = new EnemyGroundVfx(art.pixel, art.glow);
         chestVfx = new LootChestVfx(art.pixel, art.glow);
-        skillArt = new SkillExpansionArt(buildIcons, art.glow);
+        skillArt = new SkillExpansionArt(buildIcons, art.pixel, art.glow, art.shadow, art.spriteEffects);
         damageNumberArt = new DamageNumberArt(uiArt.body);
         floorLayout = new ArenaFloorLayout(new JsonReader().parse(Gdx.files.internal("arena/crypt-floor.json")));
         float radius = floorLayout.medallionDiameter * .5f;
@@ -169,6 +169,7 @@ public final class ArenaRenderer implements Disposable {
             batch.begin();
             drawChestLights(world, camera);
             skillArt.ground(batch, world, camera);
+            skillArt.followups(batch, world, camera);
             drawMeleeWaves(world, camera);
             // All floor effects precede the complete depth-sorted actor pass. Their painted
             // foreground rims must never be laid over a closer enemy or the player's body.
@@ -197,7 +198,6 @@ public final class ArenaRenderer implements Disposable {
             drawShots(world, camera);
             if (profileBatch != null) profileBatch.pass("effects/followups/ranks", slot);
             drawEffects(world, camera);
-            skillArt.followups(batch, world, camera);
             drawDamageNumbers(world, camera);
             drawEnemyRanks(world);
             batch.end();
@@ -516,12 +516,12 @@ public final class ArenaRenderer implements Disposable {
         }
         for (int i = 0; i < world.skills.orbiters.length; i++) {
             SkillExpansion.OrbitBlade blade = world.skills.orbiters[i];
-            if (blade.active && visible(camera, blade.x, blade.y, 70f))
+            if (blade.active && visible(camera, blade.x, blade.y, 110f))
                 add(SENTINEL_BLADE, i, blade.x, blade.y);
         }
         for (int i = 0; i < world.skills.glaives.length; i++) {
             SkillExpansion.Glaive glaive = world.skills.glaives[i];
-            if (glaive.active && visible(camera, glaive.x, glaive.y, 70f))
+            if (glaive.active && visible(camera, glaive.x, glaive.y, 110f))
                 add(RETURNING_GLAIVE, i, glaive.x, glaive.y);
         }
         for (int i = 0; i < world.skills.relics.length; i++) {
@@ -922,11 +922,12 @@ public final class ArenaRenderer implements Disposable {
                         impactY = y + BOLT_ORIGIN[origin + 1] * sourceScale;
                     }
                     if (!effect.heroHit && effect.impactKind == ArenaWorld.ImpactKind.SWORD) {
-                        float dx = screenX(effect.dirX, effect.dirY), dy = screenY(effect.dirX, effect.dirY);
-                        float rotation = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees - 25f;
+                        // Rotate before Y compression, as for the world-space weapon sweep.
+                        float rotation = MathUtils.atan2(effect.dirY, effect.dirX) + MathUtils.PI * .25f
+                            - 25f * MathUtils.degreesToRadians;
                         batch.setColor(Color.WHITE);
-                        art.vfx.draw(batch, VfxArt.Animation.SWORD_HIT, effect.maxTtl - effect.ttl,
-                            impactX, impactY, 1.45f * (effect.critical ? 1.22f : 1f), rotation, VfxArt.Layer.ALL);
+                        art.vfx.drawProjected(batch, VfxArt.Animation.SWORD_HIT, effect.maxTtl - effect.ttl,
+                            impactX, impactY, .62f * (effect.critical ? 1.22f : 1f), rotation);
                         if (effect.critical) {
                             batch.setColor(1f, .92f, .65f, .8f);
                             bodySprite(SpriteEffectArt.Type.CONTACT, effectProgress(effect), impactX, impactY, .13f, 0);

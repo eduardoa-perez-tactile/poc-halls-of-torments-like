@@ -1,5 +1,71 @@
 # Sprite combat feedback
 
+## Isometric skill readability (2026-11-26)
+
+The user approved `art-source/isometric-skill-readability/approved-proposal.png`,
+including its brighter active auras, for presentation-only implementation.
+This replaces the screen-rotated Sentinel/Glaive sprites and floating Reaping
+Stroke skill emblem. Primary melee-wave geometry, timing and damage are unchanged.
+
+Sentinel Blades and Returning Glaive rotate in the uncompressed world plane
+before the arena's 2:1 projection, at their existing 26/28-unit display heights.
+Small floor shadows anchor those heights. Fine tapered trails follow at most
+100 ms of actual combat-tick positions; the glaive also uses faint past spinning
+poses. Each of ten fixed weapon slots owns seven cached poses. No trail predicts
+a return path, advances during camera rendering or survives a reused lifetime.
+Choice/manual/background/disconnect pauses use the existing simulation gates.
+
+Reaping Stroke now reuses the resident painted cutting crescent at a compact
+48-unit visual radius, aligned with its committed world facing and drawn in the
+complete ground pass beneath all actors. Its independent delay, cone, damage
+and duration remain unchanged. The primary expanding wave is untouched.
+
+Consecrated Ground keeps its exact live field radius, lifetime and final 450 ms
+fade. Its original painted seal is more visible (64% instead of 32% tint alpha),
+with a restrained resident-texture fill and a fine ivory-gold/teal edge using
+cached antialiased geometry. Fields remain beneath hostile warnings and bodies.
+The 57%-opacity exact-range targeting outline is unchanged. Relics retain their
+original painted identities, with low hovering placement, a shallow three-quarter
+lean, contact shadows and small gold/teal floor lights; they remain collectibles.
+
+Native capture also exposed the existing oversized sword-contact bursts as a
+source of floating-icon clutter. These keep their painted animation and contact
+height, but use compact 62%-scale projected directional sweeps instead of the
+former 145%-scale screen-rotated bursts. Hit timing, critical identity, damage
+numbers and target health are untouched. Contact VFX remain body effects; floor
+sweeps and fields stay beneath the entire actor pass.
+
+All runtime raster files and texture dimensions stay byte-for-byte unchanged.
+The additional history and geometry arrays allocate once, with no frame-loop
+allocations, new textures, shader or framebuffer. Both cameras consume the same
+simulation-owned state. This is a bounded presentation change, not a difficulty
+or gameplay change.
+
+### Verification
+
+JDK 21 focused checks passed: **26 tests** across SkillExpansionCombatTest,
+SkillExpansionCullingTest, CombatVfxStateTest and VfxAtlasTest. Desktop classes
+and the Android debug APK compiled successfully. Integration checks cover real
+past weapon positions while the owner moves, pool reuse/removal/death, bounded
+history, choice-pause freezing and reset cleanup. A read-only review found no
+gameplay-calculation changes. Runtime asset files have no diff.
+
+The actual native desktop OpenGL renderer produced **14 raw 1920×1080 captures**,
+all with GL error zero, in short existing all-skill debug fixtures. Combat views
+retain five solo/ten co-op target enemies and their actual hit effects; a separate
+solo close-up uses a temporary diagnostic camera zoom of 0.7. The isolated skill
+views hide target bodies/contact effects after simulation and are labeled as
+such. No screenshot is a generated mockup. Inspected views include simultaneous
+four blades/field/glaive/Reap/primary wave/relics and six overlapping co-op fields.
+Evidence is under ignored `.run/isometric-skill-review/`.
+
+These captures verify presentation and depth, not physical-TV pacing, thermals
+or a full survival run. No device installation or emulator launch occurred.
+Capture processes exited. The existing saved LAN QR host, relay configuration
+and ADB forwards remain unchanged. A read-only handoff check still received a
+closed connection without response from that existing LAN endpoint, matching
+its previously recorded state.
+
 Current permanent player outlines and Dodge presentation are defined by the
 25 November range-and-afterimage update below; earlier aura approvals are retained
 as implementation history.

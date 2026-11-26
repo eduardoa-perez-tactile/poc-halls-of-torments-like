@@ -56,18 +56,18 @@ public final class SkillExpansion {
         randomState = seed ^ 0x4e62b7d1;
         relicsCollected = relicsPlaced = fieldAcquireMisses = delayedAcquireMisses = 0; lastRelicKind = null;
         Arrays.fill(fieldClocks, 0); Arrays.fill(glaiveClocks, 0);
-        for (OrbitBlade blade : orbiters) { blade.active = false; Arrays.fill(blade.contactClocks, 0); }
+        for (OrbitBlade blade : orbiters) { blade.active = false; blade.history.clear(); Arrays.fill(blade.contactClocks, 0); }
         for (GroundField field : fields) field.active = false;
-        for (Glaive glaive : glaives) glaive.active = false;
+        for (Glaive glaive : glaives) { glaive.active = false; glaive.history.clear(); }
         for (WorldRelic relic : relics) relic.active = false;
         for (DelayedStrike strike : delayed) strike.active = false;
     }
 
     void removePlayer(int slot) {
         fieldClocks[slot] = glaiveClocks[slot] = 0;
-        for (OrbitBlade blade : orbiters) if (blade.owner == slot) blade.active = false;
+        for (OrbitBlade blade : orbiters) if (blade.owner == slot) { blade.active = false; blade.history.clear(); }
         for (GroundField field : fields) if (field.owner == slot) field.active = false;
-        for (Glaive glaive : glaives) if (glaive.owner == slot) glaive.active = false;
+        for (Glaive glaive : glaives) if (glaive.owner == slot) { glaive.active = false; glaive.history.clear(); }
         for (DelayedStrike strike : delayed) if (strike.owner == slot) strike.active = false;
         for (ArenaWorld.Bolt bolt : world.bolts) if (bolt.owner == slot) bolt.active = false;
     }
@@ -77,7 +77,9 @@ public final class SkillExpansion {
         for (ArenaWorld.Player player : world.players) {
             player.wardFlash = Math.max(0, player.wardFlash - step);
             if (!player.active || !player.alive) {
-                for (int i = player.slot * 4; i < player.slot * 4 + 4; i++) orbiters[i].active = false;
+                for (int i = player.slot * 4; i < player.slot * 4 + 4; i++) {
+                    orbiters[i].active = false; orbiters[i].history.clear();
+                }
                 continue;
             }
             player.wardCooldown = Math.max(0, Math.min(player.wardCooldown, wardCooldown(player.wardLevel)) - step);
@@ -196,12 +198,15 @@ public final class SkillExpansion {
         player.sentinelAngle = (player.sentinelAngle + ArenaWorld.STEP * 1.8f) % TAU;
         for (int i = 0; i < 4; i++) {
             OrbitBlade blade = orbiters[player.slot * 4 + i];
-            if (i >= count) { blade.active = false; continue; }
+            if (i >= count) { blade.active = false; blade.history.clear(); continue; }
+            if (!blade.active || blade.formationCount != count) blade.history.clear();
             if (!blade.active) { Arrays.fill(blade.contactClocks, 0); Arrays.fill(blade.contactGenerations, -1); }
             blade.active = true; blade.owner = player.slot;
+            blade.formationCount = count;
             blade.angle = player.sentinelAngle + TAU * i / count;
             blade.x = player.x + (float) Math.cos(blade.angle) * sentinelRadius();
             blade.y = player.y + (float) Math.sin(blade.angle) * sentinelRadius();
+            blade.history.capture(blade.x, blade.y, blade.angle);
             for (int index = 0; index < world.enemies.length; index++) {
                 blade.contactClocks[index] = Math.max(0, blade.contactClocks[index] - ArenaWorld.STEP);
                 ArenaWorld.Enemy enemy = world.enemies[index];
@@ -263,6 +268,7 @@ public final class SkillExpansion {
         glaive.speed = 420 * projectileSpeed(player); glaive.remaining = glaiveRange(player.glaiveLevel);
         glaive.damage = glaiveDamage(player.glaiveLevel) * world.equipment.damageMultiplier(player);
         glaive.age = glaive.angle = 0; glaive.ttl = 5;
+        glaive.history.clear();
         Arrays.fill(glaive.hitGenerations, -1); glaiveClocks[player.slot] = glaiveCooldown();
     }
 
@@ -271,7 +277,7 @@ public final class SkillExpansion {
         for (Glaive glaive : glaives) {
             if (!glaive.active) continue;
             ArenaWorld.Player owner = world.players[glaive.owner];
-            if (!owner.active || !owner.alive) { glaive.active = false; continue; }
+            if (!owner.active || !owner.alive) { glaive.active = false; glaive.history.clear(); continue; }
             float oldX = glaive.x, oldY = glaive.y;
             glaive.age += ArenaWorld.STEP; glaive.ttl -= ArenaWorld.STEP; glaive.angle = glaive.age * 12;
             float travel = glaive.speed * ArenaWorld.STEP;
@@ -294,6 +300,8 @@ public final class SkillExpansion {
                 if (glaive.remaining <= .0001f) { glaive.returning = true; Arrays.fill(glaive.hitGenerations, -1); }
             } else if (distanceSquared(glaive.x, glaive.y, owner.x, owner.y) <= 18 * 18) glaive.active = false;
             if (glaive.ttl <= 0) glaive.active = false;
+            if (glaive.active) glaive.history.capture(glaive.x, glaive.y, glaive.angle);
+            else glaive.history.clear();
         }
     }
 
@@ -384,6 +392,8 @@ public final class SkillExpansion {
 
     public static final class OrbitBlade {
         public boolean active; public int owner; public float x, y, angle;
+        public final PoseHistory history = new PoseHistory();
+        private int formationCount;
         private final float[] contactClocks = new float[ArenaWorld.MAX_ENEMIES];
         private final int[] contactGenerations = new int[ArenaWorld.MAX_ENEMIES];
     }
@@ -393,8 +403,27 @@ public final class SkillExpansion {
     }
     public static final class Glaive {
         public boolean active, returning; public int owner; public float x, y, vx, vy, angle, age, ttl;
+        public final PoseHistory history = new PoseHistory();
         private float speed, remaining, damage;
         private final int[] hitGenerations = new int[ArenaWorld.MAX_ENEMIES];
+    }
+
+    /** Actual combat-tick poses, newest first; index i is i * STEP seconds old (at most 100 ms). */
+    public static final class PoseHistory {
+        public static final int CAPACITY = 7;
+        public final float[] x = new float[CAPACITY], y = new float[CAPACITY], angle = new float[CAPACITY];
+        public int count;
+
+        private void clear() { count = 0; }
+
+        private void capture(float px, float py, float rotation) {
+            int previous = Math.min(count, CAPACITY - 1);
+            System.arraycopy(x, 0, x, 1, previous);
+            System.arraycopy(y, 0, y, 1, previous);
+            System.arraycopy(angle, 0, angle, 1, previous);
+            x[0] = px; y[0] = py; angle[0] = rotation;
+            count = previous + 1;
+        }
     }
     public static final class WorldRelic {
         public boolean active; public RelicKind kind; public float x, y, age;
