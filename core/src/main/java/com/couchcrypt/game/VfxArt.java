@@ -16,6 +16,7 @@ public final class VfxArt implements Disposable {
     private final Texture texture;
     private final Metadata metadata;
     private final Part[][] parts;
+    private final float[] vertices = new float[20];
 
     public VfxArt() {
         metadata = new Metadata(new JsonReader().parse(Gdx.files.internal("art/combat-vfx.json")));
@@ -55,6 +56,31 @@ public final class VfxArt implements Disposable {
         batch.draw(p.region, x + p.left * scale, y + p.bottom * scale,
             -p.left * scale, -p.bottom * scale, p.width * scale, p.height * scale,
             1, 1, rotationDegrees);
+    }
+
+    /** A small directional contact sweep lies in the same plane as a weapon, at its hit height. */
+    public void drawProjected(SpriteBatch batch, Animation animation, float age, float x, float y,
+                              float scale, float angleRadians) {
+        int index = metadata.clips[animation.ordinal()].sample(age);
+        if (index < 0) return;
+        Part p = parts[index][Layer.ALL.ordinal()];
+        if (p == null) return;
+        float c = (float) Math.cos(angleRadians), s = (float) Math.sin(angleRadians);
+        float left = p.left * scale, right = (p.left + p.width) * scale;
+        float bottom = p.bottom * scale, top = (p.bottom + p.height) * scale;
+        float color = batch.getPackedColor();
+        projectedVertex(0, x, y, left, bottom, c, s, color, p.region.getU(), p.region.getV2());
+        projectedVertex(5, x, y, left, top, c, s, color, p.region.getU(), p.region.getV());
+        projectedVertex(10, x, y, right, top, c, s, color, p.region.getU2(), p.region.getV());
+        projectedVertex(15, x, y, right, bottom, c, s, color, p.region.getU2(), p.region.getV2());
+        batch.draw(texture, vertices, 0, vertices.length);
+    }
+
+    private void projectedVertex(int at, float x, float y, float u, float v, float c, float s,
+                                 float color, float textureU, float textureV) {
+        vertices[at] = x + u * c - v * s;
+        vertices[at + 1] = y + .5f * (u * s + v * c);
+        vertices[at + 2] = color; vertices[at + 3] = textureU; vertices[at + 4] = textureV;
     }
 
     @Override public void dispose() { texture.dispose(); }
