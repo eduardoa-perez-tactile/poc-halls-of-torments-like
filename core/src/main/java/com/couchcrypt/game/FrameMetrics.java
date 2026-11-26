@@ -13,7 +13,7 @@ public final class FrameMetrics {
     private static final String[] STAGE_NAMES = {"handoff", "simulation", "audio", "status", "arena", "ui", "floor", "gather", "worldDraw", "hud"};
     private static final String[] POOL_NAMES = {"enemies", "bolts", "pickups", "shots", "hazards", "effects",
         "meleeWaves", "orbiters", "fields", "glaives", "relics", "delayedStrikes", "chests"};
-    private static final String[] RENDER_COUNT_NAMES = {"floorDraws", "worldDraws", "hudDraws", "dynamicSpriteBatchTextureSelections", "visibleSprites"};
+    private static final String[] RENDER_COUNT_NAMES = {"floorDraws", "worldDraws", "hudDraws", "dynamicSpriteBatchTextureSelections", "visibleSprites", "dynamicSpriteBatchVertexUploads"};
     private static final int CAPACITY = 2048;
     private static final long REPORT_NS = 5_000_000_000L;
     private static final long BUDGET_NS = 16_700_000L, DOUBLE_BUDGET_NS = 33_400_000L;
@@ -102,6 +102,12 @@ public final class FrameMetrics {
     public void recordRenderCounts(int floorDraws, int worldDraws, int hudDraws, int textureSelections, int visibleSprites) {
         frameRenderCounts[0] = floorDraws; frameRenderCounts[1] = worldDraws; frameRenderCounts[2] = hudDraws;
         frameRenderCounts[3] = textureSelections; frameRenderCounts[4] = visibleSprites;
+    }
+
+    public void recordRenderCounts(int floorDraws, int worldDraws, int hudDraws, int textureSelections,
+                                   int visibleSprites, int vertexUploads) {
+        recordRenderCounts(floorDraws, worldDraws, hudDraws, textureSelections, visibleSprites);
+        frameRenderCounts[5] = vertexUploads;
     }
 
     /**

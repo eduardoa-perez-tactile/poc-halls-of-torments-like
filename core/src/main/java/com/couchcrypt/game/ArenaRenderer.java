@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.StreamingSpriteBatch;
 import com.badlogic.gdx.graphics.g2d.SpriteCache;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.MathUtils;
@@ -84,7 +85,7 @@ public final class ArenaRenderer implements Disposable {
     public ArenaRenderer(GameArt gameArt, UiArt uiArt, BuildIcons buildIcons, HudArt hudArt, FrameMetrics frameMetrics) {
         metrics = frameMetrics;
         paletteShader = EnemyPalette.createShader();
-        batch = metrics == null ? new SpriteBatch(1800, paletteShader) : new ProfileBatch(paletteShader);
+        batch = metrics == null ? new StreamingSpriteBatch(1800, paletteShader) : new ProfileBatch(paletteShader);
         iris = new SoftIris();
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
         rankMarkers = new EnemyRankMarkers(art.pixel);
@@ -138,6 +139,7 @@ public final class ArenaRenderer implements Disposable {
         int width = Gdx.graphics.getWidth(), height = Gdx.graphics.getHeight();
         if (width <= 0 || height <= 0) return;
         long arenaStartedNs = metrics == null ? 0 : System.nanoTime();
+        long uploadsBefore = metrics == null ? 0 : ((StreamingSpriteBatch) batch).vertexUploadCount();
         ProfileBatch profileBatch = metrics == null ? null : (ProfileBatch) batch;
         int active = (world.players[0].active ? 1 : 0) + (world.players[1].active ? 1 : 0);
         boolean split = active == 2;
@@ -236,7 +238,8 @@ public final class ArenaRenderer implements Disposable {
         if (metrics != null) {
             metrics.endStage(FrameMetrics.HUD);
             metrics.recordRenderCounts(floorDraws, worldDraws, batch.renderCalls,
-                ((ProfileBatch) batch).textureSelections, visibleSprites);
+                ((ProfileBatch) batch).textureSelections, visibleSprites,
+                (int) (((StreamingSpriteBatch) batch).vertexUploadCount() - uploadsBefore));
             long endedNs = System.nanoTime(), wallNs = endedNs - arenaStartedNs;
             if (wallNs > 33_300_000L && (lastStallLogNs == 0 || endedNs - lastStallLogNs >= 1_000_000_000L)) {
                 lastStallLogNs = endedNs;
@@ -250,7 +253,7 @@ public final class ArenaRenderer implements Disposable {
     }
 
     /** Counts arena batch selections without intercepting GL or forcing extra flushes/fences. */
-    private static final class ProfileBatch extends SpriteBatch {
+    private static final class ProfileBatch extends StreamingSpriteBatch {
         int textureSelections;
         int flushCount, camera = -1, maxFlushCamera = -1;
         long flushTotalNs, maxFlushNs;

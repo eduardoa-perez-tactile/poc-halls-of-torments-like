@@ -1,5 +1,8 @@
 # Crowded full-skill headless stress — 26 November 2026
 
+This is the pre-fix baseline. See [the buffer-upload fix and repeated long
+measurement](buffer-upload-fix.md) for the subsequent implementation and checks.
+
 The longer checks reproduce intermittent drawing stalls. The traced examples
 concentrate their time in the emulator's GPU-buffer upload encoding path.
 They do not establish a physical-TV GPU bottleneck or a verified production fix.

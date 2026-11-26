@@ -27,8 +27,7 @@ final class TvFramePacer implements Choreographer.FrameCallback, SurfaceHolder.C
     private final boolean profile;
     private volatile boolean active, surfaceReady, swapReady;
     private volatile long drawn, swapped, bootstrapAfter;
-    private volatile long lateLimitNs = FrameCadence.TARGET_PERIOD_NS * 9 / 10,
-        creditAgeNs = FrameCadence.TARGET_PERIOD_NS / 2, drainedCredits;
+    private volatile long lateLimitNs = FrameCadence.TARGET_PERIOD_NS * 9 / 10, drainedCredits;
     private volatile long presentationPeriodNs = FrameCadence.TARGET_PERIOD_NS;
     private volatile long presentationSet, presentationFailed, presentationUnavailable;
     private volatile boolean presentationAvailable;
@@ -99,7 +98,8 @@ final class TvFramePacer implements Choreographer.FrameCallback, SurfaceHolder.C
         swapped++;
         if (!requests.complete(drawingTicket)) return;
         if (drawn > bootstrapAfter) swapReady = true;
-        if (requestCredit(System.nanoTime(), creditAgeNs) == FrameRequestGate.CLAIMED && profile) drainedCredits++;
+        // A swap delay must not discard a tick the UI would still admit for its future presentation.
+        if (requestCredit(System.nanoTime(), lateLimitNs) == FrameRequestGate.CLAIMED && profile) drainedCredits++;
     }
     private int requestCredit(long now, long maximumAge) {
         if (!active || !surfaceReady || !swapReady) return FrameRequestGate.EMPTY;
@@ -135,8 +135,7 @@ final class TvFramePacer implements Choreographer.FrameCallback, SurfaceHolder.C
         refreshHz = Float.isFinite(rate) && rate >= 20 && rate <= 1_000 ? rate : 60;
         cadence.configure(refreshHz);
         // A skipped display tick is intentional at 30 FPS; use the render budget for lateness.
-        creditAgeNs = cadence.framePeriodNs() / 2;
-        lateLimitNs = cadence.framePeriodNs() * 9 / 10;
+        lateLimitNs = cadence.maximumRequestAgeNs();
         presentationPeriodNs = cadence.framePeriodNs();
         if (Build.VERSION.SDK_INT < 30 && display != null) preferCompatibleMode(display);
         if (surfaceReady) applyFrameRateHint();
