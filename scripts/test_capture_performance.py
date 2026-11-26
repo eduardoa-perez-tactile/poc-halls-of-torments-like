@@ -192,6 +192,23 @@ class DuplicateFieldsTest(unittest.TestCase):
         self.assertEqual(90, report['gpuTextureBytesDistribution']['min'])
 
 
+class FixtureKeyboardTest(unittest.TestCase):
+    def test_does_not_send_back_to_the_game_when_keyboard_is_hidden(self):
+        key, wait = mock.Mock(), mock.Mock()
+        self.assertFalse(capture.dismiss_fixture_keyboard(mock.Mock(return_value='mInputShown=false'), key, wait))
+        key.assert_not_called()
+        wait.assert_not_called()
+
+    def test_verifies_keyboard_dismissal_before_measuring(self):
+        key, wait = mock.Mock(), mock.Mock()
+        command = mock.Mock(side_effect=['mInputShown=true', 'mInputShown=false'])
+        self.assertTrue(capture.dismiss_fixture_keyboard(command, key, wait))
+        key.assert_called_once_with(4)
+        for states in (['visibility unavailable'], ['mInputShown=true', 'mInputShown=true']):
+            with self.subTest(states=states), self.assertRaises(RuntimeError):
+                capture.dismiss_fixture_keyboard(mock.Mock(side_effect=states), mock.Mock(), mock.Mock())
+
+
 class SystemTraceTest(unittest.TestCase):
     def test_configuration_is_finite_and_bounded(self):
         config = capture.trace_configuration(7)
@@ -203,6 +220,9 @@ class SystemTraceTest(unittest.TestCase):
         for invalid in (0, 4, 31, 999999):
             with self.assertRaises(ValueError):
                 capture.trace_configuration(invalid)
+        self.assertIn('size_kb: 131072', capture.trace_configuration(15, 131072))
+        with self.assertRaises(ValueError):
+            capture.trace_configuration(15, 262144)
 
     def test_capture_process_pull_and_owned_cleanup(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -221,11 +221,27 @@ def parser_for_capture():
     return parser
 
 
-def trace_configuration(seconds):
+def dismiss_fixture_keyboard(command, key, wait):
+    """Android TV can open its IME for the injected numeric profiling shortcut."""
+    state = command('shell', 'dumpsys', 'input_method')
+    if 'mInputShown=' not in state:
+        raise RuntimeError('Cannot verify that the emulator keyboard is absent')
+    if 'mInputShown=true' not in state:
+        return False
+    key(4)
+    wait(.2)
+    if 'mInputShown=false' not in command('shell', 'dumpsys', 'input_method'):
+        raise RuntimeError('Emulator keyboard remained over the fixture')
+    return True
+
+
+def trace_configuration(seconds, buffer_kib=65536):
     if not 5 <= seconds <= 30:
         raise ValueError('System trace duration must be 5..30 seconds')
+    if buffer_kib not in (65536, 131072):
+        raise ValueError('System trace storage must remain bounded to 64 or 128 MiB')
     return f'''duration_ms: {seconds * 1000}
-buffers {{ size_kb: 65536 fill_policy: RING_BUFFER }}
+buffers {{ size_kb: {buffer_kib} fill_policy: RING_BUFFER }}
 data_sources {{ config {{ name: "linux.ftrace" ftrace_config {{
   ftrace_events: "sched/sched_switch"
   ftrace_events: "sched/sched_wakeup"
@@ -241,17 +257,18 @@ data_sources {{ config {{ name: "android.surfaceflinger.frametimeline" }} }}
 
 class SystemTrace:
     """One finite foreground adb/Perfetto process and one owned device filename."""
-    def __init__(self, target, prefix, seconds, command):
+    def __init__(self, target, prefix, seconds, command, *, buffer_kib=65536):
         self.target, self.prefix, self.seconds, self.command = target, prefix, seconds, command
+        self.buffer_kib = buffer_kib
         self.device_path = f'/data/misc/perfetto-traces/couchcrypt-baseline-{os.getpid()}.perfetto-trace'
         self.process = None
         self.metadata = {'requested': True, 'status': 'pending', 'duration_ms': seconds * 1000,
-                         'buffer_kib': 65536, 'device_path': self.device_path,
+                         'buffer_kib': buffer_kib, 'device_path': self.device_path,
                          'note': 'Trace attempt adds overhead; compare with a separate trace_on=false baseline. FrameTimeline source is optional and does not establish SurfaceView presentation timing.'}
 
     def start(self):
         try:
-            config = trace_configuration(self.seconds)
+            config = trace_configuration(self.seconds, self.buffer_kib)
             self.process = subprocess.Popen(self.target + ['shell', 'perfetto', '--txt', '-c', '-', '-o', self.device_path],
                                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             self.process.stdin.write(config)
@@ -477,6 +494,8 @@ def main():
                 key(136)  # F6: add the real final boss and existing telegraphs.
             elif args.fixture == 'expansion-coop':
                 key(11)  # NUM_4: complete skill composition, fixed durable targets and both relics.
+                wait(.2)
+                metadata['fixture_keyboard_dismissed'] = dismiss_fixture_keyboard(command, key, wait)
                 metadata['fixture_note'] = 'Dedicated expansion fixture; not simultaneous maximum-pool saturation.'
             else:
                 key(137 if args.fixture == 'results' else 141 if args.fixture == 'late-coop' else 142 if args.fixture == 'items-coop' else 136)

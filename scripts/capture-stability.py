@@ -15,11 +15,11 @@ capture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(capture)
 
 
-def validate_combat_evidence(log_text, completed_cycles):
+def validate_combat_evidence(log_text, completed_cycles, phase='COOP_BOSS', require_skills=False):
     """A responsive controller alone is not evidence that a stress fixture actually simulated combat."""
     parsed = capture.summarize_baseline(log_text, {'fixture': 'stability'})
-    boss_frames = [row for row in parsed['reports'] if row.get('phase') == 'COOP_BOSS']
-    boss_worlds = [row for row in parsed['diagnostics'] if row['tag'] == 'ProfileWorld' and row.get('phase') == 'COOP_BOSS']
+    boss_frames = [row for row in parsed['reports'] if row.get('phase') == phase]
+    boss_worlds = [row for row in parsed['diagnostics'] if row['tag'] == 'ProfileWorld' and row.get('phase') == phase]
     runs = {}
     for row in boss_worlds:
         runs.setdefault(row['runSeed'], []).append(row)
@@ -27,6 +27,8 @@ def validate_combat_evidence(log_text, completed_cycles):
                     - min(float(row['elapsed']) for row in rows) >= 5 for rows in runs.values())
     crowded_windows = sum(row.get('enemies', {}).get('frameSampledPeak', 0) >= 40 for row in boss_frames)
     simulated_steps = sum(int(row.get('simulationStepsTotal', 0)) for row in boss_frames)
+    skill_windows = sum(sum(row.get(pool, {}).get('frameSampledPeak', 0) > 0
+                            for pool in ('orbiters', 'fields', 'glaives', 'delayedStrikes')) >= 3 for row in boss_frames)
     attacking_runs = sum(any(int(row.get('boltCollisionCandidates', 0)) + int(row.get('meleeCollisionCandidates', 0))
                              + int(row.get('expansionCollisionCandidates', 0)) > 0 for row in rows)
                          for rows in runs.values())
@@ -36,10 +38,11 @@ def validate_combat_evidence(log_text, completed_cycles):
     violations = []
     for condition, message in [
         (completed_cycles > 0, 'No completed stress cycles'),
-        (advancing >= completed_cycles, 'Not every cycle has evidence of advancing boss combat time'),
+        (advancing >= completed_cycles, 'Not every cycle has evidence of advancing combat time'),
         (attacking_runs >= completed_cycles, 'Not every cycle has real attack collision tests'),
-        (crowded_windows >= completed_cycles, 'Insufficient high-enemy-occupancy boss windows'),
-        (simulated_steps >= completed_cycles * 600, 'Insufficient active fixed-step boss simulation'),
+        (crowded_windows >= completed_cycles, 'Insufficient high-enemy-occupancy combat windows'),
+        (not require_skills or skill_windows >= completed_cycles, 'Insufficient occupied expansion-skill pools'),
+        (simulated_steps >= completed_cycles * 600, 'Insufficient active fixed-step combat simulation'),
         (workers == {2}, 'Audio workers failed, grew, or were not reported'),
         (bool(handles) and max(handles) <= 1, 'Music handle ownership grew or was not reported'),
         (bool(textures) and max(textures) <= 32 * 1_048_576, 'Texture budget exceeded or was not reported'),
@@ -47,21 +50,61 @@ def validate_combat_evidence(log_text, completed_cycles):
         if not condition:
             violations.append(message)
     return {'valid': not violations, 'violations': violations, 'advancing_combat_runs': advancing,
+            'combat_phase': phase, 'occupied_skill_windows': skill_windows,
             'attacking_runs': attacking_runs, 'crowded_boss_windows': crowded_windows,
             'boss_simulation_steps': simulated_steps, 'audio_worker_counts': sorted(workers),
             'music_handle_counts': sorted(handles), 'max_texture_bytes': max(textures, default=0)}
 
 
-def main():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--serial', required=True)
     parser.add_argument('--host', required=True, type=capture.phone_reachable_host)
     parser.add_argument('--forward-port', required=True, type=int)
     parser.add_argument('--seconds', type=int, choices=range(60, 901), default=600, metavar='60..900')
     parser.add_argument('--output-dir', type=Path, required=True)
-    args = parser.parse_args()
+    parser.add_argument('--presentation', action='store_true', help='Observe SurfaceFlinger presentation during each 20s combat window')
+    parser.add_argument('--trace-every', type=int, choices=range(0, 11), default=0, metavar='0..10',
+                        help='Trace cycles 1, 1+N, ... for 15s; 0 disables tracing')
+    parser.add_argument('--full-skills', action='store_true', help='Use existing NUM4 plus F12 skill/crowd fixtures, without the killable boss')
+    args = parser.parse_args(argv)
     if not re.fullmatch(r'emulator-\d+', args.serial):
         parser.error('An explicit emulator serial is required; physical devices are never targeted.')
+    return args
+
+
+def trace_selected(cycle, every):
+    return every > 0 and (cycle - 1) % every == 0
+
+
+def finish_instrumentation(presentation, system_trace):
+    """Stop finite observations before memory/lifecycle work, including after a failed combat window."""
+    result = {}
+    try:
+        if presentation is not None:
+            try:
+                result['presentation_stopped'] = presentation.stop()
+                result['presentation_sampling'] = presentation.metadata()
+                result['presentation_analysis'] = presentation.analyze(*presentation.observation_bounds(), target_fps=30)
+            except Exception as failure:
+                result['presentation_error'] = str(failure)
+    finally:
+        if system_trace is not None:
+            try:
+                system_trace.finish()
+            except Exception as failure:
+                result['trace_error'] = str(failure)
+            finally:
+                try:
+                    system_trace.cleanup()
+                except Exception as failure:
+                    result['trace_cleanup_error'] = str(failure)
+                result['system_trace'] = system_trace.metadata
+    return result
+
+
+def main():
+    args = parse_args()
     directory = args.output_dir.resolve()
     directory.mkdir(parents=True, exist_ok=True)
     sdk = Path(os.environ.get('ANDROID_HOME', Path.home() / 'Library/Android/sdk'))
@@ -69,8 +112,11 @@ def main():
     phones = []
     retired_inputs = []
     logger = None
+    presentation = system_trace = cycle_metrics = None
     report = {'requested_seconds': args.seconds, 'source': capture.source_provenance(),
               'cycles': [], 'memory': [], 'complete': False,
+              'presentation_requested': args.presentation, 'trace_every': args.trace_every,
+              'full_skills': args.full_skills,
               'limits': ['Profiling/debug APK and synthetic input; no physical-TV thermal or GPU certification.',
                          'ADB snapshots and transitions perturb frame pacing; use separate untraced captures for comparison.',
                          'Each cycle uses existing short fixtures; this is repeated stress, not a twenty-minute survival playthrough.']}
@@ -127,6 +173,22 @@ def main():
         save()
         print(json.dumps(snapshot), flush=True)
 
+    def finish_cycle_instrumentation():
+        nonlocal presentation, system_trace
+        observed, traced = presentation, system_trace
+        presentation = system_trace = None
+        if observed is None and traced is None:
+            return
+        details = finish_instrumentation(observed, traced)
+        path = directory / f"cycle-{cycle_metrics['cycle']:03d}.presentation.json"
+        path.write_text(json.dumps({'cycle': cycle_metrics['cycle'], 'target_fps': 30, **details}, indent=2) + '\n')
+        cycle_metrics.update(details, observation_file=str(path))
+        if 'presentation_sampling' in cycle_metrics:
+            # Raw bounded snapshots stay in the per-cycle file instead of being rewritten with every meminfo.
+            cycle_metrics['presentation_sampling'] = {key: value for key, value in details['presentation_sampling'].items()
+                                                       if key != 'snapshots'}
+        save()
+
     def choose(kind):
         phase = 'level_up' if kind == 'upgrade' else 'loot'
         until(lambda: all_phase(phase), phase)
@@ -165,7 +227,8 @@ def main():
     try:
         output = (directory / 'game.log').open('wb', buffering=0)
         logger = subprocess.Popen(target + ['logcat', '-v', 'threadtime', '-T', '1', 'FrameMetrics:I',
-                                  'ProfileWorld:I', 'ProfileMemory:I', 'FramePacing:I', 'Audio:I', 'AndroidRuntime:E', '*:S'],
+                                  'ProfileWorld:I', 'ProfileMemory:I', 'ProfileRenderStall:I', 'FramePacing:I',
+                                  'm.couchcrypt.tv:I', 'com.couchcrypt.tv:I', 'Audio:I', 'AndroidRuntime:E', '*:S'],
                                   stdout=output, stderr=subprocess.STDOUT)
         command('shell', 'am', 'force-stop', capture.PACKAGE)
         command('shell', 'am', 'start', '-n', capture.COMPONENT, '--ez', 'profile', 'true', '--es', 'joinHost', args.host)
@@ -210,9 +273,26 @@ def main():
                     raise RuntimeError('Reconnect changed player identity or pending choice')
                 key(4)
             choose('upgrade')
+            keyboard_dismissed = False
+            if args.full_skills:
+                key(11)  # NUM4: existing full-class skill fixture, before the existing crowd/boss fixtures.
+                wait(.2)
+                keyboard_dismissed = capture.dismiss_fixture_keyboard(command, key, wait)
             key(142)  # F12: equipped late encounter and bounded invulnerability.
             wait(.25)
-            key(136)  # F6: final boss.
+            if not args.full_skills:
+                key(136)  # F6: final boss; full-skill stress instead keeps the late crowd active.
+            cycle_metrics = None
+            if args.presentation or trace_selected(cycle, args.trace_every):
+                cycle_metrics = {'cycle': cycle, 'target_fps': 30, 'trace_on': trace_selected(cycle, args.trace_every),
+                                 'fixture_keyboard_dismissed': keyboard_dismissed}
+                report.setdefault('instrumentation', []).append(cycle_metrics)
+                if args.presentation:
+                    presentation = capture.presentation_metrics.PresentationSampler(target, capture.surface_latency(command))
+                    presentation.start()
+                if trace_selected(cycle, args.trace_every):
+                    system_trace = capture.SystemTrace(target, directory / f'cycle-{cycle:03d}', 15, command, buffer_kib=131072)
+                    system_trace.start()
             combat_end = time.monotonic() + 20
             while time.monotonic() < combat_end:
                 if all_phase('level_up'):
@@ -220,6 +300,7 @@ def main():
                 elif all_phase('loot'):
                     choose('equipment')
                 wait(.1)
+            finish_cycle_instrumentation()
             memory(f'cycle-{cycle}-combat')
             key(4)
             until(lambda: all_phase('paused'), 'remote pause')
@@ -239,7 +320,8 @@ def main():
             wait(.8)  # Include the approved Defeat reveal/action gate.
             memory(f'cycle-{cycle}-results')
             report['cycles'].append({'cycle': cycle, 'elapsed_seconds': round(time.monotonic() - began, 2),
-                                      'checks': ['gear', 'crowded-coop-boss', 'pause-resume', 'skill', 'results', 'replay'],
+                                      'checks': ['gear', 'crowded-coop-full-skills' if args.full_skills else 'crowded-coop-boss',
+                                                 'pause-resume', 'skill', 'results', 'replay'],
                                       'reconnect': cycle % 4 == 1, 'background_resume': cycle % 3 == 0})
             save()
             if cycle % 2:
@@ -259,6 +341,10 @@ def main():
         report['error'] = str(failure)
         raise
     finally:
+        try:
+            finish_cycle_instrumentation()
+        except Exception as failure:
+            report['instrumentation_cleanup_error'] = str(failure)
         for phone in phones:
             if phone is not None:
                 phone.close()
@@ -273,7 +359,8 @@ def main():
         log = directory / 'game.log'
         report['fatal_exception_recorded'] = log.exists() and 'FATAL EXCEPTION' in log.read_text(errors='replace')
         if report['complete']:
-            report['combat_validation'] = validate_combat_evidence(log.read_text(errors='replace'), len(report['cycles']))
+            report['combat_validation'] = validate_combat_evidence(log.read_text(errors='replace'), len(report['cycles']),
+                phase='COOP_LATE' if args.full_skills else 'COOP_BOSS', require_skills=args.full_skills)
         save()
         command('shell', 'am', 'force-stop', capture.PACKAGE)
         print('Stress capture finished; synthetic phones closed and app stopped on its explicit emulator.', flush=True)

@@ -110,6 +110,10 @@ explain a stall that the trace did not reproduce.
 
 ### Follow-up investigation
 
+The subsequent [long crowded/full-skill stress test](long-skill-stress.md)
+reproduces drawing stalls and provides native attribution. Its longer results
+supersede the clean short follow-up observations below as a stability conclusion.
+
 The requested follow-up still did not reproduce the original 211.60 ms callback
 stall. There is **no verified fix for that original event**. The retained change
 adds profiling-only diagnostics; production artwork, gameplay and the sprite
