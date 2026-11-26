@@ -48,8 +48,9 @@ public final class ArenaRenderer implements Disposable {
     // One bounded static mesh; both cameras reuse the same floor, paths and wear colours.
     private final SpriteCache floorCache = createFloorCache();
     private final int floorCacheId;
+    private final SpriteCache medallionCache;
+    private final int medallionCacheId, medallionQuadCount;
     private final ArenaFloorLayout floorLayout;
-    private final EngravedFloorArt.Quad[] medallion;
     private final OrthographicCamera[] cameras = { new OrthographicCamera(), new OrthographicCamera() };
     private final OrthographicCamera hud = new OrthographicCamera();
     private final boolean[] cameraReady = new boolean[2];
@@ -71,7 +72,9 @@ public final class ArenaRenderer implements Disposable {
     public int drawCalls;
     /** Startup inventory; shared by both cameras and never rebuilt while playing. */
     public int cachedFloorQuads;
-    public int medallionQuads() { return medallion.length; }
+    public int medallionQuads() { return medallionQuadCount; }
+    public long medallionCachedVertexBytes() { return medallionQuadCount * 80L; }
+    public long medallionCachedIndexBytes() { return medallionQuadCount * 12L; }
 
     public ArenaRenderer(GameArt gameArt, UiArt uiArt, BuildIcons buildIcons, HudArt hudArt) {
         this(gameArt, uiArt, buildIcons, hudArt, null);
@@ -99,7 +102,17 @@ public final class ArenaRenderer implements Disposable {
             engraving[i] = floorLayout.centerX + (x + y) * ISO_X;
             engraving[i + 1] = floorLayout.centerY + (y - x) * ISO_X;
         }
-        medallion = art.engravedFloor.geometry(art.engravedFloor.medallion, engraving, 1f);
+        EngravedFloorArt.Quad[] medallion = art.engravedFloor.geometry(art.engravedFloor.medallion, engraving, 1f);
+        medallionQuadCount = medallion.length;
+        medallionCache = createMedallionCache(medallionQuadCount);
+        try {
+            medallionCache.beginCache();
+            // Preserve the former per-page vertex sequence and its ordinary transparent paint.
+            art.engravedFloor.cache(medallionCache, medallion);
+            medallionCacheId = medallionCache.endCache();
+        } catch (RuntimeException | Error failure) {
+            medallionCache.dispose(); throw failure;
+        }
         floorCacheId = cacheFloor();
         hud.setToOrtho(false, HUD_WIDTH, HUD_HEIGHT);
         layout = ArenaLayout.load(art.metadata);
@@ -143,12 +156,11 @@ public final class ArenaRenderer implements Disposable {
             drawFloor(camera);
             if (metrics != null) {
                 metrics.endStage(FrameMetrics.FLOOR);
-                floorDraws += floorCache.renderCalls;
+                floorDraws += floorCache.renderCalls + medallionCache.renderCalls;
                 metrics.beginStage(FrameMetrics.WORLD_DRAW);
             }
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
-            art.engravedFloor.draw(batch, medallion);
             drawChestLights(world, camera);
             skillArt.ground(batch, world, camera);
             drawMeleeWaves(world, camera);
@@ -276,7 +288,7 @@ public final class ArenaRenderer implements Disposable {
         }
         if (quads > EngravedFloorArt.MAX_FLOOR_QUADS) throw new IllegalStateException("Floor cache capacity exceeded");
         cachedFloorQuads = quads;
-        Gdx.app.log("FloorArt", "Cached ground quads=" + quads + ", medallion quads=" + medallion.length);
+        Gdx.app.log("FloorArt", "Cached ground quads=" + quads + ", medallion quads=" + medallionQuadCount);
         floorCache.setColor(Color.WHITE);
         return floorCache.endCache();
     }
@@ -345,6 +357,61 @@ public final class ArenaRenderer implements Disposable {
         }
     }
 
+    private static SpriteCache createMedallionCache(int quadCount) {
+        // Match the existing arena batch's unmarked UVs, colour precision and packed-alpha correction.
+        // Unlike opaque paving, this paint must retain every sampled alpha without a coverage discard.
+        String vertex = """
+            #ifdef GL_ES
+            precision highp float;
+            #define LOWP lowp
+            #define HIGHP highp
+            #else
+            #define LOWP
+            #define HIGHP
+            #endif
+            attribute vec4 a_position;
+            attribute vec4 a_color;
+            attribute vec2 a_texCoord0;
+            uniform mat4 u_projectionViewMatrix;
+            varying LOWP vec4 v_color;
+            varying HIGHP vec2 v_texCoords;
+            void main() {
+                v_color = a_color;
+                v_color.a *= 255.0 / 254.0;
+                v_texCoords = a_texCoord0;
+                gl_Position = u_projectionViewMatrix * a_position;
+            }
+            """;
+        String fragment = """
+            #ifdef GL_ES
+            precision mediump float;
+            #define LOWP lowp
+            #define HIGHP highp
+            #else
+            #define LOWP
+            #define HIGHP
+            #endif
+            varying LOWP vec4 v_color;
+            varying HIGHP vec2 v_texCoords;
+            uniform sampler2D u_texture;
+            void main() {
+                vec4 source = texture2D(u_texture, v_texCoords);
+                gl_FragColor = source * v_color;
+            }
+            """;
+        ShaderProgram shader = new ShaderProgram(vertex, fragment);
+        if (!shader.isCompiled()) {
+            String log = shader.getLog(); shader.dispose();
+            throw new IllegalStateException("Cannot compile cached medallion shader: " + log);
+        }
+        try {
+            // Exact-sized managed vertex/index buffers; the cache owns its base shader.
+            return new SpriteCache(quadCount, shader, true);
+        } catch (RuntimeException | Error failure) {
+            shader.dispose(); throw failure;
+        }
+    }
+
     private void drawFloor(OrthographicCamera camera) {
         // Projection/scissor clip the unchanged static tiles independently for each pane.
         Gdx.gl.glEnable(GL20.GL_BLEND);
@@ -354,6 +421,12 @@ public final class ArenaRenderer implements Disposable {
         floorCache.draw(floorCacheId);
         floorCache.end();
         drawCalls += floorCache.renderCalls;
+        // Same world order as before: opaque paving, transparent seal, then every ground effect/actor.
+        medallionCache.setProjectionMatrix(camera.combined);
+        medallionCache.begin();
+        medallionCache.draw(medallionCacheId);
+        medallionCache.end();
+        drawCalls += medallionCache.renderCalls;
     }
 
     private void gatherSprites(ArenaWorld world, OrthographicCamera camera) {
@@ -1217,5 +1290,5 @@ public final class ArenaRenderer implements Disposable {
     }
     private static float screenX(float x, float y) { return (x - y) * ISO_X; }
     private static float screenY(float x, float y) { return (x + y) * ISO_Y; }
-    @Override public void dispose() { floorCache.dispose(); batch.dispose(); paletteShader.dispose(); iris.dispose(); playerFootRing.dispose(); }
+    @Override public void dispose() { floorCache.dispose(); medallionCache.dispose(); batch.dispose(); paletteShader.dispose(); iris.dispose(); playerFootRing.dispose(); }
 }
