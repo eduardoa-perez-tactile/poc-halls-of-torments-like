@@ -165,7 +165,7 @@ def main():
     try:
         output = (directory / 'game.log').open('wb', buffering=0)
         logger = subprocess.Popen(target + ['logcat', '-v', 'threadtime', '-T', '1', 'FrameMetrics:I',
-                                  'ProfileWorld:I', 'ProfileMemory:I', 'Audio:I', 'AndroidRuntime:E', '*:S'],
+                                  'ProfileWorld:I', 'ProfileMemory:I', 'FramePacing:I', 'Audio:I', 'AndroidRuntime:E', '*:S'],
                                   stdout=output, stderr=subprocess.STDOUT)
         command('shell', 'am', 'force-stop', capture.PACKAGE)
         command('shell', 'am', 'start', '-n', capture.COMPONENT, '--ez', 'profile', 'true', '--es', 'joinHost', args.host)

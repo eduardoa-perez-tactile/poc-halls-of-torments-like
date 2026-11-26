@@ -214,6 +214,7 @@ def parser_for_capture():
     parser.add_argument('--switch-smoke', action='store_true', help='Results only: send rapid F7/F8/Back after measurement')
     parser.add_argument('--moving-input', action='store_true', help='Send deterministic 30Hz movement and occasional Dodge; no choices')
     parser.add_argument('--frame-pacing', choices=['on', 'off'], default='on', help='Profiling A/B override; old APKs ignore this intent extra')
+    parser.add_argument('--target-fps', type=int, choices=[30, 60], default=30, help='Presentation analysis target; does not change simulation or installed-APK cadence')
     parser.add_argument('--warmup-seconds', type=int, choices=range(0, 11), default=0, metavar='0..10')
     parser.add_argument('--output-dir', type=Path, default=ROOT / '.run', help='Use a unique directory to preserve a baseline')
     parser.add_argument('--system-trace', action='store_true', help='Attempt one bounded Perfetto trace; compare with a separate untraced baseline')
@@ -497,7 +498,7 @@ def main():
         marker('END')
         presentation.stop()
         metadata['presentation_sampling'] = presentation.metadata()
-        metadata['presentation_analysis'] = presentation.analyze(*presentation.observation_bounds())
+        metadata['presentation_analysis'] = presentation.analyze(*presentation.observation_bounds(), target_fps=args.target_fps)
         if system_trace is not None:
             system_trace.finish()
         metadata['pid_after_measurement'] = optional_command('shell', 'pidof', PACKAGE)
@@ -546,7 +547,7 @@ def main():
             if presentation is not None:
                 presentation.stop()
                 metadata['presentation_sampling'] = presentation.metadata()
-                metadata['presentation_analysis'] = presentation.analyze(*presentation.observation_bounds())
+                metadata['presentation_analysis'] = presentation.analyze(*presentation.observation_bounds(), target_fps=args.target_fps)
             if system_trace is not None:
                 system_trace.cleanup()
             if logger is not None:

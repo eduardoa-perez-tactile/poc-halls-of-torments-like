@@ -132,20 +132,23 @@ final class TvFramePacer implements Choreographer.FrameCallback, SurfaceHolder.C
         if (!surface.isValid()) return;
         try {
             if (Build.VERSION.SDK_INT >= 31)
-                surface.setFrameRate(60, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT, Surface.CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS);
-            else surface.setFrameRate(60, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT);
+                surface.setFrameRate(cadence.targetFps(), Surface.FRAME_RATE_COMPATIBILITY_DEFAULT, Surface.CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS);
+            else surface.setFrameRate(cadence.targetFps(), Surface.FRAME_RATE_COMPATIBILITY_DEFAULT);
         } catch (IllegalArgumentException | IllegalStateException failure) {
             if (profile) android.util.Log.i("FramePacing", "Display frame-rate hint unavailable");
         }
     }
     private void preferCompatibleMode(Display display) {
         Display.Mode current = display.getMode(), best = null;
+        int currentMultiple = Math.max(1, Math.round(current.getRefreshRate() / cadence.targetFps()));
+        // Keep an already compatible 60/90/120 Hz output; only content production is fixed at 30.
+        if (Math.abs(current.getRefreshRate() / currentMultiple - cadence.targetFps()) <= .2f) return;
         float bestRate = Float.MAX_VALUE;
         for (Display.Mode mode : display.getSupportedModes()) {
             if (mode.getPhysicalWidth() != current.getPhysicalWidth() || mode.getPhysicalHeight() != current.getPhysicalHeight()) continue;
             float rate = mode.getRefreshRate();
-            int multiple = Math.max(1, Math.round(rate / 60));
-            if (Math.abs(rate / multiple - 60) > .2f || rate >= bestRate) continue;
+            int multiple = Math.max(1, Math.round(rate / cadence.targetFps()));
+            if (Math.abs(rate / multiple - cadence.targetFps()) > .2f || rate >= bestRate) continue;
             best = mode; bestRate = rate;
         }
         if (best != null) {
@@ -158,7 +161,7 @@ final class TvFramePacer implements Choreographer.FrameCallback, SurfaceHolder.C
     private void report(long now) {
         if (now - reportStart < 5_000_000_000L) return;
         long requestCount = requested.get(), drawCount = drawn, swapCount = swapped;
-        android.util.Log.i("FramePacing", "backend=choreographer enabled=true refreshHz=" + refreshHz
+        android.util.Log.i("FramePacing", "backend=choreographer enabled=true targetFps=" + cadence.targetFps() + " refreshHz=" + refreshHz
             + " displayPeriodNs=" + cadence.displayPeriodNs() + " windowNs=" + (now - reportStart)
             + " targetPeriodNs=" + cadence.framePeriodNs()
             + " requested=" + (requestCount - lastRequested) + " drawn=" + (drawCount - lastDrawn)

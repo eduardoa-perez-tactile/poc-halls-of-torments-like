@@ -99,6 +99,45 @@ class PresentationAnalysisTest(unittest.TestCase):
         self.assertEqual(2, result['longestMissedRefreshLikeStreak'])
         self.assertAlmostEqual(3 * T / 1e6, result['intervalMs']['p99'])
         self.assertAlmostEqual(1.5 * T, result['thresholdNs'])
+        self.assertEqual(60, result['targetFps'])
+        self.assertEqual(result['missedRefreshLikeGaps'], result['missedTargetFrameLikeGaps'])
+        self.assertEqual(result['estimatedMissedRefreshes'], result['estimatedMissedTargetFrames'])
+
+    def test_stable_thirty_fps_is_two_display_refreshes_without_missed_target_frames(self):
+        times = [BASE + i * 2 * T for i in range(6)]
+        sampler = presentation.PresentationSampler(['unused'], snapshot(times[:1]))
+        sampler.add_snapshot(snapshot(times), final=True)
+        result = sampler.analyze(*sampler.observation_bounds(), target_fps=30)
+        self.assertTrue(result['coverage']['complete'])
+        self.assertEqual(30, result['targetFps'])
+        self.assertAlmostEqual(1e9 / 30, result['targetPeriodNs'])
+        self.assertAlmostEqual(2, result['expectedRefreshesPerFrame'], places=6)
+        self.assertEqual({'2': 5}, result['refreshMultipleHistogram'])
+        self.assertEqual(0, result['missedTargetFrameLikeGaps'])
+        self.assertEqual(0, result['missedTargetFrameLikeGapRate'])
+        self.assertEqual(0, result['estimatedMissedTargetFrames'])
+        self.assertEqual(0, result['longestMissedTargetFrameLikeStreak'])
+        self.assertAlmostEqual(50_000_000, result['targetFrameThresholdNs'])
+        # Keep legacy display-refresh metrics intact, but explicitly separate their meaning.
+        self.assertEqual(5, result['missedRefreshLikeGaps'])
+        self.assertIn('not target-frame acceptance', result['legacyRefreshHeuristicScope'])
+
+    def test_sixty_six_ms_gap_is_a_missed_target_frame_at_thirty_fps(self):
+        times = [BASE, BASE + 2 * T, BASE + 6 * T, BASE + 8 * T]
+        sampler = presentation.PresentationSampler(['unused'], snapshot(times[:1]))
+        sampler.add_snapshot(snapshot(times), final=True)
+        result = sampler.analyze(*sampler.observation_bounds(), target_fps=30)
+        self.assertEqual(1, result['missedTargetFrameLikeGaps'])
+        self.assertAlmostEqual(1 / 3, result['missedTargetFrameLikeGapRate'])
+        self.assertEqual(1, result['estimatedMissedTargetFrames'])
+        self.assertEqual(1, result['longestMissedTargetFrameLikeStreak'])
+        self.assertEqual({'2': 2, '4': 1}, result['refreshMultipleHistogram'])
+
+    def test_unsupported_capture_targets_are_rejected(self):
+        sampler = presentation.PresentationSampler(['unused'], snapshot([BASE]))
+        for target in [0, 15, 120, None, float('nan')]:
+            with self.subTest(target=target), self.assertRaises(ValueError):
+                sampler.analyze(BASE, BASE + T, target_fps=target)
 
     def test_device_boundaries_filter_history_and_require_coverage_at_both_ends(self):
         times = [BASE + i * T for i in range(9)]

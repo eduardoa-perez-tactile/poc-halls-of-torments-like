@@ -255,12 +255,18 @@ class PresentationSampler:
                     'snapshots': [dict(s, rows=list(s['rows'])) for s in self.snapshots],
                     'limits': ['Presentation timestamps do not certify hardware scan-out or GPU execution time.',
                                'A gap above 1.5 refresh periods is an emulator missed-refresh-like heuristic.',
+                               'Target-frame gaps use the configured FPS period; legacy refresh misses are not lower-target failures.',
                                'Missing adjacency or unbracketed device boundaries prevents complete coverage.']}
 
-    def analyze(self, startNs, endNs):
+    def analyze(self, startNs, endNs, target_fps=60):
+        """Target-frame cadence is distinct from the legacy display-refresh heuristic."""
+        if target_fps not in (30, 60):
+            raise ValueError('The capture target must be 30 or 60 FPS')
+        target_period = 1_000_000_000 / target_fps
         if (not isinstance(startNs, int) or isinstance(startNs, bool) or not isinstance(endNs, int)
                 or isinstance(endNs, bool) or startNs < 0 or endNs <= startNs):
-            return {'available': False, 'coverage': {'complete': False, 'reasons': ['Invalid device-clock boundaries']}}
+            return {'available': False, 'targetFps': target_fps, 'targetPeriodNs': target_period,
+                    'coverage': {'complete': False, 'reasons': ['Invalid device-clock boundaries']}}
         with self.lock:
             times = sorted(self.samples)
             edges = set(self.edges)
@@ -288,17 +294,24 @@ class PresentationSampler:
                     'requestedDurationNs': endNs - startNs,
                     'observedStartNs': inside[0] if inside else None, 'observedEndNs': inside[-1] if inside else None}
         missed = [gap > refresh * 1.5 for gap in gaps] if refresh else []
+        missed_target = [gap > target_period * 1.5 for gap in gaps]
         longest = streak = 0
+        longest_target = target_streak = 0
         for a, b in zip(inside, inside[1:]):
             late = refresh and (a, b) in edges and b - a > refresh * 1.5
             streak = streak + 1 if late else 0
             longest = max(longest, streak)
+            target_late = (a, b) in edges and b - a > target_period * 1.5
+            target_streak = target_streak + 1 if target_late else 0
+            longest_target = max(longest_target, target_streak)
         histogram = {}
         if refresh:
             for gap in gaps:
                 multiple = str(max(0, math.floor(gap / refresh + .5)))
                 histogram[multiple] = histogram.get(multiple, 0) + 1
         return {'available': bool(gaps and refresh), 'layer': layer, 'refreshNs': refresh,
+                'targetFps': target_fps, 'targetPeriodNs': target_period,
+                'expectedRefreshesPerFrame': target_period / refresh if refresh else None,
                 'frameCount': len(inside), 'intervalCount': len(gaps), 'coverage': coverage,
                 'intervalMs': _percentiles(gaps), 'refreshMultipleHistogram': histogram,
                 'observedFps': ((len(inside) - 1) * 1e9 / (inside[-1] - inside[0]))
@@ -309,4 +322,10 @@ class PresentationSampler:
                 if refresh else None,
                 'longestMissedRefreshLikeStreak': longest,
                 'thresholdNs': refresh * 1.5 if refresh else None,
+                'legacyRefreshHeuristicScope': 'Display refreshes, not target-frame acceptance at a lower target FPS',
+                'missedTargetFrameLikeGaps': sum(missed_target),
+                'missedTargetFrameLikeGapRate': sum(missed_target) / len(gaps) if gaps else None,
+                'estimatedMissedTargetFrames': sum(max(0, math.floor(gap / target_period + .5) - 1) for gap in gaps),
+                'longestMissedTargetFrameLikeStreak': longest_target,
+                'targetFrameThresholdNs': target_period * 1.5,
                 'hardwareDeadlineProof': False}
