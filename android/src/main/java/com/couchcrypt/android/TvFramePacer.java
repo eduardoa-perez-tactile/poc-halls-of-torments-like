@@ -28,6 +28,9 @@ final class TvFramePacer implements Choreographer.FrameCallback, SurfaceHolder.C
     private volatile boolean active, surfaceReady, swapReady;
     private volatile long drawn, swapped, bootstrapAfter;
     private volatile long lateLimitNs = 15_000_000, creditAgeNs = 8_333_333, drainedCredits;
+    private volatile long presentationPeriodNs = FrameCadence.TARGET_PERIOD_NS;
+    private volatile long presentationSet, presentationFailed, presentationUnavailable;
+    private volatile boolean presentationAvailable;
     private long drawingTicket;
     private boolean callbackPosted, closed;
     private float refreshHz = 60;
@@ -82,6 +85,15 @@ final class TvFramePacer implements Choreographer.FrameCallback, SurfaceHolder.C
         postCallback();
     }
     void beforeDraw() { drawn++; drawingTicket = requests.beginDraw(); }
+    long presentationTimeNs() {
+        return active && surfaceReady ? requests.presentationTimeNs(drawingTicket, presentationPeriodNs) : 0;
+    }
+    void presentationAvailable(boolean available) { presentationAvailable = available; }
+    void presentationResult(boolean accepted) {
+        if (!profile) return;
+        if (accepted) presentationSet++; else presentationFailed++;
+    }
+    void presentationUnavailable() { if (profile) presentationUnavailable++; }
     void afterSwap() {
         swapped++;
         if (!requests.complete(drawingTicket)) return;
@@ -123,6 +135,7 @@ final class TvFramePacer implements Choreographer.FrameCallback, SurfaceHolder.C
         cadence.configure(refreshHz);
         creditAgeNs = cadence.displayPeriodNs() / 2;
         lateLimitNs = cadence.displayPeriodNs() * 9 / 10;
+        presentationPeriodNs = cadence.framePeriodNs();
         if (Build.VERSION.SDK_INT < 30 && display != null) preferCompatibleMode(display);
         if (surfaceReady) applyFrameRateHint();
     }
@@ -168,7 +181,9 @@ final class TvFramePacer implements Choreographer.FrameCallback, SurfaceHolder.C
             + " postSwap=" + (swapCount - lastSwapped) + " inFlight=" + requests.inFlight()
             + " skippedBusy=" + busySkips + " skippedCadence=" + cadenceSkips
             + " skippedLate=" + lateSkips + " skippedBootstrap=" + bootstrapSkips
-            + " drainedCredits=" + drainedCredits + " expiredCredits=" + expiredCredits.get());
+            + " drainedCredits=" + drainedCredits + " expiredCredits=" + expiredCredits.get()
+            + " presentationAvailable=" + presentationAvailable + " presentationSet=" + presentationSet
+            + " presentationFailed=" + presentationFailed + " presentationUnavailable=" + presentationUnavailable);
         reportStart = now; lastRequested = requestCount; lastDrawn = drawCount; lastSwapped = swapCount;
     }
 }

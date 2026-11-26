@@ -7,6 +7,25 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class FrameRequestGateTest {
+    @Test void presentationTargetUsesAdmittedVsyncRatherThanDrawStartAndIsBoundToItsTicket() {
+        FrameRequestGate gate = new FrameRequestGate();
+        long period = 33_333_334, vsync = 1_000_000_000L;
+        assertEquals(0, gate.presentationTimeNs(gate.beginDraw(), period), "Bootstrap has no owned VSYNC");
+        gate.reset(); gate.offer(vsync);
+        assertEquals(FrameRequestGate.CLAIMED, gate.claim(vsync + 2_000_000, 8_333_333));
+        long ticket = gate.beginDraw();
+        assertEquals(vsync + period, gate.presentationTimeNs(ticket, period));
+        gate.offer(vsync + period);
+        assertEquals(vsync + period, gate.presentationTimeNs(ticket, period), "Pending credit cannot change the current frame target");
+        assertTrue(gate.complete(ticket));
+        assertEquals(0, gate.presentationTimeNs(ticket, period));
+        assertEquals(FrameRequestGate.CLAIMED, gate.claim(vsync + period + 1_000_000, 8_333_333));
+        long replacement = gate.beginDraw();
+        assertEquals(vsync + period * 2, gate.presentationTimeNs(replacement, period));
+        assertEquals(0, gate.presentationTimeNs(ticket, period));
+        gate.reset();
+        assertEquals(0, gate.presentationTimeNs(replacement, period), "Pause/surface reset invalidates presentation ownership");
+    }
     @Test void swapFinishingAfterNextVsyncDrainsItsCreditInsteadOfLockingAtThirtyFps() throws Exception {
         FrameRequestGate gate = new FrameRequestGate();
         long period = 16_666_667;
