@@ -1,5 +1,60 @@
 # Sprite combat feedback
 
+## Ranger bolts and stronger Warden contact (2026-11-26)
+
+The user approved `art-source/ranger-warden-contact/approved-proposal.png` after
+finding the previous Warden contact too small. This supersedes the earlier
+62%-scale contact treatment, without changing the Warden's primary ground wave.
+
+Ranger bolts retain their original painted head pivot and animation. Their
+painted silhouette narrows into a dart (78% longitudinal/28% transverse source
+scale), rotates in the uncompressed weapon plane, then receives the arena's 2:1
+projection. A small ivory core reinforces the leading head. The existing painted
+taper supplies a short trail; broad star-shaped projectile ghost copies are
+removed for Ranger only. Cultist/Sovereign projectile presentation is unchanged.
+Release uses a small ivory/teal flash at the original four-facing emitter, over
+the existing 100 ms combat-owned emergence window.
+
+Actual Ranger contacts retain their existing target/launch-height anchor and
+painted radial animation. A small bright core, soft expanding radial rim and
+five tiny motes emphasize puncture without a directional fan or ground-area
+warning. Existing critical identity adds warmer colour and the existing 1.22×
+visual scale. Warden contact paint increases from 62% to 93% scale, restoring
+50% more visual width with a brighter cutting core and five short gold sparks.
+The cut and sparks project in the weapon plane at the original hit height.
+
+`CombatContactArt` reuses one cached radial mesh, a quad buffer and resident
+paint/glow/white pixels. All ages/progress come from existing combat-owned
+projectile, player and contact state. No new effect pool, texture, framebuffer,
+shader or frame-loop allocations are introduced. Damage, collisions, projectile
+paths/speed/lifetimes, pierce/ricochet, attack cadence, release growth, pause gates,
+enemy behavior and the primary melee wave are unchanged. Runtime raster files
+and atlas metadata have no diff.
+
+### Verification and emulator handoff
+
+JDK 21 desktop compilation and Android debug assembly passed, together with
+**16 focused tests** across ProjectilePresentationTest, MagicProjectileArtTest,
+CombatVfxStateTest and VfxAtlasTest. Existing checks cover projectile emergence,
+original flight speed/collision radius, choice-pause freezing, pooled lifetimes
+and managed art metadata. No simulation/progression code or runtime assets changed in this
+pass. A read-only review found no projection, pivot, age or allocation defects.
+
+The updated APK was installed on the existing Television_1080p Android emulator;
+the installed package SHA-256 matches the locally built APK. Actual Android
+screenrecord/screencap evidence is under ignored
+`.run/ranger-warden-impact-review/`. Short existing full-skill and close-combat
+fixtures show Ranger and Warden separately; close-combat captures avoid the
+unrelated Frost/Storm effects hiding the new contacts. All enemy bodies and
+actual attack simulation remain present. These are native APK captures, not
+ImageGen edits or desktop-rendered substitutes.
+
+The saved LAN QR host, relay and both ADB forwards are preserved. The controller
+endpoint returned HTTP 200 after capture. Synthetic phones and recording helpers
+are closed, and the installed game is left at Home for the user's playtest.
+Brief rendering checks do not establish sustained physical-TV frame pacing or
+thermals; no full survival playthrough was performed.
+
 ## Isometric skill readability (2026-11-26)
 
 The user approved `art-source/isometric-skill-readability/approved-proposal.png`,
