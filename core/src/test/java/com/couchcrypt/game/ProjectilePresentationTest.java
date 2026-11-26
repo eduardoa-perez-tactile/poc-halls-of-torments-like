@@ -69,7 +69,7 @@ class ProjectilePresentationTest {
     private static ArenaWorld.Enemy cultist(ArenaWorld world) {
         ArenaWorld.Enemy enemy = world.enemies[0];
         enemy.active = true; enemy.kind = ArenaWorld.EnemyKind.CULTIST;
-        enemy.x = 350; enemy.y = 0; enemy.health = enemy.maxHealth = 1000;
+        enemy.x = 250; enemy.y = 0; enemy.health = enemy.maxHealth = 1000;
         world.activeEnemies = 1;
         return enemy;
     }

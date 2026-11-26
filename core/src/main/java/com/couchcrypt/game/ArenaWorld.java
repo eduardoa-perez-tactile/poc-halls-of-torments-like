@@ -15,7 +15,7 @@ public final class ArenaWorld {
     public enum Outcome { RUNNING, VICTORY, DEFEAT }
     public enum Hero {
         WARDEN(100, 28, .7f, 180, 160, 2.4f),
-        RANGER(100, 16, .55f, 198, 600, 2.4f);
+        RANGER(100, 16, .55f, 198, 300, 2.4f);
 
         public final float baseHealth, baseDamage, attackInterval, moveSpeed, attackRange, dodgeCooldown;
         Hero(float baseHealth, float baseDamage, float attackInterval, float moveSpeed, float attackRange, float dodgeCooldown) {

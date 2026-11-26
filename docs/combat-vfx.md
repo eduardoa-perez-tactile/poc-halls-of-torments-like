@@ -2,21 +2,25 @@
 
 ## Shorter Ranger targeting range (2026-11-26)
 
-The user found Ranger's attack range too large. Its primary target-acquisition
-radius is now **600 world units**, reduced from 800 (25%). The existing ground
+The user found the first 800→600 reduction still too large and requested a
+further 50% reduction. Its primary target-acquisition radius is now **300 world
+units**, halved from the current 600. The existing ground
 outline reads the same authoritative hero value, so it follows the reduction
 without another rendering change. This supersedes
-the historical 800-unit Ranger requirement below. Warden reach, secondary
+the historical 800-unit requirement and the earlier 600-unit reduction. Warden reach, secondary
 abilities, bolt speed/damage/cadence, flight lifetime, pierce/ricochet, approved
 art and effects are unchanged. Already released bolts keep their normal flight;
 this changes when Ranger acquires a target and starts firing.
 
-Twenty focused checks passed across CombatVfxStateTest, CompleteArenaCombatTest
-and ProjectilePresentationTest, including solo/co-op targets just outside and
-inside the new boundary. The JDK 21 Android debug build was installed and
-launched on Television_1080p; its installed APK hash matches the built file.
-The saved LAN host/forwards are preserved, the phone endpoint returned HTTP 200
-and no fatal launch logs were recorded. The game is left at Home for playtesting.
+The previous 600-unit iteration passed twenty focused checks and was installed
+on Television_1080p. For the latest 300-unit iteration the user explicitly
+requested **no device testing yet**: compilation/headless checks only, without
+installing, launching or interacting with the emulator. Its existing installed
+600-unit build is left untouched. The latest iteration passed all twenty focused
+checks and JDK 21 Android debug assembly, including solo/co-op targets at 301
+(no shot) and 299 (shot) world units. The projectile-emergence fixture's target
+was moved within the shorter range so it still tests real release and pause
+behavior, rather than expecting a shot at an out-of-range target.
 
 ## Ranger bolts and stronger Warden contact (2026-11-26)
 

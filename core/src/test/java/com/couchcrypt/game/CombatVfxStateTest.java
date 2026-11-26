@@ -45,7 +45,7 @@ class CombatVfxStateTest {
         assertEquals(1, world.swordSwings);
         assertEquals(reach, wave(world).reach, .0001f);
         player.hero = ArenaWorld.Hero.RANGER;
-        assertEquals(600f, world.primaryAttackRange(player), "Sword reach gear and ranks do not exaggerate Ranger targeting range");
+        assertEquals(300f, world.primaryAttackRange(player), "Sword reach gear and ranks do not exaggerate Ranger targeting range");
     }
 
     @Test void rangerOnlyStartsFiringInsideItsShorterIndicatedRangeInSoloAndCoop() {
@@ -54,11 +54,11 @@ class CombatVfxStateTest {
             if (slot == 1) world.activatePlayer(0);
             world.setHero(slot, ArenaWorld.Hero.RANGER); world.activatePlayer(slot);
             ArenaWorld.Player player = world.players[slot];
-            ArenaWorld.Enemy target = enemy(world, player.x + 601f, 1000f);
+            ArenaWorld.Enemy target = enemy(world, player.x + 301f, 1000f);
             target.y = player.y; target.stunTime = 100f;
             world.update(ArenaWorld.STEP);
             assertEquals(0, world.arrowsFired, "Targets outside the smaller outline must not trigger a shot");
-            target.x = player.x + 599f;
+            target.x = player.x + 299f;
             world.update(ArenaWorld.STEP);
             assertEquals(1, world.arrowsFired, "Crossing inside the outline must immediately enable firing");
             assertEquals(.55f, player.attackCooldown, .0001f);
