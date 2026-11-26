@@ -5,7 +5,7 @@ The normal run uses `ArenaTimeline.TWENTY_MINUTES`. Mourning Bell arrives at 5:0
 | Active time | Phase / composition | Checkpoint |
 | --- | --- | --- |
 | 0:00–1:30 | The Crypt Stirs: ghoul swarm | — |
-| 1:30–3:00 | Restless Hunt: wraiths and ghouls | — |
+| 1:30–3:00 | Restless Hunt: two ghouls and one original wraith per pack | — |
 | 3:00–5:00 | The Iron March: brute, ghoul, wraith | Brute elite |
 | 5:00–7:00 | Choir of Ash: cultist formation | Mourning Bell at 5:00 |
 | 7:00–9:00 | Broken Ranks: brute/cultist siege | Cultist elite |
@@ -18,18 +18,39 @@ The normal run uses `ArenaTimeline.TWENTY_MINUTES`. Mourning Bell arrives at 5:0
 | 19:00–20:00 | Before the Throne: combined assault | — |
 | 20:00 onward | Grave King and limited reinforcements | Grave King kill required |
 
-The 24 November difficulty pass keeps the same arrival times and art. Regular
+The 26 November learning-curve correction supersedes the opening density of the
+24 November difficulty pass. Base species still enter at 0:00 (Ghoul), 1:30
+(Wraith), 3:00 (Brute) and 5:00 (Cultist). Early Wraiths are now a minority in
+their pack. Colour/stat variants enter separately through the
+[staged variant schedule](enemy-variants.md#staged-introductions), rather than all
+being eligible from the first spawn of each species. Boss and elite times stay fixed.
+
+Regular
 packs contain three to five enemies. Nominal solo reinforcement rates (before
 soft caps, unsafe-spawn skips and phase-entry delays) increase monotonically:
-55.6 / 61.8 / 67.0 / 75 / 84 / 90 / 104.8 / 114.6 / 126.9 / 137.5 / 148.6 / 165
+31.3 / 37.5 / 45 / 61.8 / 70 / 75 / 104.8 / 114.6 / 126.9 / 137.5 / 148.6 / 165
 enemies per minute. The old fifteen-minute reinforcement slump is removed.
 Breathers occupy four seconds of each 24-second opening cycle, then three, then
 two from minute eleven. Phase changes retain a 1.4-second pack delay.
 
+| Active time | Solo pack interval | Solo soft cap |
+| --- | ---: | ---: |
+| 0:00–1:30 | 4.8 s | 16 |
+| 1:30–3:00 | 4.2 s | 20 |
+| 3:00–5:00 | 3.5 s | 24 |
+| 5:00–7:00 | 3.4 s | 28 |
+| 7:00–9:00 | 3.0 s | 32 |
+| 9:00–11:00 | 2.1 s | 36 |
+
+From 11:00 onward, pack intervals and caps retain the previous difficulty pass.
+Reduced early reinforcement also means fewer potential souls; XP per enemy,
+level costs, healing rules and equipment sustain are unchanged. First-upgrade
+timing and survival remain user-playtest questions.
+
 Enemy health and damage interpolate between authored phase-start values rather
 than jumping at boundaries. Health rises 1→4.8× and contact/cultist damage 1→2×;
 the last node is reached at minute nineteen and remains steady afterward.
-Existing enemies retain their spawn snapshots. Solo soft caps rise 28→50; two
+Existing enemies retain their spawn snapshots. Solo soft caps rise 16→50; two
 living players add twelve slots (maximum 62), shorten pack intervals by 18% and
 add 60% ordinary enemy health. Variant and elite modifiers apply once. An ally
 falling reduces future reinforcement pressure without changing existing stats.
