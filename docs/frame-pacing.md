@@ -1,5 +1,9 @@
 # Stable 30 FPS Android rendering — 26 November 2026
 
+Subsequent crowded full-skill testing and the buffer-upload/request-deadline
+fix are recorded in [the current long-test report](buffer-upload-fix.md).
+The original short results below describe their original APK.
+
 The user accepted a stable 30 FPS target in place of 60 FPS. Android now produces
 30 frames per second while the existing simulation continues at 60 fixed steps
 per second. Art, resolution, combat rules, difficulty and audio behavior are

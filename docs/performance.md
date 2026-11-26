@@ -1,6 +1,6 @@
 # Bounded performance checks
 
-The current Android target is stable 30 FPS (about 33.3 ms per frame), accepted by the user on 26 November 2026; simulation remains at 60 Hz. See [the current frame-pacing report](frame-pacing.md). Earlier 60 FPS measurements below describe their original builds. The existing 32 MiB limit applies to resident uncompressed GPU texture data, including QR. It is not a limit on the whole Android process.
+The current Android target is stable 30 FPS (about 33.3 ms per frame), accepted by the user on 26 November 2026; simulation remains at 60 Hz. See [frame pacing](frame-pacing.md) and [the latest buffer-upload fix and long stress test](buffer-upload-fix.md). Earlier 60 FPS measurements below describe their original builds. The existing 32 MiB limit applies to resident uncompressed GPU texture data, including QR. It is not a limit on the whole Android process.
 
 ## Measurements
 
