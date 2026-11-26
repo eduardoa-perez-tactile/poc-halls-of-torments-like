@@ -346,7 +346,7 @@ def summarize_baseline(log_text, metadata):
             measured = False
             saw_end = True
             continue
-        tag = next((name for name in ('FrameMetrics', 'ProfileStartup', 'ProfileMemory', 'ProfileWorld', 'ProfileBoundary', 'FramePacing') if name in line), None)
+        tag = next((name for name in ('FrameMetrics', 'ProfileStartup', 'ProfileMemory', 'ProfileWorld', 'ProfileBoundary', 'ProfileRenderStall', 'FramePacing') if name in line), None)
         if tag is None or '=' not in line:
             continue
         report = {'within_measurement_markers': measured, 'tag': tag, 'raw': line}
@@ -442,7 +442,8 @@ def main():
         # A unique --output-dir preserves baselines; default filenames retain replacement behavior.
         output.truncate(0)
         logger = subprocess.Popen(target + ['logcat', '-v', 'threadtime', '-T', '1', 'FrameMetrics:I',
-                                            'ProfileStartup:I', 'ProfileMemory:I', 'ProfileWorld:I', 'ProfileBoundary:I', 'FramePacing:I',
+                                            'ProfileStartup:I', 'ProfileMemory:I', 'ProfileWorld:I', 'ProfileBoundary:I', 'ProfileRenderStall:I', 'FramePacing:I',
+                                            'm.couchcrypt.tv:I', 'com.couchcrypt.tv:I',
                                             'LobbyPerf:I', 'OutcomeArt:I', 'AndroidRuntime:E', '*:S'],
                                   stdout=output, stderr=subprocess.STDOUT)
         fresh_lobby()

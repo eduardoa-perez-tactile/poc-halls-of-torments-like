@@ -69,6 +69,7 @@ public final class ArenaRenderer implements Disposable {
         + SkillExpansion.MAX_ORBITERS + SkillExpansion.MAX_GLAIVES + SkillExpansion.MAX_RELICS];
     private final int[] types = new int[depths.length], indices = new int[depths.length], layers = new int[depths.length];
     private int sortCount;
+    private long lastStallLogNs;
     public int drawCalls;
     /** Startup inventory; shared by both cameras and never rebuilt while playing. */
     public int cachedFloorQuads;
@@ -136,16 +137,19 @@ public final class ArenaRenderer implements Disposable {
     public void render(ArenaWorld world, ArenaHudState state, float delta, boolean showHud) {
         int width = Gdx.graphics.getWidth(), height = Gdx.graphics.getHeight();
         if (width <= 0 || height <= 0) return;
+        long arenaStartedNs = metrics == null ? 0 : System.nanoTime();
+        ProfileBatch profileBatch = metrics == null ? null : (ProfileBatch) batch;
         int active = (world.players[0].active ? 1 : 0) + (world.players[1].active ? 1 : 0);
         boolean split = active == 2;
         drawCalls = 0;
         playerFootRing.drawCalls = 0;
         int floorDraws = 0, worldDraws = 0, visibleSprites = 0;
-        if (metrics != null) ((ProfileBatch) batch).textureSelections = 0;
+        if (profileBatch != null) profileBatch.resetFrame();
         Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST);
         for (int slot = 0; slot < 2; slot++) {
             if (!world.players[slot].active) continue;
             int ringDrawsBefore = playerFootRing.drawCalls;
+            if (profileBatch != null) profileBatch.pass("ground", slot);
             int paneX = split && slot == 1 ? width / 2 : 0;
             int paneWidth = split ? (slot == 0 ? width / 2 : width - width / 2) : width;
             Gdx.gl.glViewport(paneX, 0, paneWidth, height);
@@ -183,10 +187,13 @@ public final class ArenaRenderer implements Disposable {
                 visibleSprites += sortCount;
                 metrics.beginStage(FrameMetrics.WORLD_DRAW);
             }
+            if (profileBatch != null) profileBatch.pass("actors/shadows", slot);
             drawShadows(world);
             drawSprites(world, camera, slot);
+            if (profileBatch != null) profileBatch.pass("projectiles", slot);
             drawBolts(world, camera);
             drawShots(world, camera);
+            if (profileBatch != null) profileBatch.pass("effects/followups/ranks", slot);
             drawEffects(world, camera);
             skillArt.followups(batch, world, camera);
             drawDamageNumbers(world, camera);
@@ -211,6 +218,7 @@ public final class ArenaRenderer implements Disposable {
             metrics.beginStage(FrameMetrics.HUD);
         }
         batch.setProjectionMatrix(hud.combined);
+        if (profileBatch != null) profileBatch.pass("hud", -1);
         batch.begin();
         if (showHud) {
             gameHud.render(batch, world, state, split, delta);
@@ -229,13 +237,45 @@ public final class ArenaRenderer implements Disposable {
             metrics.endStage(FrameMetrics.HUD);
             metrics.recordRenderCounts(floorDraws, worldDraws, batch.renderCalls,
                 ((ProfileBatch) batch).textureSelections, visibleSprites);
+            long endedNs = System.nanoTime(), wallNs = endedNs - arenaStartedNs;
+            if (wallNs > 33_300_000L && (lastStallLogNs == 0 || endedNs - lastStallLogNs >= 1_000_000_000L)) {
+                lastStallLogNs = endedNs;
+                Gdx.app.log("ProfileRenderStall", "frameEndNs=" + endedNs + " arenaWallNs=" + wallNs
+                    + " combatElapsed=" + world.elapsed + " flushes=" + profileBatch.flushCount
+                    + " flushTotalNs=" + profileBatch.flushTotalNs + " maxFlushNs=" + profileBatch.maxFlushNs
+                    + " maxFlushPass=" + profileBatch.maxFlushPass + " maxFlushCamera=" + profileBatch.maxFlushCamera
+                    + " passMeaning=flushCallSite_pendingContentsMaySpanPasses");
+            }
         }
     }
 
     /** Counts arena batch selections without intercepting GL or forcing extra flushes/fences. */
     private static final class ProfileBatch extends SpriteBatch {
         int textureSelections;
+        int flushCount, camera = -1, maxFlushCamera = -1;
+        long flushTotalNs, maxFlushNs;
+        String pass = "ground", maxFlushPass = "none";
         ProfileBatch(ShaderProgram shader) { super(1800, shader); }
+        void resetFrame() {
+            textureSelections = flushCount = 0;
+            flushTotalNs = maxFlushNs = 0;
+            camera = maxFlushCamera = -1;
+            pass = "ground"; maxFlushPass = "none";
+        }
+        // Labels identify the flushing call site; pending vertices may originate in earlier passes.
+        // Changing labels must never flush, reorder, or otherwise alter the SpriteBatch stream.
+        void pass(String value, int cameraIndex) { pass = value; camera = cameraIndex; }
+        @Override public void flush() {
+            int previousCalls = renderCalls;
+            long startedNs = System.nanoTime();
+            super.flush();
+            long elapsedNs = System.nanoTime() - startedNs;
+            if (renderCalls == previousCalls) return;
+            flushCount++; flushTotalNs += elapsedNs;
+            if (elapsedNs > maxFlushNs) {
+                maxFlushNs = elapsedNs; maxFlushPass = pass; maxFlushCamera = camera;
+            }
+        }
         @Override protected void switchTexture(Texture texture) {
             textureSelections++;
             super.switchTexture(texture);

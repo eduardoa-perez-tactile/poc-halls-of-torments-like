@@ -108,6 +108,55 @@ The original stall's cause remains unestablished; both the failed capture and
 the clean repeats are retained. No speculative renderer rewrite was added to
 explain a stall that the trace did not reproduce.
 
+### Follow-up investigation
+
+The requested follow-up still did not reproduce the original 211.60 ms callback
+stall. There is **no verified fix for that original event**. The retained change
+adds profiling-only diagnostics; production artwork, gameplay and the sprite
+buffer backend remain unchanged.
+
+The existing profiling batch now measures actual nonempty flush calls using
+primitive per-frame counters. An arena render above 33.3 ms can emit one
+`ProfileRenderStall` record per second, with monotonic frame-end time, combat time,
+arena wall time, flush count/total/maximum, camera and flushing pass. Pass labels
+identify the calling code; queued vertices can originate in preceding passes.
+The counters add no GL calls, synchronization fences or per-frame objects.
+Capture logging retains these records and ART collection messages.
+
+The preceding production APK's additional fifteen-second traced combined-skills
+capture delivered 30.0014 FPS with zero target-frame-like gaps. A diagnostic build
+then completed six repeated fifteen-second combined-skills windows in the same
+process, alternating traced and untraced capture. All six had complete
+presentation coverage: 2,709 intervals, each matching two display refreshes,
+29.9975–30.0011 FPS, zero target-frame-like gaps and no arena stall records.
+Reported process PSS was 67,289–69,123 KiB (65.71–67.50 MiB), without monotonic
+growth. Audio stayed at two workers/one music handle; textures stayed below the
+unchanged ceiling. No fatal exception was recorded.
+
+This fixture uses ten durable targets and repeated skill effects, with four
+orbiters, six fields, up to two glaives and nine delayed strikes observed. Each
+fixture is refreshed before its thirty-second development hold expires. It does
+not represent a full survival run or simultaneous saturation of all pools.
+
+The traces show recurring emulator-side `glBufferDataSyncAEMU` encoding work,
+but do not establish it as the cause of the original long stall. A small
+`VertexBufferObjectSubData` experiment was rejected and reverted: the resolved
+LibGDX 1.14.2 implementation still invokes `glBufferData` during a dirty bind,
+so normal SpriteBatch flushes retain the same upload path. Its trace confirmed
+21,652 such calls over fifteen seconds. That experiment also had four
+target-frame-like gaps and a 39.95 ms arena frame whose 53 flushes totaled
+37.74 ms, with no individual flush longer than 1.98 ms. It is not evidence of
+fixing the original event. See the pinned [SpriteBatch implementation](https://github.com/libgdx/libgdx/blob/1.14.2/gdx/src/com/badlogic/gdx/graphics/g2d/SpriteBatch.java)
+and [buffer implementation](https://github.com/libgdx/libgdx/blob/1.14.2/gdx/src/com/badlogic/gdx/graphics/glutils/VertexBufferObjectSubData.java).
+
+Android packaging, eight focused Java checks and eighteen capture-tool checks
+passed for the retained diagnostics. All 108 APK assets remain byte-identical.
+Diagnostic APK SHA-256:
+`55fe1f803368006274cd8c4c21980979997a6eb6434a47d6c6d16f6d86429f0f`.
+Follow-up evidence is in ignored `.run/skill-stutters-2026-11-26/`, including the
+failed experiment. The original isolated stall remains open; clean repetitions
+are not proof that it has been eliminated.
+
 The separate equipped-boss trace also retained the complete 8.03-second span,
 with no trace error counters. Its 229 `onDrawFrame` slices had a 17.89 ms maximum;
 GL-thread CPU execution totaled 2.30 seconds and EGL swap wall time totaled
