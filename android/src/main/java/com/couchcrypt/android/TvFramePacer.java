@@ -27,7 +27,8 @@ final class TvFramePacer implements Choreographer.FrameCallback, SurfaceHolder.C
     private final boolean profile;
     private volatile boolean active, surfaceReady, swapReady;
     private volatile long drawn, swapped, bootstrapAfter;
-    private volatile long lateLimitNs = 15_000_000, creditAgeNs = 8_333_333, drainedCredits;
+    private volatile long lateLimitNs = FrameCadence.TARGET_PERIOD_NS * 9 / 10,
+        creditAgeNs = FrameCadence.TARGET_PERIOD_NS / 2, drainedCredits;
     private volatile long presentationPeriodNs = FrameCadence.TARGET_PERIOD_NS;
     private volatile long presentationSet, presentationFailed, presentationUnavailable;
     private volatile boolean presentationAvailable;
@@ -133,8 +134,9 @@ final class TvFramePacer implements Choreographer.FrameCallback, SurfaceHolder.C
         float rate = display == null ? 60 : display.getRefreshRate();
         refreshHz = Float.isFinite(rate) && rate >= 20 && rate <= 1_000 ? rate : 60;
         cadence.configure(refreshHz);
-        creditAgeNs = cadence.displayPeriodNs() / 2;
-        lateLimitNs = cadence.displayPeriodNs() * 9 / 10;
+        // A skipped display tick is intentional at 30 FPS; use the render budget for lateness.
+        creditAgeNs = cadence.framePeriodNs() / 2;
+        lateLimitNs = cadence.framePeriodNs() * 9 / 10;
         presentationPeriodNs = cadence.framePeriodNs();
         if (Build.VERSION.SDK_INT < 30 && display != null) preferCompatibleMode(display);
         if (surfaceReady) applyFrameRateHint();
