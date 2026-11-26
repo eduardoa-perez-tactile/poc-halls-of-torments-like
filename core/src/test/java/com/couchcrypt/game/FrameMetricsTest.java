@@ -7,6 +7,28 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class FrameMetricsTest {
+    @Test void worldPoolSnapshotIncludesExpansionAndKeepsFrameSampledPeaksAfterReset() {
+        FakeClock clock = new FakeClock();
+        List<String> logs = new ArrayList<>();
+        FrameMetrics metrics = new FrameMetrics(clock, logs::add);
+        ArenaWorld world = new ArenaWorld();
+        world.meleeWaves[0].active = world.meleeWaves[1].active = true;
+        world.skills.orbiters[0].active = world.skills.fields[0].active = world.skills.glaives[0].active = true;
+        world.skills.relics[0].active = world.skills.delayed[0].active = world.chests[0].active = true;
+        metrics.beginFrame(); metrics.recordPoolCounts(world); metrics.endFrame("coop", 1, 2, 3, 4);
+        world.reset();
+        metrics.beginFrame(); metrics.recordPoolCounts(world); metrics.endFrame("coop", 1, 2, 3, 4);
+        metrics.beginFrame(); metrics.endFrame("home", 1, 2, 3, 4);
+        metrics.beginFrame(); metrics.endFrame("lobby", 1, 2, 3, 4);
+        assertEquals(2, logs.size());
+        String combat = logs.get(0), home = logs.get(1);
+        assertTrue(combat.contains("meleeWaves[last=0,frameSampledPeak=2]"), combat);
+        for (String pool : new String[]{"orbiters", "fields", "glaives", "relics", "delayedStrikes", "chests"}) {
+            assertTrue(combat.contains(pool + "[last=0,frameSampledPeak=1]"), combat);
+            assertTrue(home.contains(pool + "[last=0,frameSampledPeak=0]"), home);
+        }
+    }
+
     @Test void rendererStagesNestInsideArenaAndRenderCountsResetAcrossPhases() {
         FakeClock clock = new FakeClock();
         List<String> logs = new ArrayList<>();
@@ -19,7 +41,7 @@ class FrameMetricsTest {
         metrics.beginStage(FrameMetrics.WORLD_DRAW); clock.ms(2); metrics.endStage(FrameMetrics.WORLD_DRAW);
         metrics.beginStage(FrameMetrics.HUD); clock.ms(1); metrics.endStage(FrameMetrics.HUD);
         metrics.endStage(FrameMetrics.ARENA);
-        metrics.recordRenderCounts(2, 24, 6, 19, 42);
+        metrics.recordRenderCounts(2, 24, 6, 19, 42, 3);
         metrics.endFrame("coop", 1, 2, 3, 32);
         metrics.beginFrame(); metrics.endFrame("home", 1, 2, 3, 4);
         metrics.beginFrame(); metrics.endFrame("lobby", 1, 2, 3, 4);
@@ -30,6 +52,7 @@ class FrameMetricsTest {
         assertTrue(coop.contains("gatherMs[p50=2.00,p95=2.00,p99=2.00,max=2.00]"), coop);
         assertTrue(coop.contains("worldDrawMs[p50=5.00,p95=5.00,p99=5.00,max=5.00]"), coop);
         assertTrue(coop.contains("hudMs[p50=1.00,p95=1.00,p99=1.00,max=1.00]"), coop);
+        assertTrue(coop.contains("dynamicSpriteBatchVertexUploads[min=3,p50=3,p95=3,p99=3,max=3]"), coop);
         assertTrue(coop.contains("renderStages=nestedInArenaNonadditive"), coop);
         assertTrue(coop.contains("floorDraws[min=2,p50=2,p95=2,p99=2,max=2]"), coop);
         assertTrue(coop.contains("worldDraws[min=24,p50=24,p95=24,p99=24,max=24]"), coop);
@@ -37,6 +60,7 @@ class FrameMetricsTest {
         assertTrue(coop.contains("dynamicSpriteBatchTextureSelections[min=19,p50=19,p95=19,p99=19,max=19]"), coop);
         assertTrue(coop.contains("visibleSprites[min=42,p50=42,p95=42,p99=42,max=42]"), coop);
         assertTrue(home.contains("visibleSprites[min=0,p50=0,p95=0,p99=0,max=0]"), home);
+        assertTrue(home.contains("dynamicSpriteBatchVertexUploads[min=0,p50=0,p95=0,p99=0,max=0]"), home);
         assertTrue(home.contains("floorMs[p50=0.00,p95=0.00,p99=0.00,max=0.00]"), home);
     }
 

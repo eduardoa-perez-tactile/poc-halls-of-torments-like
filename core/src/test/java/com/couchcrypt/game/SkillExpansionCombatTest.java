@@ -90,6 +90,37 @@ class SkillExpansionCombatTest {
         }
     }
 
+    @Test void weaponTrailsKeepActualSteppedPosesAndDiscardPreviousLifetimes() {
+        ArenaWorld world = solo(); ArenaWorld.Player player = world.players[0];
+        player.sentinelLevel = player.glaiveLevel = 1;
+        enemy(world, 0, 150, 0, 10000);
+        world.skills.update();
+        SkillExpansion.OrbitBlade blade = world.skills.orbiters[0];
+        SkillExpansion.Glaive glaive = world.skills.glaives[0];
+        assertEquals(1, blade.history.count); assertEquals(1, glaive.history.count);
+        for (int i = 0; i < 12; i++) {
+            float bx = blade.x, by = blade.y, ba = blade.angle;
+            float gx = glaive.x, gy = glaive.y, ga = glaive.angle;
+            player.x += 3; player.y -= 2;
+            world.skills.update();
+            assertEquals(bx, blade.history.x[1]); assertEquals(by, blade.history.y[1]);
+            assertEquals(ba, blade.history.angle[1]);
+            assertEquals(gx, glaive.history.x[1]); assertEquals(gy, glaive.history.y[1]);
+            assertEquals(ga, glaive.history.angle[1]);
+            assertEquals(blade.x, blade.history.x[0]); assertEquals(glaive.x, glaive.history.x[0]);
+        }
+        assertEquals(7, blade.history.count); assertEquals(7, glaive.history.count);
+        world.skills.removePlayer(0);
+        assertEquals(0, blade.history.count); assertEquals(0, glaive.history.count);
+        player.x = -100; player.y = -80;
+        world.skills.update();
+        assertTrue(blade.active); assertTrue(glaive.active);
+        assertEquals(1, blade.history.count); assertEquals(1, glaive.history.count,
+            "Reused weapon slots cannot draw samples from their previous lifetime");
+        player.alive = false; world.skills.update();
+        assertEquals(0, blade.history.count); assertEquals(0, glaive.history.count);
+    }
+
     @Test void wardAbsorbsOneRealHitAndKeepsHealthAndSustainIntact() {
         ArenaWorld world = solo(); ArenaWorld.Player player = world.players[0]; player.wardLevel = 1;
         hostileShot(world); world.update(ArenaWorld.STEP);
@@ -167,17 +198,26 @@ class SkillExpansionCombatTest {
         ArenaWorld world = solo(); ArenaWorld.Player player = world.players[0];
         player.glaiveLevel = player.consecrationLevel = player.sentinelLevel = player.wardLevel = 1;
         player.wardCooldown = 10; enemy(world, 0, 150, 0, 10000);
-        world.skills.update();
+        for (int i = 0; i < 8; i++) world.skills.update();
         float fieldTtl = world.skills.fields[0].ttl, glaiveX = world.skills.glaives[0].x;
         float ward = player.wardCooldown, angle = player.sentinelAngle;
+        SkillExpansion.PoseHistory blades = world.skills.orbiters[0].history;
+        SkillExpansion.PoseHistory glaives = world.skills.glaives[0].history;
+        float[] bladeX = blades.x.clone(), bladeY = blades.y.clone(), bladeAngles = blades.angle.clone();
+        float[] glaiveXs = glaives.x.clone(), glaiveYs = glaives.y.clone(), glaiveAngles = glaives.angle.clone();
+        int bladeSamples = blades.count, glaiveSamples = glaives.count;
         SkillExpansion.WorldRelic relic = relic(world, SkillExpansion.RelicKind.STASIS); relic.x = 500;
         world.progression.addXp(world.progression.xpToNext); world.update(.1f);
         assertEquals(fieldTtl, world.skills.fields[0].ttl); assertEquals(glaiveX, world.skills.glaives[0].x);
         assertEquals(ward, player.wardCooldown); assertEquals(angle, player.sentinelAngle); assertEquals(0, relic.age);
+        assertEquals(bladeSamples, blades.count); assertEquals(glaiveSamples, glaives.count);
+        assertArrayEquals(bladeX, blades.x); assertArrayEquals(bladeY, blades.y); assertArrayEquals(bladeAngles, blades.angle);
+        assertArrayEquals(glaiveXs, glaives.x); assertArrayEquals(glaiveYs, glaives.y); assertArrayEquals(glaiveAngles, glaives.angle);
         world.reset();
         assertEquals(0, player.glaiveLevel); assertFalse(player.echoStorm); assertFalse(relic.active);
         for (SkillExpansion.GroundField field : world.skills.fields) assertFalse(field.active);
         for (SkillExpansion.Glaive glaive : world.skills.glaives) assertFalse(glaive.active);
+        assertEquals(0, blades.count); assertEquals(0, glaives.count);
     }
 
     @Test void scheduledRelicsAreBoundedAndDoNotGrantRewardsOrPauseOnAppearance() {

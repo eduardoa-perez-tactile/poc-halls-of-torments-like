@@ -1,78 +1,112 @@
 package com.couchcrypt.game;
 
-import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Mesh;
+import com.badlogic.gdx.graphics.VertexAttribute;
+import com.badlogic.gdx.graphics.VertexAttributes;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.graphics.glutils.ShaderProgram;
+import com.badlogic.gdx.math.Matrix4;
+import com.badlogic.gdx.utils.Disposable;
 
-/** Shared plain range/telegraph outline, projected onto the 2:1 ground plane. */
-final class PlayerFootRing {
-    static final float STROKE_MARGIN = 1.3f;
-    private static final int SEGMENTS = 192;
-    // A 1.2-logical-unit core with small antialiasing fringes; no halo or filled centre.
-    private static final float[] EDGE = {-STROKE_MARGIN, -.6f, .6f, STROKE_MARGIN};
-    private static final float[] ALPHA = {0, 1f, 1f, 0};
+/** Static GPU geometry for large ranges; small warnings retain normal SpriteBatch batching. */
+final class PlayerFootRing implements Disposable {
+    static final float STROKE_MARGIN = RingGeometry.STROKE_MARGIN;
+    private final Mesh mesh;
+    private final ShaderProgram shader;
+    private final Matrix4 projection = new Matrix4();
     private final TextureRegion pixel;
-    // Unit ellipse positions and outward screen-space normals, calculated only at startup.
-    private final float[] unit = new float[SEGMENTS * 4];
-    private final float[] vertices = new float[SEGMENTS * (EDGE.length - 1) * 20];
-    private final float[] gold = new float[EDGE.length], teal = new float[EDGE.length];
-    private final float[] tint = new float[EDGE.length];
+    private final RingGeometry.Small small;
+    int drawCalls;
 
     PlayerFootRing(TextureRegion pixel) {
         this.pixel = pixel;
-        float u = (pixel.getU() + pixel.getU2()) * .5f, v = (pixel.getV() + pixel.getV2()) * .5f;
-        for (int segment = 0; segment < SEGMENTS; segment++) {
-            float angle = MathUtils.PI2 * segment / SEGMENTS;
-            float c = MathUtils.cos(angle), s = MathUtils.sin(angle);
-            float normalLength = (float) Math.sqrt(c * c + 4f * s * s);
-            int at = segment * 4;
-            unit[at] = c; unit[at + 1] = s * .5f;
-            unit[at + 2] = c / normalLength; unit[at + 3] = 2f * s / normalLength;
+        small = new RingGeometry.Small((pixel.getU() + pixel.getU2()) * .5f, (pixel.getV() + pixel.getV2()) * .5f);
+        ShaderProgram loadedShader = new ShaderProgram(VERTEX, FRAGMENT);
+        if (!loadedShader.isCompiled()) {
+            String log = loadedShader.getLog(); loadedShader.dispose();
+            throw new IllegalStateException("Ground outline shader failed: " + log);
         }
-        for (int edge = 0; edge < EDGE.length; edge++) {
-            gold[edge] = Color.toFloatBits(1f, .82f, .42f, ALPHA[edge] * .57f);
-            teal[edge] = Color.toFloatBits(.36f, .95f, .90f, ALPHA[edge] * .57f);
+        Mesh loadedMesh = null;
+        try {
+            RingGeometry geometry = new RingGeometry();
+            // Large outlines share 768 vertices. Managed static buffers restore after context loss.
+            loadedMesh = new Mesh(true, geometry.vertices.length / RingGeometry.STRIDE, geometry.indices.length,
+                new VertexAttribute(VertexAttributes.Usage.Position, 2, "a_unit"),
+                new VertexAttribute(VertexAttributes.Usage.Normal, 2, "a_normal"),
+                new VertexAttribute(VertexAttributes.Usage.Generic, 2, "a_edge"));
+            loadedMesh.setVertices(geometry.vertices); loadedMesh.setIndices(geometry.indices);
+        } catch (RuntimeException | Error failure) {
+            if (loadedMesh != null) loadedMesh.dispose();
+            loadedShader.dispose(); throw failure;
         }
-        for (int at = 0; at < vertices.length; at += 5) {
-            // Ordinary UVs sample the resident white texel without an enemy palette marker.
-            vertices[at + 3] = u; vertices[at + 4] = v;
-        }
+        shader = loadedShader; mesh = loadedMesh;
     }
 
     void draw(SpriteBatch batch, float x, float y, float radius, int slot) {
-        draw(batch, x, y, radius, slot == 0 ? gold : teal);
+        if (slot == 0) draw(batch, x, y, radius, 1f, .82f, .42f, .57f);
+        else draw(batch, x, y, radius, .36f, .95f, .90f, .57f);
     }
 
-    /** Enemy warnings share the same cached geometry without borrowing player identity colours. */
+    /** Flush in place so ground warning/actor ordering and the caller's batch state are preserved. */
     void draw(SpriteBatch batch, float x, float y, float radius, float red, float green, float blue, float alpha) {
-        for (int edge = 0; edge < EDGE.length; edge++)
-            tint[edge] = Color.toFloatBits(red, green, blue, ALPHA[edge] * alpha);
-        draw(batch, x, y, radius, tint);
-    }
-
-    private void draw(SpriteBatch batch, float x, float y, float radius, float[] colors) {
         if (!Float.isFinite(radius) || radius <= 0) return;
-        // Small attack cues need fewer samples; their chord error remains below the AA fringe.
-        int segmentStep = radius <= 90f ? 4 : 1;
-        int vertex = 0;
-        for (int edge = 0; edge < EDGE.length - 1; edge++) {
-            for (int segment = 0; segment < SEGMENTS; segment += segmentStep) {
-                int next = (segment + segmentStep) % SEGMENTS;
-                point(vertex++, segment, edge, x, y, radius, colors);
-                point(vertex++, segment, edge + 1, x, y, radius, colors);
-                point(vertex++, next, edge + 1, x, y, radius, colors);
-                point(vertex++, next, edge, x, y, radius, colors);
-            }
+        if (radius <= 90f) {
+            small.update(x, y, radius, red, green, blue, alpha);
+            batch.draw(pixel.getTexture(), small.vertices, 0, small.vertices.length);
+            return;
         }
-        batch.draw(pixel.getTexture(), vertices, 0, vertex * 5);
+        batch.flush();
+        if (batch.isBlendingEnabled()) {
+            Gdx.gl.glEnable(GL20.GL_BLEND);
+            Gdx.gl.glBlendFuncSeparate(batch.getBlendSrcFunc(), batch.getBlendDstFunc(),
+                batch.getBlendSrcFuncAlpha(), batch.getBlendDstFuncAlpha());
+        } else Gdx.gl.glDisable(GL20.GL_BLEND);
+        shader.bind();
+        shader.setUniformMatrix("u_projection", projection.set(batch.getProjectionMatrix()).mul(batch.getTransformMatrix()));
+        shader.setUniformf("u_ring", x, y, radius);
+        shader.setUniformf("u_color", RingGeometry.channel(red), RingGeometry.channel(green),
+            RingGeometry.channel(blue), RingGeometry.alpha(alpha));
+        mesh.render(shader, GL20.GL_TRIANGLES, 0, RingGeometry.FULL_INDICES);
+        drawCalls++;
+        batch.getShader().bind();
     }
 
-    private void point(int vertex, int segment, int edge, float x, float y, float radius, float[] colors) {
-        int at = vertex * 5, direction = segment * 4;
-        // Keep the stroke centred on the exact range while its thickness stays constant as range changes.
-        vertices[at] = x + unit[direction] * radius + unit[direction + 2] * EDGE[edge];
-        vertices[at + 1] = y + unit[direction + 1] * radius + unit[direction + 3] * EDGE[edge];
-        vertices[at + 2] = colors[edge];
-    }
+    @Override public void dispose() { mesh.dispose(); shader.dispose(); }
+
+    private static final String VERTEX = """
+        #ifdef GL_ES
+        precision highp float;
+        #define LOWP lowp
+        #else
+        #define LOWP
+        #endif
+        attribute vec2 a_unit;
+        attribute vec2 a_normal;
+        attribute vec2 a_edge;
+        uniform mat4 u_projection;
+        uniform vec3 u_ring;
+        uniform vec4 u_color;
+        varying LOWP vec4 v_color;
+        void main() {
+            vec2 position = u_ring.xy + a_unit * u_ring.z + a_normal * a_edge.x;
+            gl_Position = u_projection * vec4(position, 0.0, 1.0);
+            v_color = vec4(u_color.rgb, u_color.a * a_edge.y);
+        }
+        """;
+
+    private static final String FRAGMENT = """
+        #ifdef GL_ES
+        precision mediump float;
+        #define LOWP lowp
+        #else
+        #define LOWP
+        #endif
+        varying LOWP vec4 v_color;
+        void main() {
+            gl_FragColor = v_color;
+        }
+        """;
 }

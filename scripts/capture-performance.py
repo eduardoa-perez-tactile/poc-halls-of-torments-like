@@ -3,6 +3,7 @@
 import argparse
 import base64
 import hashlib
+import importlib.util
 import ipaddress
 import json
 import math
@@ -20,6 +21,9 @@ from datetime import datetime, timezone
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'com.couchcrypt.tv'
 COMPONENT = PACKAGE + '/com.couchcrypt.android.AndroidLauncher'
+_presentation_spec = importlib.util.spec_from_file_location('presentation_metrics', Path(__file__).with_name('presentation-metrics.py'))
+presentation_metrics = importlib.util.module_from_spec(_presentation_spec)
+_presentation_spec.loader.exec_module(presentation_metrics)
 
 
 def websocket_frame(payload, opcode=1):
@@ -34,7 +38,7 @@ def websocket_frame(payload, opcode=1):
 
 class Phone:
     """Heartbeat by default; optional deterministic session input, never choices."""
-    def __init__(self, port, room, moving_input=False, player_offset=0):
+    def __init__(self, port, room, moving_input=False, player_offset=0, token=None):
         self.connection = socket.create_connection(('127.0.0.1', port), timeout=3)
         self.stopping = threading.Event()
         self.error = None
@@ -42,6 +46,9 @@ class Phone:
         self.moving_input = moving_input
         self.player_offset = player_offset
         self.joined = self.controllable = False
+        self.token = token
+        self.player = None
+        self.latest_status = None
         self.sequence = 0
         self.received = bytearray()
         self.fragment = bytearray()
@@ -49,7 +56,8 @@ class Phone:
         self.input_messages = self.active_input_messages = self.dodge_edges = 0
         try:
             key = base64.b64encode(os.urandom(16)).decode()
-            request = (f'GET /socket?room={room} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n'
+            query = f'room={room}' + (f'&token={token}' if token is not None else '')
+            request = (f'GET /socket?{query} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n'
                        f'Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: {key}\r\n'
                        'Sec-WebSocket-Version: 13\r\n\r\n')
             self.connection.sendall(request.encode())
@@ -115,9 +123,12 @@ class Phone:
             self.fragment.clear()
             if message.get('type') == 'joined':
                 self.joined = True
+                self.token = message.get('token')
+                self.player = message.get('player')
             elif message.get('type') in ('error', 'removed'):
                 raise RuntimeError('Synthetic controller rejected: ' + str(message.get('reason', 'removed')))
             elif message.get('type') == 'status':
+                self.latest_status = message
                 self.controllable = message.get('phase') == 'session' and message.get('hostActive') is True and message.get('alive') is not False
 
     def input(self, elapsed, neutral=False):
@@ -197,22 +208,40 @@ def parser_for_capture():
     parser.add_argument('--host', required=True, type=phone_reachable_host,
                         help='Existing relay LAN IPv4 used by the TV QR (persisted by Android)')
     parser.add_argument('--forward-port', type=int, required=True, help='Existing ADB localhost forward to TV8787')
-    parser.add_argument('--fixture', choices=['lobby', 'boss-solo', 'boss-coop', 'late-coop', 'items-coop', 'art-solo', 'art-coop', 'results'], default='boss-coop')
+    parser.add_argument('--fixture', choices=['lobby', 'boss-solo', 'boss-coop', 'late-coop', 'items-coop', 'art-solo', 'art-coop', 'expansion-coop', 'results'], default='boss-coop')
     parser.add_argument('--seconds', type=int, default=20, choices=range(5, 31), metavar='5..30')
     parser.add_argument('--lifecycle', action='store_true', help='Add one brief results/lobby/background-resume observation')
     parser.add_argument('--switch-smoke', action='store_true', help='Results only: send rapid F7/F8/Back after measurement')
     parser.add_argument('--moving-input', action='store_true', help='Send deterministic 30Hz movement and occasional Dodge; no choices')
+    parser.add_argument('--frame-pacing', choices=['on', 'off'], default='on', help='Profiling A/B override; old APKs ignore this intent extra')
+    parser.add_argument('--target-fps', type=int, choices=[30, 60], default=30, help='Presentation analysis target; does not change simulation or installed-APK cadence')
     parser.add_argument('--warmup-seconds', type=int, choices=range(0, 11), default=0, metavar='0..10')
     parser.add_argument('--output-dir', type=Path, default=ROOT / '.run', help='Use a unique directory to preserve a baseline')
     parser.add_argument('--system-trace', action='store_true', help='Attempt one bounded Perfetto trace; compare with a separate untraced baseline')
     return parser
 
 
-def trace_configuration(seconds):
+def dismiss_fixture_keyboard(command, key, wait):
+    """Android TV can open its IME for the injected numeric profiling shortcut."""
+    state = command('shell', 'dumpsys', 'input_method')
+    if 'mInputShown=' not in state:
+        raise RuntimeError('Cannot verify that the emulator keyboard is absent')
+    if 'mInputShown=true' not in state:
+        return False
+    key(4)
+    wait(.2)
+    if 'mInputShown=false' not in command('shell', 'dumpsys', 'input_method'):
+        raise RuntimeError('Emulator keyboard remained over the fixture')
+    return True
+
+
+def trace_configuration(seconds, buffer_kib=65536):
     if not 5 <= seconds <= 30:
         raise ValueError('System trace duration must be 5..30 seconds')
+    if buffer_kib not in (65536, 131072):
+        raise ValueError('System trace storage must remain bounded to 64 or 128 MiB')
     return f'''duration_ms: {seconds * 1000}
-buffers {{ size_kb: 65536 fill_policy: RING_BUFFER }}
+buffers {{ size_kb: {buffer_kib} fill_policy: RING_BUFFER }}
 data_sources {{ config {{ name: "linux.ftrace" ftrace_config {{
   ftrace_events: "sched/sched_switch"
   ftrace_events: "sched/sched_wakeup"
@@ -228,17 +257,18 @@ data_sources {{ config {{ name: "android.surfaceflinger.frametimeline" }} }}
 
 class SystemTrace:
     """One finite foreground adb/Perfetto process and one owned device filename."""
-    def __init__(self, target, prefix, seconds, command):
+    def __init__(self, target, prefix, seconds, command, *, buffer_kib=65536):
         self.target, self.prefix, self.seconds, self.command = target, prefix, seconds, command
+        self.buffer_kib = buffer_kib
         self.device_path = f'/data/misc/perfetto-traces/couchcrypt-baseline-{os.getpid()}.perfetto-trace'
         self.process = None
         self.metadata = {'requested': True, 'status': 'pending', 'duration_ms': seconds * 1000,
-                         'buffer_kib': 65536, 'device_path': self.device_path,
+                         'buffer_kib': buffer_kib, 'device_path': self.device_path,
                          'note': 'Trace attempt adds overhead; compare with a separate trace_on=false baseline. FrameTimeline source is optional and does not establish SurfaceView presentation timing.'}
 
     def start(self):
         try:
-            config = trace_configuration(self.seconds)
+            config = trace_configuration(self.seconds, self.buffer_kib)
             self.process = subprocess.Popen(self.target + ['shell', 'perfetto', '--txt', '-c', '-', '-o', self.device_path],
                                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             self.process.stdin.write(config)
@@ -333,7 +363,7 @@ def summarize_baseline(log_text, metadata):
             measured = False
             saw_end = True
             continue
-        tag = next((name for name in ('FrameMetrics', 'ProfileStartup', 'ProfileMemory', 'ProfileWorld') if name in line), None)
+        tag = next((name for name in ('FrameMetrics', 'ProfileStartup', 'ProfileMemory', 'ProfileWorld', 'ProfileBoundary', 'ProfileRenderStall', 'FramePacing') if name in line), None)
         if tag is None or '=' not in line:
             continue
         report = {'within_measurement_markers': measured, 'tag': tag, 'raw': line}
@@ -352,12 +382,13 @@ def summarize_baseline(log_text, metadata):
             'fixture': metadata['fixture'], 'measurement_complete': saw_start and saw_end,
             'trace_on': metadata.get('system_trace', {}).get('requested', False),
             'trace_captured': metadata.get('system_trace', {}).get('status') == 'captured',
+            'presentation': metadata.get('presentation_analysis', {'available': False, 'reason': 'Not collected by this capture'}),
             'reports': reports, 'diagnostics': diagnostics,
             'measured_report_count': sum(report['within_measurement_markers'] for report in reports),
             'limits': ['Report windows may straddle measurement markers; raw reports are retained.',
                        'Window percentiles cannot be combined into a run percentile.',
                        'Render callback wall time is not GPU duration or displayed-frame timing.',
-                       'Emulator evidence does not establish physical-TV 60 FPS.']}
+                       'Emulator evidence does not establish physical-TV frame pacing or thermal behavior.']}
 
 
 def main():
@@ -377,6 +408,7 @@ def main():
     logger = None
     output = None
     system_trace = None
+    presentation = None
     metadata = {'fixture': args.fixture, 'arguments': {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()},
                 'created_utc': datetime.now(timezone.utc).isoformat(), 'source': source_provenance()}
 
@@ -416,7 +448,8 @@ def main():
 
     def fresh_lobby():
         command('shell', 'am', 'force-stop', PACKAGE)
-        command('shell', 'am', 'start', '-n', COMPONENT, '--ez', 'profile', 'true', '--es', 'joinHost', args.host)
+        command('shell', 'am', 'start', '-n', COMPONENT, '--ez', 'profile', 'true',
+                '--ez', 'framePacing', 'true' if args.frame_pacing == 'on' else 'false', '--es', 'joinHost', args.host)
         wait(2)
         key(23)
         wait(.3)
@@ -426,7 +459,8 @@ def main():
         # A unique --output-dir preserves baselines; default filenames retain replacement behavior.
         output.truncate(0)
         logger = subprocess.Popen(target + ['logcat', '-v', 'threadtime', '-T', '1', 'FrameMetrics:I',
-                                            'ProfileStartup:I', 'ProfileMemory:I', 'ProfileWorld:I',
+                                            'ProfileStartup:I', 'ProfileMemory:I', 'ProfileWorld:I', 'ProfileBoundary:I', 'ProfileRenderStall:I', 'FramePacing:I',
+                                            'm.couchcrypt.tv:I', 'com.couchcrypt.tv:I',
                                             'LobbyPerf:I', 'OutcomeArt:I', 'AndroidRuntime:E', '*:S'],
                                   stdout=output, stderr=subprocess.STDOUT)
         fresh_lobby()
@@ -458,6 +492,11 @@ def main():
                 key(142)  # F12: equipped late encounter, real builds and temporary invulnerability.
                 wait(.2)
                 key(136)  # F6: add the real final boss and existing telegraphs.
+            elif args.fixture == 'expansion-coop':
+                key(11)  # NUM_4: complete skill composition, fixed durable targets and both relics.
+                wait(.2)
+                metadata['fixture_keyboard_dismissed'] = dismiss_fixture_keyboard(command, key, wait)
+                metadata['fixture_note'] = 'Dedicated expansion fixture; not simultaneous maximum-pool saturation.'
             else:
                 key(137 if args.fixture == 'results' else 141 if args.fixture == 'late-coop' else 142 if args.fixture == 'items-coop' else 136)
                 # F7 sample victory / F11 late encounter / F12 equipped late encounter / F6 boss fixture.
@@ -472,9 +511,14 @@ def main():
             system_trace.start()
         key(93)  # Profile-only PAGE_DOWN resets app metric windows after setup/warmup.
         metadata['metric_reset_key'] = 'PAGE_DOWN (93); requires the matching profiling APK'
+        presentation = presentation_metrics.PresentationSampler(target, metadata['surfaceflinger_start'])
+        presentation.start()
         marker('START')
         wait(args.seconds)
         marker('END')
+        presentation.stop()
+        metadata['presentation_sampling'] = presentation.metadata()
+        metadata['presentation_analysis'] = presentation.analyze(*presentation.observation_bounds(), target_fps=args.target_fps)
         if system_trace is not None:
             system_trace.finish()
         metadata['pid_after_measurement'] = optional_command('shell', 'pidof', PACKAGE)
@@ -517,9 +561,13 @@ def main():
             memory += '\n' + label + '\n' + snapshot
         prefix.with_suffix('.memory.txt').write_text(memory)
         print(f'Captured {args.seconds}s {args.fixture}: {prefix}.log and {prefix}.memory.txt')
-        print('Frame interval includes scheduling/presentation; CPU submission is not GPU time. Emulator results do not establish physical-TV60FPS.')
+        print('Frame interval includes scheduling/presentation; CPU submission is not GPU time. Emulator results do not establish physical-TV frame pacing.')
     finally:
         try:
+            if presentation is not None:
+                presentation.stop()
+                metadata['presentation_sampling'] = presentation.metadata()
+                metadata['presentation_analysis'] = presentation.analyze(*presentation.observation_bounds(), target_fps=args.target_fps)
             if system_trace is not None:
                 system_trace.cleanup()
             if logger is not None:

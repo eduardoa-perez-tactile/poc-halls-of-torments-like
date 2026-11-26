@@ -14,6 +14,7 @@ public final class MagicProjectileArt {
     public final long textureBytes = 0, retainedPixmapBytes = 0;
     private final Metadata metadata;
     private final Part[] parts;
+    private final float[] rangerVertices = new float[20];
 
     public MagicProjectileArt(Texture environmentPage) {
         metadata = new Metadata(new JsonReader().parse(Gdx.files.internal("art/magic-projectiles.json")));
@@ -38,6 +39,34 @@ public final class MagicProjectileArt {
         batch.draw(p.region, x + p.left * scale, y + p.bottom * scale,
             -p.left * scale, -p.bottom * scale, p.width * scale, p.height * scale,
             1, 1, rotationDegrees);
+    }
+
+    /**
+     * A slim painted dart, rotated before the arena's 2:1 Y compression.
+     * planeAngleRadians is atan2(worldVy, worldVx) + PI / 4; x/y already include the
+     * original weapon-height offset. The authored head pivot stays fixed at that point.
+     */
+    public void drawRanger(SpriteBatch batch, float age, float x, float y,
+                           float scale, float planeAngleRadians) {
+        Part p = parts[metadata.clips[Type.RANGER.ordinal()].sample(age)];
+        float c = (float) Math.cos(planeAngleRadians), s = (float) Math.sin(planeAngleRadians);
+        // Retain the original brush texture and pointed ivory head, without the broad badge silhouette.
+        float left = p.left * scale * .78f, right = (p.left + p.width) * scale * .78f;
+        float bottom = p.bottom * scale * .28f, top = (p.bottom + p.height) * scale * .28f;
+        float color = batch.getPackedColor();
+        rangerVertex(0, x, y, left, bottom, c, s, color, p.region.getU(), p.region.getV2());
+        rangerVertex(5, x, y, left, top, c, s, color, p.region.getU(), p.region.getV());
+        rangerVertex(10, x, y, right, top, c, s, color, p.region.getU2(), p.region.getV());
+        rangerVertex(15, x, y, right, bottom, c, s, color, p.region.getU2(), p.region.getV2());
+        batch.draw(p.region.getTexture(), rangerVertices, 0, rangerVertices.length);
+    }
+
+    private void rangerVertex(int at, float x, float y, float forward, float side, float c, float s,
+                              float color, float u, float v) {
+        rangerVertices[at] = x + forward * c - side * s;
+        rangerVertices[at + 1] = y + .5f * (forward * s + side * c);
+        rangerVertices[at + 2] = color;
+        rangerVertices[at + 3] = u; rangerVertices[at + 4] = v;
     }
 
     private record Part(TextureRegion region, float left, float bottom, int width, int height) {}

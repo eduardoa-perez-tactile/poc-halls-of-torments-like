@@ -32,6 +32,7 @@ import com.couchcrypt.game.HudArt;
 import com.couchcrypt.game.PartyProgression;
 import com.couchcrypt.game.GameAudio;
 import com.couchcrypt.game.AudioSettings;
+import com.couchcrypt.game.AudioWorkerLifecycle;
 import com.couchcrypt.game.SceneMusic;
 import com.couchcrypt.game.SoundCue;
 import com.couchcrypt.game.ArenaRenderer;
@@ -48,6 +49,7 @@ import com.couchcrypt.ui.BuildIcons;
 import com.couchcrypt.ui.ItemArt;
 import com.couchcrypt.ui.RunDetailsView;
 import com.couchcrypt.ui.ResultsSummaryView;
+import com.couchcrypt.ui.PauseMenuView;
 import com.couchcrypt.ui.CharacterInfoView;
 import com.couchcrypt.ui.HeroSelectionView;
 import com.couchcrypt.ui.HeroPortraitDrawable;
@@ -205,7 +207,8 @@ public final class CryptLobby extends ApplicationAdapter {
                 + " floorUsedIndexBytes=" + arena.cachedFloorQuads * 12L
                 + " floorCapacityVertexBytes=" + com.couchcrypt.game.EngravedFloorArt.MAX_FLOOR_QUADS * 80L
                 + " floorCapacityIndexBytes=" + com.couchcrypt.game.EngravedFloorArt.MAX_FLOOR_QUADS * 12L
-                + " medallionVertexBytes=" + arena.medallionQuads() * 80L);
+                + " medallionCachedVertexBytes=" + arena.medallionCachedVertexBytes()
+                + " medallionCachedIndexBytes=" + arena.medallionCachedIndexBytes());
         }
     }
 
@@ -574,9 +577,16 @@ public final class CryptLobby extends ApplicationAdapter {
         labels.add("AUDIO"); actions.add(() -> audioSettings(true));
         labels.add("RESTART RUN"); actions.add(this::confirmRestart);
         labels.add("RETURN TO LOBBY"); actions.add(this::confirmReturnToLobby);
-        modal("Paused", pauseDescription(snapshot), labels.toArray(String[]::new), actions.toArray(Runnable[]::new));
+        if (overlay != null) closeModal();
+        savedButtons = new ArrayList<>(buttons); savedFocus = focus; buttons.clear();
+        overlay = new Table(); overlay.setFillParent(true); overlay.setBackground(art.scrim);
+        overlay.setTouchable(Touchable.enabled);
+        PauseMenuView view = new PauseMenuView(art, pauseDescription(snapshot),
+            labels.toArray(String[]::new), actions.toArray(Runnable[]::new), this::registerButton);
+        overlay.add(view.root).minHeight(740);
+        stage.addActor(overlay); overlay.validate(); setFocus(0);
         modalKind = Modal.PAUSE;
-        pauseMessage = modalMessage;
+        pauseMessage = modalMessage = view.message;
         pauseResume = buttons.get(0);
         setTextButtonDisabled(pauseResume, !canResume(snapshot));
         if (pauseResume.isDisabled()) setFocus(1);
@@ -592,19 +602,17 @@ public final class CryptLobby extends ApplicationAdapter {
         for (int slot = 0; slot < 2; slot++) {
             if (!world.players[slot].active) continue;
             var player = slot == 0 ? snapshot.first() : snapshot.second();
+            if (message.length() > 0) message.append("  /  ");
             message.append(slot == 0 ? "PLAYER I" : "PLAYER II");
             if (player.connected()) message.append(" CONNECTED");
             else if (player.reserved()) {
-                message.append(" DISCONNECTED - ");
-                if (player.secondsLeft() > 0) message.append("reconnect within ").append(player.secondsLeft()).append('s');
-                else message.append("reconnect or remove player");
+                message.append(" DISCONNECTED");
+                if (player.secondsLeft() > 0) message.append(" (").append(player.secondsLeft()).append("s)");
             }
             else message.append(" PLACE RELEASED");
-            message.append('\n');
         }
-        if (snapshot.connected() == 0) message.append("Reconnect a phone to resume. Keep its controller page open.");
-        else if (!canResume(snapshot)) message.append("Waiting for the missing phone. Reconnect it or remove its place below.");
-        else message.append("Ready to resume. The run and upgrade timers stay frozen until you continue.");
+        if (snapshot.connected() == 0) message.append("\nReconnect a phone to continue.");
+        else if (!canResume(snapshot)) message.append("\nReconnect the missing phone or remove its place.");
         return message.toString();
     }
 
@@ -949,6 +957,7 @@ public final class CryptLobby extends ApplicationAdapter {
         // Profiling capture boundary only: exclude fixture/warm-up work without changing the run.
         if (key == Input.Keys.PAGE_DOWN && frameMetrics != null) {
             frameMetrics.reset();
+            Gdx.app.log("ProfileBoundary", "resetNs=" + System.nanoTime());
             return true;
         }
         if (key == Input.Keys.PAGE_UP && config.profile() && screen == Screen.SESSION
@@ -1328,15 +1337,24 @@ public final class CryptLobby extends ApplicationAdapter {
                 if (config.profile()) {
                     Gdx.app.log("LobbyPerf", stats);
                     var counters = world.diagnostics();
+                    AudioWorkerLifecycle audioWorkers = Gdx.audio instanceof AudioWorkerLifecycle owner ? owner : null;
                     int healingOnFloor = 0, healingValue = 0;
                     for (var pickup : world.pickups) if (pickup.active && pickup.healing) {
                         healingOnFloor++; healingValue += pickup.value;
                     }
                     Gdx.app.log("ProfileWorld", "phase=" + profileMode() + " runSeed=" + world.runSeed
-                        + " elapsed=" + world.elapsed + " candidates=" + counters.boltCollisionCandidates
+                        + " elapsed=" + world.elapsed + " boltCollisionCandidates=" + counters.boltCollisionCandidates
+                        + " meleeCollisionCandidates=" + counters.meleeCollisionCandidates
+                        + " expansionCollisionCandidates=" + counters.expansionCollisionCandidates
                         + " enemyMisses=" + counters.enemySpawnMisses + " boltMisses=" + counters.boltAcquireMisses
                         + " shotMisses=" + counters.shotAcquireMisses + " hazardMisses=" + counters.hazardAcquireMisses
-                        + " effectMisses=" + counters.effectAcquireMisses + " pickupMerges=" + counters.pickupMerges
+                        + " effectMisses=" + counters.effectAcquireMisses + " meleeMisses=" + counters.meleeAcquireMisses
+                        + " fieldMisses=" + world.skills.fieldAcquireMisses + " delayedMisses=" + world.skills.delayedAcquireMisses
+                        + " relicPoolBlockedTicks=" + counters.relicPoolBlockedTicks
+                        + " relicPlacementMisses=" + counters.relicPlacementMisses
+                        + " audioWorkers=" + (audioWorkers == null ? 0 : audioWorkers.diagnosticWorkers())
+                        + " audioMusicHandles=" + (audioWorkers == null ? 0 : audioWorkers.diagnosticMusicHandles())
+                        + " pickupMerges=" + counters.pickupMerges
                         + " partyLevel=" + world.progression.level + " partyXp=" + world.progression.totalXp
                         + " kills=" + world.kills + " activeEnemies=" + world.activeEnemies
                         + " healingOnFloor=" + healingOnFloor + " healingFloorValue=" + healingValue
@@ -1373,14 +1391,7 @@ public final class CryptLobby extends ApplicationAdapter {
         if (frameMetrics != null) {
             frameMetrics.endStage(FrameMetrics.UI);
             frameMetrics.addSimulationSteps(simulationSteps, rawDelta);
-            int enemies = 0, bolts = 0, pickups = 0, shots = 0, hazards = 0, effects = 0;
-            for (var value : world.enemies) if (value.active) enemies++;
-            for (var value : world.bolts) if (value.active) bolts++;
-            for (var value : world.pickups) if (value.active) pickups++;
-            for (var value : world.shots) if (value.active) shots++;
-            for (var value : world.hazards) if (value.active) hazards++;
-            for (var value : world.effects) if (value.active) effects++;
-            frameMetrics.recordPoolCounts(enemies, bolts, pickups, shots, hazards, effects);
+            frameMetrics.recordPoolCounts(world);
             frameMetrics.endFrame(profileMode(), residentArtBytes(), residentPixmapBytes(),
                 Gdx.app.getJavaHeap(), (screen == Screen.SESSION ? arena.drawCalls : 0) + ((SpriteBatch) stage.getBatch()).renderCalls);
         }

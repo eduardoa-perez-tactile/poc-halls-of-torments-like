@@ -27,28 +27,35 @@ footer { margin-top: 30px; font-size: 12px; }
 
 /* A dedicated two-thumb controller during play; game information stays on the TV. */
 #game-controls { margin-top: 18px; padding: 14px 10px; touch-action: none; user-select: none; -webkit-user-select: none; }
-.touch-controls { display: flex; justify-content: space-around; align-items: center; gap: 20px; }
-.movement-control, .dodge-control { display: flex; flex: 1; flex-direction: column; align-items: center; min-width: 0; }
-#joystick { width: min(100%, 210px); aspect-ratio: 1; position: relative; border: 2px solid #938064; border-radius: 50%; background: radial-gradient(circle, #424344bb, #141a1cee 70%); box-shadow: inset 0 0 0 7px #0c111888, 0 0 0 3px #171b1c; touch-action: none; }
+.touch-controls { position: relative; display: grid; grid-template-rows: minmax(0, 3fr) minmax(0, 1fr); flex: 1; min-height: 0; width: 100%; }
+/* Separate touch zones: captured movement can cross the boundary without firing Dodge. */
+.movement-control { position: relative; min-height: 0; overflow: hidden; touch-action: none; }
+.dodge-control { min-height: 0; }
+#joystick { visibility: hidden; width: min(64vw, 32svh, 250px); aspect-ratio: 1; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; border: 2px solid #938064; border-radius: 50%; background: radial-gradient(circle, #424344bb, #141a1cee 70%); box-shadow: inset 0 0 0 7px #0c111888, 0 0 0 3px #171b1c; touch-action: none; }
 .stick-cross { position: absolute; inset: 25%; border: 1px solid #9e8f6e55; border-radius: 50%; }
 #stick { position: absolute; width: 40%; height: 40%; left: 30%; top: 30%; border: 2px solid var(--player); border-radius: 50%; background: radial-gradient(circle at 35% 30%, #a89c7f, #3e3b35 75%); box-shadow: 0 4px 8px #0008; will-change: transform; pointer-events: none; }
-#joystick.engaged { border-color: #f0d395; box-shadow: inset 0 0 0 7px #0c111888, 0 0 12px #d4b47c44; }
-#dodge { width: min(100%, 150px); aspect-ratio: 1; min-height: 0; margin: 0; padding: 12px; border: 2px solid var(--player); border-radius: 50%; background: radial-gradient(circle at 40% 35%, #424344, #141a1c 75%); box-shadow: inset 0 0 0 6px #0c111888, inset 0 0 0 8px #93806455, 0 0 0 3px #171b1c; color: #eee7d8; font-size: 21px; letter-spacing: .08em; text-shadow: 0 2px 3px #000; touch-action: none; -webkit-tap-highlight-color: transparent; }
-#dodge:focus-visible:not(:disabled), #dodge:active:not(:disabled), #dodge.pressed:not(:disabled) { background: radial-gradient(circle at 40% 35%, #756344, #25231d 75%); color: #fff2ce; border-color: #f0d395; box-shadow: inset 0 0 0 6px #0c111866, inset 0 0 0 8px #d4b47c88, 0 0 14px #d4b47c44; }
+#joystick.engaged { visibility: visible; border-color: #f0d395; box-shadow: inset 0 0 0 7px #0c111888, 0 0 12px #d4b47c44; }
+#joystick.engaged + .movement-hint { visibility: hidden; }
+#dodge { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 12px; border: 2px solid var(--player); border-radius: 3px; background: linear-gradient(#303535, #141a1cee); box-shadow: inset 0 0 0 6px #0c111888, inset 0 0 0 8px #93806455; color: #eee7d8; font-size: 25px; letter-spacing: .08em; text-shadow: 0 2px 3px #000; touch-action: none; -webkit-tap-highlight-color: transparent; }
+#dodge:focus-visible:not(:disabled), #dodge:active:not(:disabled), #dodge.pressed:not(:disabled) { background: linear-gradient(#756344, #25231d); color: #fff2ce; border-color: #f0d395; box-shadow: inset 0 0 0 6px #0c111866, inset 0 0 0 8px #d4b47c88, 0 0 14px #d4b47c44; }
 #dodge:disabled { opacity: .55; color: #b5b4ac; border-color: #777973; box-shadow: inset 0 0 0 6px #0c111888, 0 0 0 3px #171b1c; }
 .control-label { display: block; color: var(--player); font-size: 11px; letter-spacing: .12em; margin-top: 18px; min-height: 16px; }
 body.playing { height: 100svh; overflow: hidden; touch-action: auto; }
 /* Thumbs can land anywhere, including outside the controls or on cooldown Dodge.
    Keep the choice view scrollable by applying this only to the gameplay surface. */
 body.playing:not(.has-upgrade) { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-body.playing main { display: flex; flex-direction: column; max-width: 1000px; width: 100%; height: 100svh; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+body.playing main { display: flex; flex-direction: column; max-width: 520px; width: 100%; height: 100svh; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
 body.playing header, body.playing h1, body.playing #message, body.playing #connected, body.playing #join-form, body.playing footer { display: none; }
-body.playing .connection-card { border: 0; background: none; padding: 0; }
+body.playing .connection-card { position: absolute; top: max(16px, env(safe-area-inset-top)); left: 0; right: 0; border: 0; background: none; padding: 0; pointer-events: none; }
 body.playing .eyebrow { margin: 0 0 12px; font-size: 12px; }
 body.playing #game-controls { display: flex; flex: 1; flex-direction: column; justify-content: center; min-height: 0; margin: 0; padding: 0; border: 0; background: none; touch-action: auto; }
-body.playing .touch-controls { width: 100%; flex-shrink: 0; gap: 24px; }
+body.playing .touch-controls { width: 100%; }
+.movement-hint { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; color: var(--player); pointer-events: none; }
+.movement-hint strong { font: normal 21px Georgia, serif; letter-spacing: .07em; }
+.movement-hint span { font-size: 12px; color: #b5b4ac; }
 body.playing .control-label { margin-top: 12px; font-size: 12px; }
-#starter-build { flex: 0 0 auto; margin: 0 0 16px; }
+body.playing #dodge-status { margin: 0; }
+#starter-build { position: absolute; top: max(40px, calc(env(safe-area-inset-top) + 24px)); left: 24px; right: 24px; margin: 0; pointer-events: none; }
 
 /* Personal choices use a dedicated view while the host pauses combat. */
 #upgrade-choices { --choice-progress: 100%; min-height: 0; width: 100%; max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
@@ -92,29 +99,16 @@ body.has-upgrade { height: 100svh; overflow: hidden; background-image: linear-gr
 body.has-upgrade main { padding: max(16px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
 body.has-upgrade .connection-card, body.has-upgrade header, body.has-upgrade footer, body.has-upgrade .touch-controls { display: none; }
 body.has-upgrade #game-controls { justify-content: stretch; }
-body.has-upgrade #upgrade-choices { flex: 1; }
+body.has-upgrade #upgrade-choices { flex: 1; overflow: hidden; }
 body.has-upgrade .upgrade-options { flex: 1; }
+/* Portrait is the controller layout for movement and personal choices alike. */
+#portrait-notice { display: none; }
 @media (orientation: landscape) {
-  body.playing main { padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: max(12px, env(safe-area-inset-bottom)); }
-  body.playing .touch-controls { gap: clamp(40px, 20vw, 220px); padding: 0 24px; }
-  body.playing #joystick { width: min(100%, 48svh, 210px); }
-  body.playing #dodge { width: min(100%, 38svh, 150px); }
-  body.has-upgrade main { padding-top: max(10px, env(safe-area-inset-top)); padding-bottom: max(10px, env(safe-area-inset-bottom)); }
-  #upgrade-choices { max-width: 1000px; gap: 8px; }
-  .upgrade-heading h2 { font-size: 22px; }
-  .upgrade-kicker { font-size: 9px; margin-bottom: 2px; }
-  #upgrade-seconds { font-size: 28px; }
-  .upgrade-options { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(220px, 1fr); gap: 10px; }
-  #upgrade-choices[data-kind='equipment'] .upgrade-options { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(142px, 1fr); }
-  .upgrade-choice { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(72px, 1fr) auto; gap: 5px; padding: 10px 12px 14px; align-items: center; }
-  .skill-art { width: min(100%, 28svh, 150px); margin: 0 auto; }
-  .skill-copy { gap: 5px; }
-  .skill-title { font-size: clamp(17px, 2.7vw, 23px); }
-  .skill-headline { font-size: clamp(16px, 2.5vw, 22px); }
-  .skill-preview { font-size: 11px; gap: 2px 4px; }
-  .skill-meta { font-size: 9px; }
-  .skill-rank { font-size: 8px; }
-  #upgrade-choices[data-kind='equipment'] .upgrade-choice { grid-template-columns: clamp(64px, 11vw, 100px) minmax(0, 1fr); grid-template-rows: auto; gap: 8px; }
-  #upgrade-choices[data-kind='equipment'] .skill-art { width: 100%; }
+  body { height: 100svh; overflow: hidden; }
+  body > main { visibility: hidden; pointer-events: none; }
+  #portrait-notice { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; background: #11191cf5; }
+  .portrait-phone { width: 42px; height: 68px; border: 2px solid var(--player); border-radius: 7px; box-shadow: inset 0 -7px #d4b47c33; }
+  #portrait-notice h2 { margin: 4px 0 0; font: normal 26px Georgia, serif; color: #f5e6c9; }
+  #portrait-notice p { margin: 0; color: #b5b4ac; font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) { .upgrade-clock span { transition: none; } }

@@ -6,6 +6,7 @@ import java.util.List;
 public final class ArenaTimeline {
     public enum Pattern {
         SWARM(ArenaWorld.EnemyKind.GHOUL, ArenaWorld.EnemyKind.GHOUL, ArenaWorld.EnemyKind.GHOUL),
+        SCOUT_HUNT(ArenaWorld.EnemyKind.GHOUL, ArenaWorld.EnemyKind.GHOUL, ArenaWorld.EnemyKind.WRAITH),
         BRUTE_PRESSURE(ArenaWorld.EnemyKind.BRUTE, ArenaWorld.EnemyKind.GHOUL, ArenaWorld.EnemyKind.WRAITH),
         CULTIST_FORMATION(ArenaWorld.EnemyKind.CULTIST, ArenaWorld.EnemyKind.GHOUL,
             ArenaWorld.EnemyKind.WRAITH, ArenaWorld.EnemyKind.CULTIST),
@@ -51,12 +52,12 @@ public final class ArenaTimeline {
 
     /** Authored twenty-minute survival schedule. Balance targets require human gameplay feedback. */
     public static final ArenaTimeline TWENTY_MINUTES = new ArenaTimeline(
-        longPhase("THE CRYPT STIRS", 90, Pattern.SWARM, 2.7f, 4, null, 1, 1, 28),
-        longPhase("RESTLESS HUNT", 90, Pattern.HUNT, 2.55f, 3, null, 1.2f, 1.1f, 30),
-        longPhase("THE IRON MARCH", 120, Pattern.BRUTE_PRESSURE, 2.35f, 3, ArenaWorld.EnemyKind.BRUTE, 1.4f, 1.15f, 32),
-        longPhase("CHOIR OF ASH", 120, Pattern.CULTIST_FORMATION, 2.8f, 3, null, 1.7f, 1.25f, 34),
-        longPhase("BROKEN RANKS", 120, Pattern.SIEGE, 2.5f, 3, ArenaWorld.EnemyKind.CULTIST, 2, 1.3f, 36),
-        longPhase("WRAITH PROCESSION", 120, Pattern.HUNT, 1.75f, 3, null, 2.5f, 1.4f, 38),
+        longPhase("THE CRYPT STIRS", 90, Pattern.SWARM, 4.8f, 4, null, 1, 1, 16),
+        longPhase("RESTLESS HUNT", 90, Pattern.SCOUT_HUNT, 4.2f, 3, null, 1.2f, 1.1f, 20),
+        longPhase("THE IRON MARCH", 120, Pattern.BRUTE_PRESSURE, 3.5f, 3, ArenaWorld.EnemyKind.BRUTE, 1.4f, 1.15f, 24),
+        longPhase("CHOIR OF ASH", 120, Pattern.CULTIST_FORMATION, 3.4f, 3, null, 1.7f, 1.25f, 28),
+        longPhase("BROKEN RANKS", 120, Pattern.SIEGE, 3f, 3, ArenaWorld.EnemyKind.CULTIST, 2, 1.3f, 32),
+        longPhase("WRAITH PROCESSION", 120, Pattern.HUNT, 2.1f, 3, null, 2.5f, 1.4f, 36),
         longPhase("SOVEREIGN'S GUARD", 120, Pattern.SIEGE, 2.1f, 2, ArenaWorld.EnemyKind.BRUTE, 3, 1.5f, 40),
         longPhase("THE CLOSING CIRCLE", 120, Pattern.ONSLAUGHT, 2.4f, 2, null, 3.4f, 1.65f, 42),
         longPhase("DREAD REINFORCEMENTS", 90, Pattern.BRUTE_PRESSURE, 1.3f, 2, ArenaWorld.EnemyKind.CULTIST, 3.9f, 1.8f, 44),

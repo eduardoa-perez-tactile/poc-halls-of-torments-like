@@ -15,7 +15,7 @@ public final class ArenaWorld {
     public enum Outcome { RUNNING, VICTORY, DEFEAT }
     public enum Hero {
         WARDEN(100, 28, .7f, 180, 160, 2.4f),
-        RANGER(100, 16, .55f, 198, 800, 2.4f);
+        RANGER(100, 16, .55f, 198, 300, 2.4f);
 
         public final float baseHealth, baseDamage, attackInterval, moveSpeed, attackRange, dodgeCooldown;
         Hero(float baseHealth, float baseDamage, float attackInterval, float moveSpeed, float attackRange, float dodgeCooldown) {
@@ -38,12 +38,21 @@ public final class ArenaWorld {
     public static final class Diagnostics {
         /** Active, not-yet-hit bolt/enemy pairs submitted to the geometric collision test. */
         public long boltCollisionCandidates;
+        /** Active, not-yet-hit melee/enemy pairs submitted to the crossed-rim/cone test. */
+        public long meleeCollisionCandidates;
+        /** Orbiter, field, glaive and delayed-strike damage tests; excludes targeting and placement. */
+        public long expansionCollisionCandidates;
         public long enemySpawnMisses, boltAcquireMisses, shotAcquireMisses, hazardAcquireMisses, effectAcquireMisses;
+        public long meleeAcquireMisses;
+        /** Due relic placements blocked by a full pool or failed bounded safe-position searches. */
+        public long relicPoolBlockedTicks, relicPlacementMisses;
         /** Rewards merged into existing pickups because every pickup slot was occupied. */
         public long pickupMerges;
 
         private void reset() {
             boltCollisionCandidates = enemySpawnMisses = boltAcquireMisses = shotAcquireMisses = 0;
+            meleeCollisionCandidates = expansionCollisionCandidates = meleeAcquireMisses = 0;
+            relicPoolBlockedTicks = relicPlacementMisses = 0;
             hazardAcquireMisses = effectAcquireMisses = pickupMerges = 0;
         }
     }
@@ -436,6 +445,7 @@ public final class ArenaWorld {
         int first = owner * MeleeWave.PER_PLAYER;
         for (int i = first; i < first + MeleeWave.PER_PLAYER; i++)
             if (!meleeWaves[i].active) return meleeWaves[i];
+        if (diagnostics != null) diagnostics.meleeAcquireMisses++;
         return null;
     }
 
@@ -453,6 +463,7 @@ public final class ArenaWorld {
                 for (int i = 0; i < enemies.length; i++) {
                     Enemy enemy = enemies[i];
                     if (!enemy.active || melee.hitGenerations[i] == enemy.spawnId) continue;
+                    if (diagnostics != null) diagnostics.meleeCollisionCandidates++;
                     float dx = enemy.x - melee.x, dy = enemy.y - melee.y, distance = length(dx, dy);
                     if (dx * dx + dy * dy < .0001f) {
                         dx = melee.dirX * .01f; dy = melee.dirY * .01f;
@@ -1200,6 +1211,11 @@ public final class ArenaWorld {
     }
 
     private Enemy spawn(EnemyKind kind, boolean elite, Player anchor, float angle) {
+        return spawn(kind, elite, anchor, angle, null);
+    }
+
+    /** Only explicit art-review fixtures bypass the combat-time variant schedule. */
+    private Enemy spawn(EnemyKind kind, boolean elite, Player anchor, float angle, EnemyVariant fixtureVariant) {
         if (activeEnemies >= MAX_ENEMIES) {
             if (diagnostics != null) diagnostics.enemySpawnMisses++;
             return null;
@@ -1207,7 +1223,9 @@ public final class ArenaWorld {
         if (anchor == null) return null;
         for (Enemy e : enemies) {
             if (e.active) continue;
-            EnemyVariant variant = EnemyVariant.forSpawn(kind, runSeed, enemySpawnSerial);
+            EnemyVariant variant = fixtureVariant != null ? fixtureVariant : timeline.isFullRun()
+                ? EnemyVariant.forSpawn(kind, runSeed, enemySpawnSerial, elapsed)
+                : EnemyVariant.forSpawn(kind, runSeed, enemySpawnSerial);
             e.radius = EnemySizing.groundRadius(kind, variant, elite);
             boolean safe = false;
             for (int attempt = 0; attempt < 12 && !safe; attempt++) {
@@ -1363,12 +1381,7 @@ public final class ArenaWorld {
     }
 
     private Enemy spawnSizingFixture(EnemyKind kind, EnemyVariant variant, boolean elite, Player anchor) {
-        for (int attempt = 0; attempt < 64; attempt++) {
-            Enemy enemy = spawn(kind, elite, anchor, 0);
-            if (enemy == null || enemy.variant == variant) return enemy;
-            enemy.active = false; activeEnemies--;
-        }
-        return null;
+        return spawn(kind, elite, anchor, 0, variant);
     }
 
     /** Profile-only close combat fixture for brief sprite capture; normal encounters never use it. */

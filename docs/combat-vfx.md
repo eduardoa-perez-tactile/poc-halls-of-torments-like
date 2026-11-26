@@ -1,5 +1,155 @@
 # Sprite combat feedback
 
+## Shorter Ranger targeting range (2026-11-26)
+
+The user found the first 800→600 reduction still too large and requested a
+further 50% reduction. Its primary target-acquisition radius is now **300 world
+units**, halved from the current 600. The existing ground
+outline reads the same authoritative hero value, so it follows the reduction
+without another rendering change. This supersedes
+the historical 800-unit requirement and the earlier 600-unit reduction. Warden reach, secondary
+abilities, bolt speed/damage/cadence, flight lifetime, pierce/ricochet, approved
+art and effects are unchanged. Already released bolts keep their normal flight;
+this changes when Ranger acquires a target and starts firing.
+
+The previous 600-unit iteration passed twenty focused checks and was installed
+on Television_1080p. For the latest 300-unit iteration the user explicitly
+requested **no device testing yet**: compilation/headless checks only, without
+installing, launching or interacting with the emulator. Its existing installed
+600-unit build is left untouched. The latest iteration passed all twenty focused
+checks and JDK 21 Android debug assembly, including solo/co-op targets at 301
+(no shot) and 299 (shot) world units. The projectile-emergence fixture's target
+was moved within the shorter range so it still tests real release and pause
+behavior, rather than expecting a shot at an out-of-range target.
+
+## Ranger bolts and stronger Warden contact (2026-11-26)
+
+The user approved `art-source/ranger-warden-contact/approved-proposal.png` after
+finding the previous Warden contact too small. This supersedes the earlier
+62%-scale contact treatment, without changing the Warden's primary ground wave.
+
+Ranger bolts retain their original painted head pivot and animation. Their
+painted silhouette narrows into a dart (78% longitudinal/28% transverse source
+scale), rotates in the uncompressed weapon plane, then receives the arena's 2:1
+projection. A small ivory core reinforces the leading head. The existing painted
+taper supplies a short trail; broad star-shaped projectile ghost copies are
+removed for Ranger only. Cultist/Sovereign projectile presentation is unchanged.
+Release uses a small ivory/teal flash at the original four-facing emitter, over
+the existing 100 ms combat-owned emergence window.
+
+Actual Ranger contacts retain their existing target/launch-height anchor and
+painted radial animation. A small bright core, soft expanding radial rim and
+five tiny motes emphasize puncture without a directional fan or ground-area
+warning. Existing critical identity adds warmer colour and the existing 1.22×
+visual scale. Warden contact paint increases from 62% to 93% scale, restoring
+50% more visual width with a brighter cutting core and five short gold sparks.
+The cut and sparks project in the weapon plane at the original hit height.
+
+`CombatContactArt` reuses one cached radial mesh, a quad buffer and resident
+paint/glow/white pixels. All ages/progress come from existing combat-owned
+projectile, player and contact state. No new effect pool, texture, framebuffer,
+shader or frame-loop allocations are introduced. Damage, collisions, projectile
+paths/speed/lifetimes, pierce/ricochet, attack cadence, release growth, pause gates,
+enemy behavior and the primary melee wave are unchanged. Runtime raster files
+and atlas metadata have no diff.
+
+### Verification and emulator handoff
+
+JDK 21 desktop compilation and Android debug assembly passed, together with
+**16 focused tests** across ProjectilePresentationTest, MagicProjectileArtTest,
+CombatVfxStateTest and VfxAtlasTest. Existing checks cover projectile emergence,
+original flight speed/collision radius, choice-pause freezing, pooled lifetimes
+and managed art metadata. No simulation/progression code or runtime assets changed in this
+pass. A read-only review found no projection, pivot, age or allocation defects.
+
+The updated APK was installed on the existing Television_1080p Android emulator;
+the installed package SHA-256 matches the locally built APK. Actual Android
+screenrecord/screencap evidence is under ignored
+`.run/ranger-warden-impact-review/`. Short existing full-skill and close-combat
+fixtures show Ranger and Warden separately; close-combat captures avoid the
+unrelated Frost/Storm effects hiding the new contacts. All enemy bodies and
+actual attack simulation remain present. These are native APK captures, not
+ImageGen edits or desktop-rendered substitutes.
+
+The saved LAN QR host, relay and both ADB forwards are preserved. The controller
+endpoint returned HTTP 200 after capture. Synthetic phones and recording helpers
+are closed, and the installed game is left at Home for the user's playtest.
+Brief rendering checks do not establish sustained physical-TV frame pacing or
+thermals; no full survival playthrough was performed.
+
+The subsequently requested [crowded co-op before/after comparison](effects-performance-comparison.md)
+measured sixteen twenty-second windows in ABBA order. It found no sustained
+30 FPS regression, modest additional rendering work and a 0.707 MiB higher
+same-phase median process PSS without a sustained latest-only growth pattern.
+Both builds retained rare presentation gaps; see the report for raw-interval
+statistics, memory details and emulator limits.
+
+## Isometric skill readability (2026-11-26)
+
+The user approved `art-source/isometric-skill-readability/approved-proposal.png`,
+including its brighter active auras, for presentation-only implementation.
+This replaces the screen-rotated Sentinel/Glaive sprites and floating Reaping
+Stroke skill emblem. Primary melee-wave geometry, timing and damage are unchanged.
+
+Sentinel Blades and Returning Glaive rotate in the uncompressed world plane
+before the arena's 2:1 projection, at their existing 26/28-unit display heights.
+Small floor shadows anchor those heights. Fine tapered trails follow at most
+100 ms of actual combat-tick positions; the glaive also uses faint past spinning
+poses. Each of ten fixed weapon slots owns seven cached poses. No trail predicts
+a return path, advances during camera rendering or survives a reused lifetime.
+Choice/manual/background/disconnect pauses use the existing simulation gates.
+
+Reaping Stroke now reuses the resident painted cutting crescent at a compact
+48-unit visual radius, aligned with its committed world facing and drawn in the
+complete ground pass beneath all actors. Its independent delay, cone, damage
+and duration remain unchanged. The primary expanding wave is untouched.
+
+Consecrated Ground keeps its exact live field radius, lifetime and final 450 ms
+fade. Its original painted seal is more visible (64% instead of 32% tint alpha),
+with a restrained resident-texture fill and a fine ivory-gold/teal edge using
+cached antialiased geometry. Fields remain beneath hostile warnings and bodies.
+The 57%-opacity exact-range targeting outline is unchanged. Relics retain their
+original painted identities, with low hovering placement, a shallow three-quarter
+lean, contact shadows and small gold/teal floor lights; they remain collectibles.
+
+Native capture also exposed the existing oversized sword-contact bursts as a
+source of floating-icon clutter. These keep their painted animation and contact
+height, but use compact 62%-scale projected directional sweeps instead of the
+former 145%-scale screen-rotated bursts. Hit timing, critical identity, damage
+numbers and target health are untouched. Contact VFX remain body effects; floor
+sweeps and fields stay beneath the entire actor pass.
+
+All runtime raster files and texture dimensions stay byte-for-byte unchanged.
+The additional history and geometry arrays allocate once, with no frame-loop
+allocations, new textures, shader or framebuffer. Both cameras consume the same
+simulation-owned state. This is a bounded presentation change, not a difficulty
+or gameplay change.
+
+### Verification
+
+JDK 21 focused checks passed: **26 tests** across SkillExpansionCombatTest,
+SkillExpansionCullingTest, CombatVfxStateTest and VfxAtlasTest. Desktop classes
+and the Android debug APK compiled successfully. Integration checks cover real
+past weapon positions while the owner moves, pool reuse/removal/death, bounded
+history, choice-pause freezing and reset cleanup. A read-only review found no
+gameplay-calculation changes. Runtime asset files have no diff.
+
+The actual native desktop OpenGL renderer produced **14 raw 1920×1080 captures**,
+all with GL error zero, in short existing all-skill debug fixtures. Combat views
+retain five solo/ten co-op target enemies and their actual hit effects; a separate
+solo close-up uses a temporary diagnostic camera zoom of 0.7. The isolated skill
+views hide target bodies/contact effects after simulation and are labeled as
+such. No screenshot is a generated mockup. Inspected views include simultaneous
+four blades/field/glaive/Reap/primary wave/relics and six overlapping co-op fields.
+Evidence is under ignored `.run/isometric-skill-review/`.
+
+These captures verify presentation and depth, not physical-TV pacing, thermals
+or a full survival run. No device installation or emulator launch occurred.
+Capture processes exited. The existing saved LAN QR host, relay configuration
+and ADB forwards remain unchanged. A read-only handoff check still received a
+closed connection without response from that existing LAN endpoint, matching
+its previously recorded state.
+
 Current permanent player outlines and Dodge presentation are defined by the
 25 November range-and-afterimage update below; earlier aura approvals are retained
 as implementation history.

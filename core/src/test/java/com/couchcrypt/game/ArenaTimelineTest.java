@@ -183,11 +183,29 @@ class ArenaTimelineTest {
         }
         float opening = scheduledEnemiesPerMinute(timeline.phase(0));
         float finalMinute = scheduledEnemiesPerMinute(timeline.phase(timeline.phaseCount() - 1));
-        assertTrue(opening >= 50 && opening <= 65, "The opening allows time for the initial build");
+        assertTrue(opening >= 28 && opening <= 35, "The opening allows time to learn and earn the initial build");
         assertTrue(finalMinute >= 150 && finalMinute <= 175, "The last minute sustains bounded heavy reinforcement");
         assertTrue(finalMinute > opening * 2.8f);
         assertTrue(scheduledEnemiesPerMinute(timeline.phase(8)) > scheduledEnemiesPerMinute(timeline.phase(7)),
             "The fifteen-minute Brute phase must not introduce the previous reinforcement slump");
+    }
+
+    @Test void earlyWraithsAreAMinorityAndOpeningCrowdsAreBoundedForSoloAndCoop() {
+        ArenaWorld world = solo(ArenaTimeline.TWENTY_MINUTES);
+        assertTrue(world.reinforcementLimit() <= 18, "The opening must not permit the former 28-enemy solo crowd");
+        world.activatePlayer(1);
+        assertEquals(ArenaTimeline.TWENTY_MINUTES.phase(0).soloEnemyLimit() + 12, world.reinforcementLimit());
+        ArenaTimeline.Pattern introduction = ArenaTimeline.TWENTY_MINUTES.phase(1).pattern();
+        int ghouls = 0, wraiths = 0;
+        for (int i = 0; i < introduction.size(); i++) {
+            if (introduction.member(i) == ArenaWorld.EnemyKind.GHOUL) ghouls++;
+            else if (introduction.member(i) == ArenaWorld.EnemyKind.WRAITH) wraiths++;
+            else fail("The first Wraith pack must not introduce Brute or Cultist mechanics");
+        }
+        assertEquals(1, wraiths);
+        assertTrue(ghouls > wraiths, "Teach the mobile enemy without making it the majority of early packs");
+        assertEquals(ArenaTimeline.Pattern.BRUTE_PRESSURE, ArenaTimeline.TWENTY_MINUTES.phase(2).pattern());
+        assertEquals(ArenaTimeline.Pattern.CULTIST_FORMATION, ArenaTimeline.TWENTY_MINUTES.phase(3).pattern());
     }
 
     @Test void fullRunStatGrowthIsContinuousAndNeverFallsAtEncounterBoundaries() {

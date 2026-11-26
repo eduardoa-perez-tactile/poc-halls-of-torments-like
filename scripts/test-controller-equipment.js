@@ -61,8 +61,9 @@ async function main() {
   let timerId = 0;
   const intervals = new Map();
   const windowEvents = new Map();
+  const orientation = { matches: true, addEventListener(name, handler) { this.changed = handler; } };
   const context = {
-    document, window: { addEventListener(name, handler) { windowEvents.set(name, handler); } }, location: { host: 'tv:8787', href: 'http://tv:8787/' },
+    document, window: { matchMedia: () => orientation, addEventListener(name, handler) { windowEvents.set(name, handler); } }, location: { host: 'tv:8787', href: 'http://tv:8787/' },
     performance: { now: () => now }, Date, URL, AbortController, WebSocket: Socket,
     localStorage: { getItem: () => '', setItem() {} },
     setInterval: (handler, delay) => { const id = ++timerId; intervals.set(id, { handler, delay }); return id; },
@@ -113,32 +114,46 @@ async function main() {
   browserGestures.forEach((name) => assert.equal(gesture(name, get('dodge')), true,
     `Cooldown does not restore browser ${name} gestures over Dodge`));
   status({ equipment: null });
-  const joystick = get('joystick'), dodge = get('dodge');
+  const joystick = get('joystick'), movementZone = get('movement-zone'), dodge = get('dodge');
   const pointer = (element, type, pointerId, clientX = 100, clientY = 100) =>
     element.listeners.get(type)({ pointerId, clientX, clientY, preventDefault() {} });
-  pointer(joystick, 'pointerdown', 1, 150);
-  assert.ok(socket.sent.at(-1).x > 0, 'The first thumb starts movement');
-  assert.equal(joystick.hasPointerCapture(1), true);
+  pointer(movementZone, 'pointerdown', 1, 150);
+  assert.equal(socket.sent.at(-1).x, 0, 'A fresh touch centres the floating stick without a movement jump');
+  pointer(movementZone, 'pointermove', 1, 190);
+  [...intervals.values()].filter((timer) => timer.delay === 1000 / 30).forEach((timer) => timer.handler());
+  assert.ok(socket.sent.at(-1).x > 0, 'Dragging from a fresh thumb position starts movement');
+  assert.equal(movementZone.hasPointerCapture(1), true);
   pointer(dodge, 'pointerdown', 2);
   assert.equal(socket.sent.at(-1).dodge, true, 'A second thumb can Dodge during movement');
   assert.ok(socket.sent.at(-1).x > 0, 'Dodge preserves held movement');
-  pointer(joystick, 'pointermove', 1, 1000);
+  pointer(movementZone, 'pointermove', 1, 1000);
   [...intervals.values()].filter((timer) => timer.delay === 1000 / 30).forEach((timer) => timer.handler());
   assert.equal(socket.sent.at(-1).x, 1, 'Captured movement remains normalized outside the joystick');
-  pointer(joystick, 'pointerup', 1);
+  pointer(movementZone, 'pointerup', 1);
   assert.equal(socket.sent.at(-1).x, 0);
   assert.equal(dodge.classList.contains('pressed'), true, 'Lifting movement does not release the other thumb');
-  pointer(joystick, 'pointerdown', 3, 0);
-  assert.equal(socket.sent.at(-1).x, -1, 'Movement can restart while Dodge remains held');
+  pointer(movementZone, 'pointerdown', 3, 0);
+  assert.equal(socket.sent.at(-1).x, 0, 'Retouching outside the old ring starts from neutral');
+  pointer(movementZone, 'pointermove', 3, -100);
+  [...intervals.values()].filter((timer) => timer.delay === 1000 / 30).forEach((timer) => timer.handler());
+  assert.equal(socket.sent.at(-1).x, -1, 'Movement can restart outside the old ring while Dodge remains held');
   assert.equal(socket.sent.at(-1).dodge, false, 'Restarting movement does not retrigger held Dodge');
-  pointer(joystick, 'pointercancel', 99);
+  pointer(movementZone, 'pointercancel', 99);
   assert.equal(joystick.classList.contains('engaged'), true, 'Another pointer cannot cancel movement');
-  pointer(joystick, 'pointercancel', 3);
+  pointer(movementZone, 'pointercancel', 3);
   assert.equal(socket.sent.at(-1).x, 0, 'A canceled movement pointer sends neutral input');
   assert.equal(joystick.classList.contains('engaged'), false);
   pointer(dodge, 'pointercancel', 2);
   assert.equal(dodge.classList.contains('pressed'), false, 'A canceled Dodge clears its held appearance');
   assert.equal(socket.sent.at(-1).dodge, false);
+  pointer(movementZone, 'pointerdown', 4, 500, 600);
+  pointer(movementZone, 'pointermove', 4, 600, 600);
+  orientation.matches = false; orientation.changed();
+  assert.equal(socket.sent.at(-1).x, 0, 'Turning sideways neutralizes a held movement pointer');
+  assert.equal(movementZone.hasPointerCapture(4), false);
+  pointer(movementZone, 'pointerdown', 5, 50, 50);
+  assert.equal(joystick.classList.contains('engaged'), false, 'Landscape cannot start movement');
+  orientation.matches = true; orientation.changed();
   const keyboard = (key) => windowEvents.get('keydown')({ key, target: {}, preventDefault() {} });
   keyboard('d');
   assert.equal(socket.sent.at(-1).x, 1, 'A defaulted late join can move immediately');
@@ -157,6 +172,13 @@ async function main() {
   assert.equal(get('starter-build').hidden, true, 'Normal future choices retain the full card space');
   assert.equal(get('upgrade-level').textContent, 'LEVEL 2', 'Skill choices take priority over equipment');
   assert.equal(get('equipment-keep').hidden, true);
+  orientation.matches = false; orientation.changed();
+  assert.equal(first.disabled, true, 'Sideways choices wait for portrait');
+  const sidewaysSent = socket.sent.length;
+  first.click();
+  assert.equal(socket.sent.length, sidewaysSent, 'The portrait notice cannot submit a hidden choice');
+  orientation.matches = true; orientation.changed();
+  assert.equal(first.disabled, false, 'Returning upright restores the same offer');
   first.click();
   assert.equal(socket.sent.at(-1).type, 'upgrade');
   assert.equal(choices.hidden, false, 'A submitted choice remains visible until the host clears it');

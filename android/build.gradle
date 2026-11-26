@@ -7,7 +7,7 @@ android {
         applicationId 'com.couchcrypt.tv'
         minSdk 26
         targetSdk 35
-        versionCode 5
+        versionCode 6
         versionName project.version
     }
     sourceSets.main {

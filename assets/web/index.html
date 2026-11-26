@@ -9,6 +9,7 @@
   <script src="/controller.js" defer></script>
 </head>
 <body>
+  <aside id="portrait-notice" role="status"><span class="portrait-phone" aria-hidden="true"></span><h2>Turn your phone upright</h2><p>Play and choose upgrades in portrait.</p></aside>
   <main>
     <header><img class="brand-logo" src="/art/home-logo.png" alt="Couch Crypt"><p class="subtitle">Two souls. One descent.</p></header>
     <section class="card connection-card" aria-labelledby="title">
@@ -35,13 +36,13 @@
       </section>
       <p id="starter-build" class="hint" role="status" hidden>Starter build equipped—you’re ready</p>
       <div class="touch-controls">
-        <div class="movement-control">
+        <div class="movement-control" id="movement-zone" aria-label="Drag anywhere here to move">
           <div id="joystick" role="group" aria-label="Drag to move your character">
             <span class="stick-cross" aria-hidden="true"></span><span id="stick" aria-hidden="true"></span>
           </div>
-          <span class="control-label">MOVE</span>
+          <div class="movement-hint"><strong>TOUCH &amp; DRAG TO MOVE</strong><span>Start anywhere in this area</span></div>
         </div>
-        <div class="dodge-control"><button id="dodge" type="button" aria-label="Dodge">DODGE</button><span id="dodge-status" class="control-label">READY</span></div>
+        <div class="dodge-control"><button id="dodge" type="button" aria-label="Dodge"><span>DODGE</span><span id="dodge-status" class="control-label">READY</span></button></div>
       </div>
     </section>
     <footer><span id="network-status">LOCAL NETWORK</span><br>Keep this page open while you play.</footer>

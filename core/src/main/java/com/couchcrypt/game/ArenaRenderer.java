@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.StreamingSpriteBatch;
 import com.badlogic.gdx.graphics.g2d.SpriteCache;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.MathUtils;
@@ -39,6 +40,7 @@ public final class ArenaRenderer implements Disposable {
     private final EnemyGroundVfx enemyGroundVfx;
     private final LootChestVfx chestVfx;
     private final SkillExpansionArt skillArt;
+    private final CombatContactArt contactArt;
     private final DamageNumberArt damageNumberArt;
     private final ArenaAmbience ambience;
     private final SpriteBatch batch;
@@ -48,8 +50,9 @@ public final class ArenaRenderer implements Disposable {
     // One bounded static mesh; both cameras reuse the same floor, paths and wear colours.
     private final SpriteCache floorCache = createFloorCache();
     private final int floorCacheId;
+    private final SpriteCache medallionCache;
+    private final int medallionCacheId, medallionQuadCount;
     private final ArenaFloorLayout floorLayout;
-    private final EngravedFloorArt.Quad[] medallion;
     private final OrthographicCamera[] cameras = { new OrthographicCamera(), new OrthographicCamera() };
     private final OrthographicCamera hud = new OrthographicCamera();
     private final boolean[] cameraReady = new boolean[2];
@@ -68,10 +71,13 @@ public final class ArenaRenderer implements Disposable {
         + SkillExpansion.MAX_ORBITERS + SkillExpansion.MAX_GLAIVES + SkillExpansion.MAX_RELICS];
     private final int[] types = new int[depths.length], indices = new int[depths.length], layers = new int[depths.length];
     private int sortCount;
+    private long lastStallLogNs;
     public int drawCalls;
     /** Startup inventory; shared by both cameras and never rebuilt while playing. */
     public int cachedFloorQuads;
-    public int medallionQuads() { return medallion.length; }
+    public int medallionQuads() { return medallionQuadCount; }
+    public long medallionCachedVertexBytes() { return medallionQuadCount * 80L; }
+    public long medallionCachedIndexBytes() { return medallionQuadCount * 12L; }
 
     public ArenaRenderer(GameArt gameArt, UiArt uiArt, BuildIcons buildIcons, HudArt hudArt) {
         this(gameArt, uiArt, buildIcons, hudArt, null);
@@ -80,14 +86,15 @@ public final class ArenaRenderer implements Disposable {
     public ArenaRenderer(GameArt gameArt, UiArt uiArt, BuildIcons buildIcons, HudArt hudArt, FrameMetrics frameMetrics) {
         metrics = frameMetrics;
         paletteShader = EnemyPalette.createShader();
-        batch = metrics == null ? new SpriteBatch(1800, paletteShader) : new ProfileBatch(paletteShader);
+        batch = metrics == null ? new StreamingSpriteBatch(1800, paletteShader) : new ProfileBatch(paletteShader);
         iris = new SoftIris();
         art = gameArt; gameHud = new GameHud(gameArt, uiArt, buildIcons, hudArt);
         rankMarkers = new EnemyRankMarkers(art.pixel);
         playerFootRing = new PlayerFootRing(art.pixel);
         enemyGroundVfx = new EnemyGroundVfx(art.pixel, art.glow);
         chestVfx = new LootChestVfx(art.pixel, art.glow);
-        skillArt = new SkillExpansionArt(buildIcons, art.glow);
+        skillArt = new SkillExpansionArt(buildIcons, art.pixel, art.glow, art.shadow, art.spriteEffects);
+        contactArt = new CombatContactArt(art.glow, art.pixel, art.spriteEffects);
         damageNumberArt = new DamageNumberArt(uiArt.body);
         floorLayout = new ArenaFloorLayout(new JsonReader().parse(Gdx.files.internal("arena/crypt-floor.json")));
         float radius = floorLayout.medallionDiameter * .5f;
@@ -99,7 +106,17 @@ public final class ArenaRenderer implements Disposable {
             engraving[i] = floorLayout.centerX + (x + y) * ISO_X;
             engraving[i + 1] = floorLayout.centerY + (y - x) * ISO_X;
         }
-        medallion = art.engravedFloor.geometry(art.engravedFloor.medallion, engraving, 1f);
+        EngravedFloorArt.Quad[] medallion = art.engravedFloor.geometry(art.engravedFloor.medallion, engraving, 1f);
+        medallionQuadCount = medallion.length;
+        medallionCache = createMedallionCache(medallionQuadCount);
+        try {
+            medallionCache.beginCache();
+            // Preserve the former per-page vertex sequence and its ordinary transparent paint.
+            art.engravedFloor.cache(medallionCache, medallion);
+            medallionCacheId = medallionCache.endCache();
+        } catch (RuntimeException | Error failure) {
+            medallionCache.dispose(); throw failure;
+        }
         floorCacheId = cacheFloor();
         hud.setToOrtho(false, HUD_WIDTH, HUD_HEIGHT);
         layout = ArenaLayout.load(art.metadata);
@@ -123,14 +140,20 @@ public final class ArenaRenderer implements Disposable {
     public void render(ArenaWorld world, ArenaHudState state, float delta, boolean showHud) {
         int width = Gdx.graphics.getWidth(), height = Gdx.graphics.getHeight();
         if (width <= 0 || height <= 0) return;
+        long arenaStartedNs = metrics == null ? 0 : System.nanoTime();
+        long uploadsBefore = metrics == null ? 0 : ((StreamingSpriteBatch) batch).vertexUploadCount();
+        ProfileBatch profileBatch = metrics == null ? null : (ProfileBatch) batch;
         int active = (world.players[0].active ? 1 : 0) + (world.players[1].active ? 1 : 0);
         boolean split = active == 2;
         drawCalls = 0;
+        playerFootRing.drawCalls = 0;
         int floorDraws = 0, worldDraws = 0, visibleSprites = 0;
-        if (metrics != null) ((ProfileBatch) batch).textureSelections = 0;
+        if (profileBatch != null) profileBatch.resetFrame();
         Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST);
         for (int slot = 0; slot < 2; slot++) {
             if (!world.players[slot].active) continue;
+            int ringDrawsBefore = playerFootRing.drawCalls;
+            if (profileBatch != null) profileBatch.pass("ground", slot);
             int paneX = split && slot == 1 ? width / 2 : 0;
             int paneWidth = split ? (slot == 0 ? width / 2 : width - width / 2) : width;
             Gdx.gl.glViewport(paneX, 0, paneWidth, height);
@@ -141,14 +164,14 @@ public final class ArenaRenderer implements Disposable {
             drawFloor(camera);
             if (metrics != null) {
                 metrics.endStage(FrameMetrics.FLOOR);
-                floorDraws += floorCache.renderCalls;
+                floorDraws += floorCache.renderCalls + medallionCache.renderCalls;
                 metrics.beginStage(FrameMetrics.WORLD_DRAW);
             }
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
-            art.engravedFloor.draw(batch, medallion);
             drawChestLights(world, camera);
-            skillArt.ground(batch, world);
+            skillArt.ground(batch, world, camera);
+            skillArt.followups(batch, world, camera);
             drawMeleeWaves(world, camera);
             // All floor effects precede the complete depth-sorted actor pass. Their painted
             // foreground rims must never be laid over a closer enemy or the player's body.
@@ -169,19 +192,22 @@ public final class ArenaRenderer implements Disposable {
                 visibleSprites += sortCount;
                 metrics.beginStage(FrameMetrics.WORLD_DRAW);
             }
+            if (profileBatch != null) profileBatch.pass("actors/shadows", slot);
             drawShadows(world);
             drawSprites(world, camera, slot);
+            if (profileBatch != null) profileBatch.pass("projectiles", slot);
             drawBolts(world, camera);
             drawShots(world, camera);
+            if (profileBatch != null) profileBatch.pass("effects/followups/ranks", slot);
             drawEffects(world, camera);
-            skillArt.followups(batch, world);
             drawDamageNumbers(world, camera);
             drawEnemyRanks(world);
             batch.end();
-            drawCalls += batch.renderCalls;
+            int ringDraws = playerFootRing.drawCalls - ringDrawsBefore;
+            drawCalls += batch.renderCalls + ringDraws;
             if (metrics != null) {
                 metrics.endStage(FrameMetrics.WORLD_DRAW);
-                worldDraws += batch.renderCalls;
+                worldDraws += batch.renderCalls + ringDraws;
             }
         }
         Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
@@ -196,6 +222,7 @@ public final class ArenaRenderer implements Disposable {
             metrics.beginStage(FrameMetrics.HUD);
         }
         batch.setProjectionMatrix(hud.combined);
+        if (profileBatch != null) profileBatch.pass("hud", -1);
         batch.begin();
         if (showHud) {
             gameHud.render(batch, world, state, split, delta);
@@ -213,14 +240,47 @@ public final class ArenaRenderer implements Disposable {
         if (metrics != null) {
             metrics.endStage(FrameMetrics.HUD);
             metrics.recordRenderCounts(floorDraws, worldDraws, batch.renderCalls,
-                ((ProfileBatch) batch).textureSelections, visibleSprites);
+                ((ProfileBatch) batch).textureSelections, visibleSprites,
+                (int) (((StreamingSpriteBatch) batch).vertexUploadCount() - uploadsBefore));
+            long endedNs = System.nanoTime(), wallNs = endedNs - arenaStartedNs;
+            if (wallNs > 33_300_000L && (lastStallLogNs == 0 || endedNs - lastStallLogNs >= 1_000_000_000L)) {
+                lastStallLogNs = endedNs;
+                Gdx.app.log("ProfileRenderStall", "frameEndNs=" + endedNs + " arenaWallNs=" + wallNs
+                    + " combatElapsed=" + world.elapsed + " flushes=" + profileBatch.flushCount
+                    + " flushTotalNs=" + profileBatch.flushTotalNs + " maxFlushNs=" + profileBatch.maxFlushNs
+                    + " maxFlushPass=" + profileBatch.maxFlushPass + " maxFlushCamera=" + profileBatch.maxFlushCamera
+                    + " passMeaning=flushCallSite_pendingContentsMaySpanPasses");
+            }
         }
     }
 
     /** Counts arena batch selections without intercepting GL or forcing extra flushes/fences. */
-    private static final class ProfileBatch extends SpriteBatch {
+    private static final class ProfileBatch extends StreamingSpriteBatch {
         int textureSelections;
+        int flushCount, camera = -1, maxFlushCamera = -1;
+        long flushTotalNs, maxFlushNs;
+        String pass = "ground", maxFlushPass = "none";
         ProfileBatch(ShaderProgram shader) { super(1800, shader); }
+        void resetFrame() {
+            textureSelections = flushCount = 0;
+            flushTotalNs = maxFlushNs = 0;
+            camera = maxFlushCamera = -1;
+            pass = "ground"; maxFlushPass = "none";
+        }
+        // Labels identify the flushing call site; pending vertices may originate in earlier passes.
+        // Changing labels must never flush, reorder, or otherwise alter the SpriteBatch stream.
+        void pass(String value, int cameraIndex) { pass = value; camera = cameraIndex; }
+        @Override public void flush() {
+            int previousCalls = renderCalls;
+            long startedNs = System.nanoTime();
+            super.flush();
+            long elapsedNs = System.nanoTime() - startedNs;
+            if (renderCalls == previousCalls) return;
+            flushCount++; flushTotalNs += elapsedNs;
+            if (elapsedNs > maxFlushNs) {
+                maxFlushNs = elapsedNs; maxFlushPass = pass; maxFlushCamera = camera;
+            }
+        }
         @Override protected void switchTexture(Texture texture) {
             textureSelections++;
             super.switchTexture(texture);
@@ -273,7 +333,7 @@ public final class ArenaRenderer implements Disposable {
         }
         if (quads > EngravedFloorArt.MAX_FLOOR_QUADS) throw new IllegalStateException("Floor cache capacity exceeded");
         cachedFloorQuads = quads;
-        Gdx.app.log("FloorArt", "Cached ground quads=" + quads + ", medallion quads=" + medallion.length);
+        Gdx.app.log("FloorArt", "Cached ground quads=" + quads + ", medallion quads=" + medallionQuadCount);
         floorCache.setColor(Color.WHITE);
         return floorCache.endCache();
     }
@@ -342,6 +402,61 @@ public final class ArenaRenderer implements Disposable {
         }
     }
 
+    private static SpriteCache createMedallionCache(int quadCount) {
+        // Match the existing arena batch's unmarked UVs, colour precision and packed-alpha correction.
+        // Unlike opaque paving, this paint must retain every sampled alpha without a coverage discard.
+        String vertex = """
+            #ifdef GL_ES
+            precision highp float;
+            #define LOWP lowp
+            #define HIGHP highp
+            #else
+            #define LOWP
+            #define HIGHP
+            #endif
+            attribute vec4 a_position;
+            attribute vec4 a_color;
+            attribute vec2 a_texCoord0;
+            uniform mat4 u_projectionViewMatrix;
+            varying LOWP vec4 v_color;
+            varying HIGHP vec2 v_texCoords;
+            void main() {
+                v_color = a_color;
+                v_color.a *= 255.0 / 254.0;
+                v_texCoords = a_texCoord0;
+                gl_Position = u_projectionViewMatrix * a_position;
+            }
+            """;
+        String fragment = """
+            #ifdef GL_ES
+            precision mediump float;
+            #define LOWP lowp
+            #define HIGHP highp
+            #else
+            #define LOWP
+            #define HIGHP
+            #endif
+            varying LOWP vec4 v_color;
+            varying HIGHP vec2 v_texCoords;
+            uniform sampler2D u_texture;
+            void main() {
+                vec4 source = texture2D(u_texture, v_texCoords);
+                gl_FragColor = source * v_color;
+            }
+            """;
+        ShaderProgram shader = new ShaderProgram(vertex, fragment);
+        if (!shader.isCompiled()) {
+            String log = shader.getLog(); shader.dispose();
+            throw new IllegalStateException("Cannot compile cached medallion shader: " + log);
+        }
+        try {
+            // Exact-sized managed vertex/index buffers; the cache owns its base shader.
+            return new SpriteCache(quadCount, shader, true);
+        } catch (RuntimeException | Error failure) {
+            shader.dispose(); throw failure;
+        }
+    }
+
     private void drawFloor(OrthographicCamera camera) {
         // Projection/scissor clip the unchanged static tiles independently for each pane.
         Gdx.gl.glEnable(GL20.GL_BLEND);
@@ -351,6 +466,12 @@ public final class ArenaRenderer implements Disposable {
         floorCache.draw(floorCacheId);
         floorCache.end();
         drawCalls += floorCache.renderCalls;
+        // Same world order as before: opaque paving, transparent seal, then every ground effect/actor.
+        medallionCache.setProjectionMatrix(camera.combined);
+        medallionCache.begin();
+        medallionCache.draw(medallionCacheId);
+        medallionCache.end();
+        drawCalls += medallionCache.renderCalls;
     }
 
     private void gatherSprites(ArenaWorld world, OrthographicCamera camera) {
@@ -397,12 +518,12 @@ public final class ArenaRenderer implements Disposable {
         }
         for (int i = 0; i < world.skills.orbiters.length; i++) {
             SkillExpansion.OrbitBlade blade = world.skills.orbiters[i];
-            if (blade.active && visible(camera, blade.x, blade.y, 70f))
+            if (blade.active && visible(camera, blade.x, blade.y, 110f))
                 add(SENTINEL_BLADE, i, blade.x, blade.y);
         }
         for (int i = 0; i < world.skills.glaives.length; i++) {
             SkillExpansion.Glaive glaive = world.skills.glaives[i];
-            if (glaive.active && visible(camera, glaive.x, glaive.y, 70f))
+            if (glaive.active && visible(camera, glaive.x, glaive.y, 110f))
                 add(RETURNING_GLAIVE, i, glaive.x, glaive.y);
         }
         for (int i = 0; i < world.skills.relics.length; i++) {
@@ -532,8 +653,14 @@ public final class ArenaRenderer implements Disposable {
             float sourceScale = art.actor(ActorAnimation.Actor.RANGER).pixelScale;
             float x = screenX(bolt.x, bolt.y) + BOLT_ORIGIN[origin] * sourceScale;
             float y = screenY(bolt.x, bolt.y) + BOLT_ORIGIN[origin + 1] * sourceScale;
-            drawMagicProjectile(camera, MagicProjectileArt.Type.RANGER, bolt.age,
-                x, y, bolt.vx, bolt.vy, bolt.critical ? 1.4f : 1.2f);
+            float scale = bolt.critical ? 1.4f : 1.2f;
+            if (!visibleProjected(camera, x, y, art.projectiles.maxRadius(MagicProjectileArt.Type.RANGER) * scale + 24f)) continue;
+            float planeAngle = MathUtils.atan2(bolt.vy, bolt.vx) + MathUtils.PI * .25f;
+            float emergence = ProjectilePresentation.spawnScale(bolt.age);
+            batch.setColor(Color.WHITE);
+            // The original painted taper is the short trail; there are no broad star-head ghost copies.
+            art.projectiles.drawRanger(batch, bolt.age, x, y, scale * emergence, planeAngle);
+            contactArt.boltHead(batch, x, y, emergence, bolt.critical);
         }
         batch.setColor(Color.WHITE);
     }
@@ -803,15 +930,19 @@ public final class ArenaRenderer implements Disposable {
                         impactY = y + BOLT_ORIGIN[origin + 1] * sourceScale;
                     }
                     if (!effect.heroHit && effect.impactKind == ArenaWorld.ImpactKind.SWORD) {
-                        float dx = screenX(effect.dirX, effect.dirY), dy = screenY(effect.dirX, effect.dirY);
-                        float rotation = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees - 25f;
+                        // Rotate before Y compression, as for the world-space weapon sweep.
+                        float rotation = MathUtils.atan2(effect.dirY, effect.dirX) + MathUtils.PI * .25f
+                            - 25f * MathUtils.degreesToRadians;
                         batch.setColor(Color.WHITE);
-                        art.vfx.draw(batch, VfxArt.Animation.SWORD_HIT, effect.maxTtl - effect.ttl,
-                            impactX, impactY, 1.45f * (effect.critical ? 1.22f : 1f), rotation, VfxArt.Layer.ALL);
+                        art.vfx.drawProjected(batch, VfxArt.Animation.SWORD_HIT, effect.maxTtl - effect.ttl,
+                            impactX, impactY, .93f * (effect.critical ? 1.22f : 1f), rotation);
+                        contactArt.swordImpact(batch, impactX, impactY, effectProgress(effect), rotation, effect.critical);
                         if (effect.critical) {
                             batch.setColor(1f, .92f, .65f, .8f);
                             bodySprite(SpriteEffectArt.Type.CONTACT, effectProgress(effect), impactX, impactY, .13f, 0);
                         }
+                    } else if (!effect.heroHit && effect.impactKind == ArenaWorld.ImpactKind.BOLT) {
+                        contactArt.boltImpact(batch, impactX, impactY, effectProgress(effect), effect.critical);
                     } else {
                         if (effect.heroHit) batch.setColor(1f, .35f, .22f, 1f);
                         else if (effect.critical) batch.setColor(1f, .95f, .78f, 1f);
@@ -1172,17 +1303,8 @@ public final class ArenaRenderer implements Disposable {
         float scale = art.actor(ActorAnimation.Actor.RANGER).pixelScale;
         float x = screenX(player.x, player.y) + BOLT_ORIGIN[origin] * scale;
         float y = screenY(player.x, player.y) + BOLT_ORIGIN[origin + 1] * scale;
-        float life = 1f - player.attackAge / .1f;
-        float emergence = ProjectilePresentation.spawnScale(player.attackAge);
-        float dx = screenX(player.attackFacingX, player.attackFacingY), dy = screenY(player.attackFacingX, player.attackFacingY);
-        float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
-        batch.setColor(.48f, .88f, 1f, life * .65f);
-        float glowRadius = 18f * emergence;
-        batch.draw(art.glow, x - glowRadius, y - glowRadius, glowRadius * 2, glowRadius * 2);
-        batch.setColor(1f, 1f, 1f, life * .85f);
-        art.projectiles.draw(batch, MagicProjectileArt.Type.RANGER, player.attackAge, x, y,
-            (.6f + life * .25f) * emergence, angle);
-        batch.setColor(Color.WHITE);
+        float planeAngle = MathUtils.atan2(player.attackFacingY, player.attackFacingX) + MathUtils.PI * .25f;
+        contactArt.release(batch, x, y, player.attackAge, planeAngle);
     }
 
     private static boolean visibleActor(OrthographicCamera camera, float x, float y,
@@ -1214,5 +1336,5 @@ public final class ArenaRenderer implements Disposable {
     }
     private static float screenX(float x, float y) { return (x - y) * ISO_X; }
     private static float screenY(float x, float y) { return (x + y) * ISO_Y; }
-    @Override public void dispose() { floorCache.dispose(); batch.dispose(); paletteShader.dispose(); iris.dispose(); }
+    @Override public void dispose() { floorCache.dispose(); medallionCache.dispose(); batch.dispose(); paletteShader.dispose(); iris.dispose(); playerFootRing.dispose(); }
 }

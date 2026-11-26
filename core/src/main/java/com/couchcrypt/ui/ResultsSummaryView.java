@@ -14,6 +14,9 @@ import java.util.function.Consumer;
 
 /** The finished party takes center stage over the already-resident shared crypt. */
 public final class ResultsSummaryView {
+    private static final float ACTION_WIDTH = 500;
+    private static final float ACTION_HEIGHT = ACTION_WIDTH * 224f / 1024f;
+    private static final float ACTION_GAP = 24;
     public final Table root = new Table();
     public final RemoteButton replayButton, lobbyButton, detailsButton;
     private final Label replayLabel, partyStatus;
@@ -67,15 +70,16 @@ public final class ResultsSummaryView {
         partyStatus.setAlignment(Align.center);
         partyStatus.setBounds(220, 184, 1480, 38); root.addActor(partyStatus);
 
-        replayButton = new RemoteButton(art, replay, false);
+        replayButton = new RemoteButton(art.summaryNormal, art.summaryFocused, replay);
         replayLabel = art.label("", art.section, UiArt.BUTTON_INK);
         replayLabel.setFontScale(.9f); replayButton.add(replayLabel);
         lobbyButton = action(art, "RETURN TO LOBBY", lobby);
         detailsButton = action(art, "RUN DETAILS", details);
         register.accept(replayButton); register.accept(lobbyButton); register.accept(detailsButton);
-        replayButton.setBounds(236, 64, 500, 94);
-        lobbyButton.setBounds(760, 64, 500, 94);
-        detailsButton.setBounds(1284, 64, 400, 94);
+        float left = (1920 - 3 * ACTION_WIDTH - 2 * ACTION_GAP) / 2;
+        replayButton.setBounds(left, 64, ACTION_WIDTH, ACTION_HEIGHT);
+        lobbyButton.setBounds(left + ACTION_WIDTH + ACTION_GAP, 64, ACTION_WIDTH, ACTION_HEIGHT);
+        detailsButton.setBounds(left + 2 * (ACTION_WIDTH + ACTION_GAP), 64, ACTION_WIDTH, ACTION_HEIGHT);
         root.addActor(replayButton); root.addActor(lobbyButton); root.addActor(detailsButton);
     }
 
@@ -91,7 +95,7 @@ public final class ResultsSummaryView {
     }
 
     private static RemoteButton action(UiArt art, String caption, Runnable command) {
-        RemoteButton button = new RemoteButton(art, command, false);
+        RemoteButton button = new RemoteButton(art.summaryNormal, art.summaryFocused, command);
         Label text = art.label(caption, art.section, UiArt.BUTTON_INK);
         text.setFontScale(.9f); button.add(text); return button;
     }

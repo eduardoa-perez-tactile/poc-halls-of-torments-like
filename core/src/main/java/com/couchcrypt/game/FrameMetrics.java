@@ -11,8 +11,9 @@ public final class FrameMetrics {
     public static final int FLOOR = 6, GATHER = 7, WORLD_DRAW = 8, HUD = 9;
     public static final int STAGE_COUNT = 10;
     private static final String[] STAGE_NAMES = {"handoff", "simulation", "audio", "status", "arena", "ui", "floor", "gather", "worldDraw", "hud"};
-    private static final String[] POOL_NAMES = {"enemies", "bolts", "pickups", "shots", "hazards", "effects"};
-    private static final String[] RENDER_COUNT_NAMES = {"floorDraws", "worldDraws", "hudDraws", "dynamicSpriteBatchTextureSelections", "visibleSprites"};
+    private static final String[] POOL_NAMES = {"enemies", "bolts", "pickups", "shots", "hazards", "effects",
+        "meleeWaves", "orbiters", "fields", "glaives", "relics", "delayedStrikes", "chests"};
+    private static final String[] RENDER_COUNT_NAMES = {"floorDraws", "worldDraws", "hudDraws", "dynamicSpriteBatchTextureSelections", "visibleSprites", "dynamicSpriteBatchVertexUploads"};
     private static final int CAPACITY = 2048;
     private static final long REPORT_NS = 5_000_000_000L;
     private static final long BUDGET_NS = 16_700_000L, DOUBLE_BUDGET_NS = 33_400_000L;
@@ -79,10 +80,34 @@ public final class FrameMetrics {
         framePools[3] = shots; framePools[4] = hazards; framePools[5] = effects;
     }
 
+    /** Scan the fixed world pools once, including combat systems added after the original six pools. */
+    public void recordPoolCounts(ArenaWorld world) {
+        Arrays.fill(framePools, 0);
+        for (ArenaWorld.Enemy value : world.enemies) if (value.active) framePools[0]++;
+        for (ArenaWorld.Bolt value : world.bolts) if (value.active) framePools[1]++;
+        for (ArenaWorld.Pickup value : world.pickups) if (value.active) framePools[2]++;
+        for (ArenaWorld.Shot value : world.shots) if (value.active) framePools[3]++;
+        for (ArenaWorld.Hazard value : world.hazards) if (value.active) framePools[4]++;
+        for (ArenaWorld.Effect value : world.effects) if (value.active) framePools[5]++;
+        for (MeleeWave value : world.meleeWaves) if (value.active) framePools[6]++;
+        for (SkillExpansion.OrbitBlade value : world.skills.orbiters) if (value.active) framePools[7]++;
+        for (SkillExpansion.GroundField value : world.skills.fields) if (value.active) framePools[8]++;
+        for (SkillExpansion.Glaive value : world.skills.glaives) if (value.active) framePools[9]++;
+        for (SkillExpansion.WorldRelic value : world.skills.relics) if (value.active) framePools[10]++;
+        for (SkillExpansion.DelayedStrike value : world.skills.delayed) if (value.active) framePools[11]++;
+        for (ArenaWorld.Chest value : world.chests) if (value.active) framePools[12]++;
+    }
+
     /** Texture selections cover dynamic SpriteBatch switches only, excluding static mesh/other GL binds. */
     public void recordRenderCounts(int floorDraws, int worldDraws, int hudDraws, int textureSelections, int visibleSprites) {
         frameRenderCounts[0] = floorDraws; frameRenderCounts[1] = worldDraws; frameRenderCounts[2] = hudDraws;
         frameRenderCounts[3] = textureSelections; frameRenderCounts[4] = visibleSprites;
+    }
+
+    public void recordRenderCounts(int floorDraws, int worldDraws, int hudDraws, int textureSelections,
+                                   int visibleSprites, int vertexUploads) {
+        recordRenderCounts(floorDraws, worldDraws, hudDraws, textureSelections, visibleSprites);
+        frameRenderCounts[5] = vertexUploads;
     }
 
     /**

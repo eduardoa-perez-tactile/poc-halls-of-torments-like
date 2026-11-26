@@ -8,7 +8,40 @@ remain unchanged.
 
 The 24 November variants reuse all existing enemy frames and attacks. Original
 enemies retain their base stats. Ghoul/Brute also spawn as Moss or Frost;
-Wraith/Cultist also spawn as Ember or Dusk. The Hollow Sovereign stays Original.
+Wraith/Cultist also spawn as Ember or Dusk. All bosses stay Original.
+
+## Staged introductions
+
+The 26 November learning-curve correction replaces immediate, equally weighted
+variant availability in the twenty-minute run. Learn original species first;
+each alternate begins with a 5% per-species spawn share at its unlock time and
+ramps to 20% over ninety combat seconds. Independent buckets keep already
+introduced variants stable when the next one unlocks. Original enemies remain
+at least 60% of each species even after both alternates mature.
+
+| Combat time | Newly eligible variant |
+| --- | --- |
+| 0:00–4:00 | Original enemies only |
+| 4:00 | Moss Ghoul |
+| 6:00 | Frost Ghoul |
+| 8:00 | Ember Wraith |
+| 10:00 | Dusk Wraith |
+| 11:00 | Moss Brute |
+| 13:00 | Frost Brute |
+| 14:00 | Ember Cultist |
+| 16:00 | Dusk Cultist |
+
+These are eligibility times, not guaranteed appearances: the active authored
+pack must include that species, and safe placement/caps still apply. Elites use
+the same gates. Existing enemies keep their spawn identity and stats. Eligibility
+uses elapsed combat time, so choices, manual pause, background and disconnect
+cannot advance it. Selection uses a separate deterministic spawn hash with no
+extra combat RNG draws, resources or frame-loop allocations. Timelines shorter
+than twenty minutes retain their original immediate variant mix, and explicit
+art-review lineups can still request every identity at any time.
+
+The [encounter schedule](twenty-minute-encounters.md) also reduces opening
+density and makes early Wraiths a minority. Variant stat modifiers stay unchanged.
 
 | Variant | Health | Movement speed | Damage |
 | --- | ---: | ---: | ---: |
@@ -49,6 +82,15 @@ Cultist late target cue. Warning times, damage geometry and strike/recovery colo
 are preserved. Their extra outline quads reuse existing textures and batching.
 
 ## Checks
+
+The 26 November onboarding change passed 62 focused tests covering variant
+eligibility/distribution, real spawn initialization, frozen choice clocks,
+explicit art-review identities, timeline pressure, boss arrivals, discovered
+chests and late joining. JDK 21 desktop compilation and Android debug assembly
+passed. No device installation or gameplay playthrough was performed for this
+change; opening survival and first-upgrade pacing need user playtesting.
+
+Earlier art/material verification:
 
 JDK 21 desktop compilation, Android debug assembly and 39 focused tests passed.
 Tests cover spawn composition, actual movement/damage, caster reuse, enemy pool
