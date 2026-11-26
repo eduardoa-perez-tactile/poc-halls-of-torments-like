@@ -40,6 +40,7 @@ public final class ArenaRenderer implements Disposable {
     private final EnemyGroundVfx enemyGroundVfx;
     private final LootChestVfx chestVfx;
     private final SkillExpansionArt skillArt;
+    private final CombatContactArt contactArt;
     private final DamageNumberArt damageNumberArt;
     private final ArenaAmbience ambience;
     private final SpriteBatch batch;
@@ -93,6 +94,7 @@ public final class ArenaRenderer implements Disposable {
         enemyGroundVfx = new EnemyGroundVfx(art.pixel, art.glow);
         chestVfx = new LootChestVfx(art.pixel, art.glow);
         skillArt = new SkillExpansionArt(buildIcons, art.pixel, art.glow, art.shadow, art.spriteEffects);
+        contactArt = new CombatContactArt(art.glow, art.pixel, art.spriteEffects);
         damageNumberArt = new DamageNumberArt(uiArt.body);
         floorLayout = new ArenaFloorLayout(new JsonReader().parse(Gdx.files.internal("arena/crypt-floor.json")));
         float radius = floorLayout.medallionDiameter * .5f;
@@ -651,8 +653,14 @@ public final class ArenaRenderer implements Disposable {
             float sourceScale = art.actor(ActorAnimation.Actor.RANGER).pixelScale;
             float x = screenX(bolt.x, bolt.y) + BOLT_ORIGIN[origin] * sourceScale;
             float y = screenY(bolt.x, bolt.y) + BOLT_ORIGIN[origin + 1] * sourceScale;
-            drawMagicProjectile(camera, MagicProjectileArt.Type.RANGER, bolt.age,
-                x, y, bolt.vx, bolt.vy, bolt.critical ? 1.4f : 1.2f);
+            float scale = bolt.critical ? 1.4f : 1.2f;
+            if (!visibleProjected(camera, x, y, art.projectiles.maxRadius(MagicProjectileArt.Type.RANGER) * scale + 24f)) continue;
+            float planeAngle = MathUtils.atan2(bolt.vy, bolt.vx) + MathUtils.PI * .25f;
+            float emergence = ProjectilePresentation.spawnScale(bolt.age);
+            batch.setColor(Color.WHITE);
+            // The original painted taper is the short trail; there are no broad star-head ghost copies.
+            art.projectiles.drawRanger(batch, bolt.age, x, y, scale * emergence, planeAngle);
+            contactArt.boltHead(batch, x, y, emergence, bolt.critical);
         }
         batch.setColor(Color.WHITE);
     }
@@ -927,11 +935,14 @@ public final class ArenaRenderer implements Disposable {
                             - 25f * MathUtils.degreesToRadians;
                         batch.setColor(Color.WHITE);
                         art.vfx.drawProjected(batch, VfxArt.Animation.SWORD_HIT, effect.maxTtl - effect.ttl,
-                            impactX, impactY, .62f * (effect.critical ? 1.22f : 1f), rotation);
+                            impactX, impactY, .93f * (effect.critical ? 1.22f : 1f), rotation);
+                        contactArt.swordImpact(batch, impactX, impactY, effectProgress(effect), rotation, effect.critical);
                         if (effect.critical) {
                             batch.setColor(1f, .92f, .65f, .8f);
                             bodySprite(SpriteEffectArt.Type.CONTACT, effectProgress(effect), impactX, impactY, .13f, 0);
                         }
+                    } else if (!effect.heroHit && effect.impactKind == ArenaWorld.ImpactKind.BOLT) {
+                        contactArt.boltImpact(batch, impactX, impactY, effectProgress(effect), effect.critical);
                     } else {
                         if (effect.heroHit) batch.setColor(1f, .35f, .22f, 1f);
                         else if (effect.critical) batch.setColor(1f, .95f, .78f, 1f);
@@ -1292,17 +1303,8 @@ public final class ArenaRenderer implements Disposable {
         float scale = art.actor(ActorAnimation.Actor.RANGER).pixelScale;
         float x = screenX(player.x, player.y) + BOLT_ORIGIN[origin] * scale;
         float y = screenY(player.x, player.y) + BOLT_ORIGIN[origin + 1] * scale;
-        float life = 1f - player.attackAge / .1f;
-        float emergence = ProjectilePresentation.spawnScale(player.attackAge);
-        float dx = screenX(player.attackFacingX, player.attackFacingY), dy = screenY(player.attackFacingX, player.attackFacingY);
-        float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
-        batch.setColor(.48f, .88f, 1f, life * .65f);
-        float glowRadius = 18f * emergence;
-        batch.draw(art.glow, x - glowRadius, y - glowRadius, glowRadius * 2, glowRadius * 2);
-        batch.setColor(1f, 1f, 1f, life * .85f);
-        art.projectiles.draw(batch, MagicProjectileArt.Type.RANGER, player.attackAge, x, y,
-            (.6f + life * .25f) * emergence, angle);
-        batch.setColor(Color.WHITE);
+        float planeAngle = MathUtils.atan2(player.attackFacingY, player.attackFacingX) + MathUtils.PI * .25f;
+        contactArt.release(batch, x, y, player.attackAge, planeAngle);
     }
 
     private static boolean visibleActor(OrthographicCamera camera, float x, float y,
